@@ -26,11 +26,11 @@ from typing import Any, Dict, List
 # and its schema is `CondensedSchema`.
 #
 # The "summary" schema is a dict from "fuchsia.library/Protocol.Message" to a dict with
-# keys: "incoming", "outgoing", "intra"; values: int number of calls.
+# keys: "incoming", "outgoing", "intra"; values: int number of calls, and "unstable": bool.
 #
 # The "flat" schema is an array of dicts with keys "incoming", "outgoing", "intra" (int),
-# and "message" with value "fuchsia.library/Protocol.Message". Same information as
-# "summary" but it's all in the values, which is easier for SQL to unpack.
+# "message" with value "fuchsia.library/Protocol.Message", and "unstable": bool. Same
+# information as "summary" but it's all in the values, which is easier for SQL to unpack.
 
 
 @dataclass(frozen=True)
@@ -51,6 +51,7 @@ class CondensedCall:
 class CondensedMessage:
     name: str
     ordinal: str
+    unstable: bool
     calls: List[CondensedCall]
 
 
@@ -71,11 +72,13 @@ class ExpandedCall:
 class ExpandedMessage:
     name: str
     ordinal: str
+    unstable: bool
     calls: List[ExpandedCall]
 
 
 @dataclass
 class CallsSummary:
+    unstable: bool
     incoming: int
     outgoing: int
     intra: int
@@ -84,6 +87,7 @@ class CallsSummary:
 @dataclass
 class CallsFlat:
     message: str
+    unstable: bool
     incoming: int
     outgoing: int
     intra: int
@@ -133,9 +137,10 @@ def cleanup_endpoint(endpoint: Dict[str, Any]) -> Dict[str, Any]:
 # map, in which case `name` is the same as `ordinal`. Accumulates both "expanded" and "condensed"
 # versions of the call info for its message, and can supply output-schema classes for either.
 class Message:
-    def __init__(self, name: str, ordinal: str) -> None:
+    def __init__(self, name: str, ordinal: str, unstable: bool) -> None:
         self.name = name
         self.ordinal = ordinal
+        self.unstable = unstable
         self.condensed_calls: List[CondensedCall] = []
         self.expanded_calls: List[ExpandedCall] = []
 
@@ -160,29 +165,40 @@ class Message:
                 )
             )
 
-    def call_counts(self) -> Dict[str, Any]:
-        counts: Dict[str, Any] = {"incoming": 0, "outgoing": 0, "intra": 0}
+    def call_data(self) -> Dict[str, Any]:
+        data: Dict[str, Any] = {
+            "incoming": 0,
+            "outgoing": 0,
+            "intra": 0,
+            "unstable": self.unstable,
+        }
         for call in self.condensed_calls:
-            counts[call.direction] += 1
-        return counts
+            data[call.direction] += 1
+        return data
 
     def summary(self) -> CallsSummary:
-        counts = self.call_counts()
-        return CallsSummary(**counts)
+        data = self.call_data()
+        return CallsSummary(**data)
 
     def flat(self) -> CallsFlat:
-        data: Dict[str, Any] = self.call_counts()
+        data: Dict[str, Any] = self.call_data()
         data["message"] = self.name
         return CallsFlat(**data)
 
     def condensed_version(self) -> CondensedMessage:
         return CondensedMessage(
-            name=self.name, ordinal=self.ordinal, calls=self.condensed_calls
+            name=self.name,
+            ordinal=self.ordinal,
+            unstable=self.unstable,
+            calls=self.condensed_calls,
         )
 
     def expanded_version(self) -> ExpandedMessage:
         return ExpandedMessage(
-            name=self.name, ordinal=self.ordinal, calls=self.expanded_calls
+            name=self.name,
+            ordinal=self.ordinal,
+            unstable=self.unstable,
+            calls=self.expanded_calls,
         )
 
 
@@ -212,7 +228,9 @@ class Messages:
         for entry in self.raw_methods:
             for method in entry["methods"]:
                 message = Message(
-                    name=method["name"], ordinal=method["ordinal"]
+                    name=method["name"],
+                    ordinal=method["ordinal"],
+                    unstable=method.get("unstable", False),
                 )
                 self.name_lookup[method["name"]] = message
                 self.ordinal_lookup[method["ordinal"]] = message
@@ -232,7 +250,7 @@ class Messages:
                 else:
                     if message not in self.name_lookup:
                         self.name_lookup[message] = Message(
-                            name=message, ordinal=message
+                            name=message, ordinal=message, unstable=False
                         )
                     self.name_lookup[message].add_calls(
                         calls=call_list, test_path=path, direction=direction
