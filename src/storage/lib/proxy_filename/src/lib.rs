@@ -109,7 +109,8 @@ mod tests {
         let encoded: String = a.into();
         let b: ProxyFilename = encoded.as_str().try_into().unwrap();
         assert_eq!(a, b);
-        assert_eq!(encoded.len(), (((8 + 149) * 4) + 2) / 3);
+        // Account for base64 bloat (Length growth by 4/3rd, rounded up)
+        assert_eq!(encoded.len(), ((8 + 149) * 4usize).div_ceil(3));
 
         // 150 length filename -- now has sha256 suffix.
         // Note the filename is all zeros. This should not affect the output.

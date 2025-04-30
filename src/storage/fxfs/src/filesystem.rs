@@ -8,7 +8,7 @@ use crate::log::*;
 use crate::object_store::allocator::{Allocator, Hold, Reservation};
 use crate::object_store::directory::Directory;
 use crate::object_store::graveyard::Graveyard;
-use crate::object_store::journal::super_block::SuperBlockHeader;
+use crate::object_store::journal::super_block::{SuperBlockHeader, SuperBlockInstance};
 use crate::object_store::journal::{self, Journal, JournalCheckpoint, JournalOptions};
 use crate::object_store::object_manager::ObjectManager;
 use crate::object_store::transaction::{
@@ -93,8 +93,9 @@ pub struct Options {
     // Default values are (5 minutes, 24 hours).
     pub trim_config: Option<(std::time::Duration, std::time::Duration)>,
 
-    // If true, journal will not be used for writes.
-    pub image_builder_mode: bool,
+    // If set, journal will not be used for writes. The user must call 'finalize' when finished.
+    // The provided superblock instance will be written upon finalize().
+    pub image_builder_mode: Option<SuperBlockInstance>,
 }
 
 impl Default for Options {
@@ -106,7 +107,7 @@ impl Default for Options {
             post_commit_hook: None,
             skip_initial_reap: false,
             trim_config: Some((TRIM_AFTER_BOOT_TIMER, TRIM_INTERVAL_TIMER)),
-            image_builder_mode: false,
+            image_builder_mode: None,
         }
     }
 }
@@ -193,19 +194,15 @@ impl OpenFxFilesystem {
     }
 
     /// Used to finalize a filesystem image when in image_builder_mode.
-    /// Returns the actual number of bytes used to store data, which may be useful in truncating
-    /// the image size down.
-    pub async fn finalize(self) -> Result<(DeviceHolder, u64), Error> {
+    pub async fn finalize(&self) -> Result<(), Error> {
         ensure!(
-            self.journal().image_builder_mode(),
+            self.journal().image_builder_mode().is_some(),
             "finalize() only valid in image_builder_mode."
         );
         self.journal().allocate_journal().await?;
-        self.journal().set_image_builder_mode(false);
+        self.journal().set_image_builder_mode(None);
         self.journal().compact().await?;
-        let actual_size = self.allocator().maximum_offset();
-        self.close().await?;
-        Ok((self.take_device().await, actual_size))
+        Ok(())
     }
 }
 
@@ -217,7 +214,9 @@ impl From<Arc<FxFilesystem>> for OpenFxFilesystem {
 
 impl Drop for OpenFxFilesystem {
     fn drop(&mut self) {
-        if self.options.image_builder_mode && self.journal().image_builder_mode() {
+        if self.options.image_builder_mode.is_some()
+            && self.journal().image_builder_mode().is_some()
+        {
             error!("OpenFxFilesystem in image_builder_mode dropped without calling finalize().");
         }
         if !self.options.read_only && !self.closed.load(Ordering::SeqCst) {
@@ -280,9 +279,10 @@ impl FxFilesystemBuilder {
     ///
     /// This mode avoids the initial write of super blocks and skips the journal for all
     /// transactions. The user *must* call `finalize()` before closing the filesystem to trigger
-    /// a compaction of in-memory data structures, a minimal journal and a write to SuperBlock A.
-    pub fn image_builder_mode(mut self, enabled: bool) -> Self {
-        self.options.image_builder_mode = enabled;
+    /// a compaction of in-memory data structures, a minimal journal and a write to one
+    /// superblock (as specified).
+    pub fn image_builder_mode(mut self, mode: Option<SuperBlockInstance>) -> Self {
+        self.options.image_builder_mode = mode;
         self
     }
 
@@ -407,14 +407,12 @@ impl FxFilesystemBuilder {
             transaction_limit_event: Event::new(),
         });
 
-        if image_builder_mode {
-            filesystem.journal().set_image_builder_mode(true);
-        }
+        filesystem.journal().set_image_builder_mode(image_builder_mode);
 
         filesystem.journal.set_trace(self.trace);
         if self.format {
             filesystem.journal.init_empty(filesystem.clone()).await?;
-            if !image_builder_mode {
+            if image_builder_mode.is_none() {
                 // The filesystem isn't valid until superblocks are written but we want to defer
                 // that until last when migrating filesystems or building system images.
                 filesystem.journal.init_superblocks().await?;
@@ -472,7 +470,7 @@ impl FxFilesystemBuilder {
 
         filesystem.closed.store(false, Ordering::SeqCst);
 
-        if !read_only && !image_builder_mode {
+        if !read_only && image_builder_mode.is_none() {
             // Start the background tasks.
             filesystem.graveyard.clone().reap_async();
 
@@ -651,7 +649,7 @@ impl FxFilesystem {
         debug_assert_not_too_long!(self.lock_manager.commit_prepare(&transaction));
         self.maybe_start_flush_task();
         let _guard = debug_assert_not_too_long!(self.commit_mutex.lock());
-        let journal_offset = if self.journal().image_builder_mode() {
+        let journal_offset = if self.journal().image_builder_mode().is_some() {
             let journal_checkpoint =
                 JournalCheckpoint { file_offset: 0, checksum: 0, version: LATEST_VERSION };
             let maybe_mutation = self
@@ -787,7 +785,7 @@ impl FxFilesystem {
         self: &Arc<Self>,
         options: transaction::Options<'a>,
     ) -> Result<(MetadataReservation, Option<&'a Reservation>, Option<Hold<'a>>), Error> {
-        if self.options.image_builder_mode {
+        if self.options.image_builder_mode.is_some() {
             // Image builder mode avoids the journal so reservation tracking for metadata overheads
             // doesn't make sense and so we essentially have 'all or nothing' semantics instead.
             return Ok((MetadataReservation::Borrowed, None, None));
@@ -967,6 +965,7 @@ mod tests {
         ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID,
     };
     use crate::object_store::directory::{replace_child, Directory};
+    use crate::object_store::journal::super_block::SuperBlockInstance;
     use crate::object_store::journal::JournalOptions;
     use crate::object_store::transaction::{lock_keys, LockKey, Options};
     use crate::object_store::volume::root_volume;
@@ -1508,7 +1507,7 @@ mod tests {
         device.reopen(true);
         let fs = FxFilesystemBuilder::new()
             .format(true)
-            .image_builder_mode(true)
+            .image_builder_mode(Some(SuperBlockInstance::A))
             .open(device)
             .await
             .expect("open failed");
@@ -1536,7 +1535,7 @@ mod tests {
         let device = {
             let fs = FxFilesystemBuilder::new()
                 .format(true)
-                .image_builder_mode(true)
+                .image_builder_mode(Some(SuperBlockInstance::B))
                 .open(device)
                 .await
                 .expect("open failed");
@@ -1569,8 +1568,9 @@ mod tests {
                 }
             }
             fs.device().reopen(false);
-            let (device, _size) = fs.finalize().await.expect("finalize");
-            device
+            fs.finalize().await.expect("finalize");
+            fs.close().await.expect("close");
+            fs.take_device().await
         };
         device.reopen(false);
         let fs = FxFilesystem::open(device).await.expect("open failed");

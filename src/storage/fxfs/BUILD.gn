@@ -157,6 +157,17 @@ rustc_library("lib") {
   test_deps = fxfs_test_deps
 }
 
+# This target includes additional hooks that are useful when
+# migrating file formats, but that shouldn't otherwise generally be exposed.
+rustc_library("migration") {
+  edition = "2021"
+  name = "fxfs"
+  features = [ "migration" ]
+
+  deps = fxfs_deps
+  sources = fxfs_sources
+}
+
 fuchsia_unittest_component("fxfs-test") {
   deps = [ ":lib_test" ]
 }

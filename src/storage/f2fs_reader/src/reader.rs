@@ -12,7 +12,7 @@ use crate::superblock::{
 };
 use anyhow::{anyhow, bail, ensure, Error};
 use async_trait::async_trait;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use storage_device::buffer::Buffer;
 use storage_device::Device;
@@ -348,6 +348,7 @@ mod test {
     use super::*;
     use crate::dir::FileType;
     use crate::xattr;
+    use std::collections::HashSet;
     use std::path::PathBuf;
     use std::sync::Arc;
 

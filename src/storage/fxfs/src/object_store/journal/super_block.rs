@@ -372,8 +372,8 @@ pub fn compact_root_parent(
 
 /// This encapsulates the A/B alternating super-block logic.
 /// All super-block load/save operations should be via the methods on this type.
-pub struct SuperBlockManager {
-    next_instance: Arc<Mutex<SuperBlockInstance>>,
+pub(super) struct SuperBlockManager {
+    pub next_instance: Arc<Mutex<SuperBlockInstance>>,
     metrics: SuperBlockMetrics,
 }
 

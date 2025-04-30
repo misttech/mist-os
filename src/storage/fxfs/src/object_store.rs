@@ -240,15 +240,15 @@ pub struct HandleOptions {
 }
 
 /// Parameters for encrypting a newly created object.
-struct ObjectEncryptionOptions {
+pub struct ObjectEncryptionOptions {
     /// If set, the keys are treated as permanent and never evicted from the KeyManager cache.
     /// This is necessary when keys are managed by another store; for example, the layer files
     /// of a child store are objects in the root store, but they are encrypted with keys from the
     /// child store.  Generally, most objects should have this set to `false`.
-    permanent: bool,
-    key_id: u64,
-    key: WrappedKey,
-    unwrapped_key: UnwrappedKey,
+    pub permanent: bool,
+    pub key_id: u64,
+    pub key: WrappedKey,
+    pub unwrapped_key: UnwrappedKey,
 }
 
 pub struct NewChildStoreOptions {
@@ -672,7 +672,7 @@ impl ObjectStore {
             buf
         };
 
-        if self.filesystem().options().image_builder_mode {
+        if self.filesystem().options().image_builder_mode.is_some() {
             // If we're in image builder mode, we want to avoid writing to disk unless explicitly
             // asked to. New object stores will have their StoreInfo written when we compact in
             // FxFilesystem::finalize().
@@ -856,6 +856,37 @@ impl ObjectStore {
         }
     }
 
+    #[cfg(feature = "migration")]
+    pub fn last_object_id(&self) -> u64 {
+        self.last_object_id.lock().id
+    }
+
+    /// Bumps the unencrypted last object ID if `object_id` is greater than
+    /// the current maximum.
+    #[cfg(feature = "migration")]
+    pub fn maybe_bump_last_object_id(&self, object_id: u64) -> Result<(), Error> {
+        let mut last_object_id = self.last_object_id.lock();
+        if object_id > last_object_id.id {
+            ensure!(
+                object_id < (u32::MAX as u64) && last_object_id.cipher.is_none(),
+                "LastObjectId bump only valid for unencrypted inodes"
+            );
+            last_object_id.id = object_id;
+        }
+        Ok(())
+    }
+
+    /// Provides access to the allocator to mark a specific region of the device as allocated.
+    #[cfg(feature = "migration")]
+    pub async fn mark_allocated(
+        &self,
+        transaction: &mut Transaction<'_>,
+        store_object_id: u64,
+        device_range: std::ops::Range<u64>,
+    ) -> Result<(), Error> {
+        self.allocator().mark_allocated(transaction, store_object_id, device_range).await
+    }
+
     /// `crypt` can be provided if the crypt service should be different to the default; see the
     /// comment on create_object.  Users should avoid having more than one handle open for the same
     /// object at the same time because they might get out-of-sync; there is no code that will
@@ -985,7 +1016,7 @@ impl ObjectStore {
         Ok(data_object_handle)
     }
 
-    async fn create_object_with_id<S: HandleOwner>(
+    pub async fn create_object_with_id<S: HandleOwner>(
         owner: &Arc<S>,
         transaction: &mut Transaction<'_>,
         object_id: u64,
@@ -1110,10 +1141,10 @@ impl ObjectStore {
     pub async fn adjust_refs(
         &self,
         transaction: &mut Transaction<'_>,
-        oid: u64,
+        object_id: u64,
         delta: i64,
     ) -> Result<bool, Error> {
-        let mut mutation = self.txn_get_object_mutation(transaction, oid).await?;
+        let mut mutation = self.txn_get_object_mutation(transaction, object_id).await?;
         let refs = if let ObjectValue::Object {
             kind: ObjectKind::File { refs, .. } | ObjectKind::Symlink { refs, .. },
             ..
@@ -1126,7 +1157,7 @@ impl ObjectStore {
             bail!(FxfsError::NotFile);
         };
         if *refs == 0 {
-            self.add_to_graveyard(transaction, oid);
+            self.add_to_graveyard(transaction, object_id);
 
             // We might still need to adjust the reference count if delta was something other than
             // -1.
@@ -1974,6 +2005,17 @@ impl ObjectStore {
                 op: Operation::ReplaceOrInsert,
             })
         }
+    }
+
+    /// Like txn_get_object_mutation but with expanded visibility.
+    /// Only available in migration code.
+    #[cfg(feature = "migration")]
+    pub async fn get_object_mutation(
+        &self,
+        transaction: &Transaction<'_>,
+        object_id: u64,
+    ) -> Result<ObjectStoreMutation, Error> {
+        self.txn_get_object_mutation(transaction, object_id).await
     }
 
     fn update_last_object_id(&self, mut object_id: u64) {

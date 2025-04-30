@@ -70,7 +70,8 @@ pub fn decode_xattr(raw_data: &[u8]) -> Result<Vec<XattrEntry>, Error> {
         let (entry, remainder): (Ref<_, RawXattrEntry>, _) = Ref::from_prefix(rest).unwrap();
         rest = remainder;
         if entry.name_index > 0 {
-            let index = Index::n(entry.name_index).ok_or(anyhow!("Unexpected xattr index"))?;
+            let index =
+                Index::n(entry.name_index).ok_or_else(|| anyhow!("Unexpected xattr index"))?;
             ensure!(
                 (entry.name_len as usize + entry.value_size as usize) <= rest.len(),
                 "invalid name_len/value_size in xattr"

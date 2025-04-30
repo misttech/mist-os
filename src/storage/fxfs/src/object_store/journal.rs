@@ -289,7 +289,7 @@ struct Inner {
     // amount is written to the journal.
     reclaim_size: u64,
 
-    image_builder_mode: bool,
+    image_builder_mode: Option<SuperBlockInstance>,
 }
 
 impl Inner {
@@ -419,7 +419,7 @@ impl Journal {
                 valid_to: 0,
                 discard_offset: None,
                 reclaim_size: options.reclaim_size,
-                image_builder_mode: false,
+                image_builder_mode: None,
             }),
             writer_mutex: Mutex::new(()),
             sync_mutex: futures::lock::Mutex::new(()),
@@ -435,11 +435,14 @@ impl Journal {
         }
     }
 
-    pub fn set_image_builder_mode(&self, enabled: bool) {
-        self.inner.lock().image_builder_mode = enabled;
+    pub fn set_image_builder_mode(&self, mode: Option<SuperBlockInstance>) {
+        self.inner.lock().image_builder_mode = mode;
+        if let Some(instance) = mode {
+            *self.super_block_manager.next_instance.lock() = instance;
+        }
     }
 
-    pub fn image_builder_mode(&self) -> bool {
+    pub fn image_builder_mode(&self) -> Option<SuperBlockInstance> {
         self.inner.lock().image_builder_mode
     }
 
@@ -1163,7 +1166,7 @@ impl Journal {
         )
         .await
         .context("create journal")?;
-        if !self.inner.lock().image_builder_mode {
+        if self.inner.lock().image_builder_mode.is_none() {
             let mut file_range = 0..self.chunk_size();
             journal_handle
                 .preallocate_range(&mut transaction, &mut file_range)
@@ -1551,7 +1554,7 @@ impl Journal {
                 {
                     break Ok(());
                 }
-                if inner.image_builder_mode {
+                if inner.image_builder_mode.is_some() {
                     break Ok(());
                 }
                 if inner.disable_compactions {
@@ -1653,7 +1656,7 @@ impl Journal {
                 if compact_fut.is_none()
                     && !inner.terminate
                     && !inner.disable_compactions
-                    && !inner.image_builder_mode
+                    && inner.image_builder_mode.is_none()
                     && self.objects.last_end_offset()
                         - inner.super_block_header.journal_checkpoint.file_offset
                         > inner.reclaim_size / 2
