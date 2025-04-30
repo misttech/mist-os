@@ -109,36 +109,6 @@ kernel_package("code-patches-test") {
   ]
 }
 
-zbi_test("zbi-self-code-patching-test") {
-  args = []
-  deps = [
-    ":code-patches-test",
-    ":zbi-self-code-patching-test.executable",
-  ]
-}
-
-physload_binary_test("elf-code-patching-test") {
-  visibility = [ ":*" ]
-
-  has_patches = false
-
-  sources = [ "elf-code-patching-test.cc" ]
-  deps = [
-    ":test-api",
-    "//src/lib/zbitl",
-    "//zircon/kernel/lib/ktl",
-    "//zircon/kernel/lib/libc",
-    "//zircon/kernel/phys:elf-image",
-    "//zircon/kernel/phys:kernel-package",
-    "//zircon/kernel/phys:symbolize",
-  ]
-
-  data_deps = [
-    ":elf-code-patching-test-add-one",
-    ":elf-code-patching-test-multiply",
-  ]
-}
-
 # This tags a test module with the PT_INTERP matching the test's build ID.
 kernel_elf_interp("elf-code-patching-test.interp") {
   visibility = [ ":*" ]
@@ -172,6 +142,36 @@ kernel_elf_binary("elf-code-patching-test-multiply") {
   deps = [
     ":elf-code-patching-test.interp",
     ":multiply_by_factor",
+  ]
+}
+
+physload_binary_test("elf-code-patching-test") {
+  visibility = [ ":*" ]
+
+  has_patches = false
+
+  sources = [ "elf-code-patching-test.cc" ]
+  deps = [
+    ":test-api",
+    "//src/lib/zbitl",
+    "//zircon/kernel/lib/ktl",
+    "//zircon/kernel/lib/libc",
+    "//zircon/kernel/phys:elf-image",
+    "//zircon/kernel/phys:kernel-package",
+    "//zircon/kernel/phys:symbolize",
+  ]
+
+  data_deps = [
+    ":elf-code-patching-test-add-one($phys_toolchain)",
+    ":elf-code-patching-test-multiply($phys_toolchain)",
+  ]
+}
+
+zbi_test("zbi-self-code-patching-test") {
+  args = []
+  deps = [
+    ":code-patches-test($phys_toolchain)",
+    ":zbi-self-code-patching-test.executable($phys_toolchain)",
   ]
 }
 

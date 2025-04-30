@@ -39,17 +39,21 @@ if (is_phys_toolchain) {
       "//zircon/system/ulib/uart",
     ]
   }
+}
 
-  zbi_test("uart-input-test-zbi") {
-    # TODO(https://fxbug.dev/42066527): This ZBI is not actually a ZBI test, but relies
-    # on the specification just for the `images` metadata implicitly set by
-    # `zbi_test()` and not `zbi()`. Investigate whether we can have `zbi()`
-    # targets set this metadata and update this target accordingly - and
-    # disable the ZBI from being booted as a ZBI test for now.
-    disabled = true
-    deps = [ ":uart-input-test" ]
-  }
+# In order for the assembly and product bundle to be generated, this must be instantiated
+# in the default_toolchain.
+zbi_test("uart-input-test-zbi") {
+  # TODO(https://fxbug.dev/42066527): This ZBI is not actually a ZBI test, but relies
+  # on the specification just for the `images` metadata implicitly set by
+  # `zbi_test()` and not `zbi()`. Investigate whether we can have `zbi()`
+  # targets set this metadata and update this target accordingly - and
+  # disable the ZBI from being booted as a ZBI test for now.
+  disabled = true
+  deps = [ ":uart-input-test($phys_toolchain)" ]
+}
 
+if (is_phys_toolchain) {
   zbi_outputs = get_target_outputs(":uart-input-test-zbi.zbi")
   assert(zbi_outputs + [ uart_input_zbi ] - [ uart_input_zbi ] != zbi_outputs)
 }

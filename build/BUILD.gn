@@ -361,6 +361,9 @@ group("non_hermetic_deps") {
     "//examples/drivers/template:*",
     "//examples/drivers/transport/driver/v2:*",
   ]
+
+  # product config for boot_tests.
+  visibility += [ "//build/testing/boot_tests:product_config" ]
 }
 
 # Build targets that use the legacy zx_library and zx_host_tool templates

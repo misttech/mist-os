@@ -44,7 +44,8 @@ def main() -> None:
     [kernel_path] = [
         image["path"]
         for image in kernel_metadata
-        if image["name"] == args.kernel_image_name and image["type"] == "zbi"
+        if image["name"] == args.kernel_image_name.removesuffix(".zbi")
+        and image["type"] == "zbi"
     ]
     kernel = KernelInfo()
     kernel.path = kernel_path
