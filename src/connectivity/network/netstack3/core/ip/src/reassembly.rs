@@ -887,9 +887,9 @@ mod tests {
     };
     use netstack3_base::{CtxPair, IntoCoreTimerCtx};
     use packet::{Buf, ParsablePacket, ParseBuffer, Serializer};
-    use packet_formats::ip::{FragmentOffset, IpProto, Ipv6ExtHdrType};
+    use packet_formats::ip::{FragmentOffset, IpProto};
     use packet_formats::ipv4::Ipv4PacketBuilder;
-    use packet_formats::ipv6::Ipv6PacketBuilder;
+    use packet_formats::ipv6::{Ipv6PacketBuilder, Ipv6PacketBuilderWithFragmentHeader};
     use test_case::test_case;
 
     use super::*;
@@ -1084,28 +1084,21 @@ mod tests {
         FragmentSpec { id, offset, size, m_flag }: FragmentSpec,
         expected_result: ExpectedResult,
     ) {
-        let mut bytes = vec![0; 48];
-        bytes[..4].copy_from_slice(&[0x60, 0x20, 0x00, 0x77][..]);
-        bytes[6] = Ipv6ExtHdrType::Fragment.into(); // Next Header
-        bytes[7] = 64;
-        bytes[8..24].copy_from_slice(TEST_ADDRS_V6.remote_ip.bytes());
-        bytes[24..40].copy_from_slice(TEST_ADDRS_V6.local_ip.bytes());
-        bytes[40] = IpProto::Tcp.into();
-        bytes[42] = (offset >> 5) as u8;
-        bytes[43] = ((offset & 0x1F) << 3) as u8 | if m_flag { 1 } else { 0 };
-        bytes[44..48].copy_from_slice(&(id as u32).to_be_bytes());
-        bytes.extend(
-            generate_body_fragment(
-                id,
-                offset,
-                usize::from(size) * usize::from(FRAGMENT_BLOCK_SIZE),
-            )
-            .iter(),
+        let builder = Ipv6PacketBuilderWithFragmentHeader::new(
+            get_ipv6_builder(),
+            FragmentOffset::new(offset).unwrap(),
+            m_flag,
+            id.into(),
         );
-        let payload_len = (bytes.len() - Ipv6::HEADER_LENGTH) as u16;
-        bytes[4..6].copy_from_slice(&payload_len.to_be_bytes());
-        let mut buf = Buf::new(bytes, ..);
-        let packet = buf.parse::<Ipv6Packet<_>>().unwrap();
+
+        let body = generate_body_fragment(
+            id,
+            offset,
+            usize::from(size) * usize::from(FRAGMENT_BLOCK_SIZE),
+        );
+
+        let mut buffer = Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap();
+        let packet = buffer.parse::<Ipv6Packet<_>>().unwrap();
 
         match expected_result {
             ExpectedResult::Ready { body_fragment_blocks } => {
@@ -1696,21 +1689,17 @@ mod tests {
 
         // Process fragment #1 (body size is not a multiple of
         // `FRAGMENT_BLOCK_SIZE` and more flag is `true`).
-        let mut bytes = vec![0; 48];
-        bytes[..4].copy_from_slice(&[0x60, 0x20, 0x00, 0x77][..]);
-        bytes[6] = Ipv6ExtHdrType::Fragment.into(); // Next Header
-        bytes[7] = 64;
-        bytes[8..24].copy_from_slice(TEST_ADDRS_V6.remote_ip.bytes());
-        bytes[24..40].copy_from_slice(TEST_ADDRS_V6.local_ip.bytes());
-        bytes[40] = IpProto::Tcp.into();
-        bytes[42] = 0;
-        bytes[43] = (1 << 3) | 1;
-        bytes[44..48].copy_from_slice(&u32::try_from(id).unwrap().to_be_bytes());
-        bytes.extend(FRAGMENT_BLOCK_SIZE..FRAGMENT_BLOCK_SIZE * 2 - 1);
-        let payload_len = (bytes.len() - 40) as u16;
-        bytes[4..6].copy_from_slice(&payload_len.to_be_bytes());
-        let mut buf = Buf::new(bytes, ..);
-        let packet = buf.parse::<Ipv6Packet<_>>().unwrap();
+        let offset = 1;
+        let body_size: usize = (FRAGMENT_BLOCK_SIZE - 1).into();
+        let builder = Ipv6PacketBuilderWithFragmentHeader::new(
+            get_ipv6_builder(),
+            FragmentOffset::new(offset).unwrap(),
+            true,
+            id.into(),
+        );
+        let body = generate_body_fragment(id, offset, body_size);
+        let mut buffer = Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap();
+        let packet = buffer.parse::<Ipv6Packet<_>>().unwrap();
         assert_matches!(
             FragmentHandler::process_fragment::<&[u8]>(&mut core_ctx, &mut bindings_ctx, packet),
             FragmentProcessingState::InvalidFragment
@@ -1719,21 +1708,15 @@ mod tests {
         // Process fragment #1 (body size is not a multiple of
         // `FRAGMENT_BLOCK_SIZE` but more flag is `false`). The last fragment is
         // allowed to not be a multiple of `FRAGMENT_BLOCK_SIZE`.
-        let mut bytes = vec![0; 48];
-        bytes[..4].copy_from_slice(&[0x60, 0x20, 0x00, 0x77][..]);
-        bytes[6] = Ipv6ExtHdrType::Fragment.into(); // Next Header
-        bytes[7] = 64;
-        bytes[8..24].copy_from_slice(TEST_ADDRS_V6.remote_ip.bytes());
-        bytes[24..40].copy_from_slice(TEST_ADDRS_V6.local_ip.bytes());
-        bytes[40] = IpProto::Tcp.into();
-        bytes[42] = 0;
-        bytes[43] = 1 << 3;
-        bytes[44..48].copy_from_slice(&u32::try_from(id).unwrap().to_be_bytes());
-        bytes.extend(FRAGMENT_BLOCK_SIZE..FRAGMENT_BLOCK_SIZE * 2 - 1);
-        let payload_len = (bytes.len() - 40) as u16;
-        bytes[4..6].copy_from_slice(&payload_len.to_be_bytes());
-        let mut buf = Buf::new(bytes, ..);
-        let packet = buf.parse::<Ipv6Packet<_>>().unwrap();
+        let builder = Ipv6PacketBuilderWithFragmentHeader::new(
+            get_ipv6_builder(),
+            FragmentOffset::new(offset).unwrap(),
+            false,
+            id.into(),
+        );
+        let body = generate_body_fragment(id, offset, body_size);
+        let mut buffer = Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap();
+        let packet = buffer.parse::<Ipv6Packet<_>>().unwrap();
         let (key, packet_len) = assert_frag_proc_state_ready!(
             FragmentHandler::process_fragment::<&[u8]>(&mut core_ctx, &mut bindings_ctx, packet),
             TEST_ADDRS_V6.remote_ip.get(),
