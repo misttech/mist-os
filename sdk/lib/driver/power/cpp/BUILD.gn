@@ -51,6 +51,7 @@ test("power-test") {
   sources = [
     "element-description-builder-tests.cc",
     "power-support-tests.cc",
+    "testing-common.h",
     "types-test.cc",
     "wake-lease-test.cc",
   ]
