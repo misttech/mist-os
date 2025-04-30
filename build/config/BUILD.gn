@@ -450,15 +450,26 @@ config("remote_link_scandeps_workaround") {
 # in build/rbe/fuchsia-rewrapper.cfg.
 # There are generally far fewer of these bigger machines available.
 # Reserve use of this for only the largest jobs that need it.
+# Note: this does not impact the machine type used for C++ compilation.
+# See also :compile_big_rbe_machine.
 config("big_rbe_machine") {
   _remote_flag = "--remote-flag=--platform=gceMachineType=n2-standard-8"
 
-  # No C++ compile should ever require this.
   if (link_rbe_enable) {
     ldflags = [ _remote_flag ]
   }
   if (rust_rbe_enable) {
     rustflags = [ _remote_flag ]
+  }
+  not_needed([ "_remote_flag" ])
+}
+
+# Use a bigger remote worker to compile C++ translation units.
+# Note: this does not automatically apply to downstream link jobs.
+config("compile_big_rbe_machine") {
+  _remote_flag = "--remote-flag=--platform=gceMachineType=n2-standard-8"
+  if (cxx_rbe_enable) {
+    cflags = [ _remote_flag ]
   }
   not_needed([ "_remote_flag" ])
 }

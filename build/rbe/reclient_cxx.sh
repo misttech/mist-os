@@ -207,6 +207,17 @@ if [[ "${#local_compile_cmd[@]}" == 0 ]]
 then exit
 fi
 
+# Check for pseudo-flags that require the Python wrapper.
+for opt in "${local_compile_cmd[@]}"
+do
+  case "$opt" in
+    --remote-flag | --remote-flag=* )
+      # use Python wrapper to wrangle such forwarding flags
+      use_py_wrapper=1
+      ;;
+  esac
+done
+
 # Only in special debug cases, fallback to the more elaborate Python wrapper.
 if [[ "$use_py_wrapper" == 1 ]]
 then
