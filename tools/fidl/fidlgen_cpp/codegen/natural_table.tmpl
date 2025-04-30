@@ -31,18 +31,33 @@ class {{ .Name }} {
   {{- if not .IsResourceType }}
     {{ .Name }}(const {{ .Name }}& other) noexcept;
     {{ .Name }}& operator=(const {{ .Name }}& other) noexcept;
-    bool operator==(const {{.Name }}& other) const noexcept;
-    bool operator!=(const {{.Name }}& other) const noexcept;
+    bool operator==(const {{.Name }}& other) const noexcept {
+      return ::fidl::internal::NaturalTableCodingTraits<{{ . }}>::Equal(this, &other);
+    }
+    bool operator!=(const {{.Name }}& other) const noexcept {
+      return !::fidl::internal::NaturalTableCodingTraits<{{ . }}>::Equal(this, &other);
+    }
   {{- end }}
 
-  bool IsEmpty() const;
+  bool IsEmpty() const {
+    {{- if len .Members }}
+      return !(
+        {{- range $i, $m := .Members }}
+          {{- if $i }}||{{ end -}}
+          storage_.{{ .Name }}.has_value()
+        {{- end }}
+      );
+    {{- else }}
+      return true;
+    {{- end }}
+  }
 
   {{- range .Members }}
     {{ .Docs }}
-    const std::optional<{{ .Type }}>& {{ .Name }}() const;
+    const std::optional<{{ .Type }}>& {{ .Name }}() const { return storage_.{{ .Name }}; }
 
     {{- .Docs }}
-    ::std::optional<{{ .Type }}>& {{ .Name }}();
+    ::std::optional<{{ .Type }}>& {{ .Name }}() { return storage_.{{ .Name }}; }
 
     // Setter for {{ .Name }}.
     //
@@ -83,6 +98,33 @@ class {{ .Name }} {
 
 
 {{- define "Table:InlineDefinition:NaturalTypesHeader" }}
+  {{ EnsureNamespace . }}
+  {{ if .IsResourceType }}
+    {{- IfdefFuchsia -}}
+  {{- end }}
+
+  inline {{ .Name }}::{{ .Name }}(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+
+  {{- if not .IsResourceType }}
+    inline {{ .Name }}::{{ .Name }}(const {{ . }}& other) noexcept : {{ .Name }}(other.CloneStorage_()){}
+    inline {{ .Name }}& {{ . }}::operator=(const {{ .Name }}& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+  {{- end }}
+
+  inline {{ .Name }}::{{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : {{ .Name }}(Storage_{}) {}
+
+  {{- range .Members }}
+    inline {{ $.Name }}& {{ $.Name }}::{{ .Name }}(std::optional<{{ .Type }}> value) {
+      storage_.{{ .Name }} = std::move(value);
+      return *this;
+    }
+  {{- end }}
+
+  {{ if .IsResourceType }}
+    {{- EndifFuchsia -}}
+  {{- end }}
 {{- end }}
 
 
@@ -127,26 +169,8 @@ class {{ .Name }} {
 
 {{- EnsureNamespace "" }}
 
-{{ . }}::{{ .Name }}({{ . }}::Storage_ storage) noexcept : storage_(std::move(storage)) {}
-
-{{ . }}::{{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : {{ .Name }}(Storage_{}) {}
-
 {{ if not .IsResourceType }}
-  {{ . }}::{{ .Name }}(const {{ . }}& other) noexcept : {{ .Name }}(other.CloneStorage_()){}
-
-  {{ . }}& {{ . }}::operator=(const {{ . }}& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
-
-  bool {{ .NoLeading }}::operator==(const {{.Name }}& other) const noexcept {
-    return ::fidl::internal::NaturalTableCodingTraits<{{ . }}>::Equal(this, &other);
-  }
-  bool {{ .NoLeading }}::operator!=(const {{.Name }}& other) const noexcept {
-    return !::fidl::internal::NaturalTableCodingTraits<{{ . }}>::Equal(this, &other);
-  }
-
-  {{ . }}::Storage_ {{ .NoLeading }}::CloneStorage_() const {
+{{ . }}::Storage_ {{ .NoLeading }}::CloneStorage_() const {
     return Storage_{
       {{- range $i, $m := .Members }}
         {{- if $i }}, {{ end }}
@@ -154,35 +178,6 @@ class {{ .Name }} {
       {{- end }}
     };
   }
-{{- end }}
-
-bool {{ .NoLeading }}::IsEmpty() const {
-  {{- if len .Members }}
-    return !(
-      {{- range $i, $m := .Members }}
-        {{- if $i }}||{{ end -}}
-        storage_.{{ .Name }}.has_value()
-      {{- end }}
-    );
-  {{- else }}
-    return true;
-  {{- end }}
-}
-
-{{- range .Members }}
-  const std::optional<{{ .Type }}>& {{ $.NoLeading }}::{{ .Name }}() const {
-    return storage_.{{ .Name }};
-  }
-
-  ::std::optional<{{ .Type }}>& {{ $.NoLeading }}::{{ .Name }}() {
-    return storage_.{{ .Name }};
-  }
-
-  {{ $ }}& {{ $.NoLeading }}::{{ .Name }}(std::optional<{{ .Type }}> value) {
-    storage_.{{ .Name }} = std::move(value);
-    return *this;
-  }
-
 {{- end }}
 
 {{ if .IsResourceType }}

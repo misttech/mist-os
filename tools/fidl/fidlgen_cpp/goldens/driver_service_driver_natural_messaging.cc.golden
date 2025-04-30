@@ -6,18 +6,6 @@
 
 #ifdef __Fuchsia__
 
-::fidl::internal::NaturalEventDispatcher<::test_driverservice::SomeDriverProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_driverservice::SomeDriverProtocol>* event_handler)
-    : IncomingEventDispatcher(event_handler) {}
-
-#endif  // __Fuchsia__
-
-::fidl::ProtocolHandler<::test_driverservice::SomeDriverProtocol> fdf::Server<::test_driverservice::SomeDriverProtocol>::bind_handler(fdf_dispatcher_t* dispatcher) {
-  return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driverservice::SomeDriverProtocol> request) {
-    (void)::fdf::BindServer(dispatcher, std::move(request), impl);
-  };
-}
-#ifdef __Fuchsia__
-
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_driverservice::SomeDriverProtocol>::entries_[] = {};
 
 const ::fidl::internal::MethodEntry* fidl::internal::NaturalServerDispatcher<::test_driverservice::SomeDriverProtocol>::entries_end_ =

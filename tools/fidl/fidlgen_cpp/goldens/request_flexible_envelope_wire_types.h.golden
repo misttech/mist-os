@@ -57,7 +57,7 @@ class FlexibleFoo {
     kI = 2,  // 0x2
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_requestflexibleenvelope::wire::FlexibleFoo::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 

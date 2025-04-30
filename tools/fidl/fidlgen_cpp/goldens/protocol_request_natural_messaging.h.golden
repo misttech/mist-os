@@ -39,7 +39,10 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Child> fin
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Child>> {
  public:
  private:
-  ::fidl::UnownedClientEnd<::test_protocolrequest::Child> _client_end() const;
+  ::fidl::UnownedClientEnd<::test_protocolrequest::Child> _client_end() const {
+    return ::fidl::UnownedClientEnd<::test_protocolrequest::Child>(
+        _transport().get<::fidl::internal::ChannelTransport>());
+  }
 };
 
 template <>
@@ -72,7 +75,8 @@ class ::fidl::SyncEventHandler<::test_protocolrequest::Child>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocolrequest::Child> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Child>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Child>* event_handler);
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Child>* event_handler)
+      : IncomingEventDispatcher(event_handler) {}
 };
 
 template <>
@@ -108,7 +112,11 @@ class ::fidl::Server<::test_protocolrequest::Child> : public ::fidl::internal::I
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher);
+  Handler bind_handler(async_dispatcher_t* dispatcher) {
+    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocolrequest::Child> request) {
+      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+    };
+  }
 
  private:
   void dispatch_message(
@@ -172,7 +180,7 @@ template <>
 class ::fidl::Response<::test_protocolrequest::Parent::GetChild> final : public ::test_protocolrequest::ParentGetChildResponse {
  public:
   using ::test_protocolrequest::ParentGetChildResponse::ParentGetChildResponse;
-  Response(::test_protocolrequest::ParentGetChildResponse v);
+  Response(::test_protocolrequest::ParentGetChildResponse v) : ParentGetChildResponse(std::move(v)) {}
 };
 
 template <>
@@ -188,7 +196,7 @@ template <>
 class ::fidl::Response<::test_protocolrequest::Parent::GetChildRequest> final : public ::test_protocolrequest::ParentGetChildRequestResponse {
  public:
   using ::test_protocolrequest::ParentGetChildRequestResponse::ParentGetChildRequestResponse;
-  Response(::test_protocolrequest::ParentGetChildRequestResponse v);
+  Response(::test_protocolrequest::ParentGetChildRequestResponse v) : ParentGetChildRequestResponse(std::move(v)) {}
 };
 
 template <>
@@ -226,7 +234,10 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Parent> fi
   ::fit::result<::fidl::OneWayError> TakeChildRequest(::fidl::Request<::test_protocolrequest::Parent::TakeChildRequest> request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocolrequest::Parent> _client_end() const;
+  ::fidl::UnownedClientEnd<::test_protocolrequest::Parent> _client_end() const {
+    return ::fidl::UnownedClientEnd<::test_protocolrequest::Parent>(
+        _transport().get<::fidl::internal::ChannelTransport>());
+  }
 };
 
 template <>
@@ -259,7 +270,8 @@ class ::fidl::SyncEventHandler<::test_protocolrequest::Parent>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocolrequest::Parent> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Parent>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Parent>* event_handler);
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Parent>* event_handler)
+      : IncomingEventDispatcher(event_handler) {}
 };
 
 template <>
@@ -335,7 +347,11 @@ class ::fidl::Server<::test_protocolrequest::Parent> : public ::fidl::internal::
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher);
+  Handler bind_handler(async_dispatcher_t* dispatcher) {
+    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocolrequest::Parent> request) {
+      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+    };
+  }
 
  private:
   void dispatch_message(

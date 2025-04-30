@@ -92,7 +92,7 @@ template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed> final : public ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse {
  public:
   using ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse::ComposedProtocolTwoWayAnonComposedResponse;
-  Response(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse v);
+  Response(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse v) : ComposedProtocolTwoWayAnonComposedResponse(std::move(v)) {}
 };
 
 template <>
@@ -108,7 +108,7 @@ template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError> final : public ::fit::result<uint32_t, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse> {
  public:
   using ::fit::result<uint32_t, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse>::result;
-  Response(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse> v);
+  Response(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse> v) : result(std::move(v)) {}
   Response() = delete;
 };
 template <>
@@ -116,7 +116,13 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocollayoutssamelibra
   using DomainObject = ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>& m);
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+      return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 };
 
 template <>
@@ -132,7 +138,7 @@ template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed> final : public ::test_protocollayoutssamelibrary::TablePayload {
  public:
   using ::test_protocollayoutssamelibrary::TablePayload::TablePayload;
-  Response(::test_protocollayoutssamelibrary::TablePayload v);
+  Response(::test_protocollayoutssamelibrary::TablePayload v) : TablePayload(std::move(v)) {}
 };
 
 template <>
@@ -148,7 +154,7 @@ template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError> final : public ::fit::result<uint32_t, ::test_protocollayoutssamelibrary::UnionPayload> {
  public:
   using ::fit::result<uint32_t, ::test_protocollayoutssamelibrary::UnionPayload>::result;
-  Response(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::UnionPayload> v);
+  Response(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::UnionPayload> v) : result(std::move(v)) {}
   Response() = delete;
 };
 template <>
@@ -156,7 +162,13 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocollayoutssamelibra
   using DomainObject = ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>& m);
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+      return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 };
 
 template <>
@@ -202,7 +214,10 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary:
   ::fit::result<::fidl::OneWayError> OneWayNamedComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> _client_end() const;
+  ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> _client_end() const {
+    return ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>(
+        _transport().get<::fidl::internal::ChannelTransport>());
+  }
 };
 
 template <>
@@ -219,8 +234,8 @@ class ::fidl::AsyncEventHandler<::test_protocollayoutssamelibrary::ComposedProto
     : public ::fidl::internal::NaturalEventHandlerInterface<::test_protocollayoutssamelibrary::ComposedProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   AsyncEventHandler() = default;
-  void OnAnonComposed(::fidl::Event<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>&) override;
-  void OnNamedComposed(::fidl::Event<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed>&) override;
+  void OnAnonComposed(::fidl::Event<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>&) override {}
+  void OnNamedComposed(::fidl::Event<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed>&) override {}
 };
 
 template <>
@@ -239,7 +254,8 @@ class ::fidl::SyncEventHandler<::test_protocollayoutssamelibrary::ComposedProtoc
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocollayoutssamelibrary::ComposedProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocollayoutssamelibrary::ComposedProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocollayoutssamelibrary::ComposedProtocol>* event_handler);
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocollayoutssamelibrary::ComposedProtocol>* event_handler)
+      : IncomingEventDispatcher(event_handler) {}
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       internal::MessageStorageViewBase* storage_view) override;
@@ -358,7 +374,11 @@ class ::fidl::Server<::test_protocollayoutssamelibrary::ComposedProtocol> : publ
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher);
+  Handler bind_handler(async_dispatcher_t* dispatcher) {
+    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocollayoutssamelibrary::ComposedProtocol> request) {
+      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+    };
+  }
 
  private:
   void dispatch_message(
@@ -530,7 +550,7 @@ template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed> final : public ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse {
  public:
   using ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse::ComposedProtocolTwoWayAnonComposedResponse;
-  Response(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse v);
+  Response(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse v) : ComposedProtocolTwoWayAnonComposedResponse(std::move(v)) {}
 };
 
 template <>
@@ -546,7 +566,7 @@ template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError> final : public ::fit::result<uint32_t, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse> {
  public:
   using ::fit::result<uint32_t, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse>::result;
-  Response(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse> v);
+  Response(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse> v) : result(std::move(v)) {}
   Response() = delete;
 };
 template <>
@@ -554,7 +574,13 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocollayoutssamelibra
   using DomainObject = ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>& m);
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+      return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 };
 
 template <>
@@ -570,7 +596,7 @@ template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed> final : public ::test_protocollayoutssamelibrary::TablePayload {
  public:
   using ::test_protocollayoutssamelibrary::TablePayload::TablePayload;
-  Response(::test_protocollayoutssamelibrary::TablePayload v);
+  Response(::test_protocollayoutssamelibrary::TablePayload v) : TablePayload(std::move(v)) {}
 };
 
 template <>
@@ -586,7 +612,7 @@ template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError> final : public ::fit::result<uint32_t, ::test_protocollayoutssamelibrary::UnionPayload> {
  public:
   using ::fit::result<uint32_t, ::test_protocollayoutssamelibrary::UnionPayload>::result;
-  Response(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::UnionPayload> v);
+  Response(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::UnionPayload> v) : result(std::move(v)) {}
   Response() = delete;
 };
 template <>
@@ -594,7 +620,13 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocollayoutssamelibra
   using DomainObject = ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>& m);
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+      return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 };
 
 template <>
@@ -610,7 +642,7 @@ template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal> final : public ::test_protocollayoutssamelibrary::TablePayload {
  public:
   using ::test_protocollayoutssamelibrary::TablePayload::TablePayload;
-  Response(::test_protocollayoutssamelibrary::TablePayload v);
+  Response(::test_protocollayoutssamelibrary::TablePayload v) : TablePayload(std::move(v)) {}
 };
 
 template <>
@@ -626,7 +658,7 @@ template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError> final : public ::fit::result<uint32_t, ::test_protocollayoutssamelibrary::UnionPayload> {
  public:
   using ::fit::result<uint32_t, ::test_protocollayoutssamelibrary::UnionPayload>::result;
-  Response(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::UnionPayload> v);
+  Response(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::UnionPayload> v) : result(std::move(v)) {}
   Response() = delete;
 };
 template <>
@@ -634,7 +666,13 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocollayoutssamelibra
   using DomainObject = ::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>& m);
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+      return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 };
 
 template <>
@@ -650,7 +688,7 @@ template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon> final : public ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse {
  public:
   using ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse;
-  Response(::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse v);
+  Response(::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse v) : MainProtocolTwoWayAnonResponse(std::move(v)) {}
 };
 
 template <>
@@ -666,7 +704,7 @@ template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError> final : public ::fit::result<uint32_t, ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResponse> {
  public:
   using ::fit::result<uint32_t, ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResponse>::result;
-  Response(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResponse> v);
+  Response(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResponse> v) : result(std::move(v)) {}
   Response() = delete;
 };
 template <>
@@ -674,7 +712,13 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocollayoutssamelibra
   using DomainObject = ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>& m);
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+      return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 };
 
 template <>
@@ -744,7 +788,10 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary:
   ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> _client_end() const;
+  ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> _client_end() const {
+    return ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol>(
+        _transport().get<::fidl::internal::ChannelTransport>());
+  }
 };
 
 template <>
@@ -763,10 +810,10 @@ class ::fidl::AsyncEventHandler<::test_protocollayoutssamelibrary::MainProtocol>
     : public ::fidl::internal::NaturalEventHandlerInterface<::test_protocollayoutssamelibrary::MainProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   AsyncEventHandler() = default;
-  void OnAnonComposed(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>&) override;
-  void OnNamedComposed(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>&) override;
-  void OnLocal(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>&) override;
-  void OnAnon(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>&) override;
+  void OnAnonComposed(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>&) override {}
+  void OnNamedComposed(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>&) override {}
+  void OnLocal(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>&) override {}
+  void OnAnon(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>&) override {}
 };
 
 template <>
@@ -785,7 +832,8 @@ class ::fidl::SyncEventHandler<::test_protocollayoutssamelibrary::MainProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocollayoutssamelibrary::MainProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocollayoutssamelibrary::MainProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocollayoutssamelibrary::MainProtocol>* event_handler);
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocollayoutssamelibrary::MainProtocol>* event_handler)
+      : IncomingEventDispatcher(event_handler) {}
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       internal::MessageStorageViewBase* storage_view) override;
@@ -984,7 +1032,11 @@ class ::fidl::Server<::test_protocollayoutssamelibrary::MainProtocol> : public :
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher);
+  Handler bind_handler(async_dispatcher_t* dispatcher) {
+    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocollayoutssamelibrary::MainProtocol> request) {
+      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+    };
+  }
 
  private:
   void dispatch_message(

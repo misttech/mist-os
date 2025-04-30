@@ -126,7 +126,6 @@ fidl::internal::WireEventDispatcher<::test_doccomments::Interface>::DispatchEven
       return ::fidl::Status::UnknownOrdinal();
   }
 }
-void fidl::WireAsyncEventHandler<::test_doccomments::Interface>::OnEvent() {}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_doccomments::Interface>::entries_[] = {
     {

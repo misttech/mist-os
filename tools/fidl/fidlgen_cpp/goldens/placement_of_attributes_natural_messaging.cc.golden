@@ -48,30 +48,12 @@ fidl::internal::NaturalSyncClientImpl<::test_placementofattributes::ExampleProto
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol> fidl::internal::NaturalSyncClientImpl<::test_placementofattributes::ExampleProtocol>::_client_end() const {
-  return ::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol>(
-      _transport().get<::fidl::internal::ChannelTransport>());
-}
-
 ::fidl::Status fidl::SyncEventHandler<::test_placementofattributes::ExampleProtocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_placementofattributes::ExampleProtocol> event_storage;
   fidl::internal::NaturalEventDispatcher<::test_placementofattributes::ExampleProtocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-::fidl::internal::NaturalEventDispatcher<::test_placementofattributes::ExampleProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_placementofattributes::ExampleProtocol>* event_handler)
-    : IncomingEventDispatcher(event_handler) {}
-
-#endif  // __Fuchsia__
-
-::fidl::ProtocolHandler<::test_placementofattributes::ExampleProtocol> fidl::Server<::test_placementofattributes::ExampleProtocol>::bind_handler(async_dispatcher_t* dispatcher) {
-  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol> request) {
-    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-  };
-}
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_placementofattributes::ExampleProtocol>::entries_[] = {
     {

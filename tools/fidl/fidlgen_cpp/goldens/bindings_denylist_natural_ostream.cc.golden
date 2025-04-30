@@ -184,70 +184,7 @@ std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingO
   }
   return os;
 }
-#ifdef __Fuchsia__
 
-std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_bindingsdenylist::OnlyCppAndDeps>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_bindingsdenylist::OnlyCppAndDeps>& value) {
-  return os << "ClientEnd<" << "test_bindingsdenylist::OnlyCppAndDeps" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_bindingsdenylist::OnlyCppAndDeps>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_bindingsdenylist::OnlyCppAndDeps>& value) {
-  return os << "ServerEnd<" << "test_bindingsdenylist::OnlyCppAndDeps" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_bindingsdenylist::OnlyCppAndDeps>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_bindingsdenylist::OnlyCppAndDeps>>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_bindingsdenylist::OnlyCppAndDeps>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_bindingsdenylist::OnlyCppAndDeps>>::Format(os, value);
-}
-std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_bindingsdenylist::DenyEachBinding>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_bindingsdenylist::DenyEachBinding>& value) {
-  return os << "ClientEnd<" << "test_bindingsdenylist::DenyEachBinding" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_bindingsdenylist::DenyEachBinding>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_bindingsdenylist::DenyEachBinding>& value) {
-  return os << "ServerEnd<" << "test_bindingsdenylist::DenyEachBinding" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_bindingsdenylist::DenyEachBinding>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_bindingsdenylist::DenyEachBinding>>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_bindingsdenylist::DenyEachBinding>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_bindingsdenylist::DenyEachBinding>>::Format(os, value);
-}
-std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_bindingsdenylist::Allowed>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_bindingsdenylist::Allowed>& value) {
-  return os << "ClientEnd<" << "test_bindingsdenylist::Allowed" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_bindingsdenylist::Allowed>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_bindingsdenylist::Allowed>& value) {
-  return os << "ServerEnd<" << "test_bindingsdenylist::Allowed" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_bindingsdenylist::Allowed>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_bindingsdenylist::Allowed>>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_bindingsdenylist::Allowed>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_bindingsdenylist::Allowed>>::Format(os, value);
-}
-std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_bindingsdenylist::ImportsSameNameContext>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_bindingsdenylist::ImportsSameNameContext>& value) {
-  return os << "ClientEnd<" << "test_bindingsdenylist::ImportsSameNameContext" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext>& value) {
-  return os << "ServerEnd<" << "test_bindingsdenylist::ImportsSameNameContext" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_bindingsdenylist::ImportsSameNameContext>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_bindingsdenylist::ImportsSameNameContext>>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext>>::Format(os, value);
-}
-
-#endif  // __Fuchsia__
 namespace test_bindingsdenylist {
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::OnlyLlcpp& value) {

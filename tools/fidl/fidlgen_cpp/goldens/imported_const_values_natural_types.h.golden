@@ -42,13 +42,21 @@ class MyStruct {
   MyStruct(const MyStruct& other) noexcept;
   MyStruct& operator=(const MyStruct& other) noexcept;
 
-  bool operator==(const MyStruct& other) const noexcept;
-  bool operator!=(const MyStruct& other) const noexcept;
+  bool operator==(const MyStruct& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_importedconstvalues::MyStruct, 1>::Equal(this, &other);
+  }
+  bool operator!=(const MyStruct& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_importedconstvalues::MyStruct, 1>::Equal(this, &other);
+  }
 
   uint8_t
-  __reserved() const;
+  __reserved() const {
+    return storage_.__reserved;
+  }
 
-  uint8_t& __reserved();
+  uint8_t& __reserved() {
+    return storage_.__reserved;
+  }
 
   // Setter for __reserved.
   //
@@ -71,6 +79,23 @@ class MyStruct {
       &Storage_::__reserved, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline MyStruct::MyStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline MyStruct::MyStruct(uint8_t __reserved) noexcept
+    : storage_({.__reserved = std::move(__reserved)}) {}
+inline MyStruct::MyStruct(const ::test_importedconstvalues::MyStruct& other) noexcept : ::test_importedconstvalues::MyStruct(other.CloneStorage_()) {}
+inline MyStruct& ::test_importedconstvalues::MyStruct::operator=(const ::test_importedconstvalues::MyStruct& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline MyStruct::MyStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MyStruct(Storage_{
+                                                                                            .__reserved = 0u,
+                                                                                        }) {}
+inline MyStruct& MyStruct::__reserved(uint8_t value) {
+  storage_.__reserved = std::move(value);
+  return *this;
+}
 
 }  // namespace test_importedconstvalues
 namespace fidl {

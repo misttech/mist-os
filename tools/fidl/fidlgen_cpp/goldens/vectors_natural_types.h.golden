@@ -38,13 +38,21 @@ class ExampleUseOfVectors {
   ExampleUseOfVectors(const ExampleUseOfVectors& other) noexcept;
   ExampleUseOfVectors& operator=(const ExampleUseOfVectors& other) noexcept;
 
-  bool operator==(const ExampleUseOfVectors& other) const noexcept;
-  bool operator!=(const ExampleUseOfVectors& other) const noexcept;
+  bool operator==(const ExampleUseOfVectors& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_vectors::ExampleUseOfVectors, 32>::Equal(this, &other);
+  }
+  bool operator!=(const ExampleUseOfVectors& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_vectors::ExampleUseOfVectors, 32>::Equal(this, &other);
+  }
 
   const ::std::vector<uint8_t>&
-  vector_of_uint8() const;
+  vector_of_uint8() const {
+    return storage_.vector_of_uint8;
+  }
 
-  ::std::vector<uint8_t>& vector_of_uint8();
+  ::std::vector<uint8_t>& vector_of_uint8() {
+    return storage_.vector_of_uint8;
+  }
 
   // Setter for vector_of_uint8.
   //
@@ -52,9 +60,13 @@ class ExampleUseOfVectors {
   ExampleUseOfVectors& vector_of_uint8(::std::vector<uint8_t> value);
 
   const ::std::vector<::std::vector<bool>>&
-  vector_of_vector_of_bool() const;
+  vector_of_vector_of_bool() const {
+    return storage_.vector_of_vector_of_bool;
+  }
 
-  ::std::vector<::std::vector<bool>>& vector_of_vector_of_bool();
+  ::std::vector<::std::vector<bool>>& vector_of_vector_of_bool() {
+    return storage_.vector_of_vector_of_bool;
+  }
 
   // Setter for vector_of_vector_of_bool.
   //
@@ -79,6 +91,29 @@ class ExampleUseOfVectors {
                                                    ::fidl::internal::NaturalStructMember<Storage_, ::std::vector<::std::vector<bool>>, fidl::internal::NaturalCodingConstraintVector<fidl::internal::NaturalCodingConstraintVector<fidl::internal::NaturalCodingConstraintEmpty>>>{&Storage_::vector_of_vector_of_bool, 16});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline ExampleUseOfVectors::ExampleUseOfVectors(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ExampleUseOfVectors::ExampleUseOfVectors(::std::vector<uint8_t> vector_of_uint8, ::std::vector<::std::vector<bool>> vector_of_vector_of_bool) noexcept
+    : storage_({.vector_of_uint8 = std::move(vector_of_uint8),
+                .vector_of_vector_of_bool = std::move(vector_of_vector_of_bool)}) {}
+inline ExampleUseOfVectors::ExampleUseOfVectors(const ::test_vectors::ExampleUseOfVectors& other) noexcept : ::test_vectors::ExampleUseOfVectors(other.CloneStorage_()) {}
+inline ExampleUseOfVectors& ::test_vectors::ExampleUseOfVectors::operator=(const ::test_vectors::ExampleUseOfVectors& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline ExampleUseOfVectors::ExampleUseOfVectors(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleUseOfVectors(Storage_{
+                                                                                                                  .vector_of_uint8 = {},
+                                                                                                                  .vector_of_vector_of_bool = {},
+                                                                                                              }) {}
+inline ExampleUseOfVectors& ExampleUseOfVectors::vector_of_uint8(::std::vector<uint8_t> value) {
+  storage_.vector_of_uint8 = std::move(value);
+  return *this;
+}
+inline ExampleUseOfVectors& ExampleUseOfVectors::vector_of_vector_of_bool(::std::vector<::std::vector<bool>> value) {
+  storage_.vector_of_vector_of_bool = std::move(value);
+  return *this;
+}
 
 }  // namespace test_vectors
 namespace fidl {

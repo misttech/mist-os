@@ -3177,15 +3177,6 @@
         return ::fidl::Status::UnknownOrdinal();
     }
   }
-void fidl::WireAsyncEventHandler<::test_typesinprotocols::Protocol>::EventBasic(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventBasic>* event) {}
-void fidl::WireAsyncEventHandler<::test_typesinprotocols::Protocol>::EventCompound(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventCompound>* event) {}
-void fidl::WireAsyncEventHandler<::test_typesinprotocols::Protocol>::EventArrayBasic(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventArrayBasic>* event) {}
-void fidl::WireAsyncEventHandler<::test_typesinprotocols::Protocol>::EventArrayCompound(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventArrayCompound>* event) {}
-void fidl::WireAsyncEventHandler<::test_typesinprotocols::Protocol>::EventVectorBasic(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventVectorBasic>* event) {}
-void fidl::WireAsyncEventHandler<::test_typesinprotocols::Protocol>::EventVectorCompound(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventVectorCompound>* event) {}
-void fidl::WireAsyncEventHandler<::test_typesinprotocols::Protocol>::EventVectorOptional(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventVectorOptional>* event) {}
-void fidl::WireAsyncEventHandler<::test_typesinprotocols::Protocol>::EventArrayVectorNested(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventArrayVectorNested>* event) {}
-void fidl::WireAsyncEventHandler<::test_typesinprotocols::Protocol>::EventResource(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventResource>* event) {}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_typesinprotocols::Protocol>::entries_[] = {
     { ::test_typesinprotocols::kProtocol_OneWayBasic_Ordinal,

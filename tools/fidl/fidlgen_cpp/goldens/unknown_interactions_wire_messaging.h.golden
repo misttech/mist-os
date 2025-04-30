@@ -3674,14 +3674,14 @@ class ::fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteracti
     : public ::fidl::internal::WireEventHandlerInterface<::test_unknowninteractions::UnknownInteractionsProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   WireAsyncEventHandler() = default;
-    void StrictEvent() override;
-    void StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFields>* event) override;
-    void StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnion>* event) override;
-    void StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTable>* event) override;
-    void FlexibleEvent() override;
-    void FlexibleEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFields>* event) override;
-    void FlexibleEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnion>* event) override;
-    void FlexibleEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTable>* event) override;
+    void StrictEvent() override {}
+    void StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFields>* event) override {}
+    void StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnion>* event) override {}
+    void StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTable>* event) override {}
+    void FlexibleEvent() override {}
+    void FlexibleEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFields>* event) override {}
+    void FlexibleEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnion>* event) override {}
+    void FlexibleEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTable>* event) override {}
 };
 
   template<>
@@ -6605,14 +6605,14 @@ class ::fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteracti
     : public ::fidl::internal::WireEventHandlerInterface<::test_unknowninteractions::UnknownInteractionsAjarProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   WireAsyncEventHandler() = default;
-    void StrictEvent() override;
-    void StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFields>* event) override;
-    void StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnion>* event) override;
-    void StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTable>* event) override;
-    void FlexibleEvent() override;
-    void FlexibleEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFields>* event) override;
-    void FlexibleEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnion>* event) override;
-    void FlexibleEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTable>* event) override;
+    void StrictEvent() override {}
+    void StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFields>* event) override {}
+    void StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnion>* event) override {}
+    void StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTable>* event) override {}
+    void FlexibleEvent() override {}
+    void FlexibleEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFields>* event) override {}
+    void FlexibleEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnion>* event) override {}
+    void FlexibleEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTable>* event) override {}
 };
 
   template<>
@@ -8910,10 +8910,10 @@ class ::fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteracti
     : public ::fidl::internal::WireEventHandlerInterface<::test_unknowninteractions::UnknownInteractionsClosedProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   WireAsyncEventHandler() = default;
-    void StrictEvent() override;
-    void StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFields>* event) override;
-    void StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnion>* event) override;
-    void StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTable>* event) override;
+    void StrictEvent() override {}
+    void StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFields>* event) override {}
+    void StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnion>* event) override {}
+    void StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTable>* event) override {}
 };
 
   template<>

@@ -47,13 +47,21 @@ class Payload {
   Payload(const Payload& other) noexcept;
   Payload& operator=(const Payload& other) noexcept;
 
-  bool operator==(const Payload& other) const noexcept;
-  bool operator!=(const Payload& other) const noexcept;
+  bool operator==(const Payload& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_driveroneway::Payload, 4>::Equal(this, &other);
+  }
+  bool operator!=(const Payload& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_driveroneway::Payload, 4>::Equal(this, &other);
+  }
 
   uint32_t
-  value() const;
+  value() const {
+    return storage_.value;
+  }
 
-  uint32_t& value();
+  uint32_t& value() {
+    return storage_.value;
+  }
 
   // Setter for value.
   //
@@ -96,13 +104,21 @@ class OneWaySendRequest {
   OneWaySendRequest(const OneWaySendRequest& other) noexcept;
   OneWaySendRequest& operator=(const OneWaySendRequest& other) noexcept;
 
-  bool operator==(const OneWaySendRequest& other) const noexcept;
-  bool operator!=(const OneWaySendRequest& other) const noexcept;
+  bool operator==(const OneWaySendRequest& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_driveroneway::OneWaySendRequest, 4>::Equal(this, &other);
+  }
+  bool operator!=(const OneWaySendRequest& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_driveroneway::OneWaySendRequest, 4>::Equal(this, &other);
+  }
 
   const ::test_driveroneway::Payload&
-  payload() const;
+  payload() const {
+    return storage_.payload;
+  }
 
-  ::test_driveroneway::Payload& payload();
+  ::test_driveroneway::Payload& payload() {
+    return storage_.payload;
+  }
 
   // Setter for payload.
   //
@@ -125,6 +141,40 @@ class OneWaySendRequest {
       &Storage_::payload, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline Payload::Payload(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Payload::Payload(uint32_t value) noexcept
+    : storage_({.value = std::move(value)}) {}
+inline Payload::Payload(const ::test_driveroneway::Payload& other) noexcept : ::test_driveroneway::Payload(other.CloneStorage_()) {}
+inline Payload& ::test_driveroneway::Payload::operator=(const ::test_driveroneway::Payload& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Payload::Payload(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Payload(Storage_{
+                                                                                          .value = {},
+                                                                                      }) {}
+inline Payload& Payload::value(uint32_t value) {
+  storage_.value = std::move(value);
+  return *this;
+}
+
+inline OneWaySendRequest::OneWaySendRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline OneWaySendRequest::OneWaySendRequest(::test_driveroneway::Payload payload) noexcept
+    : storage_({.payload = std::move(payload)}) {}
+inline OneWaySendRequest::OneWaySendRequest(const ::test_driveroneway::OneWaySendRequest& other) noexcept : ::test_driveroneway::OneWaySendRequest(other.CloneStorage_()) {}
+inline OneWaySendRequest& ::test_driveroneway::OneWaySendRequest::operator=(const ::test_driveroneway::OneWaySendRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline OneWaySendRequest::OneWaySendRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : OneWaySendRequest(Storage_{
+                                                                                                              .payload = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                          }) {}
+inline OneWaySendRequest& OneWaySendRequest::payload(::test_driveroneway::Payload value) {
+  storage_.payload = std::move(value);
+  return *this;
+}
 
 }  // namespace test_driveroneway
 namespace fidl {

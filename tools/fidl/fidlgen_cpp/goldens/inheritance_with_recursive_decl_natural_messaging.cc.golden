@@ -48,30 +48,12 @@ fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Paren
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent> fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Parent>::_client_end() const {
-  return ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent>(
-      _transport().get<::fidl::internal::ChannelTransport>());
-}
-
 ::fidl::Status fidl::SyncEventHandler<::test_inheritancewithrecursivedecl::Parent>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_inheritancewithrecursivedecl::Parent> event_storage;
   fidl::internal::NaturalEventDispatcher<::test_inheritancewithrecursivedecl::Parent> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-::fidl::internal::NaturalEventDispatcher<::test_inheritancewithrecursivedecl::Parent>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Parent>* event_handler)
-    : IncomingEventDispatcher(event_handler) {}
-
-#endif  // __Fuchsia__
-
-::fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Parent> fidl::Server<::test_inheritancewithrecursivedecl::Parent>::bind_handler(async_dispatcher_t* dispatcher) {
-  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request) {
-    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-  };
-}
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursivedecl::Parent>::entries_[] = {
     {
@@ -174,30 +156,12 @@ fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Child
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child> fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Child>::_client_end() const {
-  return ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child>(
-      _transport().get<::fidl::internal::ChannelTransport>());
-}
-
 ::fidl::Status fidl::SyncEventHandler<::test_inheritancewithrecursivedecl::Child>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_inheritancewithrecursivedecl::Child> event_storage;
   fidl::internal::NaturalEventDispatcher<::test_inheritancewithrecursivedecl::Child> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-::fidl::internal::NaturalEventDispatcher<::test_inheritancewithrecursivedecl::Child>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Child>* event_handler)
-    : IncomingEventDispatcher(event_handler) {}
-
-#endif  // __Fuchsia__
-
-::fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Child> fidl::Server<::test_inheritancewithrecursivedecl::Child>::bind_handler(async_dispatcher_t* dispatcher) {
-  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child> request) {
-    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-  };
-}
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursivedecl::Child>::entries_[] = {
     {

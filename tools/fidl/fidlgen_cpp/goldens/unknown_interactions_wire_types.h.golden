@@ -3518,7 +3518,7 @@ class UnknownInteractionsProtocolStrictTwoWayUnionResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -3658,7 +3658,7 @@ class UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -3908,7 +3908,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -4178,7 +4178,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -4350,7 +4350,7 @@ class UnknownInteractionsProtocolStrictEventUnionRequest {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -4392,7 +4392,7 @@ class UnknownInteractionsProtocolFlexibleEventUnionRequest {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -4434,7 +4434,7 @@ class UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -4574,7 +4574,7 @@ class UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -4726,7 +4726,7 @@ class UnknownInteractionsAjarProtocolStrictEventUnionRequest {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -4768,7 +4768,7 @@ class UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -4810,7 +4810,7 @@ class UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -4950,7 +4950,7 @@ class UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -5102,7 +5102,7 @@ class UnknownInteractionsClosedProtocolStrictEventUnionRequest {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -5144,7 +5144,7 @@ class UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -5284,7 +5284,7 @@ class UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -5534,7 +5534,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -5804,7 +5804,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -5976,7 +5976,7 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -6116,7 +6116,7 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -6268,7 +6268,7 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -6408,7 +6408,7 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
     kSomeField = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 

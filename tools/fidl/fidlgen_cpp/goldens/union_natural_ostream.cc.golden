@@ -380,25 +380,7 @@ std::ostream& fidl::ostream::Formatter<::test_union::EmptyFlexibleUnion>::Format
   }
   return os;
 }
-#ifdef __Fuchsia__
 
-std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_union::TestProtocol>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_union::TestProtocol>& value) {
-  return os << "ClientEnd<" << "test_union::TestProtocol" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_union::TestProtocol>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_union::TestProtocol>& value) {
-  return os << "ServerEnd<" << "test_union::TestProtocol" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_union::TestProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_union::TestProtocol>>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_union::TestProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_union::TestProtocol>>::Format(os, value);
-}
-
-#endif  // __Fuchsia__
 namespace test_union {
 
 std::ostream& operator<<(std::ostream& os, const ::test_union::Pizza& value) {

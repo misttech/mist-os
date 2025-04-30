@@ -163,7 +163,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposed> final : public ::test_protocolpayloads_imported::ImportStructPayload {
  public:
   using ::test_protocolpayloads_imported::ImportStructPayload::ImportStructPayload;
-  Response(::test_protocolpayloads_imported::ImportStructPayload v);
+  Response(::test_protocolpayloads_imported::ImportStructPayload v) : ImportStructPayload(std::move(v)) {}
 };
 
 template <>
@@ -179,7 +179,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError> final : public ::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> {
  public:
   using ::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload>::result;
-  Response(::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> v);
+  Response(::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> v) : result(std::move(v)) {}
   Response() = delete;
 };
 template <>
@@ -187,7 +187,13 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocolpayloads::MainPr
   using DomainObject = ::test_protocolpayloads_imported::ComposedProtocolTwoWayComposedWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>& m);
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+      return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 };
 
 template <>
@@ -203,7 +209,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayLocal> final : public ::test_protocolpayloads::LocalStructPayload {
  public:
   using ::test_protocolpayloads::LocalStructPayload::LocalStructPayload;
-  Response(::test_protocolpayloads::LocalStructPayload v);
+  Response(::test_protocolpayloads::LocalStructPayload v) : LocalStructPayload(std::move(v)) {}
 };
 
 template <>
@@ -219,7 +225,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError> final : public ::fit::result<uint32_t, ::test_protocolpayloads::LocalStructPayload> {
  public:
   using ::fit::result<uint32_t, ::test_protocolpayloads::LocalStructPayload>::result;
-  Response(::fit::result<uint32_t, ::test_protocolpayloads::LocalStructPayload> v);
+  Response(::fit::result<uint32_t, ::test_protocolpayloads::LocalStructPayload> v) : result(std::move(v)) {}
   Response() = delete;
 };
 template <>
@@ -227,7 +233,13 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocolpayloads::MainPr
   using DomainObject = ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>& m);
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+      return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 };
 
 template <>
@@ -243,7 +255,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayImport> final : public ::test_protocolpayloads_imported::ImportStructPayload {
  public:
   using ::test_protocolpayloads_imported::ImportStructPayload::ImportStructPayload;
-  Response(::test_protocolpayloads_imported::ImportStructPayload v);
+  Response(::test_protocolpayloads_imported::ImportStructPayload v) : ImportStructPayload(std::move(v)) {}
 };
 
 template <>
@@ -259,7 +271,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayImportWithError> final : public ::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> {
  public:
   using ::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload>::result;
-  Response(::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> v);
+  Response(::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> v) : result(std::move(v)) {}
   Response() = delete;
 };
 template <>
@@ -267,7 +279,13 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocolpayloads::MainPr
   using DomainObject = ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>& m);
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+      return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 };
 
 template <>
@@ -283,7 +301,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayAnon> final : public ::test_protocolpayloads::MainProtocolTwoWayAnonResponse {
  public:
   using ::test_protocolpayloads::MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse;
-  Response(::test_protocolpayloads::MainProtocolTwoWayAnonResponse v);
+  Response(::test_protocolpayloads::MainProtocolTwoWayAnonResponse v) : MainProtocolTwoWayAnonResponse(std::move(v)) {}
 };
 
 template <>
@@ -299,7 +317,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError> final : public ::fit::result<uint32_t, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> {
  public:
   using ::fit::result<uint32_t, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse>::result;
-  Response(::fit::result<uint32_t, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> v);
+  Response(::fit::result<uint32_t, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> v) : result(std::move(v)) {}
   Response() = delete;
 };
 template <>
@@ -307,7 +325,13 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocolpayloads::MainPr
   using DomainObject = ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>& m);
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+      return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 };
 
 template <>
@@ -377,7 +401,10 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocolpayloads::MainProto
   ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocolpayloads::MainProtocol::OneWayAnon>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> _client_end() const;
+  ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> _client_end() const {
+    return ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol>(
+        _transport().get<::fidl::internal::ChannelTransport>());
+  }
 };
 
 template <>
@@ -396,10 +423,10 @@ class ::fidl::AsyncEventHandler<::test_protocolpayloads::MainProtocol>
     : public ::fidl::internal::NaturalEventHandlerInterface<::test_protocolpayloads::MainProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   AsyncEventHandler() = default;
-  void OnComposed(::fidl::Event<::test_protocolpayloads::MainProtocol::OnComposed>&) override;
-  void OnLocal(::fidl::Event<::test_protocolpayloads::MainProtocol::OnLocal>&) override;
-  void OnImport(::fidl::Event<::test_protocolpayloads::MainProtocol::OnImport>&) override;
-  void OnAnon(::fidl::Event<::test_protocolpayloads::MainProtocol::OnAnon>&) override;
+  void OnComposed(::fidl::Event<::test_protocolpayloads::MainProtocol::OnComposed>&) override {}
+  void OnLocal(::fidl::Event<::test_protocolpayloads::MainProtocol::OnLocal>&) override {}
+  void OnImport(::fidl::Event<::test_protocolpayloads::MainProtocol::OnImport>&) override {}
+  void OnAnon(::fidl::Event<::test_protocolpayloads::MainProtocol::OnAnon>&) override {}
 };
 
 template <>
@@ -418,7 +445,8 @@ class ::fidl::SyncEventHandler<::test_protocolpayloads::MainProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocolpayloads::MainProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocolpayloads::MainProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocolpayloads::MainProtocol>* event_handler);
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocolpayloads::MainProtocol>* event_handler)
+      : IncomingEventDispatcher(event_handler) {}
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       internal::MessageStorageViewBase* storage_view) override;
@@ -617,7 +645,11 @@ class ::fidl::Server<::test_protocolpayloads::MainProtocol> : public ::fidl::int
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher);
+  Handler bind_handler(async_dispatcher_t* dispatcher) {
+    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocolpayloads::MainProtocol> request) {
+      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+    };
+  }
 
  private:
   void dispatch_message(

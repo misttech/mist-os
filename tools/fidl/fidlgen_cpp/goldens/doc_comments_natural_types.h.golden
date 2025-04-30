@@ -58,19 +58,27 @@ class Struct {
   Struct(const Struct& other) noexcept;
   Struct& operator=(const Struct& other) noexcept;
 
-  bool operator==(const Struct& other) const noexcept;
-  bool operator!=(const Struct& other) const noexcept;
+  bool operator==(const Struct& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_doccomments::Struct, 4>::Equal(this, &other);
+  }
+  bool operator!=(const Struct& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_doccomments::Struct, 4>::Equal(this, &other);
+  }
 
   /// struct member comment #1
   ///
   /// struct member comment #3
   int32_t
-  field() const;
+  field() const {
+    return storage_.field;
+  }
 
   /// struct member comment #1
   ///
   /// struct member comment #3
-  int32_t& field();
+  int32_t& field() {
+    return storage_.field;
+  }
 
   // Setter for field.
   //
@@ -115,17 +123,47 @@ class StrictUnion {
     kField = 1,  // 0x1
   };
 
-  StrictUnion(StrictUnion&& other) noexcept;
-  StrictUnion& operator=(StrictUnion&& other) noexcept;
-  StrictUnion(const StrictUnion& other) noexcept;
-  StrictUnion& operator=(const StrictUnion& other) noexcept;
-  bool operator==(const StrictUnion& other) const noexcept;
-  bool operator!=(const StrictUnion& other) const noexcept;
+  StrictUnion(StrictUnion&& other) noexcept
+      : StrictUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  StrictUnion& operator=(StrictUnion&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+  StrictUnion(const StrictUnion& other) noexcept : StrictUnion(other.CloneStorage_()) {}
+  StrictUnion& operator=(const StrictUnion& other) noexcept {
+    if (this != &other) {
+      storage_ = other.CloneStorage_();
+    }
+    return *this;
+  }
 
-  ::test_doccomments::StrictUnion::Tag Which() const;
-  static StrictUnion WithField(int32_t val);
-  const ::fidl::internal::UnionMemberView<1, Storage_> field() const;
-  ::fidl::internal::UnionMemberView<1, Storage_> field();
+  bool operator==(const StrictUnion& other) const noexcept {
+    return *storage_ == *other.storage_;
+  }
+  bool operator!=(const StrictUnion& other) const noexcept {
+    return *storage_ != *other.storage_;
+  }
+
+  constexpr ::test_doccomments::StrictUnion::Tag Which() const {
+    return StrictUnion::IndexToTag(storage_->index()).value();
+  }
+  static StrictUnion WithField(int32_t val) {
+    return StrictUnion(std::make_shared<Storage_>(
+        std::in_place_index_t<1>{},
+        std::move(val)));
+  }
+
+  const ::fidl::internal::UnionMemberView<1, Storage_> field() const {
+    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+  }
+
+  ::fidl::internal::UnionMemberView<1, Storage_> field() {
+    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+  }
 
   // Sets the union to hold the field member.
   //
@@ -133,9 +171,13 @@ class StrictUnion {
   /// union member comment #1
   ///
   /// union member comment #3
-  StrictUnion& field(int32_t value);
+  StrictUnion& field(int32_t value) {
+    storage_->emplace<1>(std::move(value));
+    return *this;
+  }
 
-  StrictUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+  StrictUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -144,10 +186,27 @@ class StrictUnion {
   static constexpr auto kMembers = std::make_tuple(
       ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
 
-  explicit StrictUnion(std::shared_ptr<Storage_> storage);
+  explicit StrictUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
 
-  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_doccomments::StrictUnion::Tag tag);
-  static std::optional<::test_doccomments::StrictUnion::Tag> IndexToTag(size_t index);
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_doccomments::StrictUnion::Tag tag) {
+    switch (tag) {
+      case ::test_doccomments::StrictUnion::Tag::kField:
+        return 1;
+      default: {
+        decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_doccomments::StrictUnion::Tag> IndexToTag(size_t index) {
+    switch (index) {
+      case 1:
+        return ::test_doccomments::StrictUnion::Tag::kField;
+      default:
+        return std::nullopt;
+    }
+  }
 };
 
 /// flexible union comment #1
@@ -166,18 +225,50 @@ class FlexibleUnion {
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
 
-  FlexibleUnion(FlexibleUnion&& other) noexcept;
-  FlexibleUnion& operator=(FlexibleUnion&& other) noexcept;
-  FlexibleUnion(const FlexibleUnion& other) noexcept;
-  FlexibleUnion& operator=(const FlexibleUnion& other) noexcept;
-  bool operator==(const FlexibleUnion& other) const noexcept;
-  bool operator!=(const FlexibleUnion& other) const noexcept;
-  bool IsUnknown() const;
+  FlexibleUnion(FlexibleUnion&& other) noexcept
+      : FlexibleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  FlexibleUnion& operator=(FlexibleUnion&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+  FlexibleUnion(const FlexibleUnion& other) noexcept : FlexibleUnion(other.CloneStorage_()) {}
+  FlexibleUnion& operator=(const FlexibleUnion& other) noexcept {
+    if (this != &other) {
+      storage_ = other.CloneStorage_();
+    }
+    return *this;
+  }
 
-  ::test_doccomments::FlexibleUnion::Tag Which() const;
-  static FlexibleUnion WithField(int32_t val);
-  const ::fidl::internal::UnionMemberView<1, Storage_> field() const;
-  ::fidl::internal::UnionMemberView<1, Storage_> field();
+  bool operator==(const FlexibleUnion& other) const noexcept {
+    return *storage_ == *other.storage_;
+  }
+  bool operator!=(const FlexibleUnion& other) const noexcept {
+    return *storage_ != *other.storage_;
+  }
+  constexpr bool IsUnknown() const {
+    return Which() == ::test_doccomments::FlexibleUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
+  }
+
+  constexpr ::test_doccomments::FlexibleUnion::Tag Which() const {
+    return FlexibleUnion::IndexToTag(storage_->index()).value();
+  }
+  static FlexibleUnion WithField(int32_t val) {
+    return FlexibleUnion(std::make_shared<Storage_>(
+        std::in_place_index_t<1>{},
+        std::move(val)));
+  }
+
+  const ::fidl::internal::UnionMemberView<1, Storage_> field() const {
+    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+  }
+
+  ::fidl::internal::UnionMemberView<1, Storage_> field() {
+    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+  }
 
   // Sets the union to hold the field member.
   //
@@ -185,9 +276,13 @@ class FlexibleUnion {
   /// union member comment #1
   ///
   /// union member comment #3
-  FlexibleUnion& field(int32_t value);
+  FlexibleUnion& field(int32_t value) {
+    storage_->emplace<1>(std::move(value));
+    return *this;
+  }
 
-  FlexibleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+  FlexibleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -196,10 +291,26 @@ class FlexibleUnion {
   static constexpr auto kMembers = std::make_tuple(
       ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
 
-  explicit FlexibleUnion(std::shared_ptr<Storage_> storage);
+  explicit FlexibleUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
 
-  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_doccomments::FlexibleUnion::Tag tag);
-  static std::optional<::test_doccomments::FlexibleUnion::Tag> IndexToTag(size_t index);
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_doccomments::FlexibleUnion::Tag tag) {
+    switch (tag) {
+      case ::test_doccomments::FlexibleUnion::Tag::kField:
+        return 1;
+      default: {
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_doccomments::FlexibleUnion::Tag> IndexToTag(size_t index) {
+    switch (index) {
+      case 1:
+        return ::test_doccomments::FlexibleUnion::Tag::kField;
+      default:
+        return ::test_doccomments::FlexibleUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
+    }
+  }
 };
 
 /// table comment #1
@@ -216,19 +327,25 @@ class Table {
   Table& operator=(Table&&) noexcept = default;
   Table(const Table& other) noexcept;
   Table& operator=(const Table& other) noexcept;
-  bool operator==(const Table& other) const noexcept;
-  bool operator!=(const Table& other) const noexcept;
+  bool operator==(const Table& other) const noexcept {
+    return ::fidl::internal::NaturalTableCodingTraits<::test_doccomments::Table>::Equal(this, &other);
+  }
+  bool operator!=(const Table& other) const noexcept {
+    return !::fidl::internal::NaturalTableCodingTraits<::test_doccomments::Table>::Equal(this, &other);
+  }
 
-  bool IsEmpty() const;
+  bool IsEmpty() const {
+    return !(storage_.field.has_value());
+  }
 
   /// table field comment #1
   ///
   /// table field comment #3
-  const std::optional<int32_t>& field() const;
+  const std::optional<int32_t>& field() const { return storage_.field; }
   /// table field comment #1
   ///
   /// table field comment #3
-  ::std::optional<int32_t>& field();
+  ::std::optional<int32_t>& field() { return storage_.field; }
 
   // Setter for field.
   //
@@ -256,6 +373,36 @@ class Table {
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalTableMember<Storage_, int32_t, fidl::internal::NaturalCodingConstraintEmpty>{
       1, &Storage_::field});
 };
+
+inline Struct::Struct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Struct::Struct(int32_t field) noexcept
+    : storage_({.field = std::move(field)}) {}
+inline Struct::Struct(const ::test_doccomments::Struct& other) noexcept : ::test_doccomments::Struct(other.CloneStorage_()) {}
+inline Struct& ::test_doccomments::Struct::operator=(const ::test_doccomments::Struct& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Struct::Struct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Struct(Storage_{
+                                                                                        .field = {},
+                                                                                    }) {}
+inline Struct& Struct::field(int32_t value) {
+  storage_.field = std::move(value);
+  return *this;
+}
+
+inline Table::Table(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Table::Table(const ::test_doccomments::Table& other) noexcept : Table(other.CloneStorage_()) {}
+inline Table& ::test_doccomments::Table::operator=(const Table& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Table::Table(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Table(Storage_{}) {}
+inline Table& Table::field(std::optional<int32_t> value) {
+  storage_.field = std::move(value);
+  return *this;
+}
 
 }  // namespace test_doccomments
 namespace fidl {
@@ -340,16 +487,30 @@ struct internal::NaturalCodingTraits<::test_doccomments::MyStrictBits, ::fidl::i
   static constexpr size_t kInlineSize = sizeof(uint32_t);
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::NaturalEncoder* encoder, ::test_doccomments::MyStrictBits* value, size_t offset, size_t recursion_depth);
-  static void Decode(internal::NaturalDecoder* decoder, ::test_doccomments::MyStrictBits* value, size_t offset, size_t recursion_depth);
+  static void Encode(internal::NaturalEncoder* encoder, ::test_doccomments::MyStrictBits* value, size_t offset, size_t recursion_depth) {
+    if (unlikely(static_cast<uint32_t>(*value) & ~3ull)) {
+      encoder->SetError(::fidl::internal::kCodingErrorUnknownBitSetInBitsValue);
+    }
+    *encoder->template GetPtr<::test_doccomments::MyStrictBits>(offset) = *value;
+  }
+  static void Decode(internal::NaturalDecoder* decoder, ::test_doccomments::MyStrictBits* value, size_t offset, size_t recursion_depth) {
+    *value = *decoder->template GetPtr<::test_doccomments::MyStrictBits>(offset);
+    if (unlikely(static_cast<uint32_t>(*value) & ~3ull)) {
+      decoder->SetError(::fidl::internal::kCodingErrorUnknownBitSetInBitsValue);
+    }
+  }
 };
 template <>
 struct internal::NaturalCodingTraits<::test_doccomments::MyFlexibleBits, ::fidl::internal::NaturalCodingConstraintEmpty> {
   static constexpr size_t kInlineSize = sizeof(uint32_t);
   static constexpr bool kIsMemcpyCompatible = true;
 
-  static void Encode(internal::NaturalEncoder* encoder, ::test_doccomments::MyFlexibleBits* value, size_t offset, size_t recursion_depth);
-  static void Decode(internal::NaturalDecoder* decoder, ::test_doccomments::MyFlexibleBits* value, size_t offset, size_t recursion_depth);
+  static void Encode(internal::NaturalEncoder* encoder, ::test_doccomments::MyFlexibleBits* value, size_t offset, size_t recursion_depth) {
+    *encoder->template GetPtr<::test_doccomments::MyFlexibleBits>(offset) = *value;
+  }
+  static void Decode(internal::NaturalDecoder* decoder, ::test_doccomments::MyFlexibleBits* value, size_t offset, size_t recursion_depth) {
+    *value = *decoder->template GetPtr<::test_doccomments::MyFlexibleBits>(offset);
+  }
 };
 
 template <>
@@ -357,16 +518,40 @@ struct internal::NaturalCodingTraits<::test_doccomments::MyStrictEnum, ::fidl::i
   static constexpr size_t kInlineSize = sizeof(uint32_t);
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::NaturalEncoder* encoder, ::test_doccomments::MyStrictEnum* value, size_t offset, size_t recursion_depth);
-  static void Decode(internal::NaturalDecoder* decoder, ::test_doccomments::MyStrictEnum* value, size_t offset, size_t recursion_depth);
+  static void Encode(internal::NaturalEncoder* encoder, ::test_doccomments::MyStrictEnum* value, size_t offset, size_t recursion_depth) {
+    switch (*value) {
+      case ::test_doccomments::MyStrictEnum::kFoo:
+      case ::test_doccomments::MyStrictEnum::kBar:
+        break;
+      default:
+        encoder->SetError(::fidl::internal::kCodingErrorUnknownEnumValue);
+        return;
+    }
+    *encoder->template GetPtr<::test_doccomments::MyStrictEnum>(offset) = *value;
+  }
+  static void Decode(internal::NaturalDecoder* decoder, ::test_doccomments::MyStrictEnum* value, size_t offset, size_t recursion_depth) {
+    *value = *decoder->template GetPtr<::test_doccomments::MyStrictEnum>(offset);
+    switch (*value) {
+      case ::test_doccomments::MyStrictEnum::kFoo:
+      case ::test_doccomments::MyStrictEnum::kBar:
+        break;
+      default:
+        decoder->SetError(::fidl::internal::kCodingErrorUnknownEnumValue);
+        return;
+    }
+  }
 };
 template <>
 struct internal::NaturalCodingTraits<::test_doccomments::MyFlexibleEnum, ::fidl::internal::NaturalCodingConstraintEmpty> {
   static constexpr size_t kInlineSize = sizeof(uint32_t);
   static constexpr bool kIsMemcpyCompatible = true;
 
-  static void Encode(internal::NaturalEncoder* encoder, ::test_doccomments::MyFlexibleEnum* value, size_t offset, size_t recursion_depth);
-  static void Decode(internal::NaturalDecoder* decoder, ::test_doccomments::MyFlexibleEnum* value, size_t offset, size_t recursion_depth);
+  static void Encode(internal::NaturalEncoder* encoder, ::test_doccomments::MyFlexibleEnum* value, size_t offset, size_t recursion_depth) {
+    *encoder->template GetPtr<::test_doccomments::MyFlexibleEnum>(offset) = *value;
+  }
+  static void Decode(internal::NaturalDecoder* decoder, ::test_doccomments::MyFlexibleEnum* value, size_t offset, size_t recursion_depth) {
+    *value = *decoder->template GetPtr<::test_doccomments::MyFlexibleEnum>(offset);
+  }
 };
 
 #pragma clang diagnostic pop

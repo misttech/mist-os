@@ -48,6 +48,7 @@ std::ostream& fidl::ostream::Formatter<::test_aliases::ExampleOfUseOfAliases>::F
 }
 
 #endif  // __Fuchsia__
+
 namespace test_aliases {
 
 std::ostream& operator<<(std::ostream& os, const ::test_aliases::ObjType& value) {

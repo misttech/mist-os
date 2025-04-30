@@ -227,7 +227,7 @@ class FlexiblePizzaOrPasta {
     kPasta = 2,  // 0x2
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_union::wire::FlexiblePizzaOrPasta::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -419,7 +419,7 @@ class FlexibleUnion {
     kVectorStringAlsoNeedsConstructor = 3,  // 0x3
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_union::wire::FlexibleUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -697,7 +697,7 @@ class FlexibleFoo {
     kI = 2,  // 0x2
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_union::wire::FlexibleFoo::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -807,7 +807,7 @@ class ExplicitFoo {
     kS = 2,  // 0x2
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_union::wire::ExplicitFoo::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -917,7 +917,7 @@ class OlderSimpleUnion {
     kF = 2,  // 0x2
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_union::wire::OlderSimpleUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -975,7 +975,7 @@ class NewerSimpleUnion {
     kV = 3,  // 0x3
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_union::wire::NewerSimpleUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -1115,7 +1115,7 @@ class UnionContainingEmptyStruct {
     kEmpty = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_union::wire::UnionContainingEmptyStruct::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -1200,7 +1200,7 @@ class ExplicitFlexibleUnion {
     kF = 4,  // 0x4
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_union::wire::ExplicitFlexibleUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -1256,7 +1256,7 @@ class UnionWithAttributes {
     kX = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_union::wire::UnionWithAttributes::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -1302,7 +1302,7 @@ class EmptyFlexibleUnion {
   enum class Tag : fidl_xunion_tag_t {
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_union::wire::EmptyFlexibleUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 

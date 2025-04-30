@@ -65,13 +65,21 @@ class StructWithNullableString {
   StructWithNullableString(const StructWithNullableString& other) noexcept;
   StructWithNullableString& operator=(const StructWithNullableString& other) noexcept;
 
-  bool operator==(const StructWithNullableString& other) const noexcept;
-  bool operator!=(const StructWithNullableString& other) const noexcept;
+  bool operator==(const StructWithNullableString& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableString, 16>::Equal(this, &other);
+  }
+  bool operator!=(const StructWithNullableString& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableString, 16>::Equal(this, &other);
+  }
 
   const ::std::optional<::std::string>&
-  val() const;
+  val() const {
+    return storage_.val;
+  }
 
-  ::std::optional<::std::string>& val();
+  ::std::optional<::std::string>& val() {
+    return storage_.val;
+  }
 
   // Setter for val.
   //
@@ -114,13 +122,21 @@ class StructWithNullableVector {
   StructWithNullableVector(const StructWithNullableVector& other) noexcept;
   StructWithNullableVector& operator=(const StructWithNullableVector& other) noexcept;
 
-  bool operator==(const StructWithNullableVector& other) const noexcept;
-  bool operator!=(const StructWithNullableVector& other) const noexcept;
+  bool operator==(const StructWithNullableVector& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableVector, 16>::Equal(this, &other);
+  }
+  bool operator!=(const StructWithNullableVector& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableVector, 16>::Equal(this, &other);
+  }
 
   const ::std::optional<::std::vector<int32_t>>&
-  val() const;
+  val() const {
+    return storage_.val;
+  }
 
-  ::std::optional<::std::vector<int32_t>>& val();
+  ::std::optional<::std::vector<int32_t>>& val() {
+    return storage_.val;
+  }
 
   // Setter for val.
   //
@@ -164,9 +180,13 @@ class StructWithNullableHandle {
   StructWithNullableHandle& operator=(StructWithNullableHandle&&) noexcept = default;
 
   const ::zx::vmo&
-  val() const;
+  val() const {
+    return storage_.val;
+  }
 
-  ::zx::vmo& val();
+  ::zx::vmo& val() {
+    return storage_.val;
+  }
 
   // Setter for val.
   //
@@ -210,13 +230,21 @@ class SimpleProtocolAddRequest {
   SimpleProtocolAddRequest(const SimpleProtocolAddRequest& other) noexcept;
   SimpleProtocolAddRequest& operator=(const SimpleProtocolAddRequest& other) noexcept;
 
-  bool operator==(const SimpleProtocolAddRequest& other) const noexcept;
-  bool operator!=(const SimpleProtocolAddRequest& other) const noexcept;
+  bool operator==(const SimpleProtocolAddRequest& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_nullable::SimpleProtocolAddRequest, 8>::Equal(this, &other);
+  }
+  bool operator!=(const SimpleProtocolAddRequest& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_nullable::SimpleProtocolAddRequest, 8>::Equal(this, &other);
+  }
 
   int32_t
-  a() const;
+  a() const {
+    return storage_.a;
+  }
 
-  int32_t& a();
+  int32_t& a() {
+    return storage_.a;
+  }
 
   // Setter for a.
   //
@@ -224,9 +252,13 @@ class SimpleProtocolAddRequest {
   SimpleProtocolAddRequest& a(int32_t value);
 
   int32_t
-  b() const;
+  b() const {
+    return storage_.b;
+  }
 
-  int32_t& b();
+  int32_t& b() {
+    return storage_.b;
+  }
 
   // Setter for b.
   //
@@ -271,13 +303,21 @@ class SimpleProtocolAddResponse {
   SimpleProtocolAddResponse(const SimpleProtocolAddResponse& other) noexcept;
   SimpleProtocolAddResponse& operator=(const SimpleProtocolAddResponse& other) noexcept;
 
-  bool operator==(const SimpleProtocolAddResponse& other) const noexcept;
-  bool operator!=(const SimpleProtocolAddResponse& other) const noexcept;
+  bool operator==(const SimpleProtocolAddResponse& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_nullable::SimpleProtocolAddResponse, 4>::Equal(this, &other);
+  }
+  bool operator!=(const SimpleProtocolAddResponse& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_nullable::SimpleProtocolAddResponse, 4>::Equal(this, &other);
+  }
 
   int32_t
-  sum() const;
+  sum() const {
+    return storage_.sum;
+  }
 
-  int32_t& sum();
+  int32_t& sum() {
+    return storage_.sum;
+  }
 
   // Setter for sum.
   //
@@ -321,9 +361,13 @@ class StructWithNullableProtocol {
   StructWithNullableProtocol& operator=(StructWithNullableProtocol&&) noexcept = default;
 
   const ::fidl::ClientEnd<::test_nullable::SimpleProtocol>&
-  val() const;
+  val() const {
+    return storage_.val;
+  }
 
-  ::fidl::ClientEnd<::test_nullable::SimpleProtocol>& val();
+  ::fidl::ClientEnd<::test_nullable::SimpleProtocol>& val() {
+    return storage_.val;
+  }
 
   // Setter for val.
   //
@@ -364,9 +408,13 @@ class StructWithNullableRequest {
   StructWithNullableRequest& operator=(StructWithNullableRequest&&) noexcept = default;
 
   const ::fidl::ServerEnd<::test_nullable::SimpleProtocol>&
-  val() const;
+  val() const {
+    return storage_.val;
+  }
 
-  ::fidl::ServerEnd<::test_nullable::SimpleProtocol>& val();
+  ::fidl::ServerEnd<::test_nullable::SimpleProtocol>& val() {
+    return storage_.val;
+  }
 
   // Setter for val.
   //
@@ -410,13 +458,21 @@ class Int32Wrapper {
   Int32Wrapper(const Int32Wrapper& other) noexcept;
   Int32Wrapper& operator=(const Int32Wrapper& other) noexcept;
 
-  bool operator==(const Int32Wrapper& other) const noexcept;
-  bool operator!=(const Int32Wrapper& other) const noexcept;
+  bool operator==(const Int32Wrapper& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_nullable::Int32Wrapper, 4>::Equal(this, &other);
+  }
+  bool operator!=(const Int32Wrapper& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_nullable::Int32Wrapper, 4>::Equal(this, &other);
+  }
 
   int32_t
-  val() const;
+  val() const {
+    return storage_.val;
+  }
 
-  int32_t& val();
+  int32_t& val() {
+    return storage_.val;
+  }
 
   // Setter for val.
   //
@@ -459,13 +515,21 @@ class StructWithNullableStruct {
   StructWithNullableStruct(const StructWithNullableStruct& other) noexcept;
   StructWithNullableStruct& operator=(const StructWithNullableStruct& other) noexcept;
 
-  bool operator==(const StructWithNullableStruct& other) const noexcept;
-  bool operator!=(const StructWithNullableStruct& other) const noexcept;
+  bool operator==(const StructWithNullableStruct& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableStruct, 8>::Equal(this, &other);
+  }
+  bool operator!=(const StructWithNullableStruct& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableStruct, 8>::Equal(this, &other);
+  }
 
   const ::fidl::Box<::test_nullable::Int32Wrapper>&
-  val() const;
+  val() const {
+    return storage_.val;
+  }
 
-  ::fidl::Box<::test_nullable::Int32Wrapper>& val();
+  ::fidl::Box<::test_nullable::Int32Wrapper>& val() {
+    return storage_.val;
+  }
 
   // Setter for val.
   //
@@ -502,32 +566,79 @@ class SimpleUnion {
     kB = 2,  // 0x2
   };
 
-  SimpleUnion(SimpleUnion&& other) noexcept;
-  SimpleUnion& operator=(SimpleUnion&& other) noexcept;
-  SimpleUnion(const SimpleUnion& other) noexcept;
-  SimpleUnion& operator=(const SimpleUnion& other) noexcept;
-  bool operator==(const SimpleUnion& other) const noexcept;
-  bool operator!=(const SimpleUnion& other) const noexcept;
+  SimpleUnion(SimpleUnion&& other) noexcept
+      : SimpleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  SimpleUnion& operator=(SimpleUnion&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+  SimpleUnion(const SimpleUnion& other) noexcept : SimpleUnion(other.CloneStorage_()) {}
+  SimpleUnion& operator=(const SimpleUnion& other) noexcept {
+    if (this != &other) {
+      storage_ = other.CloneStorage_();
+    }
+    return *this;
+  }
 
-  ::test_nullable::SimpleUnion::Tag Which() const;
-  static SimpleUnion WithA(int32_t val);
-  const ::fidl::internal::UnionMemberView<1, Storage_> a() const;
-  ::fidl::internal::UnionMemberView<1, Storage_> a();
+  bool operator==(const SimpleUnion& other) const noexcept {
+    return *storage_ == *other.storage_;
+  }
+  bool operator!=(const SimpleUnion& other) const noexcept {
+    return *storage_ != *other.storage_;
+  }
+
+  constexpr ::test_nullable::SimpleUnion::Tag Which() const {
+    return SimpleUnion::IndexToTag(storage_->index()).value();
+  }
+  static SimpleUnion WithA(int32_t val) {
+    return SimpleUnion(std::make_shared<Storage_>(
+        std::in_place_index_t<1>{},
+        std::move(val)));
+  }
+
+  const ::fidl::internal::UnionMemberView<1, Storage_> a() const {
+    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+  }
+
+  ::fidl::internal::UnionMemberView<1, Storage_> a() {
+    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+  }
 
   // Sets the union to hold the a member.
   //
 
-  SimpleUnion& a(int32_t value);
-  static SimpleUnion WithB(float val);
-  const ::fidl::internal::UnionMemberView<2, Storage_> b() const;
-  ::fidl::internal::UnionMemberView<2, Storage_> b();
+  SimpleUnion& a(int32_t value) {
+    storage_->emplace<1>(std::move(value));
+    return *this;
+  }
+  static SimpleUnion WithB(float val) {
+    return SimpleUnion(std::make_shared<Storage_>(
+        std::in_place_index_t<2>{},
+        std::move(val)));
+  }
+
+  const ::fidl::internal::UnionMemberView<2, Storage_> b() const {
+    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+  }
+
+  ::fidl::internal::UnionMemberView<2, Storage_> b() {
+    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
+  }
 
   // Sets the union to hold the b member.
   //
 
-  SimpleUnion& b(float value);
+  SimpleUnion& b(float value) {
+    storage_->emplace<2>(std::move(value));
+    return *this;
+  }
 
-  SimpleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+  SimpleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -536,10 +647,31 @@ class SimpleUnion {
   static constexpr auto kMembers = std::make_tuple(
       ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
 
-  explicit SimpleUnion(std::shared_ptr<Storage_> storage);
+  explicit SimpleUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
 
-  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_nullable::SimpleUnion::Tag tag);
-  static std::optional<::test_nullable::SimpleUnion::Tag> IndexToTag(size_t index);
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_nullable::SimpleUnion::Tag tag) {
+    switch (tag) {
+      case ::test_nullable::SimpleUnion::Tag::kA:
+        return 1;
+      case ::test_nullable::SimpleUnion::Tag::kB:
+        return 2;
+      default: {
+        decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_nullable::SimpleUnion::Tag> IndexToTag(size_t index) {
+    switch (index) {
+      case 1:
+        return ::test_nullable::SimpleUnion::Tag::kA;
+      case 2:
+        return ::test_nullable::SimpleUnion::Tag::kB;
+      default:
+        return std::nullopt;
+    }
+  }
 };
 
 class StructWithNullableUnion {
@@ -561,13 +693,21 @@ class StructWithNullableUnion {
   StructWithNullableUnion(const StructWithNullableUnion& other) noexcept;
   StructWithNullableUnion& operator=(const StructWithNullableUnion& other) noexcept;
 
-  bool operator==(const StructWithNullableUnion& other) const noexcept;
-  bool operator!=(const StructWithNullableUnion& other) const noexcept;
+  bool operator==(const StructWithNullableUnion& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableUnion, 16>::Equal(this, &other);
+  }
+  bool operator!=(const StructWithNullableUnion& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableUnion, 16>::Equal(this, &other);
+  }
 
   const ::fidl::Box<::test_nullable::SimpleUnion>&
-  val() const;
+  val() const {
+    return storage_.val;
+  }
 
-  ::fidl::Box<::test_nullable::SimpleUnion>& val();
+  ::fidl::Box<::test_nullable::SimpleUnion>& val() {
+    return storage_.val;
+  }
 
   // Setter for val.
   //
@@ -590,6 +730,175 @@ class StructWithNullableUnion {
       &Storage_::val, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline StructWithNullableString::StructWithNullableString(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline StructWithNullableString::StructWithNullableString(::std::optional<::std::string> val) noexcept
+    : storage_({.val = std::move(val)}) {}
+inline StructWithNullableString::StructWithNullableString(const ::test_nullable::StructWithNullableString& other) noexcept : ::test_nullable::StructWithNullableString(other.CloneStorage_()) {}
+inline StructWithNullableString& ::test_nullable::StructWithNullableString::operator=(const ::test_nullable::StructWithNullableString& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline StructWithNullableString::StructWithNullableString(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructWithNullableString(Storage_{
+                                                                                                                            .val = {},
+                                                                                                                        }) {}
+inline StructWithNullableString& StructWithNullableString::val(::std::optional<::std::string> value) {
+  storage_.val = std::move(value);
+  return *this;
+}
+
+inline StructWithNullableVector::StructWithNullableVector(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline StructWithNullableVector::StructWithNullableVector(::std::optional<::std::vector<int32_t>> val) noexcept
+    : storage_({.val = std::move(val)}) {}
+inline StructWithNullableVector::StructWithNullableVector(const ::test_nullable::StructWithNullableVector& other) noexcept : ::test_nullable::StructWithNullableVector(other.CloneStorage_()) {}
+inline StructWithNullableVector& ::test_nullable::StructWithNullableVector::operator=(const ::test_nullable::StructWithNullableVector& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline StructWithNullableVector::StructWithNullableVector(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructWithNullableVector(Storage_{
+                                                                                                                            .val = {},
+                                                                                                                        }) {}
+inline StructWithNullableVector& StructWithNullableVector::val(::std::optional<::std::vector<int32_t>> value) {
+  storage_.val = std::move(value);
+  return *this;
+}
+
+#ifdef __Fuchsia__
+
+inline StructWithNullableHandle::StructWithNullableHandle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline StructWithNullableHandle::StructWithNullableHandle(::zx::vmo val) noexcept
+    : storage_({.val = std::move(val)}) {}
+
+inline StructWithNullableHandle::StructWithNullableHandle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructWithNullableHandle(Storage_{
+                                                                                                                            .val = {},
+                                                                                                                        }) {}
+inline StructWithNullableHandle& StructWithNullableHandle::val(::zx::vmo value) {
+  storage_.val = std::move(value);
+  return *this;
+}
+
+#endif  // __Fuchsia__
+
+inline SimpleProtocolAddRequest::SimpleProtocolAddRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SimpleProtocolAddRequest::SimpleProtocolAddRequest(int32_t a, int32_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline SimpleProtocolAddRequest::SimpleProtocolAddRequest(const ::test_nullable::SimpleProtocolAddRequest& other) noexcept : ::test_nullable::SimpleProtocolAddRequest(other.CloneStorage_()) {}
+inline SimpleProtocolAddRequest& ::test_nullable::SimpleProtocolAddRequest::operator=(const ::test_nullable::SimpleProtocolAddRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SimpleProtocolAddRequest::SimpleProtocolAddRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SimpleProtocolAddRequest(Storage_{
+                                                                                                                            .a = {},
+                                                                                                                            .b = {},
+                                                                                                                        }) {}
+inline SimpleProtocolAddRequest& SimpleProtocolAddRequest::a(int32_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline SimpleProtocolAddRequest& SimpleProtocolAddRequest::b(int32_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline SimpleProtocolAddResponse::SimpleProtocolAddResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SimpleProtocolAddResponse::SimpleProtocolAddResponse(int32_t sum) noexcept
+    : storage_({.sum = std::move(sum)}) {}
+inline SimpleProtocolAddResponse::SimpleProtocolAddResponse(const ::test_nullable::SimpleProtocolAddResponse& other) noexcept : ::test_nullable::SimpleProtocolAddResponse(other.CloneStorage_()) {}
+inline SimpleProtocolAddResponse& ::test_nullable::SimpleProtocolAddResponse::operator=(const ::test_nullable::SimpleProtocolAddResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SimpleProtocolAddResponse::SimpleProtocolAddResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SimpleProtocolAddResponse(Storage_{
+                                                                                                                              .sum = {},
+                                                                                                                          }) {}
+inline SimpleProtocolAddResponse& SimpleProtocolAddResponse::sum(int32_t value) {
+  storage_.sum = std::move(value);
+  return *this;
+}
+
+#ifdef __Fuchsia__
+
+inline StructWithNullableProtocol::StructWithNullableProtocol(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline StructWithNullableProtocol::StructWithNullableProtocol(::fidl::ClientEnd<::test_nullable::SimpleProtocol> val) noexcept
+    : storage_({.val = std::move(val)}) {}
+
+inline StructWithNullableProtocol::StructWithNullableProtocol(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructWithNullableProtocol(Storage_{
+                                                                                                                                .val = {},
+                                                                                                                            }) {}
+inline StructWithNullableProtocol& StructWithNullableProtocol::val(::fidl::ClientEnd<::test_nullable::SimpleProtocol> value) {
+  storage_.val = std::move(value);
+  return *this;
+}
+
+inline StructWithNullableRequest::StructWithNullableRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline StructWithNullableRequest::StructWithNullableRequest(::fidl::ServerEnd<::test_nullable::SimpleProtocol> val) noexcept
+    : storage_({.val = std::move(val)}) {}
+
+inline StructWithNullableRequest::StructWithNullableRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructWithNullableRequest(Storage_{
+                                                                                                                              .val = {},
+                                                                                                                          }) {}
+inline StructWithNullableRequest& StructWithNullableRequest::val(::fidl::ServerEnd<::test_nullable::SimpleProtocol> value) {
+  storage_.val = std::move(value);
+  return *this;
+}
+
+#endif  // __Fuchsia__
+
+inline Int32Wrapper::Int32Wrapper(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Int32Wrapper::Int32Wrapper(int32_t val) noexcept
+    : storage_({.val = std::move(val)}) {}
+inline Int32Wrapper::Int32Wrapper(const ::test_nullable::Int32Wrapper& other) noexcept : ::test_nullable::Int32Wrapper(other.CloneStorage_()) {}
+inline Int32Wrapper& ::test_nullable::Int32Wrapper::operator=(const ::test_nullable::Int32Wrapper& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Int32Wrapper::Int32Wrapper(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Int32Wrapper(Storage_{
+                                                                                                    .val = {},
+                                                                                                }) {}
+inline Int32Wrapper& Int32Wrapper::val(int32_t value) {
+  storage_.val = std::move(value);
+  return *this;
+}
+
+inline StructWithNullableStruct::StructWithNullableStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline StructWithNullableStruct::StructWithNullableStruct(::fidl::Box<::test_nullable::Int32Wrapper> val) noexcept
+    : storage_({.val = std::move(val)}) {}
+inline StructWithNullableStruct::StructWithNullableStruct(const ::test_nullable::StructWithNullableStruct& other) noexcept : ::test_nullable::StructWithNullableStruct(other.CloneStorage_()) {}
+inline StructWithNullableStruct& ::test_nullable::StructWithNullableStruct::operator=(const ::test_nullable::StructWithNullableStruct& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline StructWithNullableStruct::StructWithNullableStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructWithNullableStruct(Storage_{
+                                                                                                                            .val = {},
+                                                                                                                        }) {}
+inline StructWithNullableStruct& StructWithNullableStruct::val(::fidl::Box<::test_nullable::Int32Wrapper> value) {
+  storage_.val = std::move(value);
+  return *this;
+}
+
+inline StructWithNullableUnion::StructWithNullableUnion(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline StructWithNullableUnion::StructWithNullableUnion(::fidl::Box<::test_nullable::SimpleUnion> val) noexcept
+    : storage_({.val = std::move(val)}) {}
+inline StructWithNullableUnion::StructWithNullableUnion(const ::test_nullable::StructWithNullableUnion& other) noexcept : ::test_nullable::StructWithNullableUnion(other.CloneStorage_()) {}
+inline StructWithNullableUnion& ::test_nullable::StructWithNullableUnion::operator=(const ::test_nullable::StructWithNullableUnion& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline StructWithNullableUnion::StructWithNullableUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructWithNullableUnion(Storage_{
+                                                                                                                          .val = {},
+                                                                                                                      }) {}
+inline StructWithNullableUnion& StructWithNullableUnion::val(::fidl::Box<::test_nullable::SimpleUnion> value) {
+  storage_.val = std::move(value);
+  return *this;
+}
 
 }  // namespace test_nullable
 namespace fidl {

@@ -46,13 +46,21 @@ class SuperFooRequest {
   SuperFooRequest(const SuperFooRequest& other) noexcept;
   SuperFooRequest& operator=(const SuperFooRequest& other) noexcept;
 
-  bool operator==(const SuperFooRequest& other) const noexcept;
-  bool operator!=(const SuperFooRequest& other) const noexcept;
+  bool operator==(const SuperFooRequest& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_inheritance::SuperFooRequest, 16>::Equal(this, &other);
+  }
+  bool operator!=(const SuperFooRequest& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_inheritance::SuperFooRequest, 16>::Equal(this, &other);
+  }
 
   const ::std::string&
-  s() const;
+  s() const {
+    return storage_.s;
+  }
 
-  ::std::string& s();
+  ::std::string& s() {
+    return storage_.s;
+  }
 
   // Setter for s.
   //
@@ -95,13 +103,21 @@ class SuperFooResponse {
   SuperFooResponse(const SuperFooResponse& other) noexcept;
   SuperFooResponse& operator=(const SuperFooResponse& other) noexcept;
 
-  bool operator==(const SuperFooResponse& other) const noexcept;
-  bool operator!=(const SuperFooResponse& other) const noexcept;
+  bool operator==(const SuperFooResponse& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_inheritance::SuperFooResponse, 8>::Equal(this, &other);
+  }
+  bool operator!=(const SuperFooResponse& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_inheritance::SuperFooResponse, 8>::Equal(this, &other);
+  }
 
   int64_t
-  y() const;
+  y() const {
+    return storage_.y;
+  }
 
-  int64_t& y();
+  int64_t& y() {
+    return storage_.y;
+  }
 
   // Setter for y.
   //
@@ -124,6 +140,40 @@ class SuperFooResponse {
       &Storage_::y, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline SuperFooRequest::SuperFooRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SuperFooRequest::SuperFooRequest(::std::string s) noexcept
+    : storage_({.s = std::move(s)}) {}
+inline SuperFooRequest::SuperFooRequest(const ::test_inheritance::SuperFooRequest& other) noexcept : ::test_inheritance::SuperFooRequest(other.CloneStorage_()) {}
+inline SuperFooRequest& ::test_inheritance::SuperFooRequest::operator=(const ::test_inheritance::SuperFooRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SuperFooRequest::SuperFooRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SuperFooRequest(Storage_{
+                                                                                                          .s = {},
+                                                                                                      }) {}
+inline SuperFooRequest& SuperFooRequest::s(::std::string value) {
+  storage_.s = std::move(value);
+  return *this;
+}
+
+inline SuperFooResponse::SuperFooResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SuperFooResponse::SuperFooResponse(int64_t y) noexcept
+    : storage_({.y = std::move(y)}) {}
+inline SuperFooResponse::SuperFooResponse(const ::test_inheritance::SuperFooResponse& other) noexcept : ::test_inheritance::SuperFooResponse(other.CloneStorage_()) {}
+inline SuperFooResponse& ::test_inheritance::SuperFooResponse::operator=(const ::test_inheritance::SuperFooResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SuperFooResponse::SuperFooResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SuperFooResponse(Storage_{
+                                                                                                            .y = {},
+                                                                                                        }) {}
+inline SuperFooResponse& SuperFooResponse::y(int64_t value) {
+  storage_.y = std::move(value);
+  return *this;
+}
 
 }  // namespace test_inheritance
 namespace fidl {

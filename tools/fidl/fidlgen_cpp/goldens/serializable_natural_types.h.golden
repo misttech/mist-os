@@ -43,13 +43,21 @@ class SerializableStruct {
   SerializableStruct(const SerializableStruct& other) noexcept;
   SerializableStruct& operator=(const SerializableStruct& other) noexcept;
 
-  bool operator==(const SerializableStruct& other) const noexcept;
-  bool operator!=(const SerializableStruct& other) const noexcept;
+  bool operator==(const SerializableStruct& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_serializable::SerializableStruct, 1>::Equal(this, &other);
+  }
+  bool operator!=(const SerializableStruct& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_serializable::SerializableStruct, 1>::Equal(this, &other);
+  }
 
   uint8_t
-  __reserved() const;
+  __reserved() const {
+    return storage_.__reserved;
+  }
 
-  uint8_t& __reserved();
+  uint8_t& __reserved() {
+    return storage_.__reserved;
+  }
 
   // Setter for __reserved.
   //
@@ -85,10 +93,16 @@ class SerializableTable {
   SerializableTable& operator=(SerializableTable&&) noexcept = default;
   SerializableTable(const SerializableTable& other) noexcept;
   SerializableTable& operator=(const SerializableTable& other) noexcept;
-  bool operator==(const SerializableTable& other) const noexcept;
-  bool operator!=(const SerializableTable& other) const noexcept;
+  bool operator==(const SerializableTable& other) const noexcept {
+    return ::fidl::internal::NaturalTableCodingTraits<::test_serializable::SerializableTable>::Equal(this, &other);
+  }
+  bool operator!=(const SerializableTable& other) const noexcept {
+    return !::fidl::internal::NaturalTableCodingTraits<::test_serializable::SerializableTable>::Equal(this, &other);
+  }
 
-  bool IsEmpty() const;
+  bool IsEmpty() const {
+    return true;
+  }
 
   SerializableTable(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
@@ -117,24 +131,58 @@ class SerializableUnion {
   };
   static constexpr char kSerializableName[] = "test.serializable.SerializableUnion";
 
-  SerializableUnion(SerializableUnion&& other) noexcept;
-  SerializableUnion& operator=(SerializableUnion&& other) noexcept;
-  SerializableUnion(const SerializableUnion& other) noexcept;
-  SerializableUnion& operator=(const SerializableUnion& other) noexcept;
-  bool operator==(const SerializableUnion& other) const noexcept;
-  bool operator!=(const SerializableUnion& other) const noexcept;
+  SerializableUnion(SerializableUnion&& other) noexcept
+      : SerializableUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  SerializableUnion& operator=(SerializableUnion&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+  SerializableUnion(const SerializableUnion& other) noexcept : SerializableUnion(other.CloneStorage_()) {}
+  SerializableUnion& operator=(const SerializableUnion& other) noexcept {
+    if (this != &other) {
+      storage_ = other.CloneStorage_();
+    }
+    return *this;
+  }
 
-  ::test_serializable::SerializableUnion::Tag Which() const;
-  static SerializableUnion WithUnused(bool val);
-  const ::fidl::internal::UnionMemberView<1, Storage_> unused() const;
-  ::fidl::internal::UnionMemberView<1, Storage_> unused();
+  bool operator==(const SerializableUnion& other) const noexcept {
+    return *storage_ == *other.storage_;
+  }
+  bool operator!=(const SerializableUnion& other) const noexcept {
+    return *storage_ != *other.storage_;
+  }
+
+  constexpr ::test_serializable::SerializableUnion::Tag Which() const {
+    return SerializableUnion::IndexToTag(storage_->index()).value();
+  }
+  static SerializableUnion WithUnused(bool val) {
+    return SerializableUnion(std::make_shared<Storage_>(
+        std::in_place_index_t<1>{},
+        std::move(val)));
+  }
+
+  const ::fidl::internal::UnionMemberView<1, Storage_> unused() const {
+    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+  }
+
+  ::fidl::internal::UnionMemberView<1, Storage_> unused() {
+    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
+  }
 
   // Sets the union to hold the unused member.
   //
 
-  SerializableUnion& unused(bool value);
+  SerializableUnion& unused(bool value) {
+    storage_->emplace<1>(std::move(value));
+    return *this;
+  }
 
-  SerializableUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+  SerializableUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -143,11 +191,54 @@ class SerializableUnion {
   static constexpr auto kMembers = std::make_tuple(
       ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
 
-  explicit SerializableUnion(std::shared_ptr<Storage_> storage);
+  explicit SerializableUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
 
-  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_serializable::SerializableUnion::Tag tag);
-  static std::optional<::test_serializable::SerializableUnion::Tag> IndexToTag(size_t index);
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_serializable::SerializableUnion::Tag tag) {
+    switch (tag) {
+      case ::test_serializable::SerializableUnion::Tag::kUnused:
+        return 1;
+      default: {
+        decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_serializable::SerializableUnion::Tag> IndexToTag(size_t index) {
+    switch (index) {
+      case 1:
+        return ::test_serializable::SerializableUnion::Tag::kUnused;
+      default:
+        return std::nullopt;
+    }
+  }
 };
+
+inline SerializableStruct::SerializableStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SerializableStruct::SerializableStruct(uint8_t __reserved) noexcept
+    : storage_({.__reserved = std::move(__reserved)}) {}
+inline SerializableStruct::SerializableStruct(const ::test_serializable::SerializableStruct& other) noexcept : ::test_serializable::SerializableStruct(other.CloneStorage_()) {}
+inline SerializableStruct& ::test_serializable::SerializableStruct::operator=(const ::test_serializable::SerializableStruct& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SerializableStruct::SerializableStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SerializableStruct(Storage_{
+                                                                                                                .__reserved = 0u,
+                                                                                                            }) {}
+inline SerializableStruct& SerializableStruct::__reserved(uint8_t value) {
+  storage_.__reserved = std::move(value);
+  return *this;
+}
+
+inline SerializableTable::SerializableTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SerializableTable::SerializableTable(const ::test_serializable::SerializableTable& other) noexcept : SerializableTable(other.CloneStorage_()) {}
+inline SerializableTable& ::test_serializable::SerializableTable::operator=(const SerializableTable& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SerializableTable::SerializableTable(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SerializableTable(Storage_{}) {}
 
 }  // namespace test_serializable
 namespace fidl {

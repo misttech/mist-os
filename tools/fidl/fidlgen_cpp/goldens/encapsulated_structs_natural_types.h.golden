@@ -54,13 +54,21 @@ class Int8Int32 {
   Int8Int32(const Int8Int32& other) noexcept;
   Int8Int32& operator=(const Int8Int32& other) noexcept;
 
-  bool operator==(const Int8Int32& other) const noexcept;
-  bool operator!=(const Int8Int32& other) const noexcept;
+  bool operator==(const Int8Int32& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::Int8Int32, 8>::Equal(this, &other);
+  }
+  bool operator!=(const Int8Int32& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::Int8Int32, 8>::Equal(this, &other);
+  }
 
   int8_t
-  a() const;
+  a() const {
+    return storage_.a;
+  }
 
-  int8_t& a();
+  int8_t& a() {
+    return storage_.a;
+  }
 
   // Setter for a.
   //
@@ -68,9 +76,13 @@ class Int8Int32 {
   Int8Int32& a(int8_t value);
 
   int32_t
-  b() const;
+  b() const {
+    return storage_.b;
+  }
 
-  int32_t& b();
+  int32_t& b() {
+    return storage_.b;
+  }
 
   // Setter for b.
   //
@@ -118,13 +130,21 @@ class Int16Int8 {
   Int16Int8(const Int16Int8& other) noexcept;
   Int16Int8& operator=(const Int16Int8& other) noexcept;
 
-  bool operator==(const Int16Int8& other) const noexcept;
-  bool operator!=(const Int16Int8& other) const noexcept;
+  bool operator==(const Int16Int8& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::Int16Int8, 4>::Equal(this, &other);
+  }
+  bool operator!=(const Int16Int8& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::Int16Int8, 4>::Equal(this, &other);
+  }
 
   int16_t
-  a() const;
+  a() const {
+    return storage_.a;
+  }
 
-  int16_t& a();
+  int16_t& a() {
+    return storage_.a;
+  }
 
   // Setter for a.
   //
@@ -132,9 +152,13 @@ class Int16Int8 {
   Int16Int8& a(int16_t value);
 
   int8_t
-  b() const;
+  b() const {
+    return storage_.b;
+  }
 
-  int8_t& b();
+  int8_t& b() {
+    return storage_.b;
+  }
 
   // Setter for b.
   //
@@ -182,13 +206,21 @@ class ArrayInt16Int8 {
   ArrayInt16Int8(const ArrayInt16Int8& other) noexcept;
   ArrayInt16Int8& operator=(const ArrayInt16Int8& other) noexcept;
 
-  bool operator==(const ArrayInt16Int8& other) const noexcept;
-  bool operator!=(const ArrayInt16Int8& other) const noexcept;
+  bool operator==(const ArrayInt16Int8& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::ArrayInt16Int8, 12>::Equal(this, &other);
+  }
+  bool operator!=(const ArrayInt16Int8& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::ArrayInt16Int8, 12>::Equal(this, &other);
+  }
 
   const ::std::array<::test_encapsulatedstructs::Int16Int8, 3>&
-  arr() const;
+  arr() const {
+    return storage_.arr;
+  }
 
-  ::std::array<::test_encapsulatedstructs::Int16Int8, 3>& arr();
+  ::std::array<::test_encapsulatedstructs::Int16Int8, 3>& arr() {
+    return storage_.arr;
+  }
 
   // Setter for arr.
   //
@@ -231,13 +263,21 @@ class StructPaddingTestStruct {
   StructPaddingTestStruct(const StructPaddingTestStruct& other) noexcept;
   StructPaddingTestStruct& operator=(const StructPaddingTestStruct& other) noexcept;
 
-  bool operator==(const StructPaddingTestStruct& other) const noexcept;
-  bool operator!=(const StructPaddingTestStruct& other) const noexcept;
+  bool operator==(const StructPaddingTestStruct& other) const noexcept {
+    return ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::StructPaddingTestStruct, 24>::Equal(this, &other);
+  }
+  bool operator!=(const StructPaddingTestStruct& other) const noexcept {
+    return !::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::StructPaddingTestStruct, 24>::Equal(this, &other);
+  }
 
   const ::test_encapsulatedstructs::Int16Int8&
-  trailing() const;
+  trailing() const {
+    return storage_.trailing;
+  }
 
-  ::test_encapsulatedstructs::Int16Int8& trailing();
+  ::test_encapsulatedstructs::Int16Int8& trailing() {
+    return storage_.trailing;
+  }
 
   // Setter for trailing.
   //
@@ -245,9 +285,13 @@ class StructPaddingTestStruct {
   StructPaddingTestStruct& trailing(::test_encapsulatedstructs::Int16Int8 value);
 
   const ::test_encapsulatedstructs::Int8Int32&
-  inner() const;
+  inner() const {
+    return storage_.inner;
+  }
 
-  ::test_encapsulatedstructs::Int8Int32& inner();
+  ::test_encapsulatedstructs::Int8Int32& inner() {
+    return storage_.inner;
+  }
 
   // Setter for inner.
   //
@@ -255,9 +299,13 @@ class StructPaddingTestStruct {
   StructPaddingTestStruct& inner(::test_encapsulatedstructs::Int8Int32 value);
 
   const ::test_encapsulatedstructs::ArrayInt16Int8&
-  array() const;
+  array() const {
+    return storage_.array;
+  }
 
-  ::test_encapsulatedstructs::ArrayInt16Int8& array();
+  ::test_encapsulatedstructs::ArrayInt16Int8& array() {
+    return storage_.array;
+  }
 
   // Setter for array.
   //
@@ -304,9 +352,13 @@ class NonInlineStructTestStruct {
   NonInlineStructTestStruct& operator=(NonInlineStructTestStruct&&) noexcept = default;
 
   const ::fidl::Box<::test_encapsulatedstructs::Int16Int8>&
-  element() const;
+  element() const {
+    return storage_.element;
+  }
 
-  ::fidl::Box<::test_encapsulatedstructs::Int16Int8>& element();
+  ::fidl::Box<::test_encapsulatedstructs::Int16Int8>& element() {
+    return storage_.element;
+  }
 
   // Setter for element.
   //
@@ -314,9 +366,13 @@ class NonInlineStructTestStruct {
   NonInlineStructTestStruct& element(::fidl::Box<::test_encapsulatedstructs::Int16Int8> value);
 
   const ::zx::handle&
-  h() const;
+  h() const {
+    return storage_.h;
+  }
 
-  ::zx::handle& h();
+  ::zx::handle& h() {
+    return storage_.h;
+  }
 
   // Setter for h.
   //
@@ -362,9 +418,13 @@ class TopLevelStruct {
   TopLevelStruct& operator=(TopLevelStruct&&) noexcept = default;
 
   const ::test_encapsulatedstructs::StructPaddingTestStruct&
-  a() const;
+  a() const {
+    return storage_.a;
+  }
 
-  ::test_encapsulatedstructs::StructPaddingTestStruct& a();
+  ::test_encapsulatedstructs::StructPaddingTestStruct& a() {
+    return storage_.a;
+  }
 
   // Setter for a.
   //
@@ -372,9 +432,13 @@ class TopLevelStruct {
   TopLevelStruct& a(::test_encapsulatedstructs::StructPaddingTestStruct value);
 
   const ::test_encapsulatedstructs::NonInlineStructTestStruct&
-  b() const;
+  b() const {
+    return storage_.b;
+  }
 
-  ::test_encapsulatedstructs::NonInlineStructTestStruct& b();
+  ::test_encapsulatedstructs::NonInlineStructTestStruct& b() {
+    return storage_.b;
+  }
 
   // Setter for b.
   //
@@ -398,6 +462,138 @@ class TopLevelStruct {
                                                    ::fidl::internal::NaturalStructMember<Storage_, ::test_encapsulatedstructs::NonInlineStructTestStruct, fidl::internal::NaturalCodingConstraintEmpty>{&Storage_::b, 24});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+#endif  // __Fuchsia__
+
+inline Int8Int32::Int8Int32(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Int8Int32::Int8Int32(int8_t a, int32_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Int8Int32::Int8Int32(const ::test_encapsulatedstructs::Int8Int32& other) noexcept : ::test_encapsulatedstructs::Int8Int32(other.CloneStorage_()) {}
+inline Int8Int32& ::test_encapsulatedstructs::Int8Int32::operator=(const ::test_encapsulatedstructs::Int8Int32& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Int8Int32::Int8Int32(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Int8Int32(Storage_{
+                                                                                              .a = {},
+                                                                                              .b = {},
+                                                                                          }) {}
+inline Int8Int32& Int8Int32::a(int8_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Int8Int32& Int8Int32::b(int32_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline Int16Int8::Int16Int8(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Int16Int8::Int16Int8(int16_t a, int8_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Int16Int8::Int16Int8(const ::test_encapsulatedstructs::Int16Int8& other) noexcept : ::test_encapsulatedstructs::Int16Int8(other.CloneStorage_()) {}
+inline Int16Int8& ::test_encapsulatedstructs::Int16Int8::operator=(const ::test_encapsulatedstructs::Int16Int8& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Int16Int8::Int16Int8(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Int16Int8(Storage_{
+                                                                                              .a = {},
+                                                                                              .b = {},
+                                                                                          }) {}
+inline Int16Int8& Int16Int8::a(int16_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Int16Int8& Int16Int8::b(int8_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline ArrayInt16Int8::ArrayInt16Int8(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ArrayInt16Int8::ArrayInt16Int8(::std::array<::test_encapsulatedstructs::Int16Int8, 3> arr) noexcept
+    : storage_({.arr = std::move(arr)}) {}
+inline ArrayInt16Int8::ArrayInt16Int8(const ::test_encapsulatedstructs::ArrayInt16Int8& other) noexcept : ::test_encapsulatedstructs::ArrayInt16Int8(other.CloneStorage_()) {}
+inline ArrayInt16Int8& ::test_encapsulatedstructs::ArrayInt16Int8::operator=(const ::test_encapsulatedstructs::ArrayInt16Int8& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline ArrayInt16Int8::ArrayInt16Int8(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ArrayInt16Int8(Storage_{
+                                                                                                        .arr = ::fidl::internal::DefaultConstructPossiblyInvalidObject<::std::array<::test_encapsulatedstructs::Int16Int8, 3>>::Make(),
+                                                                                                    }) {}
+inline ArrayInt16Int8& ArrayInt16Int8::arr(::std::array<::test_encapsulatedstructs::Int16Int8, 3> value) {
+  storage_.arr = std::move(value);
+  return *this;
+}
+
+inline StructPaddingTestStruct::StructPaddingTestStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline StructPaddingTestStruct::StructPaddingTestStruct(::test_encapsulatedstructs::Int16Int8 trailing, ::test_encapsulatedstructs::Int8Int32 inner, ::test_encapsulatedstructs::ArrayInt16Int8 array) noexcept
+    : storage_({.trailing = std::move(trailing),
+                .inner = std::move(inner),
+                .array = std::move(array)}) {}
+inline StructPaddingTestStruct::StructPaddingTestStruct(const ::test_encapsulatedstructs::StructPaddingTestStruct& other) noexcept : ::test_encapsulatedstructs::StructPaddingTestStruct(other.CloneStorage_()) {}
+inline StructPaddingTestStruct& ::test_encapsulatedstructs::StructPaddingTestStruct::operator=(const ::test_encapsulatedstructs::StructPaddingTestStruct& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline StructPaddingTestStruct::StructPaddingTestStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructPaddingTestStruct(Storage_{
+                                                                                                                          .trailing = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                          .inner = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                          .array = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                      }) {}
+inline StructPaddingTestStruct& StructPaddingTestStruct::trailing(::test_encapsulatedstructs::Int16Int8 value) {
+  storage_.trailing = std::move(value);
+  return *this;
+}
+inline StructPaddingTestStruct& StructPaddingTestStruct::inner(::test_encapsulatedstructs::Int8Int32 value) {
+  storage_.inner = std::move(value);
+  return *this;
+}
+inline StructPaddingTestStruct& StructPaddingTestStruct::array(::test_encapsulatedstructs::ArrayInt16Int8 value) {
+  storage_.array = std::move(value);
+  return *this;
+}
+
+#ifdef __Fuchsia__
+
+inline NonInlineStructTestStruct::NonInlineStructTestStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline NonInlineStructTestStruct::NonInlineStructTestStruct(::fidl::Box<::test_encapsulatedstructs::Int16Int8> element, ::zx::handle h) noexcept
+    : storage_({.element = std::move(element),
+                .h = std::move(h)}) {}
+
+inline NonInlineStructTestStruct::NonInlineStructTestStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : NonInlineStructTestStruct(Storage_{
+                                                                                                                              .element = {},
+                                                                                                                              .h = {},
+                                                                                                                          }) {}
+inline NonInlineStructTestStruct& NonInlineStructTestStruct::element(::fidl::Box<::test_encapsulatedstructs::Int16Int8> value) {
+  storage_.element = std::move(value);
+  return *this;
+}
+inline NonInlineStructTestStruct& NonInlineStructTestStruct::h(::zx::handle value) {
+  storage_.h = std::move(value);
+  return *this;
+}
+
+inline TopLevelStruct::TopLevelStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline TopLevelStruct::TopLevelStruct(::test_encapsulatedstructs::StructPaddingTestStruct a, ::test_encapsulatedstructs::NonInlineStructTestStruct b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+
+inline TopLevelStruct::TopLevelStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TopLevelStruct(Storage_{
+                                                                                                        .a = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                        .b = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                    }) {}
+inline TopLevelStruct& TopLevelStruct::a(::test_encapsulatedstructs::StructPaddingTestStruct value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline TopLevelStruct& TopLevelStruct::b(::test_encapsulatedstructs::NonInlineStructTestStruct value) {
+  storage_.b = std::move(value);
+  return *this;
+}
 
 #endif  // __Fuchsia__
 

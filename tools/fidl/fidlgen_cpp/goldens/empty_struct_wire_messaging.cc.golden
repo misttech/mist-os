@@ -241,7 +241,6 @@ fidl::internal::WireEventDispatcher<::test_emptystruct::EmptyProtocol>::Dispatch
       return ::fidl::Status::UnknownOrdinal();
   }
 }
-void fidl::WireAsyncEventHandler<::test_emptystruct::EmptyProtocol>::Receive(::fidl::WireEvent<::test_emptystruct::EmptyProtocol::Receive>* event) {}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_emptystruct::EmptyProtocol>::entries_[] = {
     {

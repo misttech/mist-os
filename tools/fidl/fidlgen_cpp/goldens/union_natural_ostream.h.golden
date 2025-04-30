@@ -201,17 +201,28 @@ std::ostream& operator<<(std::ostream& os, const ::test_union::EmptyFlexibleUnio
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_union::TestProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_union::TestProtocol>& value);
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_union::TestProtocol>& value) {
+    return os << "ClientEnd<" << "test_union::TestProtocol" << ">(" << value.channel().get() << ")";
+  }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_union::TestProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_union::TestProtocol>& value);
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_union::TestProtocol>& value) {
+    return os << "ServerEnd<" << "test_union::TestProtocol" << ">(" << value.channel().get() << ")";
+  }
 };
 
-std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_union::TestProtocol>& value);
+namespace fidl {
 
-std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_union::TestProtocol>& value);
+inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_union::TestProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_union::TestProtocol>>::Format(os, value);
+}
+
+inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_union::TestProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_union::TestProtocol>>::Format(os, value);
+}
+}  // namespace fidl
 
 #endif  // __Fuchsia__
 

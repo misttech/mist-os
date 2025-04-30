@@ -5,7 +5,6 @@
 */}}
 
 {{- define "Protocol:Interface:WireMessagingHeader" }}
-
 {{- range .TwoWayMethods }}
   {{- if eq .Transport.Name "Driver" }}
   {{- template "Method:CompleterBase:driver/WireMessagingHeader" . }}
@@ -71,7 +70,6 @@ class {{ .WireServer }} : public ::fidl::internal::IncomingMessageDispatcher
 
 
 {{- define "Protocol:Interface:NaturalMessagingHeader" }}
-
 {{- range .ClientMethods }}
   {{- template "Method:Request:NaturalMessagingHeader" . }}
 {{- end }}
@@ -122,7 +120,11 @@ class {{ .NaturalServer }} : public ::fidl::internal::IncomingMessageDispatcher
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler({{ .Dispatcher }}* dispatcher);
+  Handler bind_handler({{ .Dispatcher }}* dispatcher) {
+    return [impl=this, dispatcher=dispatcher]({{ .ServerEnd }} request) {
+        (void) {{ .BindServer }}(dispatcher, std::move(request), impl);
+    };
+  }
 
   private:
   {{- /* Note that this implementation is snake_case to avoid name conflicts. */}}
@@ -135,7 +137,6 @@ class {{ .NaturalServer }} : public ::fidl::internal::IncomingMessageDispatcher
 
 
 {{- define "Protocol:Interface:NaturalMessagingSource" }}
-
 {{- range .ClientMethods }}
   {{- template "Method:Request:NaturalMessagingSource" . }}
 {{- end }}
@@ -147,12 +148,4 @@ class {{ .NaturalServer }} : public ::fidl::internal::IncomingMessageDispatcher
   {{- template "Method:CompleterBase:NaturalMessagingSource" . }}
   {{- end }}
 {{- end }}
-
-::fidl::ProtocolHandler<{{ .Wire }}> {{ .NaturalServer.NoLeading }}::bind_handler({{ .Dispatcher }}* dispatcher) {
-  return [impl=this, dispatcher=dispatcher]({{ .ServerEnd }} request) {
-      (void) {{ .BindServer }}(dispatcher, std::move(request), impl);
-  };
-}
-
-
 {{- end }}

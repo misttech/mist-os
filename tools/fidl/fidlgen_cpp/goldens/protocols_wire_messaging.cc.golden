@@ -623,8 +623,6 @@
         return ::fidl::Status::UnknownOrdinal();
     }
   }
-void fidl::WireAsyncEventHandler<::test_protocols::WithAndWithoutRequestResponse>::OnEmptyResponse() {}
-void fidl::WireAsyncEventHandler<::test_protocols::WithAndWithoutRequestResponse>::OnWithResponse(::fidl::WireEvent<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse>* event) {}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_protocols::WithAndWithoutRequestResponse>::entries_[] = {
     { ::test_protocols::kWithAndWithoutRequestResponse_NoRequestNoResponse_Ordinal,
@@ -3092,7 +3090,6 @@ return MakeReply(::test_protocols::wire::WithErrorSyntaxHandleInResultResult::Wi
         return ::fidl::Status::UnknownOrdinal();
     }
   }
-void fidl::WireAsyncEventHandler<::test_protocols::ChannelProtocol>::EventA(::fidl::WireEvent<::test_protocols::ChannelProtocol::EventA>* event) {}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_protocols::ChannelProtocol>::entries_[] = {
     { ::test_protocols::kChannelProtocol_MethodA_Ordinal,
@@ -4216,7 +4213,6 @@ fidl::WireServer<::test_protocols::PlatformServer>::Handler fidl::WireServer<::t
         return ::fidl::Status::UnknownOrdinal();
     }
   }
-void fidl::WireAsyncEventHandler<::test_protocols::HandleRightsProtocol>::AnEvent(::fidl::WireEvent<::test_protocols::HandleRightsProtocol::AnEvent>* event) {}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_protocols::HandleRightsProtocol>::entries_[] = {
     { ::test_protocols::kHandleRightsProtocol_NoResponseMethod_Ordinal,

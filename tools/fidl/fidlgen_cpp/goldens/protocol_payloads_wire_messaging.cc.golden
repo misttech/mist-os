@@ -1363,10 +1363,6 @@
         return ::fidl::Status::UnknownOrdinal();
     }
   }
-void fidl::WireAsyncEventHandler<::test_protocolpayloads::MainProtocol>::OnComposed(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnComposed>* event) {}
-void fidl::WireAsyncEventHandler<::test_protocolpayloads::MainProtocol>::OnLocal(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnLocal>* event) {}
-void fidl::WireAsyncEventHandler<::test_protocolpayloads::MainProtocol>::OnImport(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnImport>* event) {}
-void fidl::WireAsyncEventHandler<::test_protocolpayloads::MainProtocol>::OnAnon(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnAnon>* event) {}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_protocolpayloads::MainProtocol>::entries_[] = {
     { ::test_protocolpayloads::kMainProtocol_OneWayComposed_Ordinal,

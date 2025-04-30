@@ -397,7 +397,7 @@ class ::fidl::WireAsyncEventHandler<::test_emptystruct::EmptyProtocol>
     : public ::fidl::internal::WireEventHandlerInterface<::test_emptystruct::EmptyProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   WireAsyncEventHandler() = default;
-  void Receive(::fidl::WireEvent<::test_emptystruct::EmptyProtocol::Receive>* event) override;
+  void Receive(::fidl::WireEvent<::test_emptystruct::EmptyProtocol::Receive>* event) override {}
 };
 
 template <>

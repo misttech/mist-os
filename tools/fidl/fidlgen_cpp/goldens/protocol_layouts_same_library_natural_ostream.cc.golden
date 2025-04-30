@@ -210,40 +210,7 @@ std::ostream& fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainPr
   }
   return os;
 }
-#ifdef __Fuchsia__
 
-std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>& value) {
-  return os << "ClientEnd<" << "test_protocollayoutssamelibrary::ComposedProtocol" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocollayoutssamelibrary::ComposedProtocol>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayoutssamelibrary::ComposedProtocol>& value) {
-  return os << "ServerEnd<" << "test_protocollayoutssamelibrary::ComposedProtocol" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayoutssamelibrary::ComposedProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocollayoutssamelibrary::ComposedProtocol>>::Format(os, value);
-}
-std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocollayoutssamelibrary::MainProtocol>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayoutssamelibrary::MainProtocol>& value) {
-  return os << "ClientEnd<" << "test_protocollayoutssamelibrary::MainProtocol" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocollayoutssamelibrary::MainProtocol>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayoutssamelibrary::MainProtocol>& value) {
-  return os << "ServerEnd<" << "test_protocollayoutssamelibrary::MainProtocol" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayoutssamelibrary::MainProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocollayoutssamelibrary::MainProtocol>>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayoutssamelibrary::MainProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocollayoutssamelibrary::MainProtocol>>::Format(os, value);
-}
-
-#endif  // __Fuchsia__
 namespace test_protocollayoutssamelibrary {
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::TablePayload& value) {

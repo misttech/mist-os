@@ -38,18 +38,6 @@ namespace test_driveroneway {
 
 #ifdef __Fuchsia__
 
-::fidl::internal::NaturalEventDispatcher<::test_driveroneway::OneWay>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_driveroneway::OneWay>* event_handler)
-    : IncomingEventDispatcher(event_handler) {}
-
-#endif  // __Fuchsia__
-
-::fidl::ProtocolHandler<::test_driveroneway::OneWay> fdf::Server<::test_driveroneway::OneWay>::bind_handler(fdf_dispatcher_t* dispatcher) {
-  return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driveroneway::OneWay> request) {
-    (void)::fdf::BindServer(dispatcher, std::move(request), impl);
-  };
-}
-#ifdef __Fuchsia__
-
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_driveroneway::OneWay>::entries_[] = {
     {
         ::test_driveroneway::kOneWay_Send_Ordinal,

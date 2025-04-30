@@ -28,7 +28,7 @@ template <>
 class ::fidl::Response<::test_drivertwoway::TwoWay::Add> final : public ::test_drivertwoway::TwoWayAddResponse {
  public:
   using ::test_drivertwoway::TwoWayAddResponse::TwoWayAddResponse;
-  Response(::test_drivertwoway::TwoWayAddResponse v);
+  Response(::test_drivertwoway::TwoWayAddResponse v) : TwoWayAddResponse(std::move(v)) {}
 };
 
 template <>
@@ -64,7 +64,8 @@ class ::fdf::AsyncEventHandler<::test_drivertwoway::TwoWay>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_drivertwoway::TwoWay> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_drivertwoway::TwoWay>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_drivertwoway::TwoWay>* event_handler);
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_drivertwoway::TwoWay>* event_handler)
+      : IncomingEventDispatcher(event_handler) {}
 };
 
 #endif  // __Fuchsia__
@@ -102,7 +103,11 @@ class ::fdf::Server<::test_drivertwoway::TwoWay> : public ::fidl::internal::Inco
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(fdf_dispatcher_t* dispatcher);
+  Handler bind_handler(fdf_dispatcher_t* dispatcher) {
+    return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_drivertwoway::TwoWay> request) {
+      (void)::fdf::BindServer(dispatcher, std::move(request), impl);
+    };
+  }
 
  private:
   void dispatch_message(

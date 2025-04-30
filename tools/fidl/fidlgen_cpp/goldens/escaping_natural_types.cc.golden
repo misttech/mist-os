@@ -7,44 +7,9 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-::test_escaping::DocCommentWithQuotes::DocCommentWithQuotes(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-::test_escaping::DocCommentWithQuotes::DocCommentWithQuotes(uint8_t __reserved) noexcept
-    : storage_({.__reserved = std::move(__reserved)}) {}
-
-::test_escaping::DocCommentWithQuotes::DocCommentWithQuotes(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DocCommentWithQuotes(Storage_{
-                                                                                                                              .__reserved = 0u,
-                                                                                                                          }) {}
-::test_escaping::DocCommentWithQuotes::DocCommentWithQuotes(const ::test_escaping::DocCommentWithQuotes& other) noexcept : ::test_escaping::DocCommentWithQuotes(other.CloneStorage_()) {}
-
-::test_escaping::DocCommentWithQuotes& test_escaping::DocCommentWithQuotes::operator=(const ::test_escaping::DocCommentWithQuotes& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-bool test_escaping::DocCommentWithQuotes::operator==(const DocCommentWithQuotes& other) const noexcept {
-  return ::fidl::internal::NaturalStructCodingTraits<::test_escaping::DocCommentWithQuotes, 1>::Equal(this, &other);
-}
-
-bool test_escaping::DocCommentWithQuotes::operator!=(const DocCommentWithQuotes& other) const noexcept {
-  return !::fidl::internal::NaturalStructCodingTraits<::test_escaping::DocCommentWithQuotes, 1>::Equal(this, &other);
-}
-
 ::test_escaping::DocCommentWithQuotes::Storage_ test_escaping::DocCommentWithQuotes::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.__reserved)};
-}
-uint8_t
-test_escaping::DocCommentWithQuotes::__reserved() const {
-  return storage_.__reserved;
-}
-
-uint8_t& ::test_escaping::DocCommentWithQuotes::__reserved() {
-  return storage_.__reserved;
-}
-
-::test_escaping::DocCommentWithQuotes& ::test_escaping::DocCommentWithQuotes::__reserved(uint8_t value) {
-  storage_.__reserved = std::move(value);
-  return *this;
 }
 
 const char* ::test_escaping::kBasic = "'\"\\\n\r\t";

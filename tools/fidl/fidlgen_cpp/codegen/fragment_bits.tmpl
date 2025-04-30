@@ -187,33 +187,26 @@ using {{ .Name }} = {{ .Unified }};
     static constexpr size_t kInlineSize = sizeof({{ .Type }});
     static constexpr bool kIsMemcpyCompatible = {{ not .Strictness }};
 
-    static void Encode(internal::NaturalEncoder* encoder, {{ . }}* value, size_t offset, size_t recursion_depth);
-    static void Decode(internal::NaturalDecoder* decoder, {{ . }}* value, size_t offset, size_t recursion_depth);
+    static void Encode(internal::NaturalEncoder* encoder, {{ . }}* value, size_t offset, size_t recursion_depth) {
+      {{- if .Strictness }}
+      if (unlikely(static_cast<{{ .Type }}>(*value) & ~{{ .Mask }}ull)) {
+        encoder->SetError(::fidl::internal::kCodingErrorUnknownBitSetInBitsValue);
+      }
+      {{- end }}
+      *encoder->template GetPtr<{{ . }}>(offset) = *value;
+    }
+    static void Decode(internal::NaturalDecoder* decoder, {{ . }}* value, size_t offset, size_t recursion_depth) {
+      *value = *decoder->template GetPtr<{{ . }}>(offset);
+      {{- if .Strictness }}
+      if (unlikely(static_cast<{{ .Type }}>(*value) & ~{{ .Mask }}ull)) {
+        decoder->SetError(::fidl::internal::kCodingErrorUnknownBitSetInBitsValue);
+      }
+      {{- end }}
+    }
   };
 {{- end }}
 
 
-{{- define "Bits:NaturalTypesSource" }}
-  {{ EnsureNamespace "" }}
-  void fidl::internal::NaturalCodingTraits<{{ . }}, ::fidl::internal::NaturalCodingConstraintEmpty>::Encode(
-      fidl::internal::NaturalEncoder* encoder, {{ . }}* value, size_t offset, size_t recursion_depth) {
-    {{- if .Strictness }}
-      if (unlikely(static_cast<{{ .Type }}>(*value) & ~{{ .Mask }}ull)) {
-        encoder->SetError(::fidl::internal::kCodingErrorUnknownBitSetInBitsValue);
-      }
-    {{- end }}
-    *encoder->template GetPtr<{{ . }}>(offset) = *value;
-  }
-  void fidl::internal::NaturalCodingTraits<{{ . }}, ::fidl::internal::NaturalCodingConstraintEmpty>::Decode(
-      fidl::internal::NaturalDecoder* decoder, {{ . }}* value, size_t offset, size_t recursion_depth) {
-    *value = *decoder->template GetPtr<{{ . }}>(offset);
-    {{- if .Strictness }}
-      if (unlikely(static_cast<{{ .Type }}>(*value) & ~{{ .Mask }}ull)) {
-        decoder->SetError(::fidl::internal::kCodingErrorUnknownBitSetInBitsValue);
-      }
-    {{- end }}
-  }
-{{- end }}
 
 {{- define "Bits:Traits:TypeConversionsHeader" }}
 template <>

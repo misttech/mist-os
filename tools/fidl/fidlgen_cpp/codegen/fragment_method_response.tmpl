@@ -175,15 +175,15 @@ class {{ .NaturalResponse }} final
     {{- if .Result }}
       {{- if .Result.HasError }}
       using {{ .ResponseMessageBase }}::result;
-      {{ .NaturalResponse.Self }}({{ .ResponseMessageBase }} v);
+      {{ .NaturalResponse.Self }}({{ .ResponseMessageBase }} v) : result(std::move(v)) {}
       {{ .NaturalResponse.Self }}() = delete;
       {{- else if .Result.ValueParameters }}
       using {{ .Result.ValueTypeDecl }}::{{ .Result.ValueTypeDecl.Self }};
-      {{ .NaturalResponse.Self }}({{ .ResponseMessageBase }} v);
+      {{ .NaturalResponse.Self }}({{ .ResponseMessageBase }} v) : {{ .Result.ValueTypeDecl.Self }}(std::move(v)) {}
       {{- end }}
     {{- else }}
       using {{ .ResponsePayload }}::{{ .ResponsePayload.Self }};
-      {{ .NaturalResponse.Self }}({{ .ResponseMessageBase }} v);
+      {{ .NaturalResponse.Self }}({{ .ResponseMessageBase }} v) : {{ .ResponsePayload.Self }}(std::move(v)) {}
     {{- end }}
   {{- end }}
 };
@@ -194,35 +194,7 @@ class {{ .NaturalResponseConverter }} {
   using DomainObject = {{ .ResponsePayload }};
 
  public:
-  static DomainObject IntoDomainObject({{ .NaturalResponseArg "m" }});
-};
-{{- end }}
-
-
-{{- EndifFuchsia -}}
-{{- end }}
-
-
-
-{{- define "Method:Response:NaturalMessagingSource" }}
-
-{{- EnsureNamespace "" }}
-
-{{- if .HasResponsePayload }}
-  {{- if .Result }}
-    {{- if .Result.HasError }}
-      {{ .NaturalResponse}}::{{ .NaturalResponse.Self }}({{ .ResponseMessageBase }} v) : result(std::move(v)) {}
-    {{- else if .Result.ValueParameters }}
-    {{ .NaturalResponse}}::{{ .NaturalResponse.Self }}({{ .ResponseMessageBase }} v) : {{ .Result.ValueTypeDecl.Self }}(std::move(v)) {}
-    {{- end }}
-  {{- else }}
-    {{ .NaturalResponse}}::{{ .NaturalResponse.Self }}({{ .ResponseMessageBase }} v) : {{ .ResponsePayload.Self }}(std::move(v)) {}
-  {{- end }}
-{{- end }}
-
-
-{{- if .Result }}
-  {{ .ResponsePayload }} {{ .NaturalResponseConverter.NoLeading }}::IntoDomainObject({{ .NaturalResponseArg "m" }}) {
+  static DomainObject IntoDomainObject({{ .NaturalResponseArg "m" }}) {
     {{ if .Result.HasError -}}
     if (m.is_error()) {
       return DomainObject::WithErr(m.error_value());
@@ -234,14 +206,23 @@ class {{ .NaturalResponseConverter }} {
       {{- end }}
     }
     {{- else -}}
-      {{- if .Result.ValueParameters }}
-        return DomainObject::WithResponse(std::move(m));
-      {{- else }}
-        return DomainObject::WithResponse({});
-      {{- end }}
+    {{- if .Result.ValueParameters }}
+      return DomainObject::WithResponse(std::move(m));
+    {{- else }}
+      return DomainObject::WithResponse({});
+    {{- end }}
     {{- end }}
   }
+};
 {{- end }}
+
+
+{{- EndifFuchsia -}}
+{{- end }}
+
+
+
+{{- define "Method:Response:NaturalMessagingSource" }}
 
 {{- end }}
 

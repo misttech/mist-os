@@ -83,7 +83,10 @@ class {{ .NaturalSyncClientImpl }} final
   {{ end }}
 
  private:
-  {{ .UnownedClientEnd }} _client_end() const;
+  {{ .UnownedClientEnd }} _client_end() const {
+    return {{ .UnownedClientEnd }}(
+      _transport().get<{{ .Transport.Type }}>());
+  }
 };
 
 {{- EndifFuchsia }}
@@ -125,12 +128,6 @@ class {{ .NaturalSyncClientImpl }} final
   }
 
 {{ end }}
-
-{{ .UnownedClientEnd }} {{ .NaturalSyncClientImpl.NoLeading }}::_client_end() const {
-  return {{ .UnownedClientEnd }}(
-    _transport().get<{{ .Transport.Type }}>());
-}
-
 
 {{- EndifFuchsia }}
 {{- end }}

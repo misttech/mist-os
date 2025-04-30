@@ -42,33 +42,69 @@ class {{ .Name }} {
   static constexpr char kSerializableName[] = "{{ .Serializable.Name }}";
   {{ end }}
 
-  {{ .Name }}({{ .Name }}&& other) noexcept;
-  {{ .Name }}& operator=({{ .Name }}&& other) noexcept;
+  {{ .Name }}({{ .Name }}&& other) noexcept
+      : {{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  {{ .Name }}& operator=({{ .Name }}&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
   {{- if not .IsResourceType }}
-    {{ .Name }}(const {{ .Name }}& other) noexcept;
-    {{ .Name }}& operator=(const {{ .Name }}& other) noexcept;
-    bool operator==(const {{ .Name }}& other) const noexcept;
-    bool operator!=(const {{ .Name }}& other) const noexcept;
+    {{ .Name }}(const {{ .Name }}& other) noexcept : {{ .Name }}(other.CloneStorage_()){}
+    {{ .Name }}& operator=(const {{ .Name }}& other) noexcept {
+      if (this != &other) {
+        storage_ = other.CloneStorage_();
+      }
+      return *this;
+    }
+
+    bool operator==(const {{ .Name }}& other) const noexcept {
+      return *storage_ == *other.storage_;
+    }
+    bool operator!=(const {{ .Name }}& other) const noexcept {
+      return *storage_ != *other.storage_;
+    }
   {{- end }}
 
   {{- if .IsFlexible }}
-  bool IsUnknown() const;
+  constexpr bool IsUnknown() const {
+    return Which() == {{ .TagUnknown }};
+  }
   {{- end }}
 
-  {{ .TagEnum }} Which() const;
+  constexpr {{ .TagEnum }} Which() const {
+    return {{ .Name }}::IndexToTag(storage_->index()).value();
+  }
 
   {{- range .Members }}
-    static {{ $.Name }} With{{ .UpperCamelCaseName }}({{ .Type }} val);
-    const ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_> {{ .Name }}() const;
-    ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_> {{ .Name }}();
+    static {{ $.Name }} With{{ .UpperCamelCaseName }}({{ .Type }} val) {
+      return {{ $.Name }}(std::make_shared<Storage_>(
+        std::in_place_index_t<{{ .NaturalIndex }}>{},
+        std::move(val)));
+    }
+
+    const ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_> {{ .Name }}() const {
+      return ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_>(storage_);
+    }
+
+    ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_> {{ .Name }}() {
+      return ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_>(storage_);
+    }
 
     // Sets the union to hold the {{ .Name }} member.
     //
     {{ .Docs }}
-    {{ $.Name }}& {{ .Name }}({{ .Type }} value);
+    {{ $.Name }}& {{ .Name }}({{ .Type }} value) {
+      storage_->emplace<{{ .NaturalIndex }}>(std::move(value));
+      return *this;
+    }
   {{- end }}
 
-  {{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+  {{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -83,10 +119,34 @@ class {{ .Name }} {
     {{- end -}}
   );
 
-  explicit {{ .Name }}(std::shared_ptr<Storage_> storage);
+  explicit {{ .Name }}(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
 
-  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, {{ .TagEnum }} tag);
-  static std::optional<{{ .TagEnum }}> IndexToTag(size_t index);
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, {{ .TagEnum }} tag) {
+    switch (tag) {
+      {{- range .Members }}
+        case {{ .TagName }}: return {{ .NaturalIndex }};
+      {{- end }}
+      default: {
+        {{- if .IsStrict }}
+          decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+        {{- end }}
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<{{ .TagEnum }}> IndexToTag(size_t index) {
+    switch (index) {
+      {{- range  .Members }}
+        case {{ .NaturalIndex }}: return {{ .TagName }};
+      {{- end }}
+      {{- if .IsFlexible }}
+        default: return {{ .TagUnknown }};
+      {{- else }}
+        default: return std::nullopt;
+      {{- end }}
+    }
+  }
 
 };
 
@@ -136,70 +196,7 @@ class {{ .Name }} {
 
 {{- EnsureNamespace "" }}
 
-{{ . }}::{{ .Name }}({{ .Name }}&& other) noexcept : {{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
-  *storage_ = std::move(*other.storage_);
-}
-
-{{ . }}& {{ . }}::operator=({{ .Name }}&& other) noexcept {
-  if (this != &other) {
-    *storage_ = std::move(*other.storage_);
-  }
-  return *this;
-}
-
-{{ . }}::{{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
-: storage_(std::make_shared<Storage_>()) {}
-
-{{ . }}::{{ .Name }}(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
-
-{{ .TagEnum }} {{ .NoLeading }}::Which() const {
-  return {{ .Name }}::IndexToTag(storage_->index()).value();
-}
-
-size_t {{ .NoLeading }}::TagToIndex(::fidl::internal::NaturalDecoder* decoder, {{ .TagEnum }} tag) {
-  switch (tag) {
-    {{- range .Members }}
-      case {{ .TagName }}: return {{ .NaturalIndex }};
-    {{- end }}
-    default: {
-      {{- if .IsStrict }}
-        decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
-      {{- end }}
-      return 0;
-    }
-  }
-}
-
-std::optional<{{ .TagEnum }}> {{ .NoLeading }}::IndexToTag(size_t index) {
-  switch (index) {
-    {{- range  .Members }}
-      case {{ .NaturalIndex }}: return {{ .TagName }};
-    {{- end }}
-    {{- if .IsFlexible }}
-      default: return {{ .TagUnknown }};
-    {{- else }}
-      default: return std::nullopt;
-    {{- end }}
-  }
-}
-
 {{ if not .IsResourceType }}
-  {{ . }}::{{ .Name }}(const {{ .Name }}& other) noexcept : {{ .Name }}(other.CloneStorage_()){}
-
-  {{ . }}& {{ .NoLeading }}::operator=(const {{ .Name }}& other) noexcept {
-    if (this != &other) {
-      storage_ = other.CloneStorage_();
-    }
-    return *this;
-  }
-
-  bool {{ .NoLeading }}::operator==(const {{ .Name }}& other) const noexcept {
-    return *storage_ == *other.storage_;
-  }
-  bool {{ .NoLeading }}::operator!=(const {{ .Name }}& other) const noexcept {
-    return *storage_ != *other.storage_;
-  }
-
   std::shared_ptr<{{ . }}::Storage_> {{ .NoLeading }}::CloneStorage_() const {
     {{- if .Members }}
     const Storage_& storage = *storage_;
@@ -214,33 +211,6 @@ std::optional<{{ .TagEnum }}> {{ .NoLeading }}::IndexToTag(size_t index) {
       default:
         return std::make_shared<Storage_>();
     }
-  }
-{{- end }}
-
-{{- if .IsFlexible }}
-  bool {{ .NoLeading }}::IsUnknown() const {
-    return Which() == {{ .TagUnknown }};
-  }
-{{- end }}
-
-{{- range .Members }}
-  {{ $ }} {{ $.NoLeading }}::With{{ .UpperCamelCaseName }}({{ .Type }} val) {
-    return {{ $.Name }}(std::make_shared<Storage_>(
-      std::in_place_index_t<{{ .NaturalIndex }}>{},
-      std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, {{ $ }}::Storage_> {{ $.NoLeading }}::{{ .Name }}() const {
-    return ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, {{ $ }}::Storage_> {{ $.NoLeading }}::{{ .Name }}() {
-    return ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_>(storage_);
-  }
-
-  {{ $ }}& {{ $.NoLeading }}::{{ .Name }}({{ .Type }} value) {
-    storage_->emplace<{{ .NaturalIndex }}>(std::move(value));
-    return *this;
   }
 {{- end }}
 

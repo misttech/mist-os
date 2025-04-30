@@ -412,7 +412,7 @@ class TheUnion {
     kV = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_protocols::wire::TheUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 

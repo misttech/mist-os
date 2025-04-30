@@ -34,17 +34,28 @@ std::ostream& operator<<(std::ostream& os, const ::test_drivertwoway::TwoWayAddR
 
 template <>
 struct fidl::ostream::Formatter<::fdf::ClientEnd<::test_drivertwoway::TwoWay>> {
-  static std::ostream& Format(std::ostream& os, const ::fdf::ClientEnd<::test_drivertwoway::TwoWay>& value);
+  static std::ostream& Format(std::ostream& os, const ::fdf::ClientEnd<::test_drivertwoway::TwoWay>& value) {
+    return os << "ClientEnd<" << "test_drivertwoway::TwoWay" << ">(" << value.channel().get() << ")";
+  }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fdf::ServerEnd<::test_drivertwoway::TwoWay>> {
-  static std::ostream& Format(std::ostream& os, const ::fdf::ServerEnd<::test_drivertwoway::TwoWay>& value);
+  static std::ostream& Format(std::ostream& os, const ::fdf::ServerEnd<::test_drivertwoway::TwoWay>& value) {
+    return os << "ServerEnd<" << "test_drivertwoway::TwoWay" << ">(" << value.channel().get() << ")";
+  }
 };
 
-std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_drivertwoway::TwoWay>& value);
+namespace fdf {
 
-std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_drivertwoway::TwoWay>& value);
+inline std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_drivertwoway::TwoWay>& value) {
+  return fidl::ostream::Formatter<::fdf::ClientEnd<::test_drivertwoway::TwoWay>>::Format(os, value);
+}
+
+inline std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_drivertwoway::TwoWay>& value) {
+  return fidl::ostream::Formatter<::fdf::ServerEnd<::test_drivertwoway::TwoWay>>::Format(os, value);
+}
+}  // namespace fdf
 
 #endif  // __Fuchsia__
 

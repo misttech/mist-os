@@ -40,17 +40,28 @@ std::ostream& operator<<(std::ostream& os, const ::test_errorsyntax::ExampleUseO
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>& value);
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>& value) {
+    return os << "ClientEnd<" << "test_errorsyntax::ExampleUseOfErrorSyntax" << ">(" << value.channel().get() << ")";
+  }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>& value);
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>& value) {
+    return os << "ServerEnd<" << "test_errorsyntax::ExampleUseOfErrorSyntax" << ">(" << value.channel().get() << ")";
+  }
 };
 
-std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>& value);
+namespace fidl {
 
-std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>& value);
+inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>>::Format(os, value);
+}
+
+inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>>::Format(os, value);
+}
+}  // namespace fidl
 
 #endif  // __Fuchsia__
 

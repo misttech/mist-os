@@ -472,23 +472,8 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorRes
   return os;
 }
 
-std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_typesinprotocols::Protocol>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_typesinprotocols::Protocol>& value) {
-  return os << "ClientEnd<" << "test_typesinprotocols::Protocol" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_typesinprotocols::Protocol>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_typesinprotocols::Protocol>& value) {
-  return os << "ServerEnd<" << "test_typesinprotocols::Protocol" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_typesinprotocols::Protocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_typesinprotocols::Protocol>>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_typesinprotocols::Protocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_typesinprotocols::Protocol>>::Format(os, value);
-}
-
 #endif  // __Fuchsia__
+
 namespace test_typesinprotocols {
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Bits& value) {

@@ -51,38 +51,8 @@ std::ostream& fidl::ostream::Formatter<::test_driverhandle::T>::Format(std::ostr
   return os;
 }
 
-std::ostream& fidl::ostream::Formatter<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>>::Format(std::ostream& os, const ::fdf::ClientEnd<::test_driverhandle::DriverProtocol>& value) {
-  return os << "ClientEnd<" << "test_driverhandle::DriverProtocol" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& fidl::ostream::Formatter<::fdf::ServerEnd<::test_driverhandle::DriverProtocol>>::Format(std::ostream& os, const ::fdf::ServerEnd<::test_driverhandle::DriverProtocol>& value) {
-  return os << "ServerEnd<" << "test_driverhandle::DriverProtocol" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_driverhandle::DriverProtocol>& value) {
-  return fidl::ostream::Formatter<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_driverhandle::DriverProtocol>& value) {
-  return fidl::ostream::Formatter<::fdf::ServerEnd<::test_driverhandle::DriverProtocol>>::Format(os, value);
-}
-std::ostream& fidl::ostream::Formatter<::fdf::ClientEnd<::test_driverhandle::HandlesInProtocol>>::Format(std::ostream& os, const ::fdf::ClientEnd<::test_driverhandle::HandlesInProtocol>& value) {
-  return os << "ClientEnd<" << "test_driverhandle::HandlesInProtocol" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& fidl::ostream::Formatter<::fdf::ServerEnd<::test_driverhandle::HandlesInProtocol>>::Format(std::ostream& os, const ::fdf::ServerEnd<::test_driverhandle::HandlesInProtocol>& value) {
-  return os << "ServerEnd<" << "test_driverhandle::HandlesInProtocol" << ">(" << value.channel().get() << ")";
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_driverhandle::HandlesInProtocol>& value) {
-  return fidl::ostream::Formatter<::fdf::ClientEnd<::test_driverhandle::HandlesInProtocol>>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_driverhandle::HandlesInProtocol>& value) {
-  return fidl::ostream::Formatter<::fdf::ServerEnd<::test_driverhandle::HandlesInProtocol>>::Format(os, value);
-}
-
 #endif  // __Fuchsia__
+
 namespace test_driverhandle {
 
 #ifdef __Fuchsia__

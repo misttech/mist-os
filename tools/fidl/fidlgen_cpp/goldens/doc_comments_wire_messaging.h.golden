@@ -209,7 +209,7 @@ class ::fidl::WireAsyncEventHandler<::test_doccomments::Interface>
   /// event comment #1
   ///
   /// event comment #3
-  void OnEvent() override;
+  void OnEvent() override {}
 };
 
 template <>

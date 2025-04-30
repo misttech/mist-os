@@ -1430,7 +1430,7 @@ class MainProtocolTwoWayAnonRequest {
     kB = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonRequest::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -1471,7 +1471,7 @@ class MainProtocolTwoWayAnonWithErrorResponse {
     kB = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -1567,7 +1567,7 @@ class MainProtocolOnAnonRequest {
     kB = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  bool IsUnknown() const {
+  constexpr bool IsUnknown() const {
     return Which() == ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
