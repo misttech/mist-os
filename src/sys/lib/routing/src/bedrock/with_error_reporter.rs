@@ -30,10 +30,11 @@ impl<T: CapabilityBound, R: ErrorReporter> Routable<T> for RouterWithErrorReport
         request: Option<Request>,
         debug: bool,
     ) -> Result<RouterResponse<T>, RouterError> {
+        let target = request.as_ref().map(|r| r.target.clone());
         match self.router.route(request, debug).await {
             Ok(res) => Ok(res),
             Err(err) => {
-                self.error_reporter.report(&self.route_request, &err).await;
+                self.error_reporter.report(&self.route_request, &err, target).await;
                 Err(err)
             }
         }

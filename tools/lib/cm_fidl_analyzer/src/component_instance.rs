@@ -175,7 +175,13 @@ impl ComponentInstanceForAnalyzer {
         struct NullErrorReporter {}
         #[async_trait]
         impl ErrorReporter for NullErrorReporter {
-            async fn report(&self, _: &RouteRequestErrorInfo, _: &RouterError) {}
+            async fn report(
+                &self,
+                _: &RouteRequestErrorInfo,
+                _: &RouterError,
+                _: Option<sandbox::WeakInstanceToken>,
+            ) {
+            }
         }
         let sandbox = build_component_sandbox(
             &self_,
