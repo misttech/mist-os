@@ -99,7 +99,7 @@ static void log_error(int err) {
 // be reliable.
 // 256KiB seems to work, but 1MiB bulk transfers lock up my z620 with a 3.13
 // kernel.
-#define MAX_USBFS_BULK_SIZE (16 * 1024)
+#define MAX_USBFS_BULK_SIZE (256 * 1024)
 
 struct usb_handle {
   char fname[64];
@@ -607,8 +607,6 @@ ssize_t interface_write(UsbInterface *interface, const void *data, ssize_t len) 
   return interface->Write(data, len);
 }
 
-void interface_close(UsbInterface *interface) {
-  delete interface;
-}
+void interface_close(UsbInterface *interface) { delete interface; }
 
 void interface_wait_for_disconnect(UsbInterface *interface) { interface->WaitForDisconnect(); }
