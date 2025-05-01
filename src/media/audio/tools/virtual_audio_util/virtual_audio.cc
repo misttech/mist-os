@@ -19,6 +19,7 @@
 #include <zircon/status.h>
 #include <zircon/syscalls/clock.h>
 
+#include <cstddef>
 #include <iterator>
 #include <limits>
 #include <optional>
@@ -27,8 +28,17 @@
 
 #include "src/lib/fsl/tasks/fd_waiter.h"
 #include "src/lib/fxl/command_line.h"
-#include "src/lib/fxl/strings/concatenate.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
+
+namespace {
+inline std::string to_string(std::optional<bool> selector, const std::string& true_str,
+                             const std::string& false_str, const std::string& none_str) {
+  if (selector.has_value()) {
+    return *selector ? true_str : false_str;
+  }
+  return none_str;
+}
+}  // namespace
 
 namespace virtual_audio {
 
@@ -39,7 +49,7 @@ class VirtualAudioUtil {
   void Run(fxl::CommandLine* cmdline);
 
  private:
-  enum class Command {
+  enum class Command : uint8_t {
     GET_NUM_VIRTUAL_DEVICES,
 
     SET_DEVICE_NAME,
@@ -151,47 +161,47 @@ class VirtualAudioUtil {
     const char* name;
     Command cmd;
   } COMMANDS[] = {
-      {kNumDevsSwitch, Command::GET_NUM_VIRTUAL_DEVICES},
+      {.name = kNumDevsSwitch, .cmd = Command::GET_NUM_VIRTUAL_DEVICES},
 
-      {kDeviceNameSwitch, Command::SET_DEVICE_NAME},
-      {kManufacturerSwitch, Command::SET_MANUFACTURER},
-      {kProductNameSwitch, Command::SET_PRODUCT_NAME},
-      {kUniqueIdSwitch, Command::SET_UNIQUE_ID},
-      {kAddFormatRangeSwitch, Command::ADD_FORMAT_RANGE},
-      {kClearFormatRangesSwitch, Command::CLEAR_FORMAT_RANGES},
-      {kClockDomainSwitch, Command::SET_CLOCK_DOMAIN},
-      {kInitialRateSwitch, Command::SET_INITIAL_CLOCK_RATE},
-      {kTransferBytesSwitch, Command::SET_TRANSFER_BYTES},
-      {kInternalDelaySwitch, Command::SET_INTERNAL_DELAY},
-      {kExternalDelaySwitch, Command::SET_EXTERNAL_DELAY},
-      {kBufferRestrictionsSwitch, Command::SET_RING_BUFFER_RESTRICTIONS},
-      {kGainPropsSwitch, Command::SET_GAIN_PROPS},
-      {kPlugPropsSwitch, Command::SET_PLUG_PROPS},
-      {kResetConfigSwitch, Command::RESET_CONFIG},
+      {.name = kDeviceNameSwitch, .cmd = Command::SET_DEVICE_NAME},
+      {.name = kManufacturerSwitch, .cmd = Command::SET_MANUFACTURER},
+      {.name = kProductNameSwitch, .cmd = Command::SET_PRODUCT_NAME},
+      {.name = kUniqueIdSwitch, .cmd = Command::SET_UNIQUE_ID},
+      {.name = kAddFormatRangeSwitch, .cmd = Command::ADD_FORMAT_RANGE},
+      {.name = kClearFormatRangesSwitch, .cmd = Command::CLEAR_FORMAT_RANGES},
+      {.name = kClockDomainSwitch, .cmd = Command::SET_CLOCK_DOMAIN},
+      {.name = kInitialRateSwitch, .cmd = Command::SET_INITIAL_CLOCK_RATE},
+      {.name = kTransferBytesSwitch, .cmd = Command::SET_TRANSFER_BYTES},
+      {.name = kInternalDelaySwitch, .cmd = Command::SET_INTERNAL_DELAY},
+      {.name = kExternalDelaySwitch, .cmd = Command::SET_EXTERNAL_DELAY},
+      {.name = kBufferRestrictionsSwitch, .cmd = Command::SET_RING_BUFFER_RESTRICTIONS},
+      {.name = kGainPropsSwitch, .cmd = Command::SET_GAIN_PROPS},
+      {.name = kPlugPropsSwitch, .cmd = Command::SET_PLUG_PROPS},
+      {.name = kResetConfigSwitch, .cmd = Command::RESET_CONFIG},
 
-      {kAddDeviceSwitch, Command::ADD_DEVICE},
-      {kRemoveDeviceSwitch, Command::REMOVE_DEVICE},
+      {.name = kAddDeviceSwitch, .cmd = Command::ADD_DEVICE},
+      {.name = kRemoveDeviceSwitch, .cmd = Command::REMOVE_DEVICE},
 
-      {kPlugSwitch, Command::PLUG},
-      {kUnplugSwitch, Command::UNPLUG},
-      {kGetGainSwitch, Command::GET_GAIN},
-      {kGetFormatSwitch, Command::GET_FORMAT},
-      {kRetrieveBufferSwitch, Command::RETRIEVE_BUFFER},
-      {kWriteBufferSwitch, Command::WRITE_BUFFER},
-      {kGetPositionSwitch, Command::GET_POSITION},
-      {kNotificationFrequencySwitch, Command::SET_NOTIFICATION_FREQUENCY},
-      {kClockRateSwitch, Command::ADJUST_CLOCK_RATE},
+      {.name = kPlugSwitch, .cmd = Command::PLUG},
+      {.name = kUnplugSwitch, .cmd = Command::UNPLUG},
+      {.name = kGetGainSwitch, .cmd = Command::GET_GAIN},
+      {.name = kGetFormatSwitch, .cmd = Command::GET_FORMAT},
+      {.name = kRetrieveBufferSwitch, .cmd = Command::RETRIEVE_BUFFER},
+      {.name = kWriteBufferSwitch, .cmd = Command::WRITE_BUFFER},
+      {.name = kGetPositionSwitch, .cmd = Command::GET_POSITION},
+      {.name = kNotificationFrequencySwitch, .cmd = Command::SET_NOTIFICATION_FREQUENCY},
+      {.name = kClockRateSwitch, .cmd = Command::ADJUST_CLOCK_RATE},
 
-      {kCodecSwitch, Command::SET_CODEC},
-      {kCompositeSwitch, Command::SET_COMPOSITE},
-      {kDaiSwitch, Command::SET_DAI},
-      {kStreamConfigSwitch, Command::SET_STREAM_CONFIG},
-      {kDirectionInSwitch, Command::SET_IN},
-      {kDirectionOutSwitch, Command::SET_OUT},
-      {kDirectionlessSwitch, Command::SET_NO_DIRECTION},
-      {kWaitSwitch, Command::WAIT},
-      {kHelp1Switch, Command::HELP},
-      {kHelp2Switch, Command::HELP},
+      {.name = kCodecSwitch, .cmd = Command::SET_CODEC},
+      {.name = kCompositeSwitch, .cmd = Command::SET_COMPOSITE},
+      {.name = kDaiSwitch, .cmd = Command::SET_DAI},
+      {.name = kStreamConfigSwitch, .cmd = Command::SET_STREAM_CONFIG},
+      {.name = kDirectionInSwitch, .cmd = Command::SET_IN},
+      {.name = kDirectionOutSwitch, .cmd = Command::SET_OUT},
+      {.name = kDirectionlessSwitch, .cmd = Command::SET_NO_DIRECTION},
+      {.name = kWaitSwitch, .cmd = Command::WAIT},
+      {.name = kHelp1Switch, .cmd = Command::HELP},
+      {.name = kHelp2Switch, .cmd = Command::HELP},
   };
 
   static async::Loop* loop_;
@@ -302,8 +312,10 @@ class VirtualAudioUtil {
   fuchsia::virtualaudio::DevicePtr* device() {
     switch (config()->device_specific().Which()) {
       case fuchsia::virtualaudio::DeviceSpecific::Tag::kCodec:
-        return configuring_input_ ? (*configuring_input_ ? &codec_input_ : &codec_output_)
-                                  : &codec_;
+        if (configuring_input_.has_value()) {
+          return (*configuring_input_ ? &codec_input_ : &codec_output_);
+        }
+        return &codec_;
       case fuchsia::virtualaudio::DeviceSpecific::Tag::kComposite:
         return &composite_;
       case fuchsia::virtualaudio::DeviceSpecific::Tag::kDai:
@@ -318,8 +330,10 @@ class VirtualAudioUtil {
       std::optional<bool> is_input, fuchsia::virtualaudio::DeviceType device_type) {
     switch (device_type) {
       case fuchsia::virtualaudio::DeviceType::CODEC:
-        return is_input ? (*is_input ? &codec_input_config_ : &codec_output_config_)
-                        : &codec_config_;
+        if (is_input.has_value()) {
+          return (*is_input ? &codec_input_config_ : &codec_output_config_);
+        }
+        return &codec_config_;
       case fuchsia::virtualaudio::DeviceType::COMPOSITE:
         return &composite_config_;
       case fuchsia::virtualaudio::DeviceType::DAI:
@@ -362,7 +376,7 @@ class VirtualAudioUtil {
   template <bool is_out>
   static void PositionCallback(fuchsia::virtualaudio::Device_GetPosition_Result result);
 
-  fuchsia::virtualaudio::DeviceType device_type_ = fuchsia::virtualaudio::DeviceType::STREAM_CONFIG;
+  fuchsia::virtualaudio::DeviceType device_type_ = fuchsia::virtualaudio::DeviceType::COMPOSITE;
 };
 
 ::async::Loop* VirtualAudioUtil::loop_;
@@ -376,7 +390,7 @@ uint32_t VirtualAudioUtil::frame_size_[2];
 media::TimelineRate VirtualAudioUtil::ref_time_to_running_position_rate_[2];
 media::TimelineFunction VirtualAudioUtil::ref_time_to_running_position_[2];
 
-enum DeviceDirection { kOutput = 0u, kInput = 1u };
+enum DeviceDirection : uint8_t { kOutput = 0u, kInput = 1u };
 uint32_t VirtualAudioUtil::BytesPerSample(uint32_t format_bitfield) {
   if (format_bitfield & (AUDIO_SAMPLE_FORMAT_20BIT_IN32 | AUDIO_SAMPLE_FORMAT_24BIT_IN32 |
                          AUDIO_SAMPLE_FORMAT_32BIT | AUDIO_SAMPLE_FORMAT_32BIT_FLOAT)) {
@@ -481,7 +495,7 @@ void VirtualAudioUtil::RegisterKeyWaiter() {
 
 bool VirtualAudioUtil::WaitForKey() {
   printf("\tPress Q to cancel, or any other key to continue...\n");
-  setbuf(stdin, nullptr);
+  setvbuf(stdin, nullptr, _IONBF, 0); // Turn off buffering; immediately receive keypresses.
   RegisterKeyWaiter();
 
   while (RunForDuration(zx::sec(1))) {
@@ -587,8 +601,8 @@ void VirtualAudioUtil::ParseAndExecute(fxl::CommandLine* cmdline) {
     return;
   }
 
-  // Defaults are StreamConfig output.
-  device_type_ = fuchsia::virtualaudio::DeviceType::STREAM_CONFIG;
+  // Defaults are Composite.
+  device_type_ = fuchsia::virtualaudio::DeviceType::COMPOSITE;
   configuring_input_ = false;
 
   for (const auto& option : cmdline->options()) {
@@ -756,7 +770,7 @@ void VirtualAudioUtil::Usage() {
 
   printf("\nValid options:\n");
 
-  printf("\n  By default, a virtual device of type StreamConfig and direction Output is used\n");
+  printf("\n  By default, a virtual device of type Composite is used\n");
   printf("  --%s    \t\t  Switch to a Codec configuration with the same direction\n", kCodecSwitch);
   printf("  --%s\t\t  Switch to a Composite configuration with the same direction\n",
          kCompositeSwitch);
@@ -888,11 +902,15 @@ bool VirtualAudioUtil::SetUniqueId(const std::string& unique_id_str) {
   bool use_default = (unique_id_str.empty());
 
   for (size_t index = 0; index < 16; ++index) {
-    unique_id[index] =
-        use_default ? kDefaultUniqueId[index]
-        : unique_id_str.size() <= (2 * index + 1)
-            ? 0
-            : fxl::StringToNumber<uint8_t>(unique_id_str.substr(index * 2, 2), fxl::Base::k16);
+    uint8_t val;
+    if (use_default) {
+      val = kDefaultUniqueId[index];
+    } else {
+      val = unique_id_str.size() <= (2 * index + 1)
+                ? 0
+                : fxl::StringToNumber<uint8_t>(unique_id_str.substr(index * 2, 2), fxl::Base::k16);
+    }
+    unique_id[index] = val;
   }
 
   memcpy(config()->mutable_unique_id()->data(), unique_id.data(), sizeof(unique_id));
@@ -1572,15 +1590,20 @@ bool VirtualAudioUtil::AddDevice() {
   }
 
   if (status != ZX_OK) {
-    printf("ERROR: Failed to add %s device, status = %d\n", configuring_input_ ? "input" : "output",
-           status);
+    printf("ERROR: Failed to add %s device, status = %d\n",
+           to_string(configuring_input_, "input", "output", "directionless").c_str(), status);
     QuitLoop();
     return false;
   }
 
   device()->set_error_handler([is_input = configuring_input_](zx_status_t error) {
-    printf("%s device disconnected (%d)!\n",
-           is_input ? (*is_input ? "input" : "output") : "directionless", error);
+    std::string direction;
+    if (is_input) {
+      direction = (*is_input ? "input" : "output");
+    } else {
+      direction = "directionless";
+    }
+    printf("%s device disconnected (%d)!\n", direction.c_str(), error);
     QuitLoop();
   });
 
@@ -1773,7 +1796,7 @@ void VirtualAudioUtil::BufferNotification(zx::vmo ring_buffer_vmo, uint32_t num_
   uint64_t vmo_size;
   ring_buffer_vmo_.get_size(&vmo_size);
   DeviceDirection dev_type = is_out ? kOutput : kInput;
-  rb_size_[dev_type] = static_cast<uint32_t>(num_ring_buffer_frames * frame_size_[dev_type]);
+  rb_size_[dev_type] = (static_cast<size_t>(num_ring_buffer_frames * frame_size_[dev_type]));
 
   printf("--Received SetBuffer (vmo size: %zu, ring size: %zu, frames: %u, notifs: %u) for %s\n",
          vmo_size, rb_size_[dev_type], num_ring_buffer_frames, notifications_per_ring,

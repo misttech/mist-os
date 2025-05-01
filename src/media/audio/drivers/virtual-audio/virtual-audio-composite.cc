@@ -20,7 +20,7 @@ fuchsia_virtualaudio::Configuration VirtualAudioComposite::GetDefaultConfig() {
 
   fuchsia_virtualaudio::Configuration config;
   config.device_name("Virtual Audio Composite Device");
-  config.manufacturer_name("Fuchsia Virtual Audio Group");
+  config.manufacturer_name("Fuchsia");
   config.product_name("Virgil v2, a Virtual Volume Vessel");
   config.unique_id(std::array<uint8_t, 16>({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0}));
 
@@ -666,6 +666,8 @@ void VirtualAudioComposite::GetElements(GetElementsCompleter::Sync& completer) {
   fuchsia_hardware_audio_signalprocessing::Element dai;
   fuchsia_hardware_audio_signalprocessing::DaiInterconnect dai_interconnect;
   // Customize this for plug_detect_capabilities?
+  dai_interconnect.plug_detect_capabilities(
+      fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
   dai.id(kDaiId)
       .type(fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect)
       .type_specific(
@@ -697,13 +699,16 @@ void VirtualAudioComposite::WatchElementState(WatchElementStateRequest& request,
   }
   if (watch_element_state_needs_reply_[index]) {
     fuchsia_hardware_audio_signalprocessing::ElementState state;
-    fuchsia_hardware_audio_signalprocessing::DaiInterconnectElementState dai_state;
-    fuchsia_hardware_audio_signalprocessing::PlugState plug_state;
-    plug_state.plugged(true).plug_state_time(0);
-    dai_state.plug_state(std::move(plug_state));
-    state.type_specific(
-        fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithDaiInterconnect(
-            std::move(dai_state)));
+    if (index == 1) {
+      fuchsia_hardware_audio_signalprocessing::DaiInterconnectElementState dai_state;
+      fuchsia_hardware_audio_signalprocessing::PlugState plug_state;
+      plug_state.plugged(true).plug_state_time(0);
+      dai_state.plug_state(std::move(plug_state));
+      state.type_specific(
+          fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithDaiInterconnect(
+              std::move(dai_state)));
+    }
+    state.started(true);
     watch_element_state_needs_reply_[index] = false;
     completer.Reply(std::move(state));
   } else if (!watch_element_state_completers_[index]) {
