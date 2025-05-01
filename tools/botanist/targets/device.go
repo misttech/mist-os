@@ -600,18 +600,22 @@ func (t *Device) fastbootFlash(ctx context.Context, pbPath string, images []boot
 	zbi := flashImages["zbi"]
 	fvmImage := flashImages["fvm"]
 
-	cmds := [][]string{
-		{"flash", "boot_a", zbi.Path},
-		{"flash", "boot_b", zbi.Path},
-		{"flash", "dtbo_a", dtbo.Path},
-		{"flash", "dtbo_b", dtbo.Path},
+	cmd := []string{
+		"flash", "boot_a", zbi.Path,
+		"flash", "boot_b", zbi.Path,
+		"flash", "dtbo_a", dtbo.Path,
+		"flash", "dtbo_b", dtbo.Path,
 	}
 	if fvmImage != nil {
-		cmds = append(cmds, []string{"flash", "super", fvmImage.Path})
+		cmd = append(cmd, "flash", "super", fvmImage.Path)
 	}
-	cmds = append(cmds, []string{"reboot"})
-	if err := t.runFastboot(ctx, fastboot.Path, cmds); err != nil {
+	if err := t.runFastboot(ctx, fastboot.Path, [][]string{cmd}); err != nil {
 		return err
+	}
+	if err := t.runFastboot(ctx, fastboot.Path, [][]string{{"reboot"}}); err != nil {
+		// The reboot command may run but return an error. Log it, but
+		// continue trying to run tests.
+		logger.Errorf(ctx, "%s", err)
 	}
 	logger.Debugf(ctx, "done flashing")
 	return nil
