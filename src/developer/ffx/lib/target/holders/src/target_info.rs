@@ -8,7 +8,7 @@ use std::any::Any;
 use std::ops::Deref;
 
 use ffx_command_error::{bug, user_error, Result};
-use fho::{return_user_error, FfxContext, FhoEnvironment, FhoTargetInfo, TryFromEnv};
+use fho::{return_user_error, FfxContext, FhoEnvironment, TryFromEnv};
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 
 /// Holder struct for TargetInfo. This one is a little different since
@@ -17,16 +17,16 @@ use fidl_fuchsia_developer_ffx as ffx_fidl;
 #[derive(Debug, Clone)]
 pub struct TargetInfoHolder(ffx_fidl::TargetInfo);
 
-impl FhoTargetInfo for TargetInfoHolder {
-    fn nodename(&self) -> Option<String> {
+impl TargetInfoHolder {
+    pub fn nodename(&self) -> Option<String> {
         self.0.nodename.clone()
     }
 
-    fn serial_number(&self) -> Option<String> {
+    pub fn serial_number(&self) -> Option<String> {
         self.0.serial_number.clone()
     }
 
-    fn addresses(&self) -> Vec<std::net::SocketAddr> {
+    pub fn addresses(&self) -> Vec<std::net::SocketAddr> {
         let mut addrs = vec![];
         if let Some(address_list) = &self.0.addresses {
             for addr in address_list {
@@ -41,7 +41,7 @@ impl FhoTargetInfo for TargetInfoHolder {
         addrs
     }
 
-    fn ssh_address(&self) -> Option<std::net::SocketAddr> {
+    pub fn ssh_address(&self) -> Option<std::net::SocketAddr> {
         if let Some(ssh_address) = &self.0.ssh_address {
             let address: addr::TargetIpAddr = ssh_address.into();
             Some(address.into())

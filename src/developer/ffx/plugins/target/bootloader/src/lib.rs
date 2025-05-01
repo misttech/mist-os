@@ -27,10 +27,7 @@ use ffx_fastboot::unlock::unlock;
 use ffx_fastboot::util::{Event, UnlockEvent};
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, UploadProgress, Variable};
 use ffx_writer::VerifiedMachineWriter;
-use fho::{
-    deferred, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool,
-    FhoTargetInfo,
-};
+use fho::{deferred, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool};
 use fidl::Error;
 use fidl_fuchsia_developer_ffx::TargetState as FidlTargetState;
 use fidl_fuchsia_hardware_power_statecontrol::AdminProxy;

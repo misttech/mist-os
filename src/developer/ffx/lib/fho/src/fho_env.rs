@@ -8,33 +8,9 @@ use ffx_command::FfxCommandLine;
 use ffx_command_error::{return_bug, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
-use std::any::Any;
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::Arc;
-
-/// This is the trait that defines the information for a given target device.
-pub trait FhoTargetInfo {
-    /// The nodename of the device, if known.
-    fn nodename(&self) -> Option<String>;
-
-    /// The serial number of the device, if known.
-    fn serial_number(&self) -> Option<String>;
-
-    /// The TCP/IP addresses of the device, if known. Note: This is a SocketAddr so
-    /// the scope_id of any IPv6 address is passed along. The port number is always
-    /// zero and is meaningless.
-    fn addresses(&self) -> Vec<std::net::SocketAddr>;
-
-    /// The address and port for the ssh service on the device.
-    fn ssh_address(&self) -> Option<std::net::SocketAddr>;
-
-    /// To be used in conjunction with downcast_ref.
-    /// We cannot just use downcast_ref with generics, as it would not be
-    /// invokeable from a dyn object as per:
-    /// https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility
-    fn as_any<'a>(&'a self) -> &'a dyn Any;
-}
 
 #[derive(Clone)]
 pub enum FhoConnectionBehavior {
