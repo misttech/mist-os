@@ -6,8 +6,9 @@
 
 #include <lib/boot-options/word-view.h>
 #include <lib/boot-shim/test-serial-number.h>
-#include <lib/stdcompat/string_view.h>
 #include <lib/zbi-format/zbi.h>
+
+#include <string_view>
 
 namespace boot_shim {
 
@@ -30,7 +31,7 @@ fit::result<ItemBase::InputZbi::Error> TestSerialNumberItem::Init(ItemBase::Inpu
             payload.size(),
         };
         for (std::string_view word : WordView(line)) {
-          if (cpp20::starts_with(word, kSerialNumberEq)) {
+          if (word.starts_with(kSerialNumberEq)) {
             word.remove_prefix(kSerialNumberEq.size());
             found = {
                 reinterpret_cast<const std::byte*>(word.data()),

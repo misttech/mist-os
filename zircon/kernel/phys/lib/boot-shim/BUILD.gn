@@ -24,9 +24,6 @@ library_headers("headers") {
   ]
 
   public_deps = [
-    # <lib/boot-shim/item-base.h> has #include <lib/stdcompat/span.h>.
-    "//sdk/lib/stdcompat",
-
     # <lib/boot-shim/acpi.h> has #include <lib/zbi-format/driver-config.h>.
     # <lib/boot-shim/item-base.h> has #include <lib/zbi-format/zbi.h>.
     "//sdk/lib/zbi-format",
@@ -120,15 +117,8 @@ if (!is_kernel) {
       "lib/boot-shim/testing/devicetree-test-fixture.h",
     ]
 
-    if (zircon_toolchain == false) {
-      _headers = ""
-    } else {
-      _headers = ":headers"
-    }
-
     public_deps = [
       ":headers",
-      "//sdk/lib/stdcompat$_headers",
       "//sdk/lib/zbi-format",
       "//zircon/kernel/lib/devicetree/testing",
     ]

@@ -8,11 +8,11 @@
 #define ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_BOOT_SHIM_H_
 
 #include <lib/elfldltl/note.h>
-#include <lib/stdcompat/span.h>
 #include <stdio.h>
 
 #include <array>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
@@ -53,8 +53,8 @@ class BootShimBase : public ItemBase {
 
     void set_build_id(const elfldltl::ElfNote& build_id) { build_id_ = build_id; }
 
-    void set_strings(cpp20::span<std::string_view> strings) { strings_ = strings; }
-    void set_cstr(cpp20::span<const char*> cstr) { cstr_ = cstr; }
+    void set_strings(std::span<std::string_view> strings) { strings_ = strings; }
+    void set_cstr(std::span<const char*> cstr) { cstr_ = cstr; }
 
     size_t size_bytes() const;
     fit::result<DataZbi::Error> AppendItems(DataZbi& zbi) const;
@@ -64,8 +64,8 @@ class BootShimBase : public ItemBase {
 
     elfldltl::ElfNote build_id_;
     std::array<std::string_view, kCount> chunks_;
-    cpp20::span<std::string_view> strings_;
-    cpp20::span<const char*> cstr_;
+    std::span<std::string_view> strings_;
+    std::span<const char*> cstr_;
   };
 
   void Log(const Cmdline& cmdline, ByteView ramdisk) const;
@@ -139,12 +139,12 @@ class BootShim : public BootShimBase {
     return *this;
   }
 
-  constexpr BootShim& set_cmdline_strings(cpp20::span<std::string_view> strings) {
+  constexpr BootShim& set_cmdline_strings(std::span<std::string_view> strings) {
     Get<Cmdline>().set_strings(strings);
     return *this;
   }
 
-  constexpr BootShim& set_cmdline_cstrings(cpp20::span<const char*> cstrings) {
+  constexpr BootShim& set_cmdline_cstrings(std::span<const char*> cstrings) {
     Get<Cmdline>().set_cstr(cstrings);
     return *this;
   }

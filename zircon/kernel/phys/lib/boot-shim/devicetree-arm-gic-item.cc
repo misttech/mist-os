@@ -9,7 +9,6 @@
 #include <lib/devicetree/matcher.h>
 #include <lib/fit/result.h>
 #include <lib/memalloc/range.h>
-#include <lib/stdcompat/array.h>
 #include <lib/uart/all.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/memory.h>

@@ -8,14 +8,15 @@
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
 #include <lib/fit/defer.h>
-#include <lib/stdcompat/algorithm.h>
 #include <lib/zbi-format/cpu.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 
 #include <fbl/alloc_checker.h>
 
@@ -346,7 +347,7 @@ fit::result<ItemBase::DataZbi::Error> DevicetreeCpuTopologyItem::UpdateEntryCpuL
 
   // sorted phandle to CPU index for lookup.
   fbl::AllocChecker ac;
-  cpp20::span cpu_table = Allocate<CpuByPhandle>(cpu_entry_count_, ac);
+  std::span cpu_table = Allocate<CpuByPhandle>(cpu_entry_count_, ac);
   if (!ac.check()) {
     return fit::error(DataZbi::Error{
         .zbi_error = "Failed to allocate scratch buffer for CPU look up.",
@@ -364,7 +365,7 @@ fit::result<ItemBase::DataZbi::Error> DevicetreeCpuTopologyItem::UpdateEntryCpuL
     current_cpu++;
   }
 
-  cpp20::sort(cpu_table.begin(), cpu_table.end(), [](const auto& a, const auto& b) {
+  std::sort(cpu_table.begin(), cpu_table.end(), [](const auto& a, const auto& b) {
     return a.present && (!b.present || a.phandle <= b.phandle);
   });
   auto get_cpu_index = [cpu_table](std::optional<uint32_t> phandle) -> std::optional<uint32_t> {
@@ -399,7 +400,7 @@ fit::result<ItemBase::DataZbi::Error> DevicetreeCpuTopologyItem::UpdateEntryCpuL
 }
 
 fit::result<ItemBase::DataZbi::Error> DevicetreeCpuTopologyItem::CalculateClusterPerformanceClass(
-    cpp20::span<zbi_topology_node_t> nodes) const {
+    std::span<zbi_topology_node_t> nodes) const {
   if (cluster_count_ <= 1) {
     return fit::ok();
   }
@@ -414,7 +415,7 @@ fit::result<ItemBase::DataZbi::Error> DevicetreeCpuTopologyItem::CalculateCluste
   };
 
   fbl::AllocChecker ac;
-  cpp20::span perf = Allocate<ClusterPerf>(cluster_count_, ac);
+  std::span perf = Allocate<ClusterPerf>(cluster_count_, ac);
   if (!ac.check()) {
     return fit::error(DataZbi::Error{.zbi_error = "Failed to allocate scratch space."});
   }
@@ -525,8 +526,8 @@ fit::result<DevicetreeCpuTopologyItem::DataZbi::Error> DevicetreeCpuTopologyItem
   }
 
   auto [header, payload] = **result;
-  cpp20::span topology_nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
-                             adjusted_node_count);
+  std::span topology_nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
+                           adjusted_node_count);
 
   size_t current_node = 0;
   uint16_t logical_cpu_id = 0;

@@ -8,13 +8,13 @@
 #define ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_ITEM_BASE_H_
 
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/image.h>
 #include <lib/zbitl/view.h>
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <type_traits>
 #include <variant>
 
@@ -27,7 +27,7 @@ namespace boot_shim {
 class ItemBase {
  public:
   using ByteView = zbitl::ByteView;
-  using WritableBytes = cpp20::span<std::byte>;
+  using WritableBytes = std::span<std::byte>;
   using InputZbi = zbitl::View<ByteView>;
   using DataZbi = zbitl::Image<WritableBytes>;
 

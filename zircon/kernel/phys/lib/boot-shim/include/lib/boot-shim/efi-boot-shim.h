@@ -10,12 +10,12 @@
 #include <lib/acpi_lite.h>
 #include <lib/fit/function.h>
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/memory.h>
 
 #include <cstdint>
 #include <cstdio>
 #include <optional>
+#include <span>
 #include <variant>
 
 #include <efi/boot-services.h>
@@ -85,9 +85,9 @@ class EfiBootShimLoader {
 
   // GetMemoryMap (below) returns this on success.
   struct MemoryMapInfo {
-    cpp20::span<std::byte> map;  // Subset of the input buffer.
-    size_t entry_size;           // Size of each entry.
-    size_t key;                  // Map key to pass to ExitBootServices.
+    std::span<std::byte> map;  // Subset of the input buffer.
+    size_t entry_size;         // Size of each entry.
+    size_t key;                // Map key to pass to ExitBootServices.
   };
 
   // The error value is the UEFI GetMemoryMap size required.
@@ -108,13 +108,13 @@ class EfiBootShimLoader {
 
   // Call the UEFI GetMemoryMap function.
   static GetMemoryMapResult GetMemoryMap(efi_boot_services* boot_services,
-                                         cpp20::span<std::byte> buffer);
+                                         std::span<std::byte> buffer);
 
   // Take a buffer filled by UEFI GetMemoryMap and convert in place into
   // ZBI_TYPE_MEM_CONFIG format.  The returned mem_config will reuse a leading
   // subspan of the buffer.
-  static cpp20::span<zbi_mem_range_t> ConvertMemoryMap(cpp20::span<std::byte> buffer,
-                                                       size_t entry_size);
+  static std::span<zbi_mem_range_t> ConvertMemoryMap(std::span<std::byte> buffer,
+                                                     size_t entry_size);
 };
 
 // This has the boot_shim::BootShim<...> API with additional features.  It

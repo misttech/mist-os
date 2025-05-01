@@ -12,12 +12,12 @@
 #include <lib/devicetree/matcher.h>
 #include <lib/devicetree/testing/loaded-dtb.h>
 #include <lib/fit/function.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbitl/image.h>
 
 #include <array>
 #include <cstdint>
 #include <iostream>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -153,7 +153,7 @@ class DevicetreeBootShimTest : public zxtest::Test {
 
 std::optional<LoadedDtb> DevicetreeBootShimTest::ldtb_;
 
-void CheckZbiHasItemWithContent(zbitl::Image<cpp20::span<std::byte>> image, uint32_t item_type,
+void CheckZbiHasItemWithContent(zbitl::Image<std::span<std::byte>> image, uint32_t item_type,
                                 std::string_view contents) {
   int count = 0;
   for (auto it : image) {
@@ -171,7 +171,7 @@ void CheckZbiHasItemWithContent(zbitl::Image<cpp20::span<std::byte>> image, uint
 
 TEST_F(DevicetreeBootShimTest, DevicetreeItemWithAlias) {
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
   boot_shim::DevicetreeBootShim<DevicetreeItem1> shim("devicetree-boot-shim-test", fdt());
   ASSERT_TRUE(shim.Init());
@@ -182,7 +182,7 @@ TEST_F(DevicetreeBootShimTest, DevicetreeItemWithAlias) {
 
 TEST_F(DevicetreeBootShimTest, DevicetreeItemWithNoAlias) {
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
   boot_shim::DevicetreeBootShim<DevicetreeItem2> shim("devicetree-boot-shim-test", fdt());
   ASSERT_TRUE(shim.Init());
@@ -193,7 +193,7 @@ TEST_F(DevicetreeBootShimTest, DevicetreeItemWithNoAlias) {
 
 TEST_F(DevicetreeBootShimTest, MultipleDevicetreeItems) {
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
   boot_shim::DevicetreeBootShim<DevicetreeItem1, DevicetreeItem2> shim("devicetree-boot-shim-test",
                                                                        fdt());
@@ -206,7 +206,7 @@ TEST_F(DevicetreeBootShimTest, MultipleDevicetreeItems) {
 
 TEST_F(DevicetreeBootShimTest, MultipleDevicetreeItemsWithNonDeviceTreeItems) {
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
   boot_shim::DevicetreeBootShim<DevicetreeItem1, DevicetreeItem2, NonDeviceTreeItem> shim(
       "devicetree-boot-shim-test", fdt());
@@ -219,7 +219,7 @@ TEST_F(DevicetreeBootShimTest, MultipleDevicetreeItemsWithNonDeviceTreeItems) {
 
 TEST_F(DevicetreeBootShimTest, ItemsWithoutMatchingNodes) {
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   std::vector<void*> allocs;
   ASSERT_TRUE(image.clear().is_ok());
   // There are no nodes in the synthetic DTB that will match any real matcher, so they will produce

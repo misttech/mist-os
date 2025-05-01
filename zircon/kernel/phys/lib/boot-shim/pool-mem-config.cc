@@ -6,21 +6,21 @@
 
 #include <lib/boot-shim/pool-mem-config.h>
 #include <lib/memalloc/pool-mem-config.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/memory.h>
 #include <stdio.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
 #include <optional>
+#include <span>
 
 namespace {
 
 using ErrorType = boot_shim::ItemBase::DataZbi::Error;
 
-void WritePayload(const memalloc::Pool& pool, cpp20::span<std::byte> buffer) {
+void WritePayload(const memalloc::Pool& pool, std::span<std::byte> buffer) {
   memalloc::PoolMemConfig mem_config(pool);
-  cpp20::span<zbi_mem_range_t> payload{
+  std::span<zbi_mem_range_t> payload{
       reinterpret_cast<zbi_mem_range_t*>(buffer.data()),
       buffer.size_bytes() / sizeof(zbi_mem_range_t),
   };

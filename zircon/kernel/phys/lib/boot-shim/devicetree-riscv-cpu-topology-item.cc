@@ -6,9 +6,9 @@
 
 #include <lib/boot-shim/devicetree.h>
 #include <lib/fit/defer.h>
-#include <lib/stdcompat/span.h>
 
 #include <functional>
+#include <span>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_hash_table.h>
@@ -98,7 +98,7 @@ void RiscvDevicetreeCpuTopologyItemBase::OnDone() {
     ZX_DEBUG_ASSERT(&dest[str.value.size()] < isa_strtab_.data() + isa_strtab_size);
     dest[str.value.size()] = '\0';
   }
-  IsaStrtabItem::set_payload(cpp20::as_bytes(isa_strtab_));
+  IsaStrtabItem::set_payload(std::as_bytes(isa_strtab_));
 }
 
 }  // namespace boot_shim
