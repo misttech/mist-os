@@ -5,6 +5,14 @@
 import("//build/compiled_action.gni")
 import("//build/testing/cc_test_executable.gni")
 
+cc_test_executable("kgsl_unit_tests") {
+  testonly = true
+
+  sources = [ "kgsl_unit_tests.cc" ]
+
+  deps = [ "//src/lib/fxl/test:gtest_main" ]
+}
+
 cc_test_executable("virtmagma_vulkan_unit_tests") {
   testonly = true
 

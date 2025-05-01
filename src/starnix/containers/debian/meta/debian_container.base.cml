@@ -13,6 +13,7 @@
             "custom_artifacts",
             "enable_suid",
             "io_uring",
+            "kgsl",
             "magma_supported_vendors:0x13B5,0x5143,0x8086",
             "netstack_mark",
             "test_data",

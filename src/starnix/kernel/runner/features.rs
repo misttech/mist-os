@@ -22,6 +22,7 @@ use starnix_modules_input::{
     EventProxyMode, InputDevice, InputEventsRelay, DEFAULT_KEYBOARD_DEVICE_ID,
     DEFAULT_MOUSE_DEVICE_ID, DEFAULT_TOUCH_DEVICE_ID,
 };
+use starnix_modules_kgsl::kgsl_device_init;
 use starnix_modules_magma::magma_device_init;
 use starnix_modules_nanohub::nanohub_device_init;
 use starnix_modules_perfetto_consumer::start_perfetto_consumer_thread;
@@ -63,6 +64,9 @@ pub struct Features {
 
     /// Whether to enable gralloc.
     pub gralloc: bool,
+
+    /// Whether to enable the Kernel Graphics Support Layer (kgsl) device used by Adreno GPUs.
+    pub kgsl: bool,
 
     /// Supported magma vendor IDs.
     pub magma_supported_vendors: Option<Vec<u16>>,
@@ -147,6 +151,7 @@ impl Features {
                 aspect_ratio,
                 enable_visual_debugging,
                 gralloc,
+                kgsl,
                 magma_supported_vendors,
                 gfxstream,
                 container,
@@ -169,6 +174,7 @@ impl Features {
                 inspect_node.record_bool("ashmem", *ashmem);
                 inspect_node.record_bool("framebuffer", *framebuffer);
                 inspect_node.record_bool("gralloc", *gralloc);
+                inspect_node.record_bool("kgsl", *kgsl);
                 inspect_node.record_string(
                     "magma_supported_vendors",
                     match magma_supported_vendors {
@@ -286,6 +292,7 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
             ("ashmem", _) => features.ashmem = true,
             ("framebuffer", _) => features.framebuffer = true,
             ("gralloc", _) => features.gralloc = true,
+            ("kgsl", _) => features.kgsl = true,
             ("magma", _) => if features.magma_supported_vendors.is_none() {
                 const VENDOR_ARM: u16 = 0x13B5;
                 const VENDOR_INTEL: u16 = 0x8086;
@@ -483,6 +490,9 @@ pub fn run_container_features(
         // IAllocator allocate2 occurs with this feature disabled, the call will
         // fail.
         gralloc_device_init(locked, system_task);
+    }
+    if features.kgsl {
+        kgsl_device_init(locked, system_task);
     }
     if let Some(supported_vendors) = &features.magma_supported_vendors {
         magma_device_init(locked, system_task, supported_vendors.clone());

@@ -1,0 +1,26 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_library("kgsl") {
+  name = "starnix-modules-kgsl"
+  edition = "2021"
+  version = "0.1.0"
+  source_root = "lib.rs"
+
+  sources = [
+    "file.rs",
+    "init.rs",
+    "lib.rs",
+  ]
+
+  deps = [
+    "//src/starnix/kernel:starnix_core",
+    "//src/starnix/lib/starnix_sync",
+    "//src/starnix/lib/starnix_syscalls",
+    "//src/starnix/lib/starnix_uapi",
+  ]
+}

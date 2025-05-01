@@ -43,7 +43,10 @@ group("tests") {
       deps += [ ":starnix_user_tests" ]
     }
 
-    deps += [ ":starnix_magma_tests" ]
+    deps += [
+      ":starnix_kgsl_tests",
+      ":starnix_magma_tests",
+    ]
   }
 }
 
@@ -77,6 +80,26 @@ if (host_os == "linux" && host_cpu == "x64") {
 
     subpackages = starnix_test_subpackages +
                   [ "//src/starnix/containers/debian:debian_package" ]
+  }
+}
+
+starnix_linux_test_component("kgsl_unit_tests") {
+  test_label = "//src/graphics/magma/tests_linux/unit_tests:kgsl_unit_tests"
+  test_type = "starnix"
+}
+
+fuchsia_test_package("starnix_kgsl_tests") {
+  test_components = [ ":kgsl_unit_tests" ]
+
+  subpackages = starnix_test_subpackages + [
+                  "//src/starnix/containers/debian:debian_package",
+                  "//src/ui/testing/test_ui_stack:test-ui-stack",
+                ]
+
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
 
