@@ -479,6 +479,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         adjust_decision: &UserClockAdjust,
     ) {
         let estimate_transform = self.new_clock_transform(&adjust_decision, last_proposal);
+        debug!("estimate_transform: {:#?}", estimate_transform);
         if !*clock_started {
             self.start_clock(&estimate_transform);
             *clock_started = true;
@@ -694,8 +695,8 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
 
     /// Starts the clock on the requested reference->utc transform, recording diagnostic events.
     fn start_clock(&mut self, estimate_transform: &UtcTransform) {
-        let mono = zx::BootInstant::get();
-        let clock_update = estimate_transform.jump_to(mono);
+        let mono = fasync::BootInstant::now();
+        let clock_update = estimate_transform.jump_to(mono.into());
         self.update_clock(clock_update);
 
         self.diagnostics.record(Event::StartClock {
@@ -703,7 +704,8 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
             source: StartClockSource::External(self.time_source_manager.role()),
         });
 
-        let utc_chrono = Utc.timestamp_nanos(estimate_transform.synthetic(mono).into_nanos());
+        let utc_chrono =
+            Utc.timestamp_nanos(estimate_transform.synthetic(mono.into()).into_nanos());
         info!("started {:?} clock from external source at {}", self.track, utc_chrono);
         self.set_delayed_update_task(vec![], estimate_transform);
     }
@@ -715,11 +717,11 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         self.delayed_updates = None;
 
         let current_transform = UtcTransform::from(self.clock.as_ref());
-        let mono = zx::BootInstant::get();
+        let mono = fasync::BootInstant::now();
 
         let correction =
-            ClockCorrection::for_transition(mono, &current_transform, estimate_transform);
-        self.record_correction(correction, estimate_transform, mono);
+            ClockCorrection::for_transition(mono.into(), &current_transform, estimate_transform);
+        self.record_correction(correction, estimate_transform, mono.into());
     }
 
     /// Records this particular clock correction.
@@ -1540,21 +1542,21 @@ mod tests {
 
         let updated_utc = clock.read().unwrap();
 
-        let reference_after = executor.boot_now();
-
         // Since we used the same covariance for the first two samples the offset in the Kalman
         // filter is roughly midway between the sample offsets, but slight closer to the second
         // because oscillator uncertainty.
         let expected_offset_min = zx::BootDuration::from_nanos(1666500000080699);
-        let expected_offset_max = zx::BootDuration::from_nanos(1666700000080699);
 
         // Check that the clock has been updated. The UTC should be bounded by the expected offset
         // added to the reference window in which the calculation took place.
-        assert_geq!(
-            updated_utc.into_nanos(),
-            (reference_before + expected_offset_min).into_nanos()
+        let expected_updated_utc = reference_before + expected_offset_min;
+        assert!(
+            updated_utc.into_nanos() >= expected_updated_utc.into_nanos(),
+            "\n\tclock_read: {:?}\n\texpected: {:?}\n\tdiff: {:?}",
+            updated_utc,
+            expected_updated_utc,
+            updated_utc.into_nanos() - expected_updated_utc.into_nanos(),
         );
-        assert_leq!(updated_utc.into_nanos(), (reference_after + expected_offset_max).into_nanos());
 
         // Check that the correct diagnostic events were logged.
         diagnostics.assert_events(&[
@@ -1817,21 +1819,46 @@ mod tests {
         );
     }
 
+    // Sets up the given `executor` to the current system time.
+    //
+    // # Returns
+    // - The applied monotonic and boot instants.
+    fn clone_system_time(
+        executor: &mut fasync::TestExecutor,
+    ) -> (zx::MonotonicInstant, zx::BootInstant) {
+        let real_now = zx::MonotonicInstant::get();
+        let real_boot_now = zx::BootInstant::get();
+        let offset_nanos = real_boot_now.into_nanos() - real_now.into_nanos();
+        // Offset is nonnegative by definition, since the boot time reading is at least
+        // the monotonic time reading.
+        assert!(offset_nanos >= 0, "offset can not be negative: {:?}", offset_nanos);
+        executor.set_fake_time(real_now.into());
+        let offset = zx::BootDuration::from_nanos(offset_nanos);
+        executor.set_fake_boot_to_mono_offset(offset);
+        (real_now, real_boot_now)
+    }
+
     #[fuchsia::test]
     fn test_user_time_adjustment() -> Result<()> {
-        // Start from the system time. Required to work around backstop time issues.
-        let real_boot_now = zx::MonotonicInstant::get();
+        // Start from the system time. Required to work around backstop time issues,
+        // and the discrepancy between boot and monotonic times. We artificially
+        // proclaim that the boot and monotonic timeline values match, which helps
+        // us run the test in fake time.
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(real_boot_now.into());
+        let (real_now, _) = clone_system_time(&mut executor);
 
         debug!("executor_boot_now: {:?}; executor_now: {:?}", executor.boot_now(), executor.now());
 
         let clock = create_clock();
         let diagnostics = Arc::new(FakeDiagnostics::new());
-        let reference = zx::BootInstant::from_nanos(executor.now().into_nanos());
+        let reference = executor.boot_now();
+
+        debug!("\n\treference   : {:?}\n\treal_boot_now: {:?}", reference, real_now);
+
+        const SAMPLING_DELAY_SEC: i64 = 10;
 
         let config = make_test_config_with_fn(|mut config| {
-            config.first_sampling_delay_sec = 10;
+            config.first_sampling_delay_sec = SAMPLING_DELAY_SEC;
 
             // Don't forbid any user time adjustment.
             config.utc_max_allowed_delta_future_sec = i64::MAX;
@@ -1844,7 +1871,7 @@ mod tests {
             Arc::clone(&clock),
             vec![Sample::new(
                 UtcInstant::from_nanos((reference + OFFSET_2).into_nanos()),
-                reference,
+                reference.into(),
                 STD_DEV,
             )],
             None,
@@ -1863,7 +1890,7 @@ mod tests {
             let (responder, mut rx) = mpsc::channel(1);
             cmd_tx
                 .send(Command::Reference {
-                    boot_reference: proposed_boot,
+                    boot_reference: proposed_boot.into(),
                     utc_reference: proposed_utc,
                     responder,
                 })

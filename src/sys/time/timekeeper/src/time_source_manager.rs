@@ -45,7 +45,7 @@ pub struct KernelBootTimeProvider();
 
 impl ReferenceTimeProvider for KernelBootTimeProvider {
     fn now(&mut self) -> zx::BootInstant {
-        zx::BootInstant::get()
+        fasync::BootInstant::now().into()
     }
 }
 
