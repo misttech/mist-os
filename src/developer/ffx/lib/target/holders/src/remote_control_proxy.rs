@@ -59,9 +59,9 @@ impl TryFromEnv for RemoteControlProxyHolder {
             },
             FhoConnectionBehavior::DirectConnector(direct) => {
                 let conn = direct.connection().await?;
-                let cc = conn.lock().await;
-                let c = cc.deref();
-                c.as_ref()
+                let cc =
+                    conn.lock().expect("fdomain::remote_control_proxy: connection lock poisoned");
+                cc.as_ref()
                     .ok_or(bug!("Connection not yet initialized"))?
                     .rcs_proxy()
                     .await

@@ -5,7 +5,6 @@
 use crate::show::TargetData;
 use addr::TargetIpAddr;
 use anyhow::{anyhow, bail, Result};
-use async_lock::Mutex;
 use async_trait::async_trait;
 use fdomain_fuchsia_buildinfo::ProviderProxy;
 use fdomain_fuchsia_feedback::{DeviceIdProviderProxy, LastRebootInfoProviderProxy};
@@ -18,7 +17,7 @@ use show::{
     AddressData, BoardData, BuildData, DeviceData, ProductData, TargetShowInfo, UpdateData,
 };
 use std::net::IpAddr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use target_holders::fdomain::{moniker, RemoteControlProxyHolder};
 use target_holders::TargetProxyHolder;
@@ -95,7 +94,7 @@ impl ShowTool {
 async fn gather_target_info_direct(
     connection: Arc<Mutex<Option<ffx_target::Connection>>>,
 ) -> Result<(AddressData, Option<fidl_fuchsia_developer_ffx::CompatibilityInfo>)> {
-    let conn = connection.lock().await;
+    let conn = connection.lock().expect("gather_target_info_direct: connection lock poisoned");
     let conn = conn.as_ref().ok_or_else(|| anyhow!("No connection available"))?;
     // If we've gotten a connection, we must have an address we connected to
     let addr = conn.device_address().expect("No address in connection?");

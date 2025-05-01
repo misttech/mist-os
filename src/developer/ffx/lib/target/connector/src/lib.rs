@@ -235,13 +235,13 @@ mod tests {
     use std::marker::PhantomData;
 
     use super::*;
-    use async_lock::Mutex;
     use ffx_command_error::{bug, NonFatalError};
     use ffx_config::{EnvironmentContext, TryFromEnvContext};
     use ffx_target::connection::testing::{FakeOvernet, FakeOvernetBehavior};
     use ffx_target::{TargetConnection, TargetConnectionError, TargetConnector};
     use fho::MockDirectConnector;
     use futures::future::LocalBoxFuture;
+    use std::sync::Mutex;
     use target_holders::RemoteControlProxyHolder;
 
     #[fuchsia::test]
@@ -327,7 +327,7 @@ mod tests {
         assert!(connector.connect().await.is_err());
         assert!(connector.connect().await.is_err());
         let err = bug!("foo");
-        assert_eq!(err.to_string(), connector.wrap_connection_errors(err).await.to_string());
+        assert_eq!(err.to_string(), connector.wrap_connection_errors(err).to_string());
     }
 
     // This is a bit of a hack, but there needs to be a way to set the behavior that also doesn't

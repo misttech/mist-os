@@ -124,7 +124,7 @@ impl FhoEnvironment {
         if let Some(behavior) = self.behavior().await {
             match (res, behavior) {
                 (Err(e), FhoConnectionBehavior::DirectConnector(ref dc)) => {
-                    return Err(dc.wrap_connection_errors(e).await);
+                    return Err(dc.wrap_connection_errors(e));
                 }
                 (r, _) => r,
             }

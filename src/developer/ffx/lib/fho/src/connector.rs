@@ -31,7 +31,7 @@ pub trait DirectConnector {
     /// protocol).
     ///
     /// In the event that `Some(_)` the enclosed vector will always be of size 1 or larger.
-    fn wrap_connection_errors(&self, e: crate::Error) -> LocalBoxFuture<'_, crate::Error>;
+    fn wrap_connection_errors(&self, e: crate::Error) -> crate::Error;
 
     /// Returns the device address (if there currently is one).
     fn device_address(&self) -> LocalBoxFuture<'_, Option<SocketAddr>>;
@@ -43,5 +43,5 @@ pub trait DirectConnector {
     fn target_spec(&self) -> Option<String>;
 
     /// Returns the `Connection` (connecting if it is not yet connected)
-    fn connection(&self) -> LocalBoxFuture<'_, Result<Arc<async_lock::Mutex<Option<Connection>>>>>;
+    fn connection(&self) -> LocalBoxFuture<'_, Result<Arc<std::sync::Mutex<Option<Connection>>>>>;
 }
