@@ -11,6 +11,7 @@ use fxfs_macros::ToWeakNode;
 use std::any::TypeId;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
+use std::fmt;
 use std::mem::ManuallyDrop;
 use std::sync::{Arc, Weak};
 use std::task::{Poll, Waker};
@@ -54,6 +55,15 @@ impl FxNode for Placeholder {
 
     fn object_descriptor(&self) -> ObjectDescriptor {
         ObjectDescriptor::File
+    }
+}
+
+impl fmt::Debug for dyn FxNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FxNode")
+            .field("id", &self.object_id())
+            .field("descriptor", &self.object_descriptor())
+            .finish()
     }
 }
 

@@ -7,7 +7,7 @@
 
 use crate::fuchsia::component::map_to_raw_status;
 use crate::fuchsia::directory::FxDirectory;
-use crate::fuchsia::fxblob::blob::FxBlob;
+use crate::fuchsia::fxblob::blob::{CompressionInfo, FxBlob};
 use crate::fuchsia::fxblob::writer::DeliveryBlobWriter;
 use crate::fuchsia::node::{FxNode, GetResult, OpenedNode};
 use crate::fuchsia::volume::{FxVolume, RootDir};
@@ -245,13 +245,13 @@ impl BlobDirectory {
                     }
                 };
 
+                let uncompressed_size = metadata.uncompressed_size;
                 let node = FxBlob::new(
                     object,
                     tree,
-                    metadata.chunk_size,
-                    metadata.compressed_offsets,
-                    metadata.uncompressed_size,
-                )? as Arc<dyn FxNode>;
+                    CompressionInfo::from_metadata(metadata)?,
+                    uncompressed_size,
+                ) as Arc<dyn FxNode>;
                 placeholder.commit(&node);
                 Ok(node)
             }
@@ -264,6 +264,7 @@ impl BlobDirectory {
     async fn create_blob_writer(
         self: &Arc<Self>,
         hash: Hash,
+        allow_existing: bool,
     ) -> Result<ClientEnd<BlobWriterMarker>, CreateBlobError> {
         let id = hash.into();
         let blob_exists = self
@@ -274,7 +275,7 @@ impl BlobDirectory {
                 CreateBlobError::Internal
             })?
             .is_some();
-        if blob_exists {
+        if blob_exists && !allow_existing {
             return Err(CreateBlobError::AlreadyExists);
         }
         let (client_end, request_stream) = create_request_stream::<BlobWriterMarker>();
@@ -293,12 +294,12 @@ impl BlobDirectory {
     async fn handle_blob_creator_requests(self: Arc<Self>, mut requests: BlobCreatorRequestStream) {
         while let Ok(Some(request)) = requests.try_next().await {
             match request {
-                BlobCreatorRequest::Create { responder, hash, .. } => {
-                    responder.send(self.create_blob_writer(Hash::from(hash)).await).unwrap_or_else(
-                        |error| {
+                BlobCreatorRequest::Create { responder, hash, allow_existing } => {
+                    responder
+                        .send(self.create_blob_writer(Hash::from(hash), allow_existing).await)
+                        .unwrap_or_else(|error| {
                             log::error!(error:?; "failed to send Create response");
-                        },
-                    );
+                        });
                 }
             }
         }

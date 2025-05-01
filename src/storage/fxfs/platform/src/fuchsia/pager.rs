@@ -44,6 +44,19 @@ pub struct PagerPacketReceiver<T> {
     file: Mutex<FileHolder<T>>,
 }
 
+/// A returnable lock held on the receiver.
+pub struct PagerPacketReceiverLock<'a, T> {
+    _guard: MutexGuard<'a, FileHolder<T>>,
+    strong: bool,
+}
+
+impl<T> PagerPacketReceiverLock<'_, T> {
+    /// Returns true if the receiver was installed as a strong.
+    pub fn is_strong(&self) -> bool {
+        self.strong
+    }
+}
+
 impl<T: PagerBacked> PagerPacketReceiver<T> {
     /// Drops the strong reference to the file that might be held if
     /// `Pager::watch_for_zero_children` was called. This should only be used when forcibly dropping
@@ -58,6 +71,23 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
             STRONG_FILE_REFS.fetch_sub(1, Ordering::Relaxed);
             strong.on_zero_children();
         }
+    }
+
+    /// Sets the current receiver and returns the lock guard so that it can be held after the value
+    /// is set. Currently this allows synchronizing open count adjustments.
+    pub fn set_receiver(&self, new_receiver: &Arc<T>) -> PagerPacketReceiverLock<'_, T> {
+        let mut receiver_lock = self.file.lock();
+        let strong = match &mut *receiver_lock {
+            FileHolder::Strong(arc) => {
+                *arc = new_receiver.clone();
+                true
+            }
+            FileHolder::Weak(arc) => {
+                *arc = Arc::downgrade(new_receiver);
+                false
+            }
+        };
+        PagerPacketReceiverLock { _guard: receiver_lock, strong }
     }
 
     fn receive_pager_packet(&self, contents: PagerPacket) {

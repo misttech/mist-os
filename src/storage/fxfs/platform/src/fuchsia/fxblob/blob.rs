@@ -21,6 +21,7 @@ use fxfs::errors::FxfsError;
 use fxfs::object_handle::{ObjectHandle, ReadObjectHandle};
 use fxfs::object_store::{DataObjectHandle, ObjectDescriptor};
 use fxfs::round::{round_down, round_up};
+use fxfs::serialized_types::BlobMetadata;
 use fxfs_macros::ToWeakNode;
 use std::num::NonZero;
 use std::ops::Range;
@@ -46,31 +47,23 @@ pub struct FxBlob {
     merkle_leaves: Box<[Hash]>,
     compression_info: Option<CompressionInfo>,
     uncompressed_size: u64, // always set.
-    pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,
+    pager_packet_receiver_registration: Arc<PagerPacketReceiverRegistration<Self>>,
 }
 
 impl FxBlob {
     pub fn new(
         handle: DataObjectHandle<FxVolume>,
         merkle_tree: MerkleTree,
-        compressed_chunk_size: u64,
-        compressed_offsets: Vec<u64>,
+        compression_info: Option<CompressionInfo>,
         uncompressed_size: u64,
-    ) -> Result<Arc<Self>, Error> {
+    ) -> Arc<Self> {
         // Only the merkle root and leaves are needed, the rest of the tree can be dropped.
         let merkle_root = merkle_tree.root();
         // The merkle leaves are intentionally copied to remove all of the spare capacity from the
         // Vec.
         let merkle_leaves = merkle_tree.as_ref()[0].clone().into_boxed_slice();
 
-        let compression_info = if compressed_offsets.is_empty() {
-            None
-        } else {
-            let read_size = default_read_size(compressed_chunk_size);
-            Some(CompressionInfo::new(compressed_chunk_size, compressed_offsets, read_size)?)
-        };
-
-        Ok(Arc::new_cyclic(|weak| {
+        Arc::new_cyclic(|weak| {
             let (vmo, pager_packet_receiver_registration) = handle
                 .owner()
                 .pager()
@@ -85,9 +78,39 @@ impl FxBlob {
                 merkle_leaves,
                 compression_info,
                 uncompressed_size,
-                pager_packet_receiver_registration,
+                pager_packet_receiver_registration: Arc::new(pager_packet_receiver_registration),
             }
-        }))
+        })
+    }
+
+    pub fn overwrite_me(
+        self: &Arc<Self>,
+        handle: DataObjectHandle<FxVolume>,
+        compression_info: Option<CompressionInfo>,
+    ) -> Arc<Self> {
+        let vmo = self.vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
+
+        let new_blob = Arc::new(Self {
+            handle,
+            vmo,
+            open_count: AtomicUsize::new(0),
+            merkle_root: self.merkle_root,
+            merkle_leaves: self.merkle_leaves.iter().cloned().collect(),
+            compression_info,
+            uncompressed_size: self.uncompressed_size,
+            pager_packet_receiver_registration: self.pager_packet_receiver_registration.clone(),
+        });
+
+        // Lock must be held until the open counts are swapped to prevent concurrent handling of
+        // zero children signals.
+        let receiver_lock =
+            self.pager_packet_receiver_registration.receiver().set_receiver(&new_blob);
+        if receiver_lock.is_strong() {
+            // If there was a strong moved between them, then the counts exchange as well.
+            new_blob.open_count_add_one();
+            self.clone().open_count_sub_one();
+        }
+        new_blob
     }
 
     /// Marks the blob as being purged.  Returns true if there are no open references.
@@ -116,6 +139,13 @@ impl Drop for FxBlob {
     fn drop(&mut self) {
         let volume = self.handle.owner();
         volume.cache().remove(self);
+        if self.open_count.load(Ordering::Relaxed) == PURGED {
+            let store = self.handle.store();
+            store
+                .filesystem()
+                .graveyard()
+                .queue_tombstone_object(store.store_object_id(), self.object_id());
+        }
     }
 }
 
@@ -168,13 +198,6 @@ impl FxNode for FxBlob {
     fn open_count_sub_one(self: Arc<Self>) {
         let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
         assert!(old & !PURGED > 0);
-        if old == PURGED + 1 {
-            let store = self.handle.store();
-            store
-                .filesystem()
-                .graveyard()
-                .queue_tombstone_object(store.store_object_id(), self.object_id());
-        }
     }
 
     fn object_descriptor(&self) -> ObjectDescriptor {
@@ -309,7 +332,7 @@ impl PagerBacked for FxBlob {
     }
 }
 
-struct CompressionInfo {
+pub struct CompressionInfo {
     chunk_size: u64,
     // The chunked compression format stores 0 as the first offset but it's not stored here. Not
     // storing the 0 avoids the allocation for all blobs smaller than 128KiB (the read-ahead size).
@@ -318,6 +341,15 @@ struct CompressionInfo {
 }
 
 impl CompressionInfo {
+    pub fn from_metadata(metadata: BlobMetadata) -> Result<Option<Self>, Error> {
+        Ok(if metadata.compressed_offsets.is_empty() {
+            None
+        } else {
+            let read_size = default_read_size(metadata.chunk_size);
+            Some(Self::new(metadata.chunk_size, metadata.compressed_offsets, read_size)?)
+        })
+    }
+
     fn new(chunk_size: u64, offsets: Vec<u64>, read_size: u64) -> Result<Self, Error> {
         // The read size should be derived from the chunk size.
         debug_assert!(
