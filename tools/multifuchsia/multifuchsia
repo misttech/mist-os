@@ -292,6 +292,18 @@ function cmd_rebase() {
     cp "$checkout/out/default/args.gn" "$checkout.new/out/default/args.gn"
   fi
 
+  if [[ -e $checkout/local ]]; then
+    (
+      cd $checkout/local
+      mkdir -p $checkout.new/local
+      for i in *; do
+        if ! cmp --quiet "$i" "$checkout.new/local/$i"; then
+          cp "$i" "$checkout.new/local/$i";
+        fi
+      done
+    )
+  fi
+
   (cd "$WORKDIR" && fixup_absolute_paths "checkouts/$checkout_name.new" "checkouts/$checkout_name")
 
   # Update the checkout's remotes/origin/main.
