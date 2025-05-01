@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::connection::Connection;
 use ffx_command_error::Result;
-use ffx_target::connection::Connection;
 use futures::future::LocalBoxFuture;
-use mockall::automock;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 /// An object used for connecting to a Fuchsia Device. This represents the entire underlying
 /// connection to a fuchsia device. If this object is dropped, then all FIDL protocols will be
 /// closed with `PEER_CLOSED` errors as a result.
-#[automock]
+#[mockall::automock]
 pub trait DirectConnector {
     // A note on the shape of this trait: the object must _not_ be sized in order for it to be used as
     // a trait object, due to the bounds around object safety in rust. Furthermore, a safe trait object
@@ -31,7 +30,7 @@ pub trait DirectConnector {
     /// protocol).
     ///
     /// In the event that `Some(_)` the enclosed vector will always be of size 1 or larger.
-    fn wrap_connection_errors(&self, e: crate::Error) -> crate::Error;
+    fn wrap_connection_errors(&self, e: fho::Error) -> fho::Error;
 
     /// Returns the device address (if there currently is one).
     fn device_address(&self) -> LocalBoxFuture<'_, Option<SocketAddr>>;

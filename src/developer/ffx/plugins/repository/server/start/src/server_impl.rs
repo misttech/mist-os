@@ -547,9 +547,10 @@ mod test {
     use assert_matches::assert_matches;
     use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::{ConfigLevel, TestEnv};
+    use ffx_target::fho::{target_interface, FhoConnectionBehavior};
     use ffx_target::TargetProxy;
     use ffx_writer::{Format, SimpleWriter, TestBuffer, TestBuffers};
-    use fho::{user_error, FfxMain, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
+    use fho::{user_error, FfxMain, FhoEnvironment, TryFromEnv};
     use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_developer_ffx::{
         RemoteControlState, SshHostAddrInfo, TargetAddrInfo, TargetInfo, TargetIpAddrInfo,
@@ -947,7 +948,8 @@ mod test {
 
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         Connector::try_from_env(&env).await.expect("Could not make RCS test connector")
     }
@@ -970,7 +972,8 @@ mod test {
 
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         Connector::try_from_env(&env).await.expect("Could not make RCS test connector")
     }
@@ -993,7 +996,8 @@ mod test {
 
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         Connector::try_from_env(&env).await.expect("Could not make RCS test connector")
     }
@@ -1507,7 +1511,9 @@ mod test {
                 &test_env.context,
                 &["some", "repo", "start", "test"],
             );
-            env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+            let target_env = ffx_target::fho::target_interface(&env);
+            target_env
+                .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
             let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
 
@@ -1656,7 +1662,8 @@ mod test {
 
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
         let tmp_port_file_path = tmp_port_file.path().to_owned();
@@ -1820,7 +1827,8 @@ mod test {
 
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         let test_stdout = TestBuffer::default();
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
@@ -1970,7 +1978,8 @@ mod test {
 
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         // Future resolves once fake target exists
         let _timeout = timeout(time::Duration::from_secs(10), async {
@@ -2147,7 +2156,8 @@ mod test {
         };
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         // Prepare serving the repo without passing the trusted root, and
         // passing of the trusted root 2.root.json explicitly

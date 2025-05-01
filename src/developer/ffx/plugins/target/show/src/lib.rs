@@ -10,8 +10,9 @@ use fdomain_fuchsia_buildinfo::ProviderProxy;
 use fdomain_fuchsia_feedback::{DeviceIdProviderProxy, LastRebootInfoProviderProxy};
 use fdomain_fuchsia_hwinfo::{Architecture, BoardProxy, DeviceProxy, ProductProxy};
 use fdomain_fuchsia_update_channelcontrol::ChannelControlProxy;
+use ffx_target::fho::{DirectConnector, FhoConnectionBehavior};
 use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
-use fho::{deferred, Deferred, DirectConnector, FfxMain, FfxTool};
+use fho::{deferred, Deferred, FfxMain, FfxTool, FhoEnvironment};
 use fidl_fuchsia_developer_ffx::TargetIpAddrInfo;
 use show::{
     AddressData, BoardData, BuildData, DeviceData, ProductData, TargetShowInfo, UpdateData,
@@ -30,8 +31,8 @@ mod show;
 pub struct ShowTool {
     #[command]
     cmd: args::TargetShow,
+    fho_env: FhoEnvironment,
     rcs_proxy: RemoteControlProxyHolder,
-    connector: Option<Arc<dyn DirectConnector>>, // Returns Some(dc) only if we have a direct connection
     target_proxy: Deferred<TargetProxyHolder>,
     #[with(moniker("/core/system-update"))]
     channel_control_proxy: ChannelControlProxy,
@@ -64,10 +65,15 @@ impl ShowTool {
     async fn show_cmd(self, writer: &mut <ShowTool as fho::FfxMain>::Writer) -> Result<()> {
         // To add more show information, add a `gather_*_show(*) call to this
         // list, as well as the labels in the Ok() and vec![] just below.
+        // Returns Some(dc) only if we have a direct connection
+        let connector = match ffx_target::fho::target_interface(&self.fho_env).behavior() {
+            Some(FhoConnectionBehavior::DirectConnector(ref direct)) => Some(direct.clone()),
+            _ => None,
+        };
         let show = match futures::try_join!(
             gather_target_show(
                 self.rcs_proxy,
-                self.connector,
+                connector,
                 self.target_proxy,
                 self.last_reboot_info_proxy
             ),
@@ -420,8 +426,8 @@ mod tests {
         let output = VerifiedMachineWriter::<TargetShowInfo>::new_test(None, &buffers);
         let tool = ShowTool {
             cmd: args::TargetShow { ..Default::default() },
+            fho_env: FhoEnvironment::default(),
             rcs_proxy: setup_fake_rcs_server(Arc::clone(&client)).into(),
-            connector: None,
             target_proxy: setup_fake_target_server(),
             channel_control_proxy: setup_fake_channel_control_server(Arc::clone(&client)),
             board_proxy: setup_fake_board_server(Arc::clone(&client)),
@@ -583,8 +589,8 @@ mod tests {
             <ShowTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &buffers);
         let tool = ShowTool {
             cmd: args::TargetShow { ..Default::default() },
+            fho_env: FhoEnvironment::default(),
             rcs_proxy: setup_fake_rcs_server(Arc::clone(&client)).into(),
-            connector: None,
             target_proxy: setup_fake_target_server(),
             channel_control_proxy: setup_fake_channel_control_server(Arc::clone(&client)),
             board_proxy: setup_fake_board_server(Arc::clone(&client)),
@@ -609,7 +615,7 @@ mod tests {
     }
 
     fn setup_fake_direct_connector() -> Arc<dyn DirectConnector> {
-        let mut dc = fho::MockDirectConnector::new();
+        let mut dc = ffx_target::fho::connector::MockDirectConnector::new();
         dc.expect_connection().return_once(|| {
             let device_address = std::net::SocketAddr::new("127.0.0.1".parse().unwrap(), 22);
             let fidl_pipe = FidlPipe::fake(Some(device_address));
@@ -624,10 +630,14 @@ mod tests {
         let client = fdomain_local::local_client(|| Err(zx_status::Status::NOT_SUPPORTED));
         let buffers = TestBuffers::default();
         let output = VerifiedMachineWriter::<TargetShowInfo>::new_test(None, &buffers);
+        let fho_env = FhoEnvironment::default();
+        let target_env = ffx_target::fho::target_interface(&fho_env);
+        target_env
+            .set_behavior(FhoConnectionBehavior::DirectConnector(setup_fake_direct_connector()));
         let tool = ShowTool {
             cmd: args::TargetShow { ..Default::default() },
+            fho_env,
             rcs_proxy: setup_fake_rcs_server(Arc::clone(&client)).into(),
-            connector: Some(setup_fake_direct_connector()),
             target_proxy: setup_fake_target_server(),
             channel_control_proxy: setup_fake_channel_control_server(Arc::clone(&client)),
             board_proxy: setup_fake_board_server(Arc::clone(&client)),

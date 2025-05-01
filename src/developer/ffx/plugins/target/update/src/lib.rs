@@ -601,10 +601,11 @@ async fn handle_wait_for_commit(
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use ffx_target::fho::FhoConnectionBehavior;
     use ffx_target::TargetProxy;
     use ffx_update_args::Update;
     use ffx_writer::TestBuffers;
-    use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
+    use fho::{FhoEnvironment, TryFromEnv};
     use fidl::endpoints::create_proxy_and_stream;
     use fidl::{EventPair, Peered, Signals};
     use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
@@ -756,7 +757,8 @@ mod tests {
         };
 
         let fho_env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
-        fho_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&fho_env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         let tool = UpdateTool {
             cmd: Update {
@@ -848,7 +850,8 @@ mod tests {
         };
 
         let fho_env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
-        fho_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&fho_env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         let tool = UpdateTool {
             cmd: Update { cmd: args::Command::ForceInstall(args.clone()) },

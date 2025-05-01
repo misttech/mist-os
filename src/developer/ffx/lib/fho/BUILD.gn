@@ -19,14 +19,12 @@ rustc_library("lib") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/core:lib",
     "//src/developer/ffx/lib/fho/metadata:lib",
-    "//src/developer/ffx/lib/target:lib",
     "//src/developer/lib/writer:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:mockall",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tracing",
@@ -40,7 +38,6 @@ rustc_library("lib") {
 
   sources = [
     "src/adapters.rs",
-    "src/connector.rs",
     "src/fho_env.rs",
     "src/from_env.rs",
     "src/lib.rs",

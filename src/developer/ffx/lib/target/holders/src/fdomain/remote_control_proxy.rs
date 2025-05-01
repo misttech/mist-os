@@ -10,7 +10,8 @@ use fdomain_client::fidl::{
 };
 use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use ffx_command_error::{FfxContext as _, Result};
-use fho::{bug, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
+use ffx_target::fho::{target_interface, FhoConnectionBehavior};
+use fho::{bug, FhoEnvironment, TryFromEnv};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
@@ -35,11 +36,12 @@ impl From<RemoteControlProxy> for RemoteControlProxyHolder {
 #[async_trait(?Send)]
 impl TryFromEnv for RemoteControlProxyHolder {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        let behavior = if let Some(behavior) = env.behavior().await {
+        let target_env = target_interface(env);
+        let behavior = if let Some(behavior) = target_env.behavior() {
             behavior
         } else {
             let b = init_connection_behavior(env.environment_context()).await?;
-            env.set_behavior(b.clone()).await;
+            target_env.set_behavior(b.clone());
             b
         };
         match behavior {

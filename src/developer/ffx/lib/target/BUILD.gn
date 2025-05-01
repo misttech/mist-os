@@ -22,6 +22,7 @@ rustc_library("lib") {
     "//src/connectivity/overnet/lib/core",
     "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/core:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/compat_info:lib",
@@ -29,6 +30,7 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/emulator_instance:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fastboot_file_discovery:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/manual_targets:lib",
     "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/rcs:lib",
@@ -47,6 +49,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:futures-lite",
     "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:mockall",
     "//third_party/rust_crates:nix",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tokio",
@@ -55,13 +58,14 @@ rustc_library("lib") {
 
   test_deps = [
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:mockall",
     "//third_party/rust_crates:tempfile",
   ]
 
   sources = [
     "src/connection.rs",
     "src/fdomain_transport.rs",
+    "src/fho/connector.rs",
+    "src/fho/mod.rs",
     "src/fidl_pipe.rs",
     "src/lib.rs",
     "src/resolve.rs",

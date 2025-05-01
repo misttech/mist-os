@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::connector::DirectConnector;
-use crate::fho_env::FhoConnectionBehavior;
-use crate::{FhoEnvironment, TryFromEnv};
+use crate::FhoEnvironment;
 use async_trait::async_trait;
 use ffx_command_error::{return_user_error, Result};
-use std::sync::Arc;
 
 #[async_trait(?Send)]
 pub trait CheckEnv {
@@ -29,18 +26,6 @@ impl<T: AsRef<str>> CheckEnv for AvailabilityFlag<T> {
                 "This is an experimental subcommand.  To enable this subcommand run 'ffx config set {} true'",
                 flag
             );
-        }
-    }
-}
-
-// Returns a DirectConnector only if we have a direct connection. Returns None for
-// a daemon connection.
-#[async_trait(?Send)]
-impl TryFromEnv for Option<Arc<dyn DirectConnector>> {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        match env.behavior().await {
-            Some(FhoConnectionBehavior::DirectConnector(ref direct)) => Ok(Some(direct.clone())),
-            _ => Ok(None),
         }
     }
 }

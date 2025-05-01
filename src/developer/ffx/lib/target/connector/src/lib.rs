@@ -5,8 +5,11 @@
 use async_trait::async_trait;
 use errors::FfxError;
 use ffx_command_error::{return_bug, Error, Result};
+use ffx_target::fho::{
+    target_interface, DirectConnector, FhoConnectionBehavior, FhoTargetEnvironment,
+};
 use ffx_target::ssh_connector::SshConnector;
-use fho::{DirectConnector, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
+use fho::{FhoEnvironment, TryFromEnv};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use std::sync::Arc;
@@ -19,6 +22,7 @@ use target_network_connector::NetworkConnector;
 #[derive(Clone)]
 pub struct Connector<T: TryFromEnv> {
     env: FhoEnvironment,
+    target_env: FhoTargetEnvironment,
     _connects_to: std::marker::PhantomData<T>,
 }
 
@@ -33,7 +37,7 @@ impl<T: TryFromEnv> Connector<T> {
         &self,
         mut log_target_wait: impl FnMut(&Option<String>, &Option<Error>) -> Result<()>,
     ) -> Result<T> {
-        if let Some(behavior) = self.env.behavior().await {
+        if let Some(behavior) = self.target_env.behavior() {
             match behavior {
                 FhoConnectionBehavior::DaemonConnector(_) => {
                     daemon_try_connect(
@@ -57,11 +61,16 @@ impl<T: TryFromEnv> Connector<T> {
 #[async_trait(?Send)]
 impl<T: TryFromEnv> TryFromEnv for Connector<T> {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        if env.behavior().await.is_none() {
+        let target_env = target_interface(env);
+        if target_env.behavior().is_none() {
             let b = init_connection_behavior(env.environment_context()).await?;
-            env.set_behavior(b).await;
+            target_env.set_behavior(b);
         }
-        Ok(Connector { env: env.clone(), _connects_to: Default::default() })
+        Ok(Connector {
+            env: env.clone(),
+            target_env: target_env.clone(),
+            _connects_to: Default::default(),
+        })
     }
 }
 
@@ -81,11 +90,11 @@ impl<T: TryFromEnv> TryFromEnv for DirectTargetConnector<T> {
             .await?,
         );
 
-        let direct_env = env.clone();
-        direct_env.set_behavior(FhoConnectionBehavior::DirectConnector(connector.clone())).await;
+        let target_env = target_interface(env);
+        target_env.set_behavior(FhoConnectionBehavior::DirectConnector(connector.clone()));
         Ok(DirectTargetConnector {
             connector,
-            inner: Connector { env: direct_env, _connects_to: Default::default() },
+            inner: Connector { env: env.clone(), target_env, _connects_to: Default::default() },
         })
     }
 }
@@ -232,8 +241,8 @@ mod tests {
     use ffx_command_error::{bug, NonFatalError};
     use ffx_config::{EnvironmentContext, TryFromEnvContext};
     use ffx_target::connection::testing::{FakeOvernet, FakeOvernetBehavior};
+    use ffx_target::fho::connector::MockDirectConnector;
     use ffx_target::{TargetConnection, TargetConnectionError, TargetConnector};
-    use fho::MockDirectConnector;
     use futures::future::LocalBoxFuture;
     use std::sync::Mutex;
     use target_holders::RemoteControlProxyHolder;
@@ -248,9 +257,8 @@ mod tests {
 
         let fho_env =
             FhoEnvironment::new_with_args(&config_env.context, &["some", "connector", "test"]);
-        fho_env
-            .set_behavior(FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)))
-            .await;
+        let target_env = target_interface(&fho_env);
+        target_env.set_behavior(FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)));
 
         let connector =
             Connector::<RemoteControlProxyHolder>::try_from_env(&fho_env).await.unwrap();
@@ -275,9 +283,8 @@ mod tests {
 
         let fho_env =
             FhoEnvironment::new_with_args(&config_env.context, &["some", "connector", "test"]);
-        fho_env
-            .set_behavior(FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)))
-            .await;
+        let target_env = target_interface(&fho_env);
+        target_env.set_behavior(FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)));
 
         let connector = Connector::<PhantomData<String>>::try_from_env(&fho_env).await.unwrap();
         let res = connector.try_connect(|_, _| Ok(())).await;
@@ -303,9 +310,8 @@ mod tests {
 
         let fho_env =
             FhoEnvironment::new_with_args(&config_env.context, &["some", "connector", "test"]);
-        fho_env
-            .set_behavior(FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)))
-            .await;
+        let target_env = target_interface(&fho_env);
+        target_env.set_behavior(FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)));
 
         let connector =
             Connector::<RemoteControlProxyHolder>::try_from_env(&fho_env).await.unwrap();

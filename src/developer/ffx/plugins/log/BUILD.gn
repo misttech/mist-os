@@ -55,6 +55,7 @@ ffx_plugin("ffx_log") {
   ]
 
   test_deps = [
+    "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/diagnostics/lib/log-command",
     "//src/lib/diagnostics/selectors",

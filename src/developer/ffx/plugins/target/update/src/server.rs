@@ -447,6 +447,7 @@ async fn try_rcs_proxy_connection(
 mod tests {
     use super::*;
     use ffx_config::TestEnv;
+    use ffx_target::fho::FhoConnectionBehavior;
     use ffx_target::TargetProxy;
     use fho::{FhoEnvironment, TryFromEnv as _};
     use fidl_fuchsia_developer_remotecontrol::{
@@ -489,9 +490,9 @@ mod tests {
                 ..Default::default()
             };
             let fho_env = FhoEnvironment::new_with_args(&test_env.context, &["some", "test"]);
-            fho_env
-                .set_behavior(fho::FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)))
-                .await;
+            let target_env = ffx_target::fho::target_interface(&fho_env);
+            target_env
+                .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
             let target_proxy_connector = Connector::try_from_env(&fho_env)
                 .await

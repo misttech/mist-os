@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 mod adapters;
-mod connector;
 mod fho_env;
 mod from_env;
 mod try_from_env;
@@ -13,15 +12,13 @@ pub mod subtool;
 pub use subtool::{FfxMain, FfxTool};
 
 // Re-export TryFromEnv related symbols
-pub use fho_env::{EnvironmentInterface, FhoConnectionBehavior, FhoEnvironment};
+pub use fho_env::{EnvironmentInterface, FhoEnvironment};
 pub use from_env::{AvailabilityFlag, CheckEnv};
+
 pub use try_from_env::{deferred, Deferred, TryFromEnv, TryFromEnvWith};
 
 // Used for deriving an FFX tool.
 pub use fho_macro::FfxTool;
-
-// Direct connection to a target device
-pub use connector::{DirectConnector, MockDirectConnector};
 
 // Re-expose the Error, Result, and FfxContext types from ffx_command
 // so you don't have to pull both in all the time.

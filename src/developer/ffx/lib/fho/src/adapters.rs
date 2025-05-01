@@ -46,7 +46,7 @@ macro_rules! embedded_plugin {
             // The env must not be dropped entirely until after the main function has completed, as
             // the underlying backing connection is kept inside the environment (in the case of
             // direct connections via `crate::connector::DefaultConnector`.
-            env.maybe_wrap_connection_errors(res).await
+            env.wrap_main_result(res)
         }
 
         pub fn ffx_plugin_is_machine_supported() -> bool {

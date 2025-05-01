@@ -156,7 +156,7 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
             self.main.main(writer).await.map(|_| ExitStatus::from_raw(0))
         };
         let res = metrics.command_finished(&res, &self.redacted_args).await.and(res);
-        self.env.maybe_wrap_connection_errors(res).await
+        self.env.wrap_main_result(res)
     }
 }
 

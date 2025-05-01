@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use diagnostics_data::{BuilderArgs, LogsData, LogsDataBuilder, Severity, Timestamp};
-use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
+use ffx_target::fho::FhoConnectionBehavior;
+use fho::{FhoEnvironment, TryFromEnv};
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use fidl_fuchsia_developer_remotecontrol::{
     IdentifyHostResponse, RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
@@ -148,7 +149,8 @@ impl TestEnvironment {
             ),
             &["some", "test"],
         );
-        fho_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&fho_env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
         Self { fho_env, state, event_rcv: Some(event_rcv), disconnect_snd: disconnect_snd }
     }
 

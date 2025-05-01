@@ -29,6 +29,7 @@ use tracing::{debug, info};
 use mockall::predicate::*;
 
 pub mod connection;
+pub mod fho;
 pub mod ssh_connector;
 
 mod fdomain_transport;

@@ -87,6 +87,13 @@ impl TryFromEnv for EnvironmentContext {
     }
 }
 
+#[async_trait(?Send)]
+impl TryFromEnv for FhoEnvironment {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        Ok(env.clone())
+    }
+}
+
 /// Allows you to defer the initialization of an object in your tool struct
 /// until you need it (if at all) or apply additional combinators on it (like
 /// custom timeout logic or anything like that).

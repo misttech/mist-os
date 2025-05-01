@@ -4,8 +4,8 @@
 
 use ffx_command_error::{bug, user_error, Error, Result};
 use ffx_config::{EnvironmentContext, TryFromEnvContext};
+use ffx_target::fho::connector::DirectConnector;
 use ffx_target::{get_target_specifier, Connection, ConnectionError, TargetConnector};
-use fho::DirectConnector;
 use futures::future::LocalBoxFuture;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex, MutexGuard};
