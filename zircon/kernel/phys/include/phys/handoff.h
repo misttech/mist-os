@@ -313,7 +313,6 @@ struct PhysHandoff {
   // Initialized UART to be used by the kernel, if any.
   uart::all::Driver uart;
 };
-
 static_assert(std::is_default_constructible_v<PhysHandoff>);
 
 // PhysHandoff does not have a standard layout due to some non-standard
@@ -330,52 +329,6 @@ extern PhysHandoff* gPhysHandoff;
 // This is the entry point function for the ELF kernel.
 extern "C" [[noreturn]] void PhysbootHandoff(PhysHandoff* handoff);
 
-#ifdef _KERNEL
-
-// These functions relate to PhysHandoff but exist only in the kernel proper.
-
-#include <stddef.h>
-
-#include <fbl/ref_ptr.h>
-#include <object/handle.h>
-
-// Forward declaration; defined in <vm/vm_object.h>
-class VmObject;
-
-// Called as soon as the physmap is available to set the gPhysHandoff pointer.
-void HandoffFromPhys(paddr_t handoff_paddr);
-
-// Valid to call only after HandoffFromPhys().
-paddr_t KernelPhysicalLoadAddress();
-
-// This can be used after HandoffFromPhys and before the ZBI is handed off to
-// userboot at the very end of kernel initialization code.  Userboot calls it
-// with true to ensure no later calls will succeed.
-
-// The remaining hand-off data to be consumed at the end of the hand-off phase
-// (see EndHandoff()).
-struct HandoffEnd {
-  // The data ZBI.
-  HandleOwner zbi;
-
-  fbl::RefPtr<VmObject> vdso;
-  fbl::RefPtr<VmObject> userboot;
-
-  // The VMOs deriving from the phys environment. As returned by EndHandoff(),
-  // the entirety of the array will be populated by real handles (if only by
-  // stub VMOs) (as is convenient for userboot, its intended caller).
-  std::array<HandleOwner, PhysVmo::kMaxExtraHandoffPhysVmos> extra_phys_vmos;
-};
-
-// Formally ends the hand-off phase, unsetting gPhysHandoff and returning the
-// remaining hand-off data left to be consumed (in a userboot-friendly way), and
-// freeing temporary hand-off memory (see PhysHandoff::temporary_memory).
-//
-// After the end of hand-off, all pointers previously referenced by gPhysHandoff
-// should be regarded as freed and unusable.
-HandoffEnd EndHandoff();
-
-#endif  // _KERNEL
 #endif  // __ASSEMBLER__
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_HANDOFF_H_

@@ -49,9 +49,9 @@
 #include <ktl/variant.h>
 #include <lk/init.h>
 #include <object/resource_dispatcher.h>
-#include <phys/handoff.h>
 #include <platform/crashlog.h>
 #include <platform/debug.h>
+#include <vm/handoff-end.h>
 #include <vm/kstack.h>
 #include <vm/physmap.h>
 #include <vm/vm.h>

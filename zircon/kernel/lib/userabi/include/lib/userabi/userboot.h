@@ -80,6 +80,8 @@ constexpr uint32_t kProcessArgsMaxBytes = 128;
 
 #ifdef _KERNEL
 
+#include <vm/handoff-end.h>
+
 // Called at the end of the boot process in the main kernel initialization sequence.
 void userboot_init(HandoffEnd handoff_end);
 

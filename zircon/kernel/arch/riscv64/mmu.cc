@@ -33,8 +33,8 @@
 #include <ktl/algorithm.h>
 #include <ktl/span.h>
 #include <phys/arch/arch-handoff.h>
-#include <phys/handoff.h>
 #include <vm/arch_vm_aspace.h>
+#include <vm/handoff-end.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/vm.h>
@@ -1709,7 +1709,8 @@ void riscv64_mmu_early_init() {
   riscv_asid_mask = (riscv64_csr_read(satp) >> RISCV64_SATP_ASID_SHIFT) & RISCV64_SATP_ASID_MASK;
   riscv64_csr_write(satp, satp_orig);
 
-  riscv64_kernel_bootstrap_translation_table_phys = (satp & RISCV64_SATP_PPN_MASK) << PAGE_SIZE_SHIFT;
+  riscv64_kernel_bootstrap_translation_table_phys = (satp & RISCV64_SATP_PPN_MASK)
+                                                    << PAGE_SIZE_SHIFT;
   pte_t* bootstrap_translation_table =
       reinterpret_cast<pte_t*>(paddr_to_physmap(riscv64_kernel_bootstrap_translation_table_phys));
 

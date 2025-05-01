@@ -23,6 +23,7 @@
 #include <phys/handoff.h>
 #include <platform/boot_timestamps.h>
 #include <platform/timer.h>
+#include <vm/handoff-end.h>
 #include <vm/physmap.h>
 #include <vm/vm_object_paged.h>
 
