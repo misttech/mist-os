@@ -333,7 +333,7 @@ fn write_target_event<W: Write>(mut writer: W, event: TargetEvent) -> Result<()>
 fn write_target_state<W: Write>(writer: &mut W, state: TargetState) -> Result<()> {
     match state {
         TargetState::Unknown => write!(writer, "Unknown")?,
-        TargetState::Product(addrs) => {
+        TargetState::Product { addrs, .. } => {
             write!(writer, "Product\t")?;
             let addr_strs =
                 addrs.iter().map(|addr| format!("{}", addr)).collect::<Vec<_>>().join("\t");
@@ -372,7 +372,7 @@ where
                         targets.remove(&handle.node_name.unwrap_or_else(|| "".to_string()));
                     }
                     TargetEvent::Added(handle) => match handle.state {
-                        TargetState::Product(addr) => {
+                        TargetState::Product { addrs: addr, .. } => {
                             targets.insert(
                                 handle.node_name.unwrap_or_else(|| "".to_string()),
                                 (addr, TargetMode::Product),

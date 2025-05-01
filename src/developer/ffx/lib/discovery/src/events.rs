@@ -48,7 +48,7 @@ impl Display for FastbootTargetState {
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum TargetState {
     Unknown,
-    Product(Vec<TargetAddr>),
+    Product { addrs: Vec<TargetAddr>, serial: Option<String> },
     Fastboot(FastbootTargetState),
     Zedboot,
 }
@@ -57,7 +57,9 @@ impl Display for TargetState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let res = match self {
             TargetState::Unknown => "Unknown".to_string(),
-            TargetState::Product(addr) => format!("Product({:?})", addr),
+            TargetState::Product { addrs: addr, serial } => {
+                format!("Product(addrs: {:?} serial:{:?})", addr, serial)
+            }
             TargetState::Fastboot(state) => format!("Fastboot({:?})", state),
             TargetState::Zedboot => "Zedboot".to_string(),
         };
@@ -168,7 +170,10 @@ impl TryFrom<ffx::TargetInfo> for TargetHandle {
         let state = match info.fastboot_interface {
             None => {
                 assert_non_empty_addrs(&addrs)?;
-                TargetState::Product(addrs.into_iter().map(Into::into).collect())
+                TargetState::Product {
+                    addrs: addrs.into_iter().map(Into::into).collect(),
+                    serial: info.serial_number,
+                }
             }
             Some(iface) => {
                 let serial_number = info.serial_number.unwrap_or_else(|| "".to_string());
@@ -223,9 +228,10 @@ impl From<ManualTargetEvent> for TargetEvent {
             ManualTargetEvent::Discovered(manual_target, manual_state) => {
                 let state = match manual_state {
                     ManualTargetState::Disconnected => TargetState::Unknown,
-                    ManualTargetState::Product => {
-                        TargetState::Product(vec![manual_target.addr().into()])
-                    }
+                    ManualTargetState::Product => TargetState::Product {
+                        addrs: vec![manual_target.addr().into()],
+                        serial: None,
+                    },
                     ManualTargetState::Fastboot => TargetState::Fastboot(FastbootTargetState {
                         serial_number: "".to_string(),
                         connection_state: FastbootConnectionState::Tcp(vec![manual_target
@@ -369,7 +375,7 @@ mod test {
                 TargetHandle::try_from(info)?,
                 TargetHandle {
                     node_name: Some("foo".to_string()),
-                    state: TargetState::Product(vec![addr])
+                    state: TargetState::Product { addrs: vec![addr], serial: None }
                 }
             );
         }
@@ -460,7 +466,29 @@ mod test {
                 TargetEvent::try_from(mdns_event)?,
                 TargetEvent::Added(TargetHandle {
                     node_name: Some("foo".to_string()),
-                    state: TargetState::Product(vec![addr])
+                    state: TargetState::Product { addrs: vec![addr], serial: None }
+                })
+            );
+        }
+        {
+            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let addr = TargetAddr::from(socket);
+            let addr_info: ffx::TargetAddrInfo = addr.into();
+            let info = ffx::TargetInfo {
+                nodename: Some("foo".to_string()),
+                addresses: Some(vec![addr_info]),
+                serial_number: Some("12348890".to_string()),
+                ..Default::default()
+            };
+            let mdns_event = ffx::MdnsEventType::TargetFound(info);
+            assert_eq!(
+                TargetEvent::try_from(mdns_event)?,
+                TargetEvent::Added(TargetHandle {
+                    node_name: Some("foo".to_string()),
+                    state: TargetState::Product {
+                        addrs: vec![addr],
+                        serial: Some("12348890".to_string())
+                    }
                 })
             );
         }
@@ -478,7 +506,7 @@ mod test {
                 TargetEvent::try_from(mdns_event)?,
                 TargetEvent::Added(TargetHandle {
                     node_name: Some("foo".to_string()),
-                    state: TargetState::Product(vec![addr])
+                    state: TargetState::Product { addrs: vec![addr], serial: None }
                 })
             );
         }
@@ -496,7 +524,7 @@ mod test {
                 TargetEvent::try_from(mdns_event)?,
                 TargetEvent::Removed(TargetHandle {
                     node_name: Some("foo".to_string()),
-                    state: TargetState::Product(vec![addr])
+                    state: TargetState::Product { addrs: vec![addr], serial: None }
                 })
             );
         }
@@ -518,7 +546,7 @@ mod test {
                 TargetEvent::try_from(emulator_event)?,
                 TargetEvent::Added(TargetHandle {
                     node_name: Some("foo".to_string()),
-                    state: TargetState::Product(vec![addr])
+                    state: TargetState::Product { addrs: vec![addr], serial: None }
                 })
             );
         }
@@ -534,7 +562,7 @@ mod test {
                 TargetEvent::try_from(emulator_event)?,
                 TargetEvent::Removed(TargetHandle {
                     node_name: Some("foo".to_string()),
-                    state: TargetState::Product(vec![addr])
+                    state: TargetState::Product { addrs: vec![addr], serial: None }
                 })
             );
         }
@@ -554,7 +582,7 @@ mod test {
                 TargetEvent::from(manual_target_event),
                 TargetEvent::Added(TargetHandle {
                     node_name: Some("127.0.0.1:8080".to_string()),
-                    state: TargetState::Product(vec![addr.into()]),
+                    state: TargetState::Product { addrs: vec![addr.into()], serial: None }
                 })
             );
         }
@@ -574,7 +602,7 @@ mod test {
                 TargetEvent::from(manual_target_event),
                 TargetEvent::Added(TargetHandle {
                     node_name: Some("[::1]:8023".to_string()),
-                    state: TargetState::Product(vec![addr.into()]),
+                    state: TargetState::Product { addrs: vec![addr.into()], serial: None }
                 })
             );
         }

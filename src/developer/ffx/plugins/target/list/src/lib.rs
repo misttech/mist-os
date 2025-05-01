@@ -179,9 +179,11 @@ async fn handle_to_info(
     handle: discovery::TargetHandle,
     connect_to_target: bool,
 ) -> Result<ffx::TargetInfo> {
+    let mut serial_number = None;
     let (target_state, addresses) = match handle.state {
         discovery::TargetState::Unknown => (ffx::TargetState::Unknown, None),
-        discovery::TargetState::Product(target_addrs) => {
+        discovery::TargetState::Product { addrs: target_addrs, serial } => {
+            serial_number = serial;
             (ffx::TargetState::Product, Some(target_addrs))
         }
         discovery::TargetState::Fastboot(fts) => {
@@ -210,6 +212,7 @@ async fn handle_to_info(
     Ok(ffx::TargetInfo {
         nodename: handle.node_name,
         addresses,
+        serial_number,
         rcs_state: Some(rcs_state),
         target_state: Some(target_state),
         board_config,

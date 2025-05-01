@@ -662,7 +662,7 @@ pub mod test {
         // This should not come into the queue since the target is not in zedboot
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Kelsier".to_string()),
-            state: TargetState::Product(vec![addr]),
+            state: TargetState::Product { addrs: vec![addr], serial: None },
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
@@ -756,7 +756,10 @@ pub mod test {
                 // Name must correspond to "runtime:name" value in config
                 node_name: Some("emu-data-instance".to_string()),
                 // Addr must correspond to "host:port_map:sh:host" value in config
-                state: TargetState::Product(vec![TargetAddr::from_str("127.0.0.1:3322")?]),
+                state: TargetState::Product {
+                    addrs: vec![TargetAddr::from_str("127.0.0.1:3322")?],
+                    serial: None
+                },
             })
         );
 
@@ -777,7 +780,10 @@ pub mod test {
                 // Name must correspond to "runtime:name" value in config
                 node_name: Some("emu-data-instance2".to_string()),
                 // Addr must correspond to "host:port_map:sh:host" value in config
-                state: TargetState::Product(vec![TargetAddr::from_str("127.0.0.1:3322")?]),
+                state: TargetState::Product {
+                    addrs: vec![TargetAddr::from_str("127.0.0.1:3322")?],
+                    serial: None
+                },
             })
         );
 

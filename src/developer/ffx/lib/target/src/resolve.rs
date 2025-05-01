@@ -306,7 +306,10 @@ async fn get_handle_info(
     let mut serial_number = None;
     let (target_state, fastboot_interface, addresses) = match handle.state {
         TargetState::Unknown => (ffx::TargetState::Unknown, None, None),
-        TargetState::Product(target_addrs) => (ffx::TargetState::Product, None, Some(target_addrs)),
+        TargetState::Product { addrs: target_addrs, serial } => {
+            serial_number = serial;
+            (ffx::TargetState::Product, None, Some(target_addrs))
+        }
         TargetState::Fastboot(state) => {
             serial_number.replace(state.serial_number);
             let (fastboot_connection, addresses) = match state.connection_state {
@@ -530,7 +533,7 @@ fn query_matches_handle(query: &TargetInfoQuery, h: &TargetHandle) -> bool {
             }
         }
         TargetInfoQuery::Addr(ref sa) => {
-            if let TargetState::Product(addrs) = &h.state {
+            if let TargetState::Product { addrs, .. } = &h.state {
                 return addrs.iter().any(|a| a.ip() == Some(sa.ip()));
             } else if let TargetState::Fastboot(fts) = &h.state {
                 match &fts.connection_state {
@@ -542,14 +545,14 @@ fn query_matches_handle(query: &TargetInfoQuery, h: &TargetHandle) -> bool {
             }
         }
         TargetInfoQuery::VSock(cid) => {
-            if let TargetState::Product(addrs) = &h.state {
+            if let TargetState::Product { addrs, .. } = &h.state {
                 if addrs.iter().any(|a| a.cid_vsock() == Some(*cid)) {
                     return true;
                 }
             }
         }
         TargetInfoQuery::Usb(cid) => {
-            if let TargetState::Product(addrs) = &h.state {
+            if let TargetState::Product { addrs, .. } = &h.state {
                 if addrs.iter().any(|a| a.cid_usb() == Some(*cid)) {
                     return true;
                 }
@@ -563,7 +566,7 @@ fn query_matches_handle(query: &TargetInfoQuery, h: &TargetHandle) -> bool {
 // Descriptions are used for matching against a TargetInfoQuery
 fn handle_to_description(handle: &TargetHandle) -> Description {
     let (addresses, serial) = match &handle.state {
-        TargetState::Product(target_addr) => (target_addr.clone(), None),
+        TargetState::Product { addrs: target_addr, .. } => (target_addr.clone(), None),
         TargetState::Fastboot(discovery::FastbootTargetState {
             serial_number: sn,
             connection_state,
@@ -666,7 +669,7 @@ impl ResolutionTarget {
     // target, and return it.
     fn from_target_handle(target: &TargetHandle) -> Result<ResolutionTarget> {
         match &target.state {
-            TargetState::Product(addresses) => {
+            TargetState::Product { addrs: addresses, .. } => {
                 let sock = choose_socketaddr_from_addresses(
                     &target,
                     &addresses.into_iter().filter_map(|x| x.try_into().ok()).collect(),
@@ -920,7 +923,7 @@ mod test {
         // A DNS name will satisfy the resolution request
         let name_spec = Some("foobar".to_string());
         let sa = addr.parse::<SocketAddr>().unwrap();
-        let state = TargetState::Product(vec![sa.into()]);
+        let state = TargetState::Product { addrs: vec![sa.into()], serial: None };
         let th = TargetHandle { node_name: name_spec.clone(), state };
         resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th]));
         resolver.expect_try_resolve_manual_target().return_once(move |_, _| Ok(None));
@@ -952,8 +955,8 @@ mod test {
         let mut resolver = MockQueryResolverT::new();
         let name_spec = Some("foobar".to_string());
         let sa = addr.parse::<SocketAddr>().unwrap();
-        let ts1 = TargetState::Product(vec![sa.into(), sa.into()]);
-        let ts2 = TargetState::Product(vec![sa.into(), sa.into()]);
+        let ts1 = TargetState::Product { addrs: vec![sa.into(), sa.into()], serial: None };
+        let ts2 = TargetState::Product { addrs: vec![sa.into(), sa.into()], serial: None };
         let th1 = TargetHandle { node_name: name_spec.clone(), state: ts1 };
         let th2 = TargetHandle { node_name: name_spec.clone(), state: ts2 };
         resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th1, th2]));
