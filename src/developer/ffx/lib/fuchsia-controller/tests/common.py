@@ -8,10 +8,10 @@ import fidl_codec
 
 
 class FuchsiaControllerTest(unittest.TestCase):
-    def setUp(self):
-        fidl_codec.add_ir_path(
+    def setUp(self) -> None:
+        fidl_codec.add_ir_path(  # type: ignore[attr-defined] # we don't have types for this cpp file
             "fidling/gen/src/developer/ffx/lib/fuchsia-controller/fidl/fuchsia.controller.test.fidl.json"
         )
-        fidl_codec.add_ir_path(
+        fidl_codec.add_ir_path(  # type: ignore[attr-defined] # we don't have types for this cpp file
             "fidling/gen/src/developer/ffx/lib/fuchsia-controller/fidl/fuchsia.controller.othertest.fidl.json"
         )
