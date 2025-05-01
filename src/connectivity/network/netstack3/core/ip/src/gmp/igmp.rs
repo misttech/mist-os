@@ -12,7 +12,7 @@ use core::time::Duration;
 
 use log::{debug, error};
 use net_declare::net_ip_v4;
-use net_types::ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr};
+use net_types::ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr, Ipv4SourceAddr};
 use net_types::{MulticastAddr, MulticastAddress as _, SpecifiedAddr, Witness};
 use netstack3_base::{
     AnyDevice, Counter, DeviceIdContext, ErrorAndSerializer, HandleableTimer, Inspectable,
@@ -135,7 +135,7 @@ pub trait IgmpPacketHandler<BC, DeviceId> {
         &mut self,
         bindings_ctx: &mut BC,
         device: &DeviceId,
-        src_ip: Ipv4Addr,
+        src_ip: Ipv4SourceAddr,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         buffer: B,
         info: &LocalDeliveryPacketInfo<Ipv4, H>,
@@ -147,7 +147,7 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::Dev
         &mut self,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
-        _src_ip: Ipv4Addr,
+        _src_ip: Ipv4SourceAddr,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         buffer: B,
         info: &LocalDeliveryPacketInfo<Ipv4, H>,
@@ -1333,7 +1333,7 @@ mod tests {
         core_ctx.receive_igmp_packet(
             bindings_ctx,
             &FakeDeviceId,
-            ROUTER_ADDR,
+            Ipv4SourceAddr::new(ROUTER_ADDR).unwrap(),
             MY_ADDR,
             buff,
             &new_recv_pkt_info(),
@@ -1353,7 +1353,7 @@ mod tests {
         core_ctx.receive_igmp_packet(
             bindings_ctx,
             &FakeDeviceId,
-            ROUTER_ADDR,
+            Ipv4SourceAddr::new(ROUTER_ADDR).unwrap(),
             MY_ADDR,
             buff,
             &new_recv_pkt_info(),
@@ -1373,7 +1373,7 @@ mod tests {
         core_ctx.receive_igmp_packet(
             bindings_ctx,
             &FakeDeviceId,
-            ROUTER_ADDR,
+            Ipv4SourceAddr::new(ROUTER_ADDR).unwrap(),
             MY_ADDR,
             buff,
             &new_recv_pkt_info(),
@@ -1386,7 +1386,7 @@ mod tests {
         core_ctx.receive_igmp_packet(
             bindings_ctx,
             &FakeDeviceId,
-            OTHER_HOST_ADDR,
+            Ipv4SourceAddr::new(OTHER_HOST_ADDR).unwrap(),
             MY_ADDR,
             buff,
             &new_recv_pkt_info(),

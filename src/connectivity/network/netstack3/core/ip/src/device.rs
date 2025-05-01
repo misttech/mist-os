@@ -22,8 +22,8 @@ use core::num::NonZeroU8;
 use derivative::Derivative;
 use log::info;
 use net_types::ip::{
-    AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
-    Subnet,
+    AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv4SourceAddr, Ipv6, Ipv6Addr,
+    Ipv6SourceAddr, Mtu, Subnet,
 };
 use net_types::{LinkLocalAddress as _, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness};
 use netstack3_base::{
@@ -889,7 +889,7 @@ pub fn receive_igmp_packet<CC, BC, B, H>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    src_ip: Ipv4Addr,
+    src_ip: Ipv4SourceAddr,
     dst_ip: SpecifiedAddr<Ipv4Addr>,
     buffer: B,
     info: &LocalDeliveryPacketInfo<Ipv4, H>,

@@ -17,7 +17,7 @@ use derivative::Derivative;
 use either::Either;
 use log::{debug, trace};
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
-use net_types::{SpecifiedAddr, ZonedAddr};
+use net_types::{SpecifiedAddr, Witness as _, ZonedAddr};
 use netstack3_base::socket::{
     self, AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr,
     IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack, ShutdownType, SocketIpAddr,
@@ -1123,7 +1123,7 @@ impl<
         let meta = echo_reply.parse_metadata();
         buffer.undo_parse(meta);
 
-        let src_ip = match SpecifiedAddr::new(src_ip.into()) {
+        let src_ip = match SpecifiedAddr::new(src_ip.into_addr()) {
             Some(src_ip) => src_ip,
             None => {
                 trace!("receive_icmp_echo_reply: unspecified source address");
@@ -1557,7 +1557,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &FakeDeviceId,
-            src_ip.get().try_into().unwrap(),
+            I::RecvSrcAddr::new(src_ip.get()).unwrap(),
             dst_ip,
             reply.clone(),
             &LocalDeliveryPacketInfo::default(),
@@ -1607,7 +1607,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &FakeDeviceId,
-            I::TEST_ADDRS.remote_ip.get().try_into().unwrap(),
+            I::RecvSrcAddr::new(I::TEST_ADDRS.remote_ip.get()).unwrap(),
             I::TEST_ADDRS.local_ip,
             reply,
             &LocalDeliveryPacketInfo::default(),

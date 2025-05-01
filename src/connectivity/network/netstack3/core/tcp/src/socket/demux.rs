@@ -11,7 +11,7 @@ use core::num::NonZeroU16;
 
 use assert_matches::assert_matches;
 use log::{debug, error, warn};
-use net_types::SpecifiedAddr;
+use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::socket::{
     AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnIpAddr, InsertError, ListenerAddr,
     ListenerIpAddr, SocketIpAddr, SocketIpAddrExt as _,
@@ -133,7 +133,7 @@ where
             return Ok(());
         }
 
-        let remote_ip = match SpecifiedAddr::new(remote_ip.into()) {
+        let remote_ip = match SpecifiedAddr::new(remote_ip.into_addr()) {
             None => {
                 CounterContext::<TcpCountersWithoutSocket<I>>::counters(core_ctx)
                     .invalid_ip_addrs_received

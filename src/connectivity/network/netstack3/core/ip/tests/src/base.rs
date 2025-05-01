@@ -43,7 +43,8 @@ use netstack3_base::testutil::{
 };
 use netstack3_base::{FrameDestination, InstantContext as _, IpDeviceAddr, Marks};
 use netstack3_core::device::{
-    DeviceId, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta,
+    DeviceId, EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize,
+    RecvEthernetFrameMeta,
 };
 use netstack3_core::filter::{
     Action, Hook, IpRoutines, NatRoutines, PacketMatcher, Routine, Routines, Rule, Tuple,
@@ -1515,30 +1516,28 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
     .assert_counters(&ctx.core_ctx(), &device);
 }
 
-#[test]
-fn test_drop_non_unicast_ipv6_source() {
-    // Test that an inbound IPv6 packet with a non-unicast source address is
-    // dropped.
-    let cfg = TEST_ADDRS_V6;
-    let (mut ctx, _device_ids) = FakeCtxBuilder::with_addrs(cfg.clone()).build();
+// Test that an inbound IP packet with a multicast source address is dropped.
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
+fn test_drop_multicast_source<I: IpExt + TestIpExt>() {
+    let (mut ctx, _device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
     let device = ctx
         .core_api()
         .device::<EthernetLinkDevice>()
         .add_device_with_default_state(
             EthernetCreationProperties {
-                mac: cfg.local_mac,
-                max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                mac: I::TEST_ADDRS.local_mac,
+                max_frame_size: MaxEthernetFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
             },
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
     ctx.test_api().enable_device(&device);
 
-    let ip: Ipv6Addr = cfg.local_mac.to_ipv6_link_local().addr().get();
     let buf = Buf::new(vec![0; 10], ..)
-        .encapsulate(Ipv6PacketBuilder::new(
-            Ipv6::MULTICAST_SUBNET.network(),
-            ip,
+        .encapsulate(I::PacketBuilder::new(
+            I::MULTICAST_SUBNET.network(),
+            I::TEST_ADDRS.remote_ip.get(),
             64,
             IpProto::Udp.into(),
         ))
@@ -1546,17 +1545,13 @@ fn test_drop_non_unicast_ipv6_source() {
         .unwrap()
         .into_inner();
 
-    ctx.test_api().receive_ip_packet::<Ipv6, _>(
+    ctx.test_api().receive_ip_packet::<I, _>(
         &device,
         Some(FrameDestination::Individual { local: true }),
         buf,
     );
-    IpCounterExpectations::<Ipv6> {
-        receive_ip_packet: 1,
-        version_rx: Ipv6RxCounters { non_unicast_source: 1, ..Default::default() },
-        ..Default::default()
-    }
-    .assert_counters(&ctx.core_ctx(), &device);
+    IpCounterExpectations::<I> { receive_ip_packet: 1, invalid_source: 1, ..Default::default() }
+        .assert_counters(&ctx.core_ctx(), &device);
 }
 
 /// Constructs a buffer containing an IP packet with sensible defaults.

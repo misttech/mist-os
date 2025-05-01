@@ -5635,7 +5635,7 @@ mod tests {
 
     use ip_test_macro::ip_test;
     use net_declare::net_ip_v6;
-    use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6SourceAddr, Mtu};
+    use net_types::ip::{Ip, Ipv4, Ipv4SourceAddr, Ipv6, Ipv6SourceAddr, Mtu};
     use net_types::{LinkLocalAddr, Witness};
     use netstack3_base::sync::{DynDebugReferences, Mutex};
     use netstack3_base::testutil::{
@@ -6413,7 +6413,7 @@ mod tests {
             MaybeDualStack::NotDualStack(())
         }
         fn recv_src_addr(addr: Self::Addr) -> Self::RecvSrcAddr {
-            addr
+            Ipv4SourceAddr::new(addr).unwrap()
         }
     }
 

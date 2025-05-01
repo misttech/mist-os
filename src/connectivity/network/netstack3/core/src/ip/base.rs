@@ -9,7 +9,7 @@ use alloc::collections::HashMap;
 use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor};
 use lock_order::relation::LockBefore;
 use log::trace;
-use net_types::ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
+use net_types::ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv4SourceAddr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
 use net_types::{MulticastAddr, SpecifiedAddr};
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{
@@ -402,7 +402,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        src_ip: Ipv4Addr,
+        src_ip: Ipv4SourceAddr,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         proto: Ipv4Proto,
         body: B,

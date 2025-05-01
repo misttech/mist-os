@@ -15,7 +15,7 @@ use core::ops::Range;
 
 use internet_checksum::Checksum;
 use log::debug;
-use net_types::ip::{GenericOverIp, IpAddress, Ipv4, Ipv4Addr, Ipv6Addr};
+use net_types::ip::{GenericOverIp, IpAddress, Ipv4, Ipv4Addr, Ipv4SourceAddr, Ipv6Addr};
 use packet::records::options::{OptionSequenceBuilder, OptionsRaw};
 use packet::records::RecordsIter;
 use packet::{
@@ -352,6 +352,14 @@ impl<B: SplitByteSlice> Ipv4Packet<B> {
     /// The size of the header prefix and options.
     pub fn header_len(&self) -> usize {
         Ref::bytes(&self.hdr_prefix).len() + self.options.bytes().len()
+    }
+
+    /// The source IP address represented as an [`Ipv4SourceAddr`].
+    ///
+    /// Unlike [`IpHeader::src_ip`], `src_ipv4` returns an `Ipv4SourceAddr`,
+    /// which represents the valid values that a source address can take.
+    pub fn src_ipv4(&self) -> Option<Ipv4SourceAddr> {
+        Ipv4SourceAddr::new(self.src_ip())
     }
 
     /// Return a buffer that is a copy of the header bytes in this

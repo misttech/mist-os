@@ -11,11 +11,12 @@ use core::num::{NonZeroU16, NonZeroU8};
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use log::{debug, error, trace};
 use net_types::ip::{
-    GenericOverIp, Ip, IpAddress, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
-    SubnetError,
+    GenericOverIp, Ip, IpAddress, IpMarked, Ipv4, Ipv4Addr, Ipv4SourceAddr, Ipv6, Ipv6Addr,
+    Ipv6SourceAddr, Mtu, SubnetError,
 };
 use net_types::{
-    LinkLocalAddress, LinkLocalUnicastAddr, MulticastAddress, SpecifiedAddr, UnicastAddr, Witness,
+    LinkLocalAddress, LinkLocalUnicastAddr, MulticastAddress, NonMulticastAddr, SpecifiedAddr,
+    UnicastAddr, Witness,
 };
 use netstack3_base::socket::{AddrIsMappedError, SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::sync::Mutex;
@@ -325,10 +326,15 @@ pub trait IcmpHandlerIpExt: IpExt {
 }
 
 impl IcmpHandlerIpExt for Ipv4 {
-    type SourceAddress = SpecifiedAddr<Ipv4Addr>;
+    type SourceAddress = NonMulticastAddr<SpecifiedAddr<Ipv4Addr>>;
     type IcmpError = Icmpv4Error;
-    fn received_source_as_icmp_source(src: Ipv4Addr) -> Option<SpecifiedAddr<Ipv4Addr>> {
-        SpecifiedAddr::new(src)
+    fn received_source_as_icmp_source(
+        src: Ipv4SourceAddr,
+    ) -> Option<NonMulticastAddr<SpecifiedAddr<Ipv4Addr>>> {
+        match src {
+            Ipv4SourceAddr::Specified(src) => Some(src),
+            Ipv4SourceAddr::Unspecified => None,
+        }
     }
     fn new_ttl_expired<B: SplitByteSlice>(
         proto: Ipv4Proto,
@@ -428,13 +434,13 @@ impl<
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
         frame_dst: Option<FrameDestination>,
-        src_ip: SpecifiedAddr<Ipv4Addr>,
+        src_ip: NonMulticastAddr<SpecifiedAddr<Ipv4Addr>>,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         original_packet: B,
         Icmpv4Error { kind, header_len }: Icmpv4Error,
         marks: &Marks,
     ) {
-        let src_ip = SocketIpAddr::new_ipv4_specified(src_ip);
+        let src_ip = SocketIpAddr::new_ipv4_specified(src_ip.get());
         let dst_ip = SocketIpAddr::new_ipv4_specified(dst_ip);
         match kind {
             Icmpv4ErrorKind::ParameterProblem { code, pointer, fragment_type } => {
@@ -825,7 +831,7 @@ impl<
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
-        src_ip: Ipv4Addr,
+        src_ip: Ipv4SourceAddr,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         mut buffer: B,
         info: &LocalDeliveryPacketInfo<Ipv4, H>,
@@ -854,7 +860,7 @@ impl<
             Icmpv4Packet::EchoRequest(echo_request) => {
                 CounterContext::<IcmpRxCounters<Ipv4>>::counters(core_ctx).echo_request.increment();
 
-                if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
+                if let Ipv4SourceAddr::Specified(src_ip) = src_ip {
                     let req = *echo_request.message();
                     let code = echo_request.code();
                     let (local_ip, remote_ip) = (dst_ip, src_ip);
@@ -868,12 +874,12 @@ impl<
                         core_ctx,
                         bindings_ctx,
                         device,
-                        SocketIpAddr::new_ipv4_specified(remote_ip),
+                        SocketIpAddr::new_ipv4_specified(remote_ip.get()),
                         SocketIpAddr::new_ipv4_specified(local_ip),
                         |src_ip| {
                             buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                                 src_ip,
-                                remote_ip,
+                                *remote_ip,
                                 code,
                                 req.reply(),
                             ))
@@ -910,7 +916,7 @@ impl<
                 CounterContext::<IcmpRxCounters<Ipv4>>::counters(core_ctx)
                     .timestamp_request
                     .increment();
-                if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
+                if let Ipv4SourceAddr::Specified(src_ip) = src_ip {
                     if core_ctx.should_send_timestamp_reply() {
                         trace!(
                             "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::\
@@ -948,12 +954,12 @@ impl<
                             core_ctx,
                             bindings_ctx,
                             device,
-                            SocketIpAddr::new_ipv4_specified(remote_ip),
+                            SocketIpAddr::new_ipv4_specified(remote_ip.get()),
                             SocketIpAddr::new_ipv4_specified(local_ip),
                             |src_ip| {
                                 buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                                     src_ip,
-                                    remote_ip,
+                                    *remote_ip,
                                     IcmpZeroCode,
                                     reply,
                                 ))
@@ -1008,7 +1014,7 @@ impl<
                         core_ctx.update_pmtu_if_less(
                             bindings_ctx,
                             dst_ip.get(),
-                            src_ip,
+                            src_ip.get(),
                             Mtu::new(u32::from(next_hop_mtu.get())),
                         )
                     } else {
@@ -1052,7 +1058,7 @@ impl<
                             core_ctx.update_pmtu_next_lower(
                                 bindings_ctx,
                                 dst_ip.get(),
-                                src_ip,
+                                src_ip.get(),
                                 Mtu::new(u32::from(total_len)),
                             )
                         } else {
@@ -3821,7 +3827,7 @@ mod tests {
                 core_ctx,
                 bindings_ctx,
                 &FakeDeviceId,
-                TEST_ADDRS_V4.remote_ip.get(),
+                Ipv4SourceAddr::new(*TEST_ADDRS_V4.remote_ip).unwrap(),
                 TEST_ADDRS_V4.local_ip,
                 Buf::new(original_packet, ..)
                     .encapsulate(IcmpPacketBuilder::new(
