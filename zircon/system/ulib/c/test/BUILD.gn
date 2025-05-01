@@ -56,6 +56,14 @@ boot_test_specs = {
 libc_component_tests = []
 libc_test_manifests = []
 
+source_set("safe-zero-construction") {
+  visibility = [ "../*" ]
+  testonly = true
+
+  public = [ "safe-zero-construction.h" ]
+  public_deps = [ "//zircon/system/ulib/zxtest" ]
+}
+
 # noop-test is a basic test that verifies that C library initialization
 # and process startup work correctly. Same as "hello world" without
 # a printed output.

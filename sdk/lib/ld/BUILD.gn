@@ -107,7 +107,7 @@ static_library("ld-log-zircon") {
   public_deps = [ ":ld-log-zircon.headers" ]
   sources = [ "log-zircon.cc" ]
   deps = [
-    "//sdk/lib/fdio:headers",
+    "//sdk/lib/fdio:constants",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]

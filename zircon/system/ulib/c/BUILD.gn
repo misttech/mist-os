@@ -35,7 +35,10 @@ libc_components = [
   "zircon",
 ]
 
-libc_testonly_components = [ "threads" ]
+libc_testonly_components = [
+  "ld",
+  "threads",
+]
 
 if (use_llvm_libc_string_functions) {
   libc_components += [
@@ -127,7 +130,7 @@ config("testonly.config") {
     # into a program using libc.so and not statically linked with the non-test
     # libc code, it's not actually ambiguous what it means in the context of
     # which binary contained the symbol.  But using a separate name is clearer.
-    "LIBC_NAMESPACE=fuchsia_libc_unittest",
+    "LIBC_NAMESPACE=$libc_test_namespace",
   ]
 }
 

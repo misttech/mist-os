@@ -2008,8 +2008,6 @@ LIBC_NO_SAFESTACK NO_ASAN NO_UBSAN_RISCV64 static dl_start_return_t __dls3(void*
     nbytes = nhandles = 0;
   }
 
-  _dl_log_write_preinit();
-
   zx_handle_t exec_vmo = ZX_HANDLE_INVALID;
   for (int i = 0; i < nhandles; ++i) {
     switch (PA_HND_TYPE(handle_info[i])) {

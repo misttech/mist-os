@@ -85,6 +85,9 @@ if (is_ubsan) {
 # statically-linked libc, but that will happen eventually.
 libc_namespace = "__fuchsia_libc"
 
+# This is used instead of $libc_namespace in the .testonly targets.
+libc_test_namespace = "fuchsia_libc_unittest"
+
 # Define source_set() targets for some libc code.
 #
 # This defines two source_set() targets, one with the main target name and one

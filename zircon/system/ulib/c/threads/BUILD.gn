@@ -39,6 +39,7 @@ libc_test("thread-allocator-tests") {
   include_dirs = [ "//sdk/lib/ld/test/modules" ]
   deps = [
     ":thread-allocator.testonly",
+    "../test:safe-zero-construction",
     "//sdk/lib/fit",
     "//sdk/lib/ld:headers",
     "//sdk/lib/ld/test/modules:tls-desc-dep.shared_library",

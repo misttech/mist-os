@@ -11,7 +11,6 @@
 #include <lib/zx/vmar.h>
 
 #include <array>
-#include <concepts>
 #include <cstddef>
 #include <map>
 #include <ranges>
@@ -19,6 +18,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "../test/safe-zero-construction.h"
 #include "thread-allocator.h"
 #include "threads_impl.h"
 #include "tls-dep.h"
@@ -104,23 +104,10 @@ auto DeathByWrite(auto* ptr, std::decay_t<decltype(*ptr)> value = {}) {
   return [ptr, value] { *Launder(ptr) = value; };
 }
 
-// Verify that default construction is the same as no construction.  Even if
-// it's not technically trivial, if all zero bytes is what it produces, then
-// it's fine.  In C++23 this could be consteval, but placement new isn't
-// allowed in C++20.
-template <std::default_initializable T>
-inline bool SafeZeroConstruction() {
-  constexpr auto is_zero = [](std::byte byte) { return byte == std::byte{}; };
-  alignas(T) std::array<std::byte, sizeof(T)> storage{};
-  new (storage.data()) T;
-  return std::ranges::all_of(storage, is_zero);
-}
-
 // There is never a `new Thread` actually done.  The memory is just zero-filled
 // by the system, and then individual fields get set.  Ensure nobody can tell.
 TEST_F(LibcThreadTests, SafeZeroConstruction) {
-  // In C++23 this can become a static_assert.
-  EXPECT_TRUE(SafeZeroConstruction<Thread>());
+  LIBC_NAMESPACE::ExpectSafeZeroConstruction<Thread>();
 }
 
 TEST_F(LibcThreadTests, TpSelfPointer) {
