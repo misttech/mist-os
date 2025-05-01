@@ -502,11 +502,12 @@ impl MountRecord {
             };
         }
 
-        // TODO(https://fxbug.dev/376509077): Migrate this to GetFlags2 when available.
-        let info = directory
-            .get_connection_info(zx::MonotonicInstant::INFINITE)
-            .context("getting directory connection info")?;
-        let rights = fio::Flags::from_bits(info.rights.unwrap().bits()).unwrap();
+        let flags = directory
+            .get_flags(zx::MonotonicInstant::INFINITE)
+            .context("transport error")?
+            .map_err(zx::Status::from_raw)
+            .context("get_flags")?;
+        let rights = flags.intersection(fio::MASK_KNOWN_PERMISSIONS);
 
         let (client_end, server_end) = zx::Channel::create();
         directory.clone(ServerEnd::new(server_end)).context("cloning directory")?;
