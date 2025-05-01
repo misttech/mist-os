@@ -94,12 +94,15 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         # All numbered API levels in the JSON file.
         # All are frozen or previously frozen. None are in-development.
         "all_numbered_api_levels": all_numbered_api_levels,
-        # API levels that the IDK supports targeting.
-        "idk_buildable_api_levels": idk_buildable_api_levels,
+        # API levels that the IDK supports targeting (by default).
+        # Do not use this directly. Instead, use GN arg `idk_buildable_api_levels`.
+        "default_idk_buildable_api_levels": idk_buildable_api_levels,
         # API levels that the platform build supports at runtime.
         "runtime_supported_api_levels": runtime_supported_api_levels,
         # API levels whose contents should not change anymore.
         "frozen_api_levels": sunset_api_levels + supported_api_levels,
+        # TODO(https://fxbug.dev/324653879): Remove once vendor repos have migrated.
+        "idk_buildable_api_levels": idk_buildable_api_levels,
     }
 
 

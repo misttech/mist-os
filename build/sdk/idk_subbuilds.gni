@@ -55,8 +55,8 @@ template("idk_subbuilds") {
         "idk_subbuild." + get_label_info(invoker.sdk_collection_label, "name")
   }
 
-  _api_levels = platform_version.idk_buildable_api_levels
-  _target_cpus = idk_target_cpus_default
+  _api_levels = idk_buildable_api_levels
+  _target_cpus = idk_target_cpus
 
   if (defined(invoker.sdk_collection_name)) {
     _sdk_collection_dir_name = invoker.sdk_collection_name

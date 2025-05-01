@@ -38,8 +38,8 @@ arechiectures, you can override GN args to specify a list of each to build. For
 example:
 
 ```
-override_idk_buildable_api_levels = [26, "NEXT"]
-override_idk_target_cpus = [ "x64" ]
+idk_buildable_api_levels = [26, "NEXT"]
+idk_target_cpus = [ "x64" ]
 ```
 
 Running this command will create the Fuchsia SDK and run the generators that

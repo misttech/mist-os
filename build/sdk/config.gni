@@ -2,6 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# The list of all cpu architectures for the prebuilt Fuchsia binaries that are
+# included in the IDK.
+idk_target_cpus_default = [
+  "arm64",
+  "riscv64",
+  "x64",
+]
+
 declare_args() {
   # Whether to only warn when an SDK has been modified.
   # If false, any unacknowledged SDK change will cause a build failure.
@@ -46,8 +54,8 @@ declare_args() {
   # Set to `true` to enable verbose logging during IDK subbuilds.
   sdk_sub_build_verbose = false
 
-  # Overrides the set of target CPU architectures for which the build will
-  # provide build-time support in the IDK/SDK. The default (`false`) set is
+  # The set of target CPU architectures for which the build will
+  # provide build-time support in the IDK/SDK. The default set is
   # equivalent to `["arm64", "riscv64", "x64"]`. Other valid values are a list
   # containing a subset of that list that includes the current `target_cpu.
   #
@@ -55,21 +63,6 @@ declare_args() {
   # includes the IDK/SDK in exchange for reduced coverage of target CPU
   # architecture support. For example, `fx build //sdk:final_fuchsia_idk`.
   #
-  # To override the set of API levels, see
-  #`override_idk_buildable_api_levels`.
-  override_idk_target_cpus = false
-}
-
-# The list of all cpu architectures for the prebuilt Fuchsia binaries that are
-# included in the IDK.
-idk_target_cpus_default = [
-  "arm64",
-  "riscv64",
-  "x64",
-]
-idk_target_cpus = idk_target_cpus_default
-
-if (override_idk_target_cpus != false) {
-  idk_target_cpus = []
-  idk_target_cpus = override_idk_target_cpus
+  # To override the set of API levels, see `idk_buildable_api_levels`.
+  idk_target_cpus = idk_target_cpus_default
 }

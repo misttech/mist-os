@@ -39,9 +39,10 @@ assert(current_toolchain == default_toolchain ||
 # built as this reduces the compatibility coverage of the build and should not
 # happen in infra. Ensure the messages are only logged once per build.
 if (current_toolchain == default_toolchain) {
-  if (override_idk_buildable_api_levels != false) {
+  if (idk_buildable_api_levels !=
+      platform_version.default_idk_buildable_api_levels) {
     print(
-        "IDK build supported API levels is overridden: ${platform_version.idk_buildable_api_levels}. Compatibility with other levels cannot be checked.")
+        "IDK build supported API levels is overridden: ${idk_buildable_api_levels}. Compatibility with other levels cannot be checked.")
   }
 
   # Ignore default list or an override that exactly matches (including order).
@@ -53,7 +54,7 @@ if (current_toolchain == default_toolchain) {
 # Verify that `current_build_target_api_level` is actually supported.
 if (current_build_target_api_level != "PLATFORM") {
   _override_is_supported = false
-  foreach(supported_level, platform_version.idk_buildable_api_levels) {
+  foreach(supported_level, idk_buildable_api_levels) {
     if (supported_level == current_build_target_api_level) {
       _override_is_supported = true
     }
@@ -64,7 +65,7 @@ if (current_build_target_api_level != "PLATFORM") {
   # should remove those builders and make this an assertion.
   if (!_override_is_supported) {
     print(
-        "`current_build_target_api_level` (${current_build_target_api_level}) is not one of the supported API levels: ${platform_version.idk_buildable_api_levels}")
+        "`current_build_target_api_level` (${current_build_target_api_level}) is not one of the supported API levels: ${idk_buildable_api_levels}")
     print("Attempting to build anyways, but this may not go well...")
   }
 }
@@ -204,7 +205,7 @@ final_fuchsia_idk_for_cpus_and_levels("final_fuchsia_idk.exported") {
 
   output_name = "fuchsia_idk"
   target_cpus = idk_target_cpus
-  api_levels = platform_version.idk_buildable_api_levels
+  api_levels = idk_buildable_api_levels
 
   # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
   # are too slow to enable this setting, and therefore the mac IDK won't have

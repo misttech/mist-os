@@ -35,8 +35,8 @@ parallelism is limited for performance reasons, so there will be effectively
 multiple rounds of sub-builds.
 
 [^3]: For local builds, the build time can be
-significantly reduced by setting the `override_idk_target_cpus` and
-`override_idk_buildable_api_levels` GN args.
+significantly reduced by setting the `idk_target_cpus` and
+`idk_buildable_api_levels` GN args.
 
 ### The Fuchsia Bazel SDK
 
