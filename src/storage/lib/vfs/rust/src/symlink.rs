@@ -393,7 +393,6 @@ pub fn serve(
 #[cfg(test)]
 mod tests {
     use super::{Connection, Symlink};
-    use crate::common::rights_to_posix_mode_bits;
     use crate::directory::entry::{EntryInfo, GetEntryInfo};
     use crate::execution_scope::ExecutionScope;
     use crate::node::Node;
@@ -550,21 +549,22 @@ mod tests {
     async fn test_get_attr() {
         let client_end = serve_test_symlink().await;
 
-        assert_matches!(
-            client_end.get_attr().await.expect("fidl failed"),
-            (
-                0,
-                fio::NodeAttributes {
-                    mode,
-                    id: fio::INO_UNKNOWN,
-                    content_size: 6,
-                    storage_size: 6,
-                    link_count: 1,
-                    creation_time: 0,
-                    modification_time: 0,
-                }
-            ) if mode == fio::MODE_TYPE_SYMLINK
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false)
+        let (mutable_attrs, immutable_attrs) = client_end
+            .get_attributes(fio::NodeAttributesQuery::all())
+            .await
+            .expect("fidl failed")
+            .expect("GetAttributes failed");
+
+        assert_eq!(mutable_attrs, Default::default());
+        assert_eq!(
+            immutable_attrs,
+            fio::ImmutableNodeAttributes {
+                content_size: Some(TARGET.len() as u64),
+                storage_size: Some(TARGET.len() as u64),
+                protocols: Some(fio::NodeProtocolKinds::SYMLINK),
+                abilities: Some(fio::Abilities::GET_ATTRIBUTES),
+                ..Default::default()
+            }
         );
     }
 

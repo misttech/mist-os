@@ -707,7 +707,6 @@ mod tests {
     use std::sync::Arc;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
-    use vfs::common::rights_to_posix_mode_bits;
     use zx::Status;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -732,19 +731,18 @@ mod tests {
             .expect("read failed");
         assert!(buf.is_empty());
 
-        let (status, attrs) = file.get_attr().await.expect("FIDL call failed");
-        Status::ok(status).expect("get_attr failed");
-        assert_ne!(attrs.id, INVALID_OBJECT_ID);
-        assert_eq!(
-            attrs.mode,
-            fio::MODE_TYPE_FILE | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false)
-        );
-        assert_eq!(attrs.content_size, 0u64);
-        assert_eq!(attrs.storage_size, 0u64);
-        assert_eq!(attrs.link_count, 1u64);
-        assert_ne!(attrs.creation_time, 0u64);
-        assert_ne!(attrs.modification_time, 0u64);
-        assert_eq!(attrs.creation_time, attrs.modification_time);
+        let (mutable_attrs, immutable_attrs) = file
+            .get_attributes(fio::NodeAttributesQuery::all())
+            .await
+            .expect("FIDL call failed")
+            .expect("GetAttributes failed");
+        assert_ne!(immutable_attrs.id.unwrap(), INVALID_OBJECT_ID);
+        assert_eq!(immutable_attrs.content_size.unwrap(), 0u64);
+        assert_eq!(immutable_attrs.storage_size.unwrap(), 0u64);
+        assert_eq!(immutable_attrs.link_count.unwrap(), 1u64);
+        assert_ne!(mutable_attrs.creation_time.unwrap(), 0u64);
+        assert_ne!(mutable_attrs.modification_time.unwrap(), 0u64);
+        assert_eq!(mutable_attrs.creation_time.unwrap(), mutable_attrs.modification_time.unwrap());
 
         close_file_checked(file).await;
         fixture.close().await;

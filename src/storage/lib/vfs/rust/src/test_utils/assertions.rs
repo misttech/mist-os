@@ -240,34 +240,6 @@ macro_rules! assert_get_attr {
 
 // See comment at the top of the file for why this is a macro.
 #[macro_export]
-macro_rules! assert_get_attr_path {
-    ($proxy:expr, $flags:expr, $path:expr, $expected:expr) => {{
-        use $crate::test_utils::assertions::reexport::{fio, Status};
-
-        let proxy = open_get_proxy_assert!(
-            $proxy,
-            $flags,
-            $path,
-            fio::DirectoryMarker,
-            fio::DirectoryEvent::OnOpen_ { s, info },
-            {
-                assert_eq!(Status::from_raw(s), Status::OK);
-                assert_eq!(
-                    info,
-                    Some(Box::new(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)))
-                );
-            }
-        );
-
-        let (status, attrs) = proxy.get_attr().await.expect("get_attr failed");
-
-        assert_eq!(Status::from_raw(status), Status::OK);
-        assert_eq!(attrs, $expected);
-    }};
-}
-
-// See comment at the top of the file for why this is a macro.
-#[macro_export]
 macro_rules! assert_query {
     ($proxy:expr, $expected:expr) => {
         let protocol = $proxy.query().await.expect("describe failed");

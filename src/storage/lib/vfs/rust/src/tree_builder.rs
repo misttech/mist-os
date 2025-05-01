@@ -371,7 +371,7 @@ mod tests {
 
     // Macros are exported into the root of the crate.
     use crate::{
-        assert_close, assert_event, assert_get_attr_path, assert_read, assert_read_dirents,
+        assert_close, assert_event, assert_read, assert_read_dirents,
         assert_read_dirents_one_listing, assert_read_dirents_path_one_listing,
         open_as_vmo_file_assert_content, open_get_directory_proxy_assert_ok, open_get_proxy_assert,
         open_get_vmo_file_proxy_assert_ok,
@@ -382,6 +382,18 @@ mod tests {
 
     use fidl_fuchsia_io as fio;
     use vfs_macros::pseudo_directory;
+
+    async fn get_id_of_path(root: &fio::DirectoryProxy, path: &str) -> u64 {
+        let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
+        root.open(path, fio::PERM_READABLE, &Default::default(), server.into_channel())
+            .expect("failed to call open");
+        let (_, immutable_attrs) = proxy
+            .get_attributes(fio::NodeAttributesQuery::ID)
+            .await
+            .expect("FIDL call failed")
+            .expect("GetAttributes failed");
+        immutable_attrs.id.expect("ID missing from GetAttributes response")
+    }
 
     #[test]
     fn vfs_with_custom_inodes() {
@@ -400,57 +412,9 @@ mod tests {
         let root = tree.build_with_inode_generator(&mut get_inode);
 
         run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
-            assert_get_attr_path!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "a",
-                fio::NodeAttributes {
-                    mode: fio::MODE_TYPE_DIRECTORY
-                        | crate::common::rights_to_posix_mode_bits(
-                            /*r*/ true, /*w*/ false, /*x*/ true
-                        ),
-                    id: 1,
-                    content_size: 0,
-                    storage_size: 0,
-                    link_count: 1,
-                    creation_time: 0,
-                    modification_time: 0,
-                }
-            );
-            assert_get_attr_path!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "a/b",
-                fio::NodeAttributes {
-                    mode: fio::MODE_TYPE_DIRECTORY
-                        | crate::common::rights_to_posix_mode_bits(
-                            /*r*/ true, /*w*/ false, /*x*/ true
-                        ),
-                    id: 2,
-                    content_size: 0,
-                    storage_size: 0,
-                    link_count: 1,
-                    creation_time: 0,
-                    modification_time: 0,
-                }
-            );
-            assert_get_attr_path!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "a/c",
-                fio::NodeAttributes {
-                    mode: fio::MODE_TYPE_DIRECTORY
-                        | crate::common::rights_to_posix_mode_bits(
-                            /*r*/ true, /*w*/ false, /*x*/ true
-                        ),
-                    id: 3,
-                    content_size: 0,
-                    storage_size: 0,
-                    link_count: 1,
-                    creation_time: 0,
-                    modification_time: 0,
-                }
-            );
+            assert_eq!(get_id_of_path(&root, "a").await, 1);
+            assert_eq!(get_id_of_path(&root, "a/b").await, 2);
+            assert_eq!(get_id_of_path(&root, "a/c").await, 3);
         });
     }
 

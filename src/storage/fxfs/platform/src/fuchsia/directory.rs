@@ -1135,7 +1135,6 @@ mod tests {
     use std::time::Duration;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
-    use vfs::common::rights_to_posix_mode_bits;
     use vfs::node::Node;
     use vfs::path::Path;
     use vfs::ObjectRequest;
@@ -4228,8 +4227,7 @@ mod tests {
             let path = Path::validate_and_split(path_str).unwrap();
 
             let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
-            let mode = fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
+            let mode: u32 = 0o123;
             let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE;
             let options = fio::Options {
                 create_attributes: Some(fio::MutableNodeAttributes {
@@ -4317,8 +4315,7 @@ mod tests {
             let path = Path::validate_and_split(path_str).unwrap();
 
             let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
-            let mode = fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
+            let mode: u32 = 0o123;
             let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE;
             let options = fio::Options {
                 create_attributes: Some(fio::MutableNodeAttributes {
@@ -4367,8 +4364,7 @@ mod tests {
             let path = Path::validate_and_split(path_str).unwrap();
 
             let (_proxy, server_end) = create_proxy::<fio::FileMarker>();
-            let mode = fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
+            let mode: u32 = 0o123;
             let uid = 1;
             let gid = 2;
             let rdev = 3;
@@ -4465,8 +4461,7 @@ mod tests {
             let path = Path::validate_and_split(path_str).unwrap();
 
             let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
-            let mode = fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
+            let mode: u32 = 0o123;
             let uid = 1;
             let gid = 2;
             let rdev = 3;

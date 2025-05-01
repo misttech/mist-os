@@ -107,16 +107,6 @@ impl<T: 'static + Send + Sync> IntoAny for T {
     }
 }
 
-/// Returns equivalent POSIX mode/permission bits based on the specified rights.
-/// Note that these only set the user bits.
-// TODO(https://fxbug.dev/324112547): Remove this function or make it only visible to this crate.
-pub fn rights_to_posix_mode_bits(readable: bool, writable: bool, executable: bool) -> u32 {
-    return (if readable { libc::S_IRUSR } else { 0 }
-        | if writable { libc::S_IWUSR } else { 0 }
-        | if executable { libc::S_IXUSR } else { 0 })
-    .into();
-}
-
 pub async fn extended_attributes_sender(
     iterator: ServerEnd<fio::ExtendedAttributeIteratorMarker>,
     attributes: Vec<Vec<u8>>,
