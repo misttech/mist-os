@@ -161,18 +161,18 @@ template("idk") {
   } else if (host_cpu == "arm64") {
     host_triple_cpu = "aarch64"
   } else {
-    assert(false, "Unrecognized host CPU: $host_cpu")
+    assert(false, "Unrecognized host CPU: ${host_cpu}")
   }
   if (host_os == "linux") {
-    host_triple_os = "linux-gnu"
+    host_triple_vendor_os = "unknown-linux-gnu"
   } else if (host_os == "mac") {
-    host_triple_os = "apple-darwin"
+    host_triple_vendor_os = "apple-darwin"
   } else if (host_os == "fuchsia") {
-    host_triple_os = "fuchsia"
+    host_triple_vendor_os = "unknown-fuchsia"
   } else {
-    assert(false, "Unrecognized host OS: $host_os")
+    assert(false, "Unrecognized host OS: ${host_os}")
   }
-  host_triple = "$host_triple_cpu-$host_triple_os"
+  host_triple = "${host_triple_cpu}-${host_triple_vendor_os}"
 
   # Combine all the individual sdk_collection subbuilds and put the result in
   # the exported directory.
