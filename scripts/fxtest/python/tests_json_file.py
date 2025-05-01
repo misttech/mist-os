@@ -85,7 +85,7 @@ class TestFileError(Exception):
 @dataparse
 @dataclass
 class TestEntry:
-    """tests.json consists of a single list of TestEntity."""
+    """tests.json consists of a single list of TestEntry."""
 
     # The "test" field for a specific entry in the file.
     test: TestSection
