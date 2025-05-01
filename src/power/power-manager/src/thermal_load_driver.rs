@@ -7,7 +7,7 @@ use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::platform_metrics::PlatformMetric;
-use crate::temperature_handler::TemperatureFilter;
+use crate::temperature_handler::{TemperatureFilter, TemperatureReadings};
 use crate::types::{Celsius, Seconds, ThermalLoad};
 use anyhow::{format_err, Error, Result};
 use async_trait::async_trait;
@@ -195,21 +195,26 @@ impl ThermalLoadDriver {
             // Enter the timer-based polling loop...
             let mut count: u32 = 0;
             while let Some(()) = periodic_timer.next().await {
-                // Read a new filtered temperature value. Errors are logged but the polling loop
-                // will continue on the next iteration.
-                let new_thermal_load = match temperature_input
-                    .get_thermal_load(&sensor_name, &mut count, log_for_test)
+                // Read a new temperature value. Errors are logged but the polling loop will
+                // continue on the next iteration.
+                let temperature = match temperature_input
+                    .get_temperature(&sensor_name, &mut count, log_for_test)
                     .await
                 {
                     Ok(load) => load,
                     Err(e) => {
                         error!(
-                            "Failed to get updated thermal load for {} (err = {})",
+                            "Failed to get updated temperature for {} (err = {})",
                             &sensor_name, e
                         );
                         continue;
                     }
                 };
+
+                // Compute the thermal load using the filtered temperature.
+                let new_thermal_load =
+                    temperature_input.temperature_to_thermal_load(temperature.filtered);
+
                 fuchsia_trace::counter!(
                     c"power_manager",
                     c"ThermalLoadDriver thermal_load",
@@ -327,53 +332,44 @@ impl TemperatureInput {
         }
     }
 
-    /// Gets the current thermal load value for this temperature input.
+    /// Gets the current temperature value for this temperature input.
     ///
-    /// The function will first poll the temperature handler to retrieve the latest filtered
-    /// temperature value. The temperature is then converted to a thermal load value by also
-    /// considering the configured `onset_temperature` and `reboot_temperature` parameters.
-    async fn get_thermal_load(
+    /// The function will first poll the temperature handler to retrieve the latest temperature.
+    async fn get_temperature(
         &self,
         name: &String,
         call_count: &mut u32,
         log_for_test: bool,
-    ) -> Result<ThermalLoad> {
+    ) -> Result<TemperatureReadings> {
         self.temperature_filter.get_temperature(get_current_timestamp()).await.map(|temperature| {
             if log_for_test {
                 if *call_count % 5 == 0 {
                     // The prefix LOG_FOR_TESTING may be used elsewhere so if this code is removed,
                     // it has to be added in other files for the same sensor. (see b/409073173).
-                    info!("LOG_FOR_TESTING {}: {:?}", name, temperature.filtered);
+                    info!("LOG_FOR_TESTING {}: {:?}", name, temperature);
                     *call_count = 0;
                 }
                 *call_count += 1;
             }
 
-            temperature_to_thermal_load(
-                temperature.filtered,
-                self.onset_temperature,
-                self.reboot_temperature,
-            )
+            temperature
         })
     }
-}
 
-/// Converts temperature to thermal load as a function of temperature, onset temperature, and reboot
-/// temperature.
-fn temperature_to_thermal_load(
-    temperature: Celsius,
-    onset_temperature: Celsius,
-    reboot_temperature: Celsius,
-) -> ThermalLoad {
-    if temperature < onset_temperature {
-        ThermalLoad(0)
-    } else if temperature > reboot_temperature {
-        ThermalLoad(100)
-    } else {
-        ThermalLoad(
-            ((temperature - onset_temperature).0 / (reboot_temperature - onset_temperature).0
-                * 100.0) as u32,
-        )
+    /// Converts temperature to thermal load as a function of temperature, onset temperature,
+    /// and reboot temperature.
+    fn temperature_to_thermal_load(&self, temperature: Celsius) -> ThermalLoad {
+        if temperature < self.onset_temperature {
+            ThermalLoad(0)
+        } else if temperature > self.reboot_temperature {
+            ThermalLoad(100)
+        } else {
+            ThermalLoad(
+                ((temperature - self.onset_temperature).0
+                    / (self.reboot_temperature - self.onset_temperature).0
+                    * 100.0) as u32,
+            )
+        }
     }
 }
 
