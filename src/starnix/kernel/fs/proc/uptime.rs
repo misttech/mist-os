@@ -22,7 +22,7 @@ impl UptimeFile {
 
 impl DynamicFileSource for UptimeFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let uptime = (zx::MonotonicInstant::get() - zx::MonotonicInstant::ZERO).into_seconds_f64();
+        let uptime = (zx::BootInstant::get() - zx::BootInstant::ZERO).into_seconds_f64();
 
         // Fetch CPU stats from `fuchsia.kernel.Stats` to calculate idle time.
         let cpu_stats = self
