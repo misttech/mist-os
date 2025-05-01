@@ -1056,7 +1056,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -2244,7 +2244,7 @@ TODO(https://fxbug.dev/320511796): Cleanup when no longer necessary.
 
 **Current value (from the default):** `false`
 
-From //build/testing/boot_tests/boot_test.gni:13
+From //build/testing/boot_tests/boot_test.gni:14
 
 ### disable_cuckoo_tests
 
