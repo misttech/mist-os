@@ -193,7 +193,6 @@ mod tests {
     use fidl_fuchsia_io as fio;
     use fuchsia_pkg_testing::blobfs::Fake as FakeBlobfs;
     use fuchsia_pkg_testing::PackageBuilder;
-    use vfs::directory::entry_container::Directory as _;
 
     #[fuchsia::test]
     async fn get_or_insert_new_entry() {
@@ -223,14 +222,11 @@ mod tests {
         let dir = server.get_or_insert(metafar_blob.merkle, None).await.unwrap();
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = vfs::execution_scope::ExecutionScope::new();
-        let () = dir.deprecated_open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
-            vfs::path::Path::dot(),
-            server_end.into_channel().into(),
-        );
-        let _: fio::ConnectionInfo =
-            proxy.get_connection_info().await.expect("directory succesfully handling requests");
+        vfs::directory::serve_on(dir, fio::PERM_READABLE, scope.clone(), server_end);
+        let _ = proxy
+            .get_attributes(Default::default())
+            .await
+            .expect("directory succesfully handling requests");
         assert_eq!(server.list().len(), 1);
 
         drop(proxy);
