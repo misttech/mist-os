@@ -74,7 +74,7 @@ class AppRenderLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
             if present_flow_event.phase != trace_model.FlowEventPhase.START:
                 continue
 
-            vsync = trace_utils.get_nearest_following_event(
+            vsync = trace_utils.get_nearest_following_flow_event(
                 present_flow_event, _EVENT_CATEGORY, _DISPLAY_VSYNC_EVENT_NAME
             )
 

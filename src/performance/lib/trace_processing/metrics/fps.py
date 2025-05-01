@@ -61,7 +61,7 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
 
         vsync_events: list[trace_model.Event] = []
         for start in cpu_render_start_events:
-            next_event = trace_utils.get_nearest_following_event(
+            next_event = trace_utils.get_nearest_following_flow_event(
                 start, _EVENT_CATEGORY, _DISPLAY_VSYNC_EVENT_NAME
             )
             if next_event is not None:

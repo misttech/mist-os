@@ -74,7 +74,7 @@ class InputLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
         latencies: list[float] = []
 
         for e in input_events:
-            vsync = trace_utils.get_nearest_following_event(
+            vsync = trace_utils.get_nearest_following_flow_event(
                 e, _CATEGORY_GFX, _DISPLAY_VSYNC_EVENT_NAME
             )
 

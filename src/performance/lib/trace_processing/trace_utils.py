@@ -162,7 +162,7 @@ def get_arg_values_from_events(
     return map(event_to_arg_type, events)
 
 
-def get_following_events(
+def get_following_flow_events(
     event: trace_model.Event,
 ) -> Iterable[trace_model.Event]:
     """Find all Events that are flow connected and follow |event|.
@@ -204,7 +204,7 @@ def get_following_events(
         yield connected_event
 
 
-def get_nearest_following_event(
+def get_nearest_following_flow_event(
     event: trace_model.Event,
     following_event_category: str,
     following_event_name: str,
@@ -220,12 +220,26 @@ def get_nearest_following_event(
       Flow connected events. If nothing is found, None.
     """
     filtered_following_events = filter_events(
-        get_following_events(event),
+        get_following_flow_events(event),
         category=following_event_category,
         name=following_event_name,
         type=trace_model.DurationEvent,
     )
     return next(iter(filtered_following_events), None)
+
+
+def get_nearest_following_event(
+    event: trace_model.Event,
+    following_event_category: str,
+    following_event_name: str,
+) -> trace_model.Event | None:
+    """Deprecated.  Use |get_nearest_following_flow_event| instead.
+
+    TODO(https://fxbug.dev/42073146): delete once there are no more callers.
+    """
+    return get_nearest_following_flow_event(
+        event, following_event_category, following_event_name
+    )
 
 
 # This method looks for a possible race between trace collection start in multiple processes.
@@ -274,7 +288,7 @@ def adjust_to_common_process_start(
     if begin_event is None:
         raise KeyError(f"Error, expected event with name '{name}'")
 
-    events_in_flow: Iterable[trace_model.Event] = get_following_events(
+    events_in_flow: Iterable[trace_model.Event] = get_following_flow_events(
         begin_event
     )
 
