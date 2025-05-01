@@ -31,7 +31,7 @@ For detailed information, follow the [RFC process](rfc_process.md).
 <!-- mdlint off(WHITESPACE_LINE_LENGTH) -->
 <div style="padding-top: 62%; position: relative; width: 100%">
   <iframe
-    src="https://docs.google.com/presentation/d/e/2PACX-1vT8Sofn5v3d-PP7fcBw9YTH4vukwlvscjjqKsC4eItDVp79qYbENpAKer6ZoE_bQ3vD23dwHYrBn_aP/embed?start=false&loop=false&delayms=3000"
+    src="https://docs.google.com/presentation/d/1nl-uLi_VGC9Hf8Q2N3ZRzb9RQA0oYYCxdy-GJiz2KDI/embed"
     frameborder="0" width="480" height="299"
     allowfullscreen="true" mozallowfullscreen="true" webkitallowfullscreen="true"
     style="position: absolute; top: 0; left: 0; width: 100%; height: 100%"></iframe>
