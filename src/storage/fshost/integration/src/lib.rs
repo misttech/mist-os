@@ -5,7 +5,7 @@
 use assert_matches::assert_matches;
 use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::ArchiveReader;
-use disk_builder::Disk;
+use disk_builder::{Disk, DEFAULT_DATA_VOLUME_SIZE};
 use fidl::endpoints::{create_proxy, ServiceMarker as _};
 use fidl_fuchsia_fxfs::{
     BlobReaderMarker, CryptManagementMarker, CryptManagementProxy, CryptMarker, CryptProxy,
@@ -37,10 +37,7 @@ pub const VFS_TYPE_MEMFS: u32 = 0x3e694d21;
 pub const VFS_TYPE_FXFS: u32 = 0x73667866;
 pub const VFS_TYPE_F2FS: u32 = 0xfe694d21;
 pub const BLOBFS_MAX_BYTES: u64 = 8765432;
-// DATA_MAX_BYTES must be greater than DEFAULT_F2FS_MIN_BYTES
-// (defined in device/constants.rs) to ensure that when f2fs is
-// the data filesystem format, we don't run out of space
-pub const DATA_MAX_BYTES: u64 = 109876543;
+pub const DATA_MAX_BYTES: u64 = DEFAULT_DATA_VOLUME_SIZE;
 pub const STARNIX_VOLUME_NAME: &str = "starnix_volume";
 
 pub fn round_down<

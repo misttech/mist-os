@@ -11,9 +11,9 @@
             "100",
 
             // Use a smaller ramdisk for short tests
-            // f2fs requires a minimum of 100mb volume
+            // f2fs requires a minimum of 50mb volume
             "--ramdisk-block-count",
-            "204800",
+            "102400",
 
             // Enable debug logging for this variant
             "-l",
