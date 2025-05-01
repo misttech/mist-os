@@ -6,6 +6,7 @@
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_args", "get_ffx_assembly_inputs")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(
     ":providers.bzl",
     "FuchsiaAssemblyDeveloperOverridesInfo",
@@ -17,7 +18,6 @@ load(
     "FuchsiaProductImageInfo",
 )
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 # Base source for running ffx assembly create-system
 _CREATE_SYSTEM_RUNNER_SH_TEMPLATE = """
@@ -36,7 +36,7 @@ def _match_assembly_pattern_string(label, pattern):
     assembly_pattern = pattern.removeprefix("//")
     if assembly_pattern.endswith("/*"):
         # Match any target in the package or below
-        return package.startswith(assembly_pattern.removesuffix("/*"))
+        return (package + "/").startswith(assembly_pattern.removesuffix("*"))
     elif assembly_pattern.endswith(":*"):
         # Match package exactly.
         return package == assembly_pattern.removesuffix(":*")
