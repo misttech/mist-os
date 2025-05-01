@@ -211,7 +211,8 @@ void PartitionDevice::StartThread(block_server::Thread thread) {
 void PartitionDevice::OnNewSession(block_server::Session session) {
   if (auto server_dispatcher = fdf::SynchronizedDispatcher::Create(
           fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "Block Server Session",
-          [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
+          [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); },
+          "fuchsia.devices.block.drivers.sdmmc.worker");
       server_dispatcher.is_ok()) {
     async::PostTask(server_dispatcher->async_dispatcher(),
                     [session = std::move(session)]() mutable { session.Run(); });
