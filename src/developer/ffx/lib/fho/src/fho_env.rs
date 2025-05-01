@@ -8,14 +8,21 @@ use ffx_command::FfxCommandLine;
 use ffx_command_error::{return_bug, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 pub enum FhoConnectionBehavior {
     DaemonConnector(Arc<dyn Injector>),
     DirectConnector(Arc<dyn DirectConnector>),
+}
+
+// Interfaces can provide additional errors
+pub trait EnvironmentInterface: Any {
+    fn wrap_main_errors(&self, err: crate::Error) -> crate::Error;
 }
 
 // Manually implement Debug here so we can skip implementing
@@ -30,6 +37,13 @@ impl fmt::Debug for FhoConnectionBehavior {
     }
 }
 
+// Type magic allowing us to both cast to Any, as well as to get back to this interface
+impl dyn EnvironmentInterface {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 #[derive(Clone)]
 pub struct FhoEnvironment {
     ffx: FfxCommandLine,
@@ -38,6 +52,8 @@ pub struct FhoEnvironment {
     /// lazily initialized, and potentially multiple threads,
     /// so using Arc<RwLock<>> container.
     behavior: Arc<RwLock<Option<FhoConnectionBehavior>>>,
+    // Store information relevant to dependent crates, at most one for each type.
+    interfaces: Arc<Mutex<HashMap<TypeId, Box<dyn EnvironmentInterface>>>>,
 }
 
 impl FhoEnvironment {
@@ -47,6 +63,7 @@ impl FhoEnvironment {
             behavior: Arc::new(RwLock::new(None)),
             ffx: ffx.clone(),
             context: context.clone(),
+            interfaces: Default::default(),
         }
     }
 
@@ -57,6 +74,7 @@ impl FhoEnvironment {
             behavior: Arc::new(RwLock::new(None)),
             ffx: FfxCommandLine::new(None, argv).unwrap(),
             context: context.clone(),
+            interfaces: Default::default(),
         }
     }
 
@@ -159,5 +177,30 @@ impl FhoEnvironment {
         }
 
         Ok(())
+    }
+
+    pub fn get_interface<T: EnvironmentInterface + Clone + 'static>(&self) -> Option<T> {
+        let interfaces = self.interfaces.lock().expect("poisoned interface map");
+        let Some(ei) = interfaces.get(&TypeId::of::<T>()) else {
+            return None;
+        };
+        ei.as_any().downcast_ref::<T>().map(|t| t.clone())
+    }
+    pub fn set_interface<T: EnvironmentInterface + 'static>(&self, ei: T) {
+        let mut interfaces = self.interfaces.lock().expect("poisoned interface map");
+        interfaces.insert(TypeId::of::<T>(), Box::new(ei));
+    }
+
+    pub fn wrap_main_result<T>(&self, res: Result<T>) -> Result<T> {
+        match res {
+            Ok(_) => res,
+            Err(mut e) => {
+                let interfaces = self.interfaces.lock().expect("poisoned interface map");
+                for i in interfaces.values() {
+                    e = i.wrap_main_errors(e);
+                }
+                Err(e)
+            }
+        }
     }
 }
