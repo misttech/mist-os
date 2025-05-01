@@ -362,6 +362,10 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 					logger.Errorf(ctx, "Flashing attempt %d/%d failed: %s.", attempt, maxAllowedAttempts, err)
 					return err
 				} else {
+					// TODO (betramlalusha): remove once b/346868967 is fixed.
+					if tcpFlash {
+						continue
+					}
 					// If not successful, and we have
 					// remaining attempts, try hard
 					// power-cycling the target to recover.
