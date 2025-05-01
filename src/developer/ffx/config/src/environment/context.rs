@@ -38,6 +38,21 @@ pub struct EnvironmentContext {
     pub(crate) no_environment: bool,
 }
 
+impl Default for EnvironmentContext {
+    fn default() -> Self {
+        Self {
+            kind: EnvironmentKind::NoContext,
+            exe_kind: ExecutableKind::Test,
+            env_vars: Default::default(),
+            runtime_args: Default::default(),
+            env_file_path: Default::default(),
+            cache: Default::default(),
+            self_path: std::env::current_exe().unwrap(),
+            no_environment: false,
+        }
+    }
+}
+
 impl std::cmp::PartialEq for EnvironmentContext {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind
@@ -570,21 +585,6 @@ mod test {
     use tempfile::tempdir;
 
     const DOMAINS_TEST_DATA_PATH: &str = env!("DOMAINS_TEST_DATA_PATH");
-
-    impl Default for EnvironmentContext {
-        fn default() -> Self {
-            Self {
-                kind: EnvironmentKind::NoContext,
-                exe_kind: ExecutableKind::Test,
-                env_vars: Default::default(),
-                runtime_args: Default::default(),
-                env_file_path: Default::default(),
-                cache: Default::default(),
-                self_path: std::env::current_exe().unwrap(),
-                no_environment: false,
-            }
-        }
-    }
 
     fn domains_test_data_path() -> &'static Utf8Path {
         Utf8Path::new(DOMAINS_TEST_DATA_PATH)

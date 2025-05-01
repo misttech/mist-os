@@ -22,7 +22,7 @@ use std::str::FromStr;
 /// output.
 pub const FFX_WRAPPER_INVOKE: &'static str = "FFX_WRAPPER_INVOKE";
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 /// The relevant argument and environment variables necessary to parse or
 /// reconstruct an ffx command invocation.
 pub struct FfxCommandLine {
