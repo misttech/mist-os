@@ -175,12 +175,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             builder.platform_bundle("fshost_non_eng");
         }
 
-        // Inform pkg-cache when fxfs_blob should be used.
-        builder.set_config_capability(
-            "fuchsia.pkgcache.UseFxblob",
-            Config::new(ConfigValueType::Bool, fxfs_blob.into()),
-        )?;
-
         let disable_automount =
             Config::new(ConfigValueType::Bool, storage_config.disable_automount.into());
 

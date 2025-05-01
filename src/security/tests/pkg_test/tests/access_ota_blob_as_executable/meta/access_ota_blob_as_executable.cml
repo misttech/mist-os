@@ -149,7 +149,6 @@
             config: [
                 "fuchsia.pkgcache.AllPackagesExecutable",
                 "fuchsia.pkgcache.EnableUpgradablePackages",
-                "fuchsia.pkgcache.UseFxblob",
                 "fuchsia.pkgcache.UseSystemImage",
             ],
             from: "#pkg-cache-config",
