@@ -16,10 +16,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
-const (
-	llvmProfdataDebuginfodSupportedVersion = "clang"
-)
-
 func SplitVersion(arg string) (version, value string) {
 	version = ""
 	s := strings.SplitN(arg, "=", 2)
@@ -50,7 +46,7 @@ func MergeSameVersionProfiles(ctx context.Context, tempDir string, profiles []st
 
 	useDebugInfod := false
 	// Use debuginfod during profile merging if it is enabled.
-	if len(debuginfodServers) > 0 && version == llvmProfdataDebuginfodSupportedVersion {
+	if len(debuginfodServers) > 0 {
 		useDebugInfod = true
 		// TODO(https://fxbug.dev/368375861): Switch to --failure-mode=any by default when missing build id issue is resolved.
 		args = append(args, "--debuginfod", "--correlate=binary", "--failure-mode=all")
