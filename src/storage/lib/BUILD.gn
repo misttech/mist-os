@@ -19,6 +19,7 @@ group("tests") {
     "block_server:tests",
     "delivery_blob:tests",
     "fs_management:tests",
+    "fscrypt:tests",
     "fsverity-merkle:tests",
     "ftl:tests",
     "key-bag:tests",

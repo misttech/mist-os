@@ -5,7 +5,7 @@ use crate::crypto::PerFileDecryptor;
 use crate::superblock::BLOCK_SIZE;
 use anyhow::{anyhow, ensure, Context, Error};
 use enumn::N;
-use proxy_filename::ProxyFilename;
+use fscrypt::proxy_filename::ProxyFilename;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, Unaligned};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, N)]
@@ -102,8 +102,7 @@ fn get_dir_entries(
         // TODO(b/404680707): Do we need to consider handling devices with badly formed filenames?
         let filename = if is_encrypted {
             if let Some(decryptor) = decryptor {
-                let mut hash_code =
-                    crate::crypto::direntry::tea_hash_filename(&raw_filename[..name_len]);
+                let mut hash_code = fscrypt::direntry::tea_hash_filename(&raw_filename[..name_len]);
                 let mut filename = raw_filename.clone();
                 decryptor.decrypt_filename_data(ino, &mut filename);
                 while filename.last() == Some(&0) {
@@ -111,7 +110,7 @@ fn get_dir_entries(
                 }
                 // If using both encryption and casefold, use hkdf-seeded hash instead.
                 if is_casefolded {
-                    hash_code = crate::crypto::direntry::casefold_encrypt_hash_filename(
+                    hash_code = fscrypt::direntry::casefold_encrypt_hash_filename(
                         filename.as_slice(),
                         &decryptor.dirhash_key(),
                     );

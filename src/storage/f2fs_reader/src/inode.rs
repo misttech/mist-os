@@ -180,7 +180,7 @@ pub struct Inode {
     pub xattr: Vec<XattrEntry>,
 
     // Crypto context, if present in xattr.
-    pub(super) context: Option<crypto::Context>,
+    pub(super) context: Option<fscrypt::Context>,
 
     // Contains the set of block addresses in the data segment used by this inode.
     // This includes nids, indirect and double indirect address pages, and the xattr page
@@ -316,7 +316,7 @@ impl Inode {
         }
         this.xattr = decode_xattr(&raw_xattr)?;
 
-        this.context = crypto::Context::read_from_xattr(&this.xattr)?;
+        this.context = crypto::try_read_context_from_xattr(&this.xattr)?;
 
         // The set of blocks making up the file begin with i_addrs. If more blocks are required
         // nids[0..5] are used. Zero pages (nid == NULL_ADDR) can be omitted at any level.

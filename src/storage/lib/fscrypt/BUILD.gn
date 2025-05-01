@@ -5,30 +5,33 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
-rustc_library("proxy_filename") {
-  name = "proxy_filename"
+rustc_library("fscrypt") {
+  name = "fscrypt"
   edition = "2021"
   with_unit_tests = true
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/direntry.rs",
+    "src/hkdf.rs",
+    "src/lib.rs",
+    "src/proxy_filename.rs",
+  ]
   deps = [
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:base64",
+    "//third_party/rust_crates:hmac",
     "//third_party/rust_crates:sha2",
+    "//third_party/rust_crates:siphasher",
     "//third_party/rust_crates:zerocopy",
   ]
+
+  test_deps = [ "//third_party/rust_crates:hex" ]
 }
 
-fuchsia_component("proxy-filename-test") {
-  testonly = true
-  deps = [ ":proxy_filename_test" ]
-  manifest = "meta/proxy_filename_test.cml"
-}
-
-fuchsia_test_package("proxy-filename-tests") {
-  test_components = [ ":proxy-filename-test" ]
+fuchsia_unittest_package("fscrypt-tests") {
+  deps = [ ":fscrypt_test" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":proxy-filename-tests" ]
+  deps = [ ":fscrypt-tests" ]
 }

@@ -21,9 +21,9 @@ use crate::object_store::{
 };
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use fidl_fuchsia_io as fio;
+use fscrypt::proxy_filename::ProxyFilename;
 use fuchsia_sync::Mutex;
 use fxfs_crypto::{Cipher, CipherSet, Key, WrappedKeys};
-use proxy_filename::ProxyFilename;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};

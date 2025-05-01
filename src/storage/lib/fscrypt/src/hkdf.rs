@@ -3,6 +3,13 @@
 // found in the LICENSE file.
 use hmac::Mac;
 
+// Fscrypt tacks a prefix onto the 'info' field in HKDF used for different purposes.
+// This prefix is built from one of the following context.
+pub const HKDF_CONTEXT_PER_FILE_ENC_KEY: u8 = 2;
+pub const HKDF_CONTEXT_DIRHASH_KEY: u8 = 5;
+pub const HKDF_CONTEXT_IV_INO_LBLK_32_KEY: u8 = 6;
+pub const HKDF_CONTEXT_INODE_HASH_KEY: u8 = 7;
+
 /// An fscrypt compatible implementation of HKDF (HKDF-extract + HKDF-expand)
 /// This is just regular HKDF but with 'info' prefixed.
 /// `context` is an fscrypt special.

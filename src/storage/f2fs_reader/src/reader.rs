@@ -206,7 +206,7 @@ impl F2fsReader {
     /// Registers a new main key.
     /// This 'unlocks' any files using this key.
     pub fn add_key(&mut self, main_key: &[u8; 64]) -> [u8; 16] {
-        let identifier = crypto::main_key_to_identifier(main_key);
+        let identifier = fscrypt::main_key_to_identifier(main_key);
         println!("Adding key with identifier {}", hex::encode(identifier));
         self.keys.insert(identifier.clone(), main_key.clone());
         identifier
@@ -267,7 +267,7 @@ impl F2fsReader {
                     decryptor.decrypt_filename_data(inode.footer.ino, &mut filename);
                 } else {
                     let proxy_filename: String =
-                        proxy_filename::ProxyFilename::new(0, &filename).into();
+                        fscrypt::proxy_filename::ProxyFilename::new(0, &filename).into();
                     filename = proxy_filename.as_bytes().to_vec();
                 }
             }

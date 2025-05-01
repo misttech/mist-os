@@ -12,8 +12,6 @@ rustc_library("lib") {
   sources = [
     "src/checkpoint.rs",
     "src/crypto.rs",
-    "src/crypto/direntry.rs",
-    "src/crypto/hkdf.rs",
     "src/dir.rs",
     "src/inode.rs",
     "src/lib.rs",
@@ -23,7 +21,7 @@ rustc_library("lib") {
     "src/xattr.rs",
   ]
   deps = [
-    "//src/storage/lib/proxy_filename",
+    "//src/storage/lib/fscrypt",
     "//src/storage/lib/storage_device",
     "//third_party/rust_crates:aes",
     "//third_party/rust_crates:anyhow",
@@ -32,8 +30,6 @@ rustc_library("lib") {
     "//third_party/rust_crates:cbc",
     "//third_party/rust_crates:enumn",
     "//third_party/rust_crates:hex",
-    "//third_party/rust_crates:hmac",
-    "//third_party/rust_crates:sha2",
     "//third_party/rust_crates:siphasher",
     "//third_party/rust_crates:zerocopy",
   ]
