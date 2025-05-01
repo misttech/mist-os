@@ -10,8 +10,6 @@
 
 #include "src/starnix/tests/selinux/userspace/util.h"
 
-extern std::string DoPrePolicyLoadWork() { return "minimal_policy.pp"; }
-
 namespace {
 
 std::string MountOptionsFor(std::string_view mount_path) {
@@ -28,6 +26,8 @@ std::string MountOptionsFor(std::string_view mount_path) {
 }
 
 TEST(MountTest, NoSelinuxMountOptions) {
+  LoadPolicy("minimal_policy.pp");
+
   ASSERT_THAT(mkdir("/mount_tests", 0755), SyscallSucceeds());
   ASSERT_THAT(mount("tmpfs", "/mount_tests", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV, 0),
               SyscallSucceeds());
@@ -42,6 +42,8 @@ TEST(MountTest, NoSelinuxMountOptions) {
 }
 
 TEST(MountTest, WithContextOption) {
+  LoadPolicy("minimal_policy.pp");
+
   ASSERT_THAT(mkdir("/mount_tests", 0755), SyscallSucceeds());
   ASSERT_THAT(mount("tmpfs", "/mount_tests", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV,
                     "context=source_u:object_r:target_t:s0"),
@@ -56,6 +58,8 @@ TEST(MountTest, WithContextOption) {
 }
 
 TEST(MountTest, WithSeclabel) {
+  LoadPolicy("minimal_policy.pp");
+
   // Base policy uses "fs_use_trans" labeling scheme for "tmpfs", which should report "seclabel".
   ASSERT_THAT(mkdir("/with_seclabel", 0755), SyscallSucceeds());
   ASSERT_THAT(mount("tmpfs", "/with_seclabel", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV, 0),
@@ -69,6 +73,8 @@ TEST(MountTest, WithSeclabel) {
 }
 
 TEST(MountTest, WithoutSeclabel) {
+  LoadPolicy("minimal_policy.pp");
+
   // Base policy uses "genfscon" labeling scheme for "proc", which should not report "seclabel".
   ASSERT_THAT(mkdir("/without_seclabel", 0755), SyscallSucceeds());
   ASSERT_THAT(

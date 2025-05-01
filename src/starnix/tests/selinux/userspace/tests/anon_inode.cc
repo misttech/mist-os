@@ -20,11 +20,11 @@
 
 #include "src/starnix/tests/selinux/userspace/util.h"
 
-extern std::string DoPrePolicyLoadWork() { return "anon_inode_policy.pp"; }
-
 namespace {
 
 TEST(AnonInodeTest, EventFdIsUnlabeled) {
+  LoadPolicy("anon_inode_policy.pp");
+
   fbl::unique_fd fd(eventfd(0, 0));
   ASSERT_TRUE(fd.is_valid());
 
@@ -32,6 +32,8 @@ TEST(AnonInodeTest, EventFdIsUnlabeled) {
 }
 
 TEST(AnonInodeTest, PrivateFdIsUnchecked) {
+  LoadPolicy("anon_inode_policy.pp");
+
   auto enforce = ScopedEnforcement::SetEnforcing();
 
   // Create an eventfd within a test domain, then validate whether the FD is usable from a set
@@ -62,6 +64,8 @@ TEST(AnonInodeTest, PrivateFdIsUnchecked) {
 }
 
 TEST(AnonInodeTest, TmpFileHasLabel) {
+  LoadPolicy("anon_inode_policy.pp");
+
   constexpr char kTmpPath[] = "/tmp";
   fbl::unique_fd fd(open(kTmpPath, O_RDWR | O_TMPFILE));
   ASSERT_TRUE(fd.is_valid());
@@ -70,6 +74,8 @@ TEST(AnonInodeTest, TmpFileHasLabel) {
 }
 
 TEST(AnonInodeTest, UserfaultFdHasLabel) {
+  LoadPolicy("anon_inode_policy.pp");
+
   fbl::unique_fd fd(static_cast<int>(syscall(SYS_userfaultfd, O_CLOEXEC)));
   ASSERT_TRUE(fd.is_valid());
 
@@ -78,6 +84,8 @@ TEST(AnonInodeTest, UserfaultFdHasLabel) {
 }
 
 TEST(AnonInodeTest, EpollIsUnlabeled) {
+  LoadPolicy("anon_inode_policy.pp");
+
   fbl::unique_fd fd(epoll_create1(0));
   ASSERT_TRUE(fd.is_valid());
 
@@ -85,6 +93,8 @@ TEST(AnonInodeTest, EpollIsUnlabeled) {
 }
 
 TEST(AnonInodeTest, InotifyIsUnlabeled) {
+  LoadPolicy("anon_inode_policy.pp");
+
   fbl::unique_fd fd(inotify_init());
   ASSERT_TRUE(fd.is_valid());
 
@@ -92,6 +102,8 @@ TEST(AnonInodeTest, InotifyIsUnlabeled) {
 }
 
 TEST(AnonInodeTest, PidFdIsUnlabeled) {
+  LoadPolicy("anon_inode_policy.pp");
+
   fbl::unique_fd fd(static_cast<int>(syscall(SYS_pidfd_open, getpid(), 0)));
   ASSERT_TRUE(fd.is_valid());
 
@@ -99,6 +111,8 @@ TEST(AnonInodeTest, PidFdIsUnlabeled) {
 }
 
 TEST(AnonInodeTest, TimerFdIsUnlabeled) {
+  LoadPolicy("anon_inode_policy.pp");
+
   fbl::unique_fd fd(timerfd_create(CLOCK_MONOTONIC, 0));
   ASSERT_TRUE(fd.is_valid());
 
@@ -106,6 +120,8 @@ TEST(AnonInodeTest, TimerFdIsUnlabeled) {
 }
 
 TEST(AnonInodeTest, SignalFdIsUnlabeled) {
+  LoadPolicy("anon_inode_policy.pp");
+
   sigset_t signals;
   sigemptyset(&signals);
   fbl::unique_fd fd(signalfd(-1, &signals, SFD_CLOEXEC));

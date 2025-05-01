@@ -6,11 +6,11 @@
 
 #include "src/starnix/tests/selinux/userspace/util.h"
 
-extern std::string DoPrePolicyLoadWork() { return "minimal_policy.pp"; }
-
 namespace {
 
 TEST(ProcAttr, Current) {
+  LoadPolicy("minimal_policy.pp");
+
   // Attempting to read the process' current context should return a value.
   EXPECT_THAT(ReadTaskAttr("current"), IsOk("system_u:unconfined_r:unconfined_t:s0"));
 }

@@ -6,9 +6,9 @@
 
 #include "src/starnix/tests/selinux/userspace/util.h"
 
-extern std::string DoPrePolicyLoadWork() { return "minimal_policy.pp"; }
-
 TEST(PolicyLoadTest, TasksUseKernelSid) {
+  LoadPolicy("minimal_policy.pp");
+
   // All processes created prior to policy loading are labeled with the kernel SID.
   EXPECT_THAT(ReadTaskAttr("current"), IsOk("system_u:unconfined_r:unconfined_t:s0"));
 }

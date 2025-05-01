@@ -10,13 +10,13 @@
 
 #include "src/starnix/tests/selinux/userspace/util.h"
 
-namespace {
-
-int g_before_policy_pipe = -1;
-
 // Under the default policy, a pipe is labeled with the label of its creating process.
 TEST(PolicyLoadTest, Pipes) {
-  EXPECT_THAT(GetLabel(g_before_policy_pipe), "system_u:unconfined_r:unconfined_t:s0");
+  int pipe_before_policy[2];
+  EXPECT_THAT(pipe(pipe_before_policy), SyscallSucceeds());
+  LoadPolicy("minimal_policy.pp");
+
+  EXPECT_THAT(GetLabel(pipe_before_policy[0]), "system_u:unconfined_r:unconfined_t:s0");
 
   ASSERT_EQ(WriteTaskAttr("current", "system_u:unconfined_r:unconfined_t:s0"), fit::ok());
 
@@ -24,15 +24,4 @@ TEST(PolicyLoadTest, Pipes) {
   EXPECT_THAT(pipe(pipe_after_policy), SyscallSucceeds());
 
   EXPECT_THAT(GetLabel(pipe_after_policy[0]), "system_u:unconfined_r:unconfined_t:s0");
-}
-
-}  // namespace
-
-extern std::string DoPrePolicyLoadWork() {
-  // Create a pipe prior to policy load, to allow the test to validate the post-policy label.
-  int pipe_before_policy[2];
-  EXPECT_THAT(pipe(pipe_before_policy), SyscallSucceeds());
-  g_before_policy_pipe = pipe_before_policy[0];
-
-  return "minimal_policy.pp";
 }

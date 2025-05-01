@@ -12,11 +12,14 @@
 
 #include <gmock/gmock.h>
 
+/// Loads the policy |name|.
+void LoadPolicy(const std::string& name);
+
 /// Writes `data` to the file at `path`, returning the `errno` if any part of that process fails.
 fit::result<int> WriteExistingFile(const std::string& path, std::string_view data);
 
 /// Reads the contents of the file at `path`.
-fit::result<int, std::string> ReadFile(const std::string& path);
+fit::result<int, std::string> ReadFile(const std::string_view& path);
 
 /// Reads the specified security attribute (e.g. "current", "exec", etc) for the current task.
 fit::result<int, std::string> ReadTaskAttr(std::string_view attr_name);

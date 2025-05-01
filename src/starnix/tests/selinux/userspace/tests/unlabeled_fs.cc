@@ -11,11 +11,10 @@
 #include "src/starnix/tests/selinux/userspace/base_initial_sids.h"
 #include "src/starnix/tests/selinux/userspace/util.h"
 
-extern std::string DoPrePolicyLoadWork() { return "file_transition_policy.pp"; }
-
 namespace {
 
 TEST(UnlabeledFsTest, CreateFileInUnlabeledFs) {
+  LoadPolicy("file_transition_policy.pp");
   ASSERT_EQ(WriteTaskAttr("current", "unconfined_u:unconfined_r:unconfined_t:s0"), fit::ok());
 
   // Check that `/` which is not labeled in the policy is labeled with the `unlabeled` initial SID.

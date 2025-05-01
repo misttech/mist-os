@@ -5,6 +5,8 @@
 #include "src/starnix/tests/selinux/userspace/util.h"
 
 #include <fcntl.h>
+#include <lib/fit/defer.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/xattr.h>
 
@@ -31,11 +33,21 @@ fit::result<int> WriteExistingFile(const std::string& path, std::string_view dat
   return fit::ok();
 }
 
-std::string RemoveTrailingNul(std::string in) {
-  if (in.size() > 0 && in[in.size() - 1] == 0) {
-    in.pop_back();
-  }
-  return in;
+void LoadPolicy(const std::string& name) {
+  auto fd = fbl::unique_fd(open(("data/policies/" + name).c_str(), O_RDONLY));
+  ASSERT_THAT(fd.get(), SyscallSucceeds()) << "opening policy at: " << name;
+
+  off_t fsize;
+  ASSERT_THAT((fsize = lseek(fd.get(), 0, SEEK_END)), SyscallSucceeds());
+
+  void* address = mmap(NULL, (size_t)fsize, PROT_READ, MAP_PRIVATE, fd.get(), 0);
+  ASSERT_THAT(reinterpret_cast<intptr_t>(address), SyscallSucceeds());
+  auto unmap =
+      fit::defer([address, fsize] { ASSERT_THAT(munmap(address, fsize), SyscallSucceeds()); });
+
+  ASSERT_TRUE(WriteExistingFile("/sys/fs/selinux/load",
+                                std::string(reinterpret_cast<char*>(address), fsize))
+                  .is_ok());
 }
 
 fit::result<int, std::string> ReadFile(const std::string& path) {
@@ -44,6 +56,13 @@ fit::result<int, std::string> ReadFile(const std::string& path) {
     return fit::ok(std::move(result));
   }
   return fit::error(errno);
+}
+
+std::string RemoveTrailingNul(std::string in) {
+  if (in.size() > 0 && in[in.size() - 1] == 0) {
+    in.pop_back();
+  }
+  return in;
 }
 
 fit::result<int, std::string> ReadTaskAttr(std::string_view attr_name) {
