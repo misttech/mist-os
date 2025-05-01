@@ -1056,7 +1056,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -8956,41 +8956,35 @@ From //third_party/pigweed/src/modules.gni:70
 
 From //third_party/pigweed/src/modules.gni:72
 
-### pw_external_re2
-
-**Current value (from the default):** `"//third_party/pigweed/src/third_party/re2"`
-
-From //third_party/pigweed/src/modules.gni:73
-
 ### pw_external_repo
 
 **Current value (from the default):** `"//third_party/pigweed/src/third_party/repo"`
 
-From //third_party/pigweed/src/modules.gni:74
+From //third_party/pigweed/src/modules.gni:73
 
 ### pw_external_smartfusion_mss
 
 **Current value (from the default):** `"//third_party/pigweed/src/third_party/smartfusion_mss"`
 
-From //third_party/pigweed/src/modules.gni:76
+From //third_party/pigweed/src/modules.gni:75
 
 ### pw_external_stm32cube
 
 **Current value (from the default):** `"//third_party/pigweed/src/third_party/stm32cube"`
 
-From //third_party/pigweed/src/modules.gni:78
+From //third_party/pigweed/src/modules.gni:77
 
 ### pw_external_threadx
 
 **Current value (from the default):** `"//third_party/pigweed/src/third_party/threadx"`
 
-From //third_party/pigweed/src/modules.gni:79
+From //third_party/pigweed/src/modules.gni:78
 
 ### pw_external_tinyusb
 
 **Current value (from the default):** `"//third_party/pigweed/src/third_party/tinyusb"`
 
-From //third_party/pigweed/src/modules.gni:80
+From //third_party/pigweed/src/modules.gni:79
 
 ### pw_function_CONFIG
 
