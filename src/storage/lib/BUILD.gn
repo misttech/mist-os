@@ -29,6 +29,7 @@ group("tests") {
     "sparse/rust:tests",
     "storage-metrics:tests",
     "storage_device:tests",
+    "super_parser:tests",
     "trace:tests",
     "vfs/cpp:tests",
     "vfs/rust:tests",
