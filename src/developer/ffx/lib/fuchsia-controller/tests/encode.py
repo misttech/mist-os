@@ -225,6 +225,66 @@ class Encode(common.FuchsiaControllerTest):
         msg = decode_fidl_request(bytes=b, handles=h)
         self.assertEqual(msg, {"v": ["foo", "bar", "baz", "qux"]})
 
+    def test_encode_decode_string_vector_with_sequence(self):
+        """
+        We accept not just lists, but also more generally sequences as input
+        for FIDL arrays and vectors. Strings themselves, in Python, are also
+        sequences of bytes. The docs say that since there is no separate
+        "character" class, strings of length 1 are used to represent
+        characters. Therefore, the expected outcome should be that we accept
+        a string for a vector, and chunk it into its individual characters
+        in FIDL.
+        Ref: https://docs.python.org/3/library/stdtypes.html#textseq
+        """
+        obj = Encode()
+        setattr(obj, "v", "sequence")
+        (b, h) = encode_fidl_message(
+            object=obj,
+            library="fuchsia.controller.test",
+            type_name="fuchsia.controller.test/NoopDoVectorNoopRequest",
+            txid=12345,
+            ordinal=method_ordinal(
+                protocol="fuchsia.controller.test/Noop", method="DoVectorNoop"
+            ),
+        )
+        msg = decode_fidl_request(bytes=b, handles=h)
+        self.assertEqual(msg, {"v": ["s", "e", "q", "u", "e", "n", "c", "e"]})
+
+    def test_encode_decode_int_array_with_list(self):
+        obj = Encode()
+        setattr(obj, "a", [1, 2, 3, 4])
+        (b, h) = encode_fidl_message(
+            object=obj,
+            library="fuchsia.controller.test",
+            type_name="fuchsia.controller.test/NoopDoArrayNoopRequest",
+            txid=12345,
+            ordinal=method_ordinal(
+                protocol="fuchsia.controller.test/Noop", method="DoArrayNoop"
+            ),
+        )
+        msg = decode_fidl_request(bytes=b, handles=h)
+        self.assertEqual(msg, {"a": [1, 2, 3, 4]})
+
+    def test_encode_decode_int_array_with_sequence(self):
+        """
+        We accept not just lists, but also more generally sequences as input
+        for FIDL arrays and vectors. The `bytes` type is a common example of
+        a sequence that is _not_ a list, so use it in the test here.
+        """
+        obj = Encode()
+        setattr(obj, "a", bytes([1, 2, 3, 4]))
+        (b, h) = encode_fidl_message(
+            object=obj,
+            library="fuchsia.controller.test",
+            type_name="fuchsia.controller.test/NoopDoArrayNoopRequest",
+            txid=12345,
+            ordinal=method_ordinal(
+                protocol="fuchsia.controller.test/Noop", method="DoArrayNoop"
+            ),
+        )
+        msg = decode_fidl_request(bytes=b, handles=h)
+        self.assertEqual(msg, {"a": [1, 2, 3, 4]})
+
     def test_encode_decode_string(self):
         obj = EncodeObj()
         setattr(obj, "value", "foobar")

@@ -56,6 +56,10 @@ closed protocol Noop {
         v vector<string:255>:255;
     }) -> ();
 
+    strict DoArrayNoop(struct {
+        a array<int32, 4>;
+    }) -> ();
+
     strict DoBitsNoop(struct {
         b SomeBits;
     }) -> ();

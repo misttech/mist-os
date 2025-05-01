@@ -211,26 +211,26 @@ void ObjectConverter::VisitType(const ::fidl_codec::Type* type) {
                ss.str().c_str());
 }
 
-void ObjectConverter::VisitList(const ::fidl_codec::ElementSequenceType* type,
-                                std::optional<size_t> count) {
+void ObjectConverter::VisitSequence(const ::fidl_codec::ElementSequenceType* type,
+                                    std::optional<size_t> count) {
   if (!count && HandleNone(type)) {
     return;
   }
 
-  if (!PyList_Check(obj_)) {
-    PyErr_SetString(PyExc_TypeError, "Expected list type");
+  if (!PySequence_Check(obj_)) {
+    PyErr_SetString(PyExc_TypeError, "Expected sequence type");
     return;
   }
 
-  auto size = PyList_Size(obj_);
+  auto size = PySequence_Size(obj_);
   if (count && static_cast<uint32_t>(size) != *count) {
-    PyErr_Format(PyExc_RuntimeError, "Expected array of size %" PRIu32, *count);
+    PyErr_Format(PyExc_RuntimeError, "Expected sequence of length %" PRIu32, *count);
     return;
   }
 
   auto res = std::make_unique<::fidl_codec::VectorValue>();
   for (Py_ssize_t i = 0; i < size; ++i) {
-    PyObject* item = PyList_GetItem(obj_, i);
+    PyObject* item = PySequence_GetItem(obj_, i);
     if (!item) {
       return;
     }
@@ -245,11 +245,11 @@ void ObjectConverter::VisitList(const ::fidl_codec::ElementSequenceType* type,
 }
 
 void ObjectConverter::VisitArrayType(const ::fidl_codec::ArrayType* type) {
-  VisitList(type, type->count());
+  VisitSequence(type, type->count());
 }
 
 void ObjectConverter::VisitVectorType(const ::fidl_codec::VectorType* type) {
-  VisitList(type, std::nullopt);
+  VisitSequence(type, std::nullopt);
 }
 
 void ObjectConverter::VisitUint8Type(const ::fidl_codec::Uint8Type* type) { VisitInteger(false); }
