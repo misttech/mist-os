@@ -27,8 +27,8 @@ namespace boot_shim {
 template <typename T, typename Shim>
 concept DevicetreeItem =
     devicetree::Matcher<T> && std::is_base_of_v<ItemBase, T> && requires(T& t, Shim shim) {
-      //`Shim::Init` method will call each of these methods, before it attempts to match items in
-      // te devicetree.
+      // `Shim::Init` method will call each of these methods, before it
+      // attempts to match items in the devicetree.
       //
       // When successful must return true, otherwise must return false.
       { t.Init(shim) };
@@ -70,20 +70,27 @@ using DevicetreeBootShimMmioObserver = fit::inline_function<void(const Devicetre
 //
 // Prefer inheriting from |DevicetreeItemBase| when possible.
 template <typename... Items>
+  requires(sizeof...(Items) > 0)
 class DevicetreeBootShim : public BootShim<Items...> {
  private:
   using Base = BootShim<Items...>;
 
  public:
+  static_assert((DevicetreeItem<Items, DevicetreeBootShim> || ...),
+                "at least one boot_shim::DevicetreeBootShim<...> template"
+                " parameter must be a DevicetreeItem");
+
   explicit DevicetreeBootShim(const char* name, devicetree::Devicetree dt, FILE* log = stdout)
       : Base(name, log), dt_(dt) {}
 
-  // Initializes all devicetree boot shim items.
-  // As part of the initialization each matcher's |Init(shim_name, log)| is called, followed by a
-  // single invocation of |devicetree::Match| allowing each provided matcher to collect information
-  // from the devicetree.
+  // Initializes all devicetree boot shim items.  As part of the initialization
+  // each matcher's `Init(shim_name, log)` is called, followed by a single
+  // invocation of `devicetree::Match| allowing each provided matcher to
+  // collect information from the devicetree.
   bool Init() {
-    auto match_with = [this](auto&... items) {
+    auto match_with = [this](auto&... items)
+      requires(sizeof...(items) > 0)
+    {
       (items.Init(*this), ...);
       return devicetree::Match(dt_, items...);
     };

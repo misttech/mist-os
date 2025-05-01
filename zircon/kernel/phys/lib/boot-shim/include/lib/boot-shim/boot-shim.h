@@ -11,6 +11,7 @@
 #include <stdio.h>
 
 #include <array>
+#include <concepts>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -94,12 +95,22 @@ class BootShimBase : public ItemBase {
 // extra capacity as size_bytes() requested.  Then BootShim::AppendItems
 // iterates across Items::AppendItems calls.  The shim is now ready to boot.
 template <class... Items>
+  requires(sizeof...(Items) > 0)
 class BootShim : public BootShimBase {
-  template <typename F, typename... Args>
-  struct CanInvokeWithTupleArgs {};
+ private:
+  using ItemsTuple = std::tuple<Cmdline, Items...>;
+
+  template <typename F, typename T>
+  static constexpr bool kCanApply = false;
 
   template <typename F, typename... Args>
-  struct CanInvokeWithTupleArgs<F, std::tuple<Args...>> : std::is_invocable<F, Args...> {};
+  static constexpr bool kCanApply<F, std::tuple<Args...>> = std::is_invocable_v<F, Args...>;
+
+  template <template <typename> typename Predicate, typename ItemTuple>
+  static constexpr auto SelectItems(ItemTuple& item_tuple) {
+    auto on = [](auto&... items) { return SelectItemsImpl<Predicate>(items...); };
+    return std::apply(on, item_tuple);
+  }
 
  public:
   // Move-only, not default-constructible.
@@ -197,133 +208,149 @@ class BootShim : public BootShimBase {
   }
 
   // Returns callback(Items&...).
-  template <typename T>
+  template <std::invocable<Cmdline&, Items&...> T>
   constexpr decltype(auto) OnItems(T&& callback) {
-    static_assert(std::is_invocable_v<T, Cmdline&, Items&...>);
     return std::apply(std::forward<T>(callback), items_);
   }
-  template <typename T>
+  template <std::invocable<Cmdline&, Items&...> T>
   constexpr decltype(auto) OnItems(T&& callback) const {
-    static_assert(std::is_invocable_v<T, Cmdline&, Items&...>);
     return std::apply(std::forward<T>(callback), items_);
   }
 
-  // Returns the result of |callback(item_0, ... , item_n)|, where each item used as argument
-  // corresponds to the shim items where |Predicate<decltype(item_i)>| is true. The relative
-  // order between items is preserved.
+  // Returns the result of `callback(item_0, ... , item_n)`, where each item
+  // used as argument corresponds to the shim items where
+  // `Predicate<decltype(item_i)>::value` is true.  The relative order between
+  // items is preserved.
   //
   // Example:
   // // Assuming the items are:
   // std::tuple<T0, T1, T2, T3> items_;
   //
-  // // And Predicate<T>::value for each of item types are respectively:
-  // // {T0: false, T1: true, T2: true, T3: false} then the generated call is
-  // // callback(T1&, T2&) and equivalent to:
-  // callback(std::get<1>(items_), std::get<2>(items)l
+  // And Predicate<T>::value for each of item types are respectively:
+  // `{T0: false, T1: true, T2: true, T3: false}` then the generated call
+  // is `callback(T1&, T2&)` and equivalent to
+  // `callback(std::get<1>(items_), std::get<2>(items)`.
   template <template <typename> typename Predicate, typename T>
+    requires(kCanApply<T, decltype(SelectItems<Predicate>(std::declval<ItemsTuple&>()))>)
   constexpr decltype(auto) OnSelectItems(T&& callback) {
-    static_assert(CanInvokeWithTupleArgs<T, decltype(SelectItems<Predicate>(
-                                                std::declval<decltype(items_)&>()))>::value,
-                  "|callback| must be callable with the selected items.");
+    return std::apply(std::forward<T>(callback), SelectItems<Predicate>(items_));
+  }
+  template <template <typename> typename Predicate, typename T>
+    requires(kCanApply<T, decltype(SelectItems<Predicate>(std::declval<const ItemsTuple&>()))>)
+  constexpr decltype(auto) OnSelectItems(T&& callback) const {
     return std::apply(std::forward<T>(callback), SelectItems<Predicate>(items_));
   }
 
   // Calls callback(item) for each of Items.
   // If Base is given, the items not derived from Base are skipped.
-  template <typename T, typename Base = void>
-  constexpr void ForEachItem(T&& callback) {
-    OnItems([&](auto&... item) {
-      (((std::is_void_v<Base> || std::is_base_of_v<Base, std::decay_t<decltype(item)>>)
-            ? (void)callback(item)
-            : (void)false),
-       ...);
-    });
+  template <typename Base = void>
+  constexpr void ForEachItem(auto&& callback) {
+    OnItems([&](auto&... item) { (IfBase<Base>(item, callback), ...); });
   }
-  template <typename T, typename Base = void>
-  constexpr void ForEachItem(T&& callback) const {
-    OnItems([&](auto&... item) {
-      (((std::is_void_v<Base> || std::is_base_of_v<Base, std::decay_t<decltype(item)>>)
-            ? (void)callback(item)
-            : (void)false),
-       ...);
-    });
+  template <typename Base = void>
+  constexpr void ForEachItem(auto&& callback) const {
+    OnItems([&](auto&... item) { (IfBase<Base>(item, callback), ...); });
   }
 
   // Returns callback(item) && ... for each of Items.
   // If Base is given, the items not derived from Base are skipped.
-  template <typename T, typename Base = void>
-  constexpr bool EveryItem(T&& callback) {
-    return OnItems([&](auto&... item) {
-      return (((std::is_void_v<Base> || std::is_base_of_v<Base, std::decay_t<decltype(item)>>)
-                   ? callback(item)
-                   : true) &&
-              ...);
-    });
+  template <typename Base = void>
+  constexpr bool EveryItem(auto&& callback) {
+    return OnItems([&](auto&... item) { return (IfBase<Base, true>(item, callback), ...); });
   }
-  template <typename T, typename Base = void>
-  constexpr bool EveryItem(T&& callback) const {
-    return OnItems([&](auto&... item) {
-      return (((std::is_void_v<Base> || std::is_base_of_v<Base, std::decay_t<decltype(item)>>)
-                   ? callback(item)
-                   : true) &&
-              ...);
-    });
+  template <typename Base = void>
+  constexpr bool EveryItem(auto&& callback) const {
+    return OnItems([&](auto&... item) { return (IfBase<Base, true>(item, callback), ...); });
   }
 
   // Returns callback(item) || ... for each of Items.
   // If Base is given, the items not derived from Base are skipped.
-  template <typename T, typename Base = void>
-  constexpr bool AnyItem(T&& callback) {
-    return OnItems([&](auto&... item) {
-      return (((std::is_void_v<Base> || std::is_base_of_v<Base, std::decay_t<decltype(item)>>)  //
-                   ? callback(item)
-                   : false) ||
-              ...);
-    });
+  template <typename Base = void>
+  constexpr bool AnyItem(auto&& callback) {
+    return OnItems([&](auto&... item) { return (IfBase<Base, false>(item, callback), ...); });
   }
-  template <typename T, typename Base = void>
-  constexpr bool AnyItem(T&& callback) const {
-    return OnItems([&](auto&... item) {
-      return (((std::is_void_v<Base> || std::is_base_of_v<Base, std::decay_t<decltype(item)>>)  //
-                   ? callback(item)
-                   : false) ||
-              ...);
-    });
+  template <typename Base = void>
+  constexpr bool AnyItem(auto&& callback) const {
+    return OnItems([&](auto&... item) { return (IfBase<Base, false>(item, callback), ...); });
+  }
+
+  // This takes any number of callbacks invocable as void(Item&) for some Item
+  // type.  For each item, each callback that is invocable with that item type
+  // will be called.  This makes it easy to just list type-specific callbacks
+  // together in one call:
+  // ```
+  // shim.OnInvocableItems([](ItemA& a) { ... }, [](ItemB& b) { ... });
+  // ```
+  // Note that it's no error if a given callback is not invocable on any
+  // item, or even if no callback is invocable on any item.  So when using
+  // this, runtime tests are required to ensure that each callback has the
+  // correct signature to get called when it's meant to be.
+  template <typename... T>
+  constexpr void OnInvocableItems(T&&... callbacks) {
+    return OnItems(OnInvocableCallback(callbacks...));
+  }
+  template <typename... T>
+  constexpr void OnInvocableItems(T&&... callbacks) const {
+    return OnItems(OnInvocableCallback(callbacks...));
   }
 
  private:
-  template <template <typename> typename Predicate, typename ItemTuple>
-  static constexpr auto SelectItems(ItemTuple& item_tuple) {
-    auto on = [](auto&... items) { return SelectItems<Predicate>(items...); };
-    return std::apply(on, item_tuple);
+  template <typename Base, class Item>
+  static constexpr bool kHasBase = std::is_base_of_v<Base, Item>;
+
+  template <class Item>
+  static constexpr bool kHasBase<Item, Item> = true;
+
+  template <class Item>
+  static constexpr bool kHasBase<void, Item> = true;
+
+  template <typename Base, bool IfNot = false, class Item, typename Callback>
+  static constexpr bool IfBase(Item& item, Callback&& callback) {
+    return kHasBase<Base, Item> ? std::forward<Callback>(callback)(item) : IfNot;
   }
 
   template <template <typename> typename Predicate, typename Item, typename... Unfiltered>
-  static constexpr auto SelectItems(Item& item, Unfiltered&... unfiltered) {
-    return SelectItems<Predicate>(std::tuple<>(), item, unfiltered...);
+  static constexpr auto SelectItemsImpl(Item& item, Unfiltered&... unfiltered) {
+    return SelectItemsImpl<Predicate>(std::tuple<>(), item, unfiltered...);
   }
 
   template <template <typename> typename Predicate, typename... Filtered, typename Item,
             typename... Unfiltered>
-  static constexpr auto SelectItems(std::tuple<Filtered&...> filtered, Item& item,
-                                    Unfiltered&... unfiltered) {
+  static constexpr auto SelectItemsImpl(std::tuple<Filtered&...> filtered, Item& item,
+                                        Unfiltered&... unfiltered) {
     if constexpr (Predicate<Item>::value) {
       auto new_filtered = std::tuple_cat(std::move(filtered), std::forward_as_tuple(item));
       if constexpr (sizeof...(Unfiltered) == 0) {
         return new_filtered;
       } else {
-        return SelectItems<Predicate>(std::move(new_filtered), unfiltered...);
+        return SelectItemsImpl<Predicate>(std::move(new_filtered), unfiltered...);
       }
     } else {
       if constexpr (sizeof...(Unfiltered) == 0) {
         return filtered;
       } else {
-        return SelectItems<Predicate>(std::move(filtered), unfiltered...);
+        return SelectItemsImpl<Predicate>(std::move(filtered), unfiltered...);
       }
     }
   }
 
-  std::tuple<Cmdline, Items...> items_;
+  template <typename Callback, class Item>
+  static constexpr void CallIfInvocable(Callback& callback, Item& item) {
+    if constexpr (std::is_invocable_v<Callback&, Item&>) {
+      callback(item);
+    }
+  }
+
+  // This returns a lambda that captures the callbacks by reference.
+  static constexpr auto OnInvocableCallback(auto&... callbacks) {
+    return [on_item = [&](auto& item) {  // Try each callback on this item.
+      (CallIfInvocable(callbacks, item), ...);
+    }](auto&... item) {  // Try all the callbacks on each item.
+      (on_item(item), ...);
+    };
+  }
+
+  ItemsTuple items_;
 };
 
 }  // namespace boot_shim
