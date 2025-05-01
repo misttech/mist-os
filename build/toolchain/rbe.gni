@@ -310,6 +310,10 @@ RBE_EXEC_STRATEGY_MAP = {
     "--remote_update_cache=false",
   ]
   racing = [ "--exec_strategy=racing" ]
+  nocache = [
+    "--exec_strategy=remote",
+    "--remote_accept_cache=false",
+  ]
 }
 
 # Dependencies for all RBE-enabled C++ actions.
