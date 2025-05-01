@@ -4,7 +4,7 @@
 
 # The list of all cpu architectures for the prebuilt Fuchsia binaries that are
 # included in the IDK.
-idk_target_cpus_default = [
+idk_buildable_cpus_default = [
   "arm64",
   "riscv64",
   "x64",
@@ -64,5 +64,5 @@ declare_args() {
   # architecture support. For example, `fx build //sdk:final_fuchsia_idk`.
   #
   # To override the set of API levels, see `idk_buildable_api_levels`.
-  idk_target_cpus = idk_target_cpus_default
+  idk_buildable_cpus = idk_buildable_cpus_default
 }

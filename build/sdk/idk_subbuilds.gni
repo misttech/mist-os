@@ -56,7 +56,7 @@ template("idk_subbuilds") {
   }
 
   _api_levels = idk_buildable_api_levels
-  _target_cpus = idk_target_cpus
+  _target_cpus = idk_buildable_cpus
 
   if (defined(invoker.sdk_collection_name)) {
     _sdk_collection_dir_name = invoker.sdk_collection_name

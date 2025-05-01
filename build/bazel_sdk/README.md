@@ -39,7 +39,7 @@ example:
 
 ```
 idk_buildable_api_levels = [26, "NEXT"]
-idk_target_cpus = [ "x64" ]
+idk_buildable_cpus = [ "x64" ]
 ```
 
 Running this command will create the Fuchsia SDK and run the generators that

@@ -21,7 +21,7 @@ group("firmware") {
 idk("firmware.exported") {
   output_name = "firmware"
   sdk_collection_label = ":firmware_collection"
-  target_cpus = idk_target_cpus
+  target_cpus = idk_buildable_cpus
 
   # TODO(https://fxbug.dev/331991540): Define how the Firmware SDK is versioned and update.
   api_levels = []

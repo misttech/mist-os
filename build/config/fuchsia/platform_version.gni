@@ -37,7 +37,7 @@ declare_args() {
   # includes the IDK/SDK in exchange for reduced coverage of API level support.
   # For example, `fx build //sdk:final_fuchsia_idk`.
   #
-  # To override the set of CPU architectures, see `idk_target_cpus`.
+  # To override the set of CPU architectures, see `idk_buildable_cpus`.
   #
   # Do not use the `platform_version` member directly.
   idk_buildable_api_levels = platform_version.default_idk_buildable_api_levels

@@ -46,8 +46,9 @@ if (current_toolchain == default_toolchain) {
   }
 
   # Ignore default list or an override that exactly matches (including order).
-  if (idk_target_cpus != idk_target_cpus_default) {
-    print("IDK build only covers a subset of target CPUs: ${idk_target_cpus}.")
+  if (idk_buildable_cpus != idk_buildable_cpus_default) {
+    print(
+        "IDK build only covers a subset of target CPUs: ${idk_buildable_cpus}.")
   }
 }
 
@@ -204,7 +205,7 @@ final_fuchsia_idk_for_cpus_and_levels("final_fuchsia_idk.exported") {
   ]
 
   output_name = "fuchsia_idk"
-  target_cpus = idk_target_cpus
+  target_cpus = idk_buildable_cpus
   api_levels = idk_buildable_api_levels
 
   # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
@@ -245,7 +246,7 @@ group("final_fuchsia_idk.validation") {
 # the test suite, one per target cpu. This is a dependency of
 # //sdk:final_fuchsia_idk.validation.
 run_fuchsia_bazel_sdk_tests("final_fuchsia_idk_bazel_sdk_tests") {
-  target_cpus = idk_target_cpus
+  target_cpus = idk_buildable_cpus
   idk_exported_path = "$root_build_dir/sdk/exported/fuchsia_idk"
   idk_exported_target = "//sdk:final_fuchsia_idk.exported"
 }
@@ -262,7 +263,7 @@ generate_fuchsia_bazel_sdk("final_fuchsia_sdk") {
 # Verify the content of the final_fuchsia_sdk target by running
 # the Bazel SDK test suite with it for all supported target cpus.
 run_fuchsia_bazel_sdk_tests("final_fuchsia_sdk_tests") {
-  target_cpus = idk_target_cpus
+  target_cpus = idk_buildable_cpus
   fuchsia_sdk_target = ":final_fuchsia_sdk"
 
   # NOTE: For now, nothing should depend on the :final_fuchsia_sdk_test
@@ -1075,11 +1076,11 @@ if (is_host) {
         "x64",
         "arm64",
       ]
-      _skipped_target_cpus = idk_target_cpus_default - idk_target_cpus
+      _skipped_target_cpus = idk_buildable_cpus_default - idk_buildable_cpus
       assert(
           _skipped_target_cpus == _skipped_target_cpus + _required_target_cpus -
                                       _required_target_cpus,
-          "`idk_target_cpus` must include all CPUs for which host tools are being cross-compiled: ${idk_target_cpus} vs. ${_required_target_cpus}")
+          "`idk_buildable_cpus` must include all CPUs for which host tools are being cross-compiled: ${idk_buildable_cpus} vs. ${_required_target_cpus}")
       _toolchains += [
         host_x64_toolchain,
         host_arm64_toolchain,
