@@ -135,6 +135,12 @@ import("//build/testing/host_test_data.gni")
 #     final IDK. Must be specified if and only if `sdk_category` is specified.
 #     May only be false when `sdk_category` is "partner".
 #
+#   additional_cpp_configs (optional list, default to empty)
+#     A list of config labels to add to the source_set for generated C++ bindings.
+#     This won't be applied to HLCPP, Banjo or Zither bindings - just the standard C++ bindings.
+#     These will be private, not public configs so will affect the compilation of the generated
+#     bindings sources, not code that uses the bindings.
+#
 #   applicable_licenses
 #   public_deps
 #   testonly
@@ -455,6 +461,10 @@ template("fidl") {
         enable_hlcpp = enable_hlcpp
         enable_cpp = enable_cpp
 
+        if (defined(invoker.additional_cpp_configs)) {
+          additional_cpp_configs = invoker.additional_cpp_configs
+        }
+
         # SDK atom aliases are only relevant in the default toolchain when an
         # the library is in an SDK category.
         declare_sdk_atom_aliases = current_toolchain == default_toolchain &&
@@ -701,7 +711,11 @@ template("fidl") {
     if (!is_fidl_toolchain) {
       not_needed(invoker, [ "sources" ])
     }
-    not_needed(invoker, [ "disable_rustdoc" ])
+    not_needed(invoker,
+               [
+                 "disable_rustdoc",
+                 "additional_cpp_configs",
+               ])
   }
 
   # Handle the case where only sub-targets that do not support `deps` are

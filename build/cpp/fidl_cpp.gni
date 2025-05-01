@@ -256,6 +256,9 @@ template("_fidl_cpp_library_impl") {
 #  source_only (optional)
 #    If true, the generated library only has a source file.
 #
+#  additional_configs (optional)
+#    A list of config labels to add to the source_set for generated C++ bindings.
+#
 template("fidl_cpp_library") {
   if (!is_fidl_toolchain) {
     if (invoker.library_name == "zx") {
@@ -307,6 +310,10 @@ template("fidl_cpp_library") {
 #  * enable_cpp
 #    - Optional: See //build/fidl/fidl.gni for a description.
 #    - Type: boolean
+#
+#  * additional_cpp_configs
+#    - Optional: See //build/fidl/fidl.gni for a description.
+#    - Type: list of labels
 #
 #  * testonly, visibility, public_deps
 #    - Optional: Usual GN meanings.
@@ -480,6 +487,10 @@ template("fidl_cpp_family") {
           ]
         }
       }
+
+      if (defined(invoker.additional_cpp_configs)) {
+        additional_configs = invoker.additional_cpp_configs
+      }
     }
 
     # Testing target
@@ -502,6 +513,9 @@ template("fidl_cpp_family") {
         "fidl/$library_name/cpp/wire_test_base.h",
       ]
       additional_public_deps = [ ":${_cpp_target}" ]
+      if (defined(invoker.additional_cpp_configs)) {
+        additional_configs = invoker.additional_cpp_configs
+      }
     }
 
     # SDK atoms for the new c++ bindings core and testing.
