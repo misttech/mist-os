@@ -2564,6 +2564,34 @@ assembly_input_bundle("adb_support") {
   ]
 }
 
+# Userspace fastboot over usb support.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: minimal
+# valid build-types: all
+#
+assembly_input_bundle("fastbootd_usb_support") {
+  base_packages = [ "//src/firmware/fastboot-usb:package" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards =
+              [ "//src/firmware/fastboot-usb/meta/fastboot_usb.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+  base_driver_packages = [
+    {
+      package_target = "//src/firmware/drivers/usb-fastboot-function:pkg"
+      driver_components = [ "meta/usb-fastboot-function.cm" ]
+    },
+  ]
+}
+
 # Core Nanohub support. Does not include driver. Driver should be included separately.
 #
 # optional: product must specify its inclusion

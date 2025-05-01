@@ -80,7 +80,10 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
             context.ensure_feature_set_level(&[FeatureSetLevel::Utility], "System Recovery")?;
             match system_recovery {
                 SystemRecovery::Fdr => builder.platform_bundle("recovery_fdr"),
-                SystemRecovery::Android => builder.platform_bundle("recovery_android"),
+                SystemRecovery::Android => {
+                    builder.platform_bundle("recovery_android");
+                    builder.platform_bundle("fastbootd_usb_support")
+                }
             }
 
             // Create the recovery domain configuration package

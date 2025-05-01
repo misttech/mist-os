@@ -384,6 +384,9 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
 
                          # Recovery
                          "recovery_android",
+
+                         # Userspace fastboot over usb support
+                         "fastbootd_usb_support",
                        ]
 
 userdebug_platform_aib_names = user_platform_aib_names + _userdebug_aib_names
@@ -510,6 +513,9 @@ experimental_aib_names = [
 
   # Recovery
   "recovery_android",
+
+  # Userspace fastboot over usb
+  "fastbootd_usb_support",
 ]
 
 # Ensure that we do not list any experimental AIBs as required
