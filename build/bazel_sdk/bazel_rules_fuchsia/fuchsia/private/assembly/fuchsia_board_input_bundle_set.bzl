@@ -42,7 +42,7 @@ def _fuchsia_board_input_bundle_set_impl(ctx):
         board_input_bundle_set_dir.path,
     ] + creation_args
     ctx.actions.run(
-        executable = sdk.assembly_generate_config,
+        executable = sdk.assembly_config,
         arguments = args,
         inputs = creation_inputs,
         outputs = [board_input_bundle_set_dir],

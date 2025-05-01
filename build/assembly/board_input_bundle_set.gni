@@ -48,8 +48,8 @@ template("board_input_bundle_set") {
                              "testonly",
                              "visibility",
                            ])
-    tool = "//build/assembly/tools/generate_config"
-    tool_output_name = "assembly_generate_config"
+    tool = "//build/assembly/tools/assembly_config"
+    tool_output_name = "assembly_config"
     outputs = [ files.output_dir ]
 
     # The contents of these folders are dynamic, and managed entirely by this

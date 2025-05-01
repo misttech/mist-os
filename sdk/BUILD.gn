@@ -1003,7 +1003,7 @@ if (is_host) {
   sdk_molecule("non_build_host_tools_required_by_bazel_sdk") {
     category = "partner"
     deps = [
-      "//build/assembly/tools/generate_config:generate_config_sdk",
+      "//build/assembly/tools/assembly_config:assembly_config_sdk",
       "//src/developer/ffx:bin_sdk",
       "//src/developer/ffx/plugins/driver:sdk",
       "//src/developer/ffx/plugins/product:sdk",

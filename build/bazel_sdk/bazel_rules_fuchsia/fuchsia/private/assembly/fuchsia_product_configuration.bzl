@@ -163,7 +163,7 @@ def _fuchsia_product_configuration_impl(ctx):
         product_config_dir.path,
     ]
     ctx.actions.run(
-        executable = sdk.assembly_generate_config,
+        executable = sdk.assembly_config,
         arguments = args,
         inputs = input_files + ctx.files.product_config_labels + ctx.files.deps,
         outputs = [product_config_dir],
@@ -360,7 +360,7 @@ def fuchsia_hybrid_product_configuration_impl(ctx):
 
     sdk = get_fuchsia_sdk_toolchain(ctx)
     ctx.actions.run(
-        executable = sdk.assembly_generate_config,
+        executable = sdk.assembly_config,
         arguments = args,
         inputs = ctx.files.packages + ctx.files.product_configuration,
         outputs = [product_config_dir],

@@ -145,7 +145,7 @@ def _fuchsia_board_configuration_impl(ctx):
         board_config_dir.path,
     ] + creation_args
     ctx.actions.run(
-        executable = sdk.assembly_generate_config,
+        executable = sdk.assembly_config,
         arguments = args,
         inputs = input_files + ctx.files.filesystems_labels,
         outputs = [board_config_dir],
@@ -325,7 +325,7 @@ def _fuchsia_hybrid_board_configuration_impl(ctx):
 
     sdk = get_fuchsia_sdk_toolchain(ctx)
     ctx.actions.run(
-        executable = sdk.assembly_generate_config,
+        executable = sdk.assembly_config,
         arguments = args,
         inputs = creation_inputs + ctx.files.board_configuration,
         outputs = [board_config_dir],

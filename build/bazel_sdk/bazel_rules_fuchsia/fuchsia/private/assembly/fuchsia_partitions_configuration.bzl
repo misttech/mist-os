@@ -37,7 +37,7 @@ def _fuchsia_partitions_configuration(ctx):
         partitions_dir.path,
     ]
     ctx.actions.run(
-        executable = sdk.assembly_generate_config,
+        executable = sdk.assembly_config,
         arguments = args,
         inputs = ctx.files.bootstrap_partitions + ctx.files.bootloader_partitions + ctx.files.unlock_credentials + [partitions_config_file],
         outputs = [partitions_dir],

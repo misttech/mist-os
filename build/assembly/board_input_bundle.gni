@@ -360,8 +360,8 @@ template("board_input_bundle") {
                              "testonly",
                              "visibility",
                            ])
-    tool = "//build/assembly/tools/generate_config"
-    tool_output_name = "assembly_generate_config"
+    tool = "//build/assembly/tools/assembly_config"
+    tool_output_name = "assembly_config"
 
     # The contents of these folders are dynamic, and managed entirely by this
     # action.  Further, this action will need to delete items from these

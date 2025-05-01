@@ -246,8 +246,8 @@ template("board_configuration") {
         [ "${files.board_config_dir}" ] + files.input_bundle_dirs +
         files.board_input_bundle_set_dirs
 
-    tool = "//build/assembly/tools/generate_config"
-    tool_output_name = "assembly_generate_config"
+    tool = "//build/assembly/tools/assembly_config"
+    tool_output_name = "assembly_config"
     inputs = []
     outputs = [ files.board_config_file ]
     depfile = "${target_out_dir}/${target_name}.d"

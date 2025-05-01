@@ -484,8 +484,8 @@ template("product_assembly_configuration") {
     # is removed from one of these sets)
     hermetic_action_ignored_prefixes = [ "${files.assembly_config_dir}" ]
 
-    tool = "//build/assembly/tools/generate_config"
-    tool_output_name = "assembly_generate_config"
+    tool = "//build/assembly/tools/assembly_config"
+    tool_output_name = "assembly_config"
     outputs = [ files.assembly_config_file ]
     depfile = "${target_out_dir}/${labels.target_name}.d"
 

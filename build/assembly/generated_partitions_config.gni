@@ -249,8 +249,8 @@ template("generated_partitions_config") {
     # is removed from one of these sets)
     hermetic_action_ignored_prefixes = [ output_path ]
 
-    tool = "//build/assembly/tools/generate_config"
-    tool_output_name = "assembly_generate_config"
+    tool = "//build/assembly/tools/assembly_config"
+    tool_output_name = "assembly_config"
 
     depfile_path = "$target_out_dir/$target_name.depfile"
     depfile = depfile_path

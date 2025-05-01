@@ -265,8 +265,8 @@ template("boot_test") {
       # is removed from one of these sets)
       hermetic_action_ignored_prefixes = [ partition_config_path ]
 
-      tool = "//build/assembly/tools/generate_config"
-      tool_output_name = "assembly_generate_config"
+      tool = "//build/assembly/tools/assembly_config"
+      tool_output_name = "assembly_config"
 
       depfile_path = "$target_out_dir/$target_name.depfile"
       depfile = depfile_path
