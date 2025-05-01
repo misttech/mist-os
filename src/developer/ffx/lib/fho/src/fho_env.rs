@@ -8,11 +8,9 @@ use ffx_command::FfxCommandLine;
 use ffx_command_error::{return_bug, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
-use futures::future::LocalBoxFuture;
 use std::any::Any;
 use std::fmt;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::sync::Arc;
 
 /// This is the trait that defines the information for a given target device.
@@ -36,19 +34,6 @@ pub trait FhoTargetInfo {
     /// invokeable from a dyn object as per:
     /// https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility
     fn as_any<'a>(&'a self) -> &'a dyn Any;
-}
-
-// This trait can a.) probably use more members, and b.) be something that is made public inside of
-// the `target` library.
-#[mockall::automock]
-pub trait DeviceLookup {
-    fn target_spec(&self, env: EnvironmentContext) -> LocalBoxFuture<'_, Result<Option<String>>>;
-
-    fn resolve_target_query_to_info(
-        &self,
-        query: Option<String>,
-        env: EnvironmentContext,
-    ) -> LocalBoxFuture<'_, Result<Vec<Box<dyn FhoTargetInfo>>>>;
 }
 
 #[derive(Clone)]
@@ -77,7 +62,6 @@ pub struct FhoEnvironment {
     /// lazily initialized, and potentially multiple threads,
     /// so using Arc<RwLock<>> container.
     behavior: Arc<RwLock<Option<FhoConnectionBehavior>>>,
-    lookup: Arc<RwLock<Rc<Option<Box<dyn DeviceLookup>>>>>,
 }
 
 impl FhoEnvironment {
@@ -87,7 +71,6 @@ impl FhoEnvironment {
             behavior: Arc::new(RwLock::new(None)),
             ffx: ffx.clone(),
             context: context.clone(),
-            lookup: Arc::new(RwLock::new(None.into())),
         }
     }
 
@@ -98,25 +81,9 @@ impl FhoEnvironment {
             behavior: Arc::new(RwLock::new(None)),
             ffx: FfxCommandLine::new(None, argv).unwrap(),
             context: context.clone(),
-            lookup: Arc::new(RwLock::new(None.into())),
         }
     }
 
-    pub fn new_for_test<T: DeviceLookup + 'static>(
-        context: &EnvironmentContext,
-        ffx: &FfxCommandLine,
-        behavior: FhoConnectionBehavior,
-        lookup: Option<T>,
-    ) -> Self {
-        let boxed: Option<Box<dyn DeviceLookup>> =
-            if let Some(l) = lookup { Some(Box::new(l)) } else { None };
-        FhoEnvironment {
-            behavior: Arc::new(RwLock::new(Some(behavior))),
-            ffx: ffx.clone(),
-            context: context.clone(),
-            lookup: Arc::new(RwLock::new(Rc::new(boxed))),
-        }
-    }
     /// This attempts to wrap errors around a potential failure in the underlying connection being
     /// used to facilitate FIDL protocols. This should NOT be used by developers, this is intended
     /// to be used outside of the scope of an ffx subtool (outside of the `main` function).
@@ -150,25 +117,12 @@ impl FhoEnvironment {
         }
     }
 
-    /// Fuchsia device lookup API.
-    pub async fn lookup(&self) -> Rc<Option<Box<dyn DeviceLookup>>> {
-        let ref value = *self.lookup.read().await;
-        value.clone()
-    }
-
     pub async fn set_behavior(&self, new_behavior: FhoConnectionBehavior) {
         tracing::debug!("setting behavior");
         let mut behavior = self.behavior.write().await;
         *behavior = Some(new_behavior);
         tracing::debug!("setting behavior done");
     }
-    pub async fn set_lookup(&self, new_lookup: Box<dyn DeviceLookup>) {
-        tracing::debug!("setting lookup");
-        let mut lookup = self.lookup.write().await;
-        *lookup = Rc::new(Some(new_lookup));
-        tracing::debug!("setting lookup done");
-    }
-
     /// While the surface of this function is a little awkward, this is necessary to provide a
     /// readable error. Authors shouldn't use this directly, they should instead use
     /// `TryFromEnv`.

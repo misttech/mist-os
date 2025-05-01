@@ -11,7 +11,7 @@ use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use std::sync::Arc;
 use std::time::Duration;
-use target_holders::{init_connection_behavior, DaemonProxyHolder, DeviceLookupDefaultImpl};
+use target_holders::{init_connection_behavior, DaemonProxyHolder};
 use target_network_connector::NetworkConnector;
 
 /// A connector lets a tool make multiple attempts to connect to an object. It
@@ -61,9 +61,6 @@ impl<T: TryFromEnv> TryFromEnv for Connector<T> {
             let b = init_connection_behavior(env.environment_context()).await?;
             env.set_behavior(b).await;
         }
-        if env.lookup().await.is_none() {
-            env.set_lookup(Box::new(DeviceLookupDefaultImpl)).await
-        }
         Ok(Connector { env: env.clone(), _connects_to: Default::default() })
     }
 }
@@ -86,9 +83,6 @@ impl<T: TryFromEnv> TryFromEnv for DirectTargetConnector<T> {
 
         let direct_env = env.clone();
         direct_env.set_behavior(FhoConnectionBehavior::DirectConnector(connector.clone())).await;
-        if direct_env.lookup().await.is_none() {
-            direct_env.set_lookup(Box::new(DeviceLookupDefaultImpl)).await
-        }
         Ok(DirectTargetConnector {
             connector,
             inner: Connector { env: direct_env, _connects_to: Default::default() },

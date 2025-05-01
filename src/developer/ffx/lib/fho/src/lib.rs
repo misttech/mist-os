@@ -13,9 +13,8 @@ pub mod subtool;
 pub use subtool::{FfxMain, FfxTool};
 
 // Re-export TryFromEnv related symbols
+pub use fho_env::{FhoConnectionBehavior, FhoEnvironment, FhoTargetInfo};
 pub use from_env::{AvailabilityFlag, CheckEnv};
-
-pub use fho_env::{DeviceLookup, FhoConnectionBehavior, FhoEnvironment, FhoTargetInfo};
 pub use try_from_env::{deferred, Deferred, TryFromEnv, TryFromEnvWith};
 
 // Used for deriving an FFX tool.

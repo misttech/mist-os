@@ -44,7 +44,6 @@ rustc_library("lib") {
 
   sources = [
     "src/daemon_proxy.rs",
-    "src/device_lookup.rs",
     "src/fake_injector.rs",
     "src/fdomain.rs",
     "src/fdomain/from_toolbox.rs",

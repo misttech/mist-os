@@ -14,7 +14,6 @@ use fidl::endpoints::Proxy;
 use target_network_connector::NetworkConnector;
 
 mod daemon_proxy;
-mod device_lookup;
 mod fake_injector;
 pub mod fdomain;
 mod from_toolbox;
@@ -24,7 +23,6 @@ mod target_proxy;
 mod with_moniker;
 
 pub use daemon_proxy::{daemon_protocol, DaemonProxyHolder};
-pub use device_lookup::DeviceLookupDefaultImpl;
 pub use fake_injector::FakeInjector;
 use from_toolbox::WithToolbox;
 pub use from_toolbox::{toolbox, toolbox_or};
