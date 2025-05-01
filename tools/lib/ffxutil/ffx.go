@@ -152,24 +152,12 @@ func (f *legacyFfxCmdBuilder) isStrict() bool {
 // approach: no isolate dir, all required configs passed to the command,
 // etc.
 type strictFfxCmdBuilder struct {
-	outputFile    string
-	configs       map[string]any
-	tmpIsolateDir string
+	outputFile string
+	configs    map[string]any
 }
 
 func newStrictFfxCmdBuilder(outputFile string) *strictFfxCmdBuilder {
 	return &strictFfxCmdBuilder{outputFile: outputFile}
-}
-
-// This is a _temporary_ mechanism for using strict ffx, while the
-// necessary subtools are still being developed. It must be provided
-// until the ffx-strict transition is complete, but it is not part of
-// the constructor, as a hint that this is mechanism is temporary.
-// TODO(slgrady): Remove this function and all references to isolateDir
-// from strictFfxCmdBuilder once all necessary ffx subtools implement
-// "--strict"
-func (b *strictFfxCmdBuilder) tempSetIsolateDir(dir string) {
-	b.tmpIsolateDir = dir
 }
 
 // Build the required command for a strict invocation. Note that the command
@@ -182,15 +170,19 @@ func (b *strictFfxCmdBuilder) command(ffxPath string, supportsStrict bool, args 
 // Note that the command may require the target, but the caller should have set that if so.
 func (b *strictFfxCmdBuilder) commandWithConfigs(ffxPath string, supportsStrict bool, args []string, configs map[string]any) []string {
 	cmd := []string{ffxPath, "-o", b.outputFile}
-
 	if supportsStrict {
-		// The command does in fact support --strict, so let's use it!
 		cmd = append(cmd, "--strict")
 	} else {
-		// We don't support strict, so we'd better keep using the isolate dir
-		cmd = append(cmd, "--isolate-dir", b.tmpIsolateDir)
+		// TODO(awdavies): This is intended to be for debugging as additional builders are brought
+		// in for testing. The current builders being tested do not trigger this line, meaning no
+		// commands have been executed thus far that require strict ffx and do not support it.
+		// This should be removed once all possible commands are moved to support strict. Any
+		// invocations of `Run()` or usage of the invoker without `setStrict()` are commands that
+		// do not yet have explicit strict support. These are mostly found in uses of `ffxutil`
+		// outside of botanist, so places like //tools/lib/syslog/syslog.go which are invoking
+		// `Run()` to achieve `ffx target wait` behavior.
+		logger.Fatalf(context.TODO(), "Running command with strict builder that doesn't support strict: args=%v", args)
 	}
-
 	// Commands that support strict always need a machine argument. If none is supplied,
 	// default to "json".
 	if !slices.Contains(args, "--machine") && supportsStrict {
@@ -226,17 +218,11 @@ func (b *strictFfxCmdBuilder) setConfigMap(user, global map[string]any) error {
 	for k, v := range user {
 		global[k] = v
 	}
-
 	// Strip out certain configs that don't apply to strict invocations
-	// TODO(slgrady): enable these once we support all strict commands, and
-	// so none of these configs are necessary. (Until then, we need
-	// to be careful, continuing to prevent a "strict" invocation
-	// from escaping its isolation)
-	// (And later still: TODO(slgrady): remove this code once we remove
-	//  non-strict ffx invocations)
-	// delete(global, "daemon.autostart")
-	// delete(global, "ffx.target-list.local-connect")
-
+	// TODO(slgrady): remove this code once we remove non-strict ffx invocations.
+	delete(global, "daemon.autostart")
+	delete(global, "ffx.target-list.local-connect")
+	delete(global, "ffx.isolated")
 	b.configs = global
 	return nil
 }
@@ -249,10 +235,8 @@ func (b *strictFfxCmdBuilder) setConfig(key, val string) {
 	b.configs[key] = val
 }
 
-// TODO(slgrady): remove this method once we get rid of isolate dirs, when
-// strict is fully supported
 func (b *strictFfxCmdBuilder) env() []string {
-	return []string{fmt.Sprintf("%s=%s", FFXIsolateDirEnvKey, b.tmpIsolateDir)}
+	return []string{}
 }
 
 func (f *strictFfxCmdBuilder) isStrict() bool {
@@ -355,7 +339,7 @@ func NewFFXInstance(
 	invokeMode FFXInvokeMode,
 	extraConfigSettings ...ConfigSettings,
 ) (*FFXInstance, error) {
-	logger.Debugf(ctx, "NewFFXInstance: ffx=%s dir=%s target=%s sshInfo=%v oDir=%s", ffxPath, processDir, target, sshInfo, outputDir)
+	logger.Infof(ctx, "NewFFXInstance: ffx=%s dir=%s target=%s sshInfo=%v oDir=%s", ffxPath, processDir, target, sshInfo, outputDir)
 	if ffxPath == "" {
 		return nil, nil
 	}
@@ -374,17 +358,12 @@ func NewFFXInstance(
 	var cmdBuilder ffxCmdBuilder
 	if invokeMode == UseFFXStrict {
 		outputFile := filepath.Join(absOutputDir, "ffx.log")
-		var strictFfx = newStrictFfxCmdBuilder(outputFile)
-		// TODO(slgrady): Remove the isolateDir when ffx-strict is fully
-		// implemented
-		strictFfx.tempSetIsolateDir(absOutputDir)
-		cmdBuilder = strictFfx
+		cmdBuilder = newStrictFfxCmdBuilder(outputFile)
 	} else {
 		cmdBuilder = newLegacyFfxCmdBuilder(
 			absOutputDir,
 			absOutputDir,
 		)
-
 	}
 	env = append(os.Environ(), env...)
 	env = append(env, cmdBuilder.env()...)
@@ -637,7 +616,6 @@ func (f *ffxInvoker) cmd() *exec.Cmd {
 		}
 	}
 	ffx_cmd := f.ffx.cmdBuilder.commandWithConfigs(f.ffx.ffxPath, f.supportsStrict, args, f.configs)
-
 	return f.ffx.runner.Command(ffx_cmd, subprocess.RunOptions{
 		Stdout: f.stdout,
 		Stderr: f.stderr,
@@ -734,16 +712,19 @@ func (f *FFXInstance) CommandWithTarget(args ...string) (*exec.Cmd, error) {
 
 // RunWithTimeout runs ffx with the associated config and provided args.
 func (f *FFXInstance) RunWithTimeout(ctx context.Context, timeout time.Duration, args ...string) error {
+	logger.Infof(ctx, "running ffx command (non-strict) with timeout=%v (non-strict): args=%v", timeout, args)
 	return f.invoker(args).setTimeout(timeout).run(ctx)
 }
 
 // Run runs ffx with the associated config and provided args.
 func (f *FFXInstance) Run(ctx context.Context, args ...string) error {
+	logger.Infof(ctx, "running ffx command (non-strict): args=%v", args)
 	return f.invoker(args).run(ctx)
 }
 
 // RunCommand runs the given cmd with the FFXInstance's subprocess runner.
 func (f *FFXInstance) RunCommand(ctx context.Context, cmd *exec.Cmd) error {
+	logger.Infof(ctx, "running ffx command: cmd=%v", cmd)
 	return f.runner.RunCommand(ctx, cmd)
 }
 
@@ -822,8 +803,11 @@ func (f *FFXInstance) WaitForDaemon(ctx context.Context) error {
 
 // Stop stops the daemon.
 func (f *FFXInstance) Stop() error {
-	// Wait up to 4000ms for daemon to shut down.
-	return f.Run(context.Background(), "daemon", "stop", "-t", "4000")
+	if !f.isStrict() {
+		// Wait up to 4000ms for daemon to shut down.
+		return f.Run(context.Background(), "daemon", "stop", "-t", "4000")
+	}
+	return nil
 }
 
 // BootloaderBoot RAM boots the target.

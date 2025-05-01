@@ -138,7 +138,7 @@ func (s *Syslogger) Stream(ctx, loggerCtx context.Context, output io.Writer) <-c
 			var reconnectErr error
 			if s.ffx != nil {
 				reconnectErr = retry.Retry(ctx, retry.WithMaxDuration(retry.NewConstantBackoff(defaultReconnectInterval), 30*time.Second), func() error {
-					return s.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
+					return s.ffx.TargetWait(ctx, "-t", "10")
 				}, nil)
 			} else {
 				reconnectErr = s.client.ReconnectWithBackoff(ctx, retry.NewConstantBackoff(defaultReconnectInterval))
