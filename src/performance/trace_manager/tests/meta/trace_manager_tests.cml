@@ -18,5 +18,9 @@
                 "fuchsia.tracing.provider.Registry",
             ],
         },
+        {
+            storage: "data",
+            path: "/traces",
+        },
     ],
 }

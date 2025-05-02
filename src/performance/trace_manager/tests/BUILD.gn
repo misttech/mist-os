@@ -15,6 +15,7 @@ executable("trace_manager_tests_bin") {
   output_name = "trace_manager_tests"
 
   sources = [
+    "buffer_forwarder_tests.cc",
     "fake_provider.cc",
     "fake_provider.h",
     "init_to_fini_tests.cc",

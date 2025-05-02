@@ -41,14 +41,16 @@ class BufferForwarder {
   TransferStatus WriteChunkBy(ForwardStrategy strategy, const zx::vmo& vmo, size_t vmo_offset,
                               size_t size) const;
 
- private:
+  virtual TransferStatus Flush() { return TransferStatus::kComplete; }
+  virtual ~BufferForwarder() = default;
+
+ protected:
   // Writes the contents of |data| to the output socket. Returns
   // TransferStatus::kComplete if the entire buffer has been
   // successfully transferred. A return value of
   // TransferStatus::kReceiverDead indicates that the peer was closed
   // during the transfer.
-  TransferStatus WriteBuffer(cpp20::span<const uint8_t> data) const;
-
+  virtual TransferStatus WriteBuffer(cpp20::span<const uint8_t> data) const;
   const zx::socket destination_;
 };
 }  // namespace tracing

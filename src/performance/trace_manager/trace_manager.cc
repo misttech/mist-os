@@ -308,9 +308,14 @@ void TraceManager::InitializeTracing(fidl::InterfaceRequest<controller::Session>
     start_timeout = zx::msec(config.start_timeout_milliseconds());
   }
 
+  DataForwarding forwarding = DataForwarding::kEager;
+  if (config.has_defer_transfer() && config.defer_transfer()) {
+    forwarding = DataForwarding::kBuffered;
+  }
+
   auto session = std::make_unique<TraceSession>(
       executor_, std::move(output), std::move(categories), default_buffer_size_megabytes,
-      tracing_buffering_mode, std::move(provider_specs), start_timeout, kStopTimeout,
+      tracing_buffering_mode, forwarding, std::move(provider_specs), start_timeout, kStopTimeout,
       std::move(fxt_version),
       [this]() {
         if (trace_controller_) {

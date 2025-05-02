@@ -30,6 +30,15 @@ namespace tracing {
 
 namespace controller = fuchsia::tracing::controller;
 
+// Determines when trace_manager forwards trace data to the socket
+enum class DataForwarding {
+  // True streaming mode: forward data to the client as soon as we receive it
+  kEager,
+  // Stream to disk mode: temporarily write data to disk, and only send it to the client after the
+  // trace has fully completed.
+  kBuffered,
+};
+
 // TraceSession keeps track of all TraceProvider instances that
 // are active for a tracing session.
 class TraceSession {
@@ -66,7 +75,7 @@ class TraceSession {
   // unrecoverable errors that render the session dead.
   TraceSession(async::Executor& executor, zx::socket destination,
                std::vector<std::string> categories, size_t buffer_size_megabytes,
-               fuchsia::tracing::BufferingMode buffering_mode,
+               fuchsia::tracing::BufferingMode buffering_mode, DataForwarding forwarding_mode,
                TraceProviderSpecMap&& provider_specs, zx::duration start_timeout,
                zx::duration stop_timeout, controller::FxtVersion fxt_version,
                fit::closure abort_handler, AlertCallback alert_callback);

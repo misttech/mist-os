@@ -12,6 +12,8 @@ source_set("lib") {
     "buffer_forwarder.h",
     "config.cc",
     "config.h",
+    "deferred_buffer_forwarder.cc",
+    "deferred_buffer_forwarder.h",
     "trace_manager.cc",
     "trace_manager.h",
     "trace_provider_bundle.cc",

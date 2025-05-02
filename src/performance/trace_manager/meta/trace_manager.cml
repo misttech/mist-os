@@ -42,6 +42,12 @@
             ],
         },
     ],
+    use: [
+        {
+            storage: "data",
+            path: "/traces",
+        },
+    ],
     offer: [
         {
             protocol: [ "fuchsia.tracing.provider.Registry" ],

@@ -20,7 +20,10 @@
             to: "#trace_manager",
         },
         {
-            storage: [ "tmp" ],
+            storage: [
+                "data",
+                "tmp",
+            ],
             from: "self",
             to: "#trace_manager",
         },
