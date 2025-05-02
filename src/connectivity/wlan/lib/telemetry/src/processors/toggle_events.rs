@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::util::cobalt_logger::log_cobalt_1dot1;
+use crate::util::cobalt_logger::log_cobalt_1dot1_batch;
+use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
 use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
-use {fuchsia_async as fasync, wlan_legacy_metrics_registry as metrics};
+use {fuchsia_async as fasync, wlan_legacy_metrics_registry as metrics, zx};
 
 pub const INSPECT_TOGGLE_EVENTS_LIMIT: usize = 20;
-const TIME_QUICK_TOGGLE_WIFI: fasync::MonotonicDuration =
-    fasync::MonotonicDuration::from_seconds(5);
+const TIME_QUICK_TOGGLE_WIFI: zx::BootDuration = zx::BootDuration::from_seconds(5);
 
 #[derive(Debug, PartialEq)]
 pub enum ClientConnectionsToggleEvent {
@@ -24,9 +24,11 @@ pub struct ToggleLogger {
     /// This is None until telemetry is notified of an off or on event, since these metrics don't
     /// currently need to know the starting state.
     current_state: Option<ClientConnectionsToggleEvent>,
+    /// The last time wlan was toggled on
+    time_started: Option<fasync::BootInstant>,
     /// The last time wlan was toggled off, or None if it hasn't been. Used to determine if WLAN
     /// was turned on right after being turned off.
-    time_stopped: Option<fasync::MonotonicInstant>,
+    time_stopped: Option<fasync::BootInstant>,
 }
 
 impl ToggleLogger {
@@ -38,9 +40,10 @@ impl ToggleLogger {
         let toggle_events = inspect_node.create_child("client_connections_toggle_events");
         let toggle_inspect_node = BoundedListNode::new(toggle_events, INSPECT_TOGGLE_EVENTS_LIMIT);
         let current_state = None;
+        let time_started = None;
         let time_stopped = None;
 
-        Self { toggle_inspect_node, cobalt_1dot1_proxy, current_state, time_stopped }
+        Self { toggle_inspect_node, cobalt_1dot1_proxy, current_state, time_started, time_stopped }
     }
 
     pub async fn log_toggle_event(&mut self, event_type: ClientConnectionsToggleEvent) {
@@ -49,37 +52,56 @@ impl ToggleLogger {
             event_type: std::format!("{:?}", event_type)
         });
 
-        let curr_time = fasync::MonotonicInstant::now();
+        let mut metric_events = vec![];
+        let now = fasync::BootInstant::now();
         match &event_type {
             ClientConnectionsToggleEvent::Enabled => {
+                // Log an occurrence if the client connection was not already enabled
+                if self.current_state != Some(ClientConnectionsToggleEvent::Enabled) {
+                    self.time_started = Some(now);
+
+                    metric_events.push(MetricEvent {
+                        metric_id: metrics::CLIENT_CONNECTION_ENABLED_OCCURRENCE_METRIC_ID,
+                        event_codes: vec![],
+                        payload: MetricEventPayload::Count(1),
+                    });
+                }
+
                 // If connections were just disabled before this, log a metric for the quick wifi
                 // restart.
                 if self.current_state == Some(ClientConnectionsToggleEvent::Disabled) {
                     if let Some(time_stopped) = self.time_stopped {
-                        if curr_time - time_stopped < TIME_QUICK_TOGGLE_WIFI {
-                            self.log_quick_toggle().await;
+                        if now - time_stopped < TIME_QUICK_TOGGLE_WIFI {
+                            metric_events.push(MetricEvent {
+                                metric_id: metrics::CLIENT_CONNECTIONS_STOP_AND_START_METRIC_ID,
+                                event_codes: vec![],
+                                payload: MetricEventPayload::Count(1),
+                            });
                         }
                     }
                 }
             }
             ClientConnectionsToggleEvent::Disabled => {
-                // Only changed the time if connections were not already disabled.
+                // Only change the time and log duration if connections were not already disabled.
                 if self.current_state == Some(ClientConnectionsToggleEvent::Enabled) {
-                    self.time_stopped = Some(curr_time);
+                    self.time_stopped = Some(now);
+
+                    if let Some(time_started) = self.time_started {
+                        let duration = now - time_started;
+                        metric_events.push(MetricEvent {
+                            metric_id: metrics::CLIENT_CONNECTION_ENABLED_DURATION_METRIC_ID,
+                            event_codes: vec![],
+                            payload: MetricEventPayload::IntegerValue(duration.into_millis()),
+                        });
+                    }
                 }
             }
         }
         self.current_state = Some(event_type);
-    }
 
-    async fn log_quick_toggle(&mut self) {
-        log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
-            log_occurrence,
-            metrics::CLIENT_CONNECTIONS_STOP_AND_START_METRIC_ID,
-            1,
-            &[],
-        );
+        if !metric_events.is_empty() {
+            log_cobalt_1dot1_batch!(self.cobalt_1dot1_proxy, &metric_events, "log_toggle_events",);
+        }
     }
 }
 
@@ -243,5 +265,46 @@ mod tests {
         let logged_metrics =
             test_helper.get_logged_metrics(metrics::CLIENT_CONNECTIONS_STOP_AND_START_METRIC_ID);
         assert!(logged_metrics.is_empty());
+    }
+
+    #[fuchsia::test]
+    fn test_log_client_connection_enabled() {
+        let mut test_helper = setup_test();
+        let inspect_node = test_helper.create_inspect_node("test_stats");
+        let mut toggle_logger =
+            ToggleLogger::new(test_helper.cobalt_1dot1_proxy.clone(), &inspect_node);
+
+        // Start with client connections enabled.
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000));
+        let event = ClientConnectionsToggleEvent::Enabled;
+        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+
+        let metrics =
+            test_helper.get_logged_metrics(metrics::CLIENT_CONNECTION_ENABLED_OCCURRENCE_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::Count(1));
+
+        // Send enabled event again. This should not log any metric because the device was not
+        // in a disabled state
+        test_helper.clear_cobalt_events();
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(50_000_000));
+        let event = ClientConnectionsToggleEvent::Enabled;
+        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+
+        let metrics =
+            test_helper.get_logged_metrics(metrics::CLIENT_CONNECTION_ENABLED_OCCURRENCE_METRIC_ID);
+        assert!(metrics.is_empty());
+
+        // Send disabled event. This should log the duration between now and when the
+        // first enabled event was sent.
+        test_helper.clear_cobalt_events();
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(100_000_000));
+        let event = ClientConnectionsToggleEvent::Disabled;
+        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+
+        let metrics =
+            test_helper.get_logged_metrics(metrics::CLIENT_CONNECTION_ENABLED_DURATION_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(90));
     }
 }
