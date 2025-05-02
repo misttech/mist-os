@@ -44,7 +44,7 @@ class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
                             ConnectStatusChangedCompleter::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_usb_phy::UsbPhy> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
-    FDF_LOG(ERROR, "Unknown method %lu", metadata.method_ordinal);
+    fdf::error("Unknown method {}", metadata.method_ordinal);
   }
 
   // For testing.

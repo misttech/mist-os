@@ -10,6 +10,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <mutex>
@@ -19,8 +20,6 @@ class AmlUsbPhy;
 
 class AmlUsbPhyDevice : public fdf::DriverBase {
  private:
-  static constexpr char kDeviceName[] = "aml_usb_phy";
-
   class ChildNode {
    public:
     explicit ChildNode(AmlUsbPhyDevice* parent, std::string_view name, uint32_t property_did)
@@ -41,6 +40,8 @@ class AmlUsbPhyDevice : public fdf::DriverBase {
   };
 
  public:
+  static constexpr std::string_view kDeviceName = "aml_usb_phy";
+
   AmlUsbPhyDevice(fdf::DriverStartArgs start_args,
                   fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)) {}
@@ -57,8 +58,7 @@ class AmlUsbPhyDevice : public fdf::DriverBase {
   zx::result<> CreateNode();
 
   // Virtual for testing.
-  virtual zx::result<fdf::MmioBuffer> MapMmio(
-      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t idx);
+  virtual zx::result<fdf::MmioBuffer> MapMmio(fdf::PDev& pdev, uint32_t idx);
 
   std::unique_ptr<AmlUsbPhy> device_;
 

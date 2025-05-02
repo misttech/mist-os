@@ -18,8 +18,8 @@ class PHY2_R : public hwreg::RegisterBase<PHY2_R, uint32_t> {
   static auto Get(uint32_t reg, uint32_t i) { return hwreg::RegisterAddr<PHY2_R>(reg * 4); }
 
   static void dump(uint32_t reg, uint32_t i, const fdf::MmioBuffer& mmio, bool starred) {
-    FDF_LOG(INFO, "%sPHY2_R%d: %x", (starred) ? "*" : " ", reg,
-            PHY2_R::Get(reg, i).ReadFrom(&mmio).reg_value());
+    fdf::info("{}PHY2_R{}: {:x}", (starred) ? "*" : " ", reg,
+              PHY2_R::Get(reg, i).ReadFrom(&mmio).reg_value());
   }
 };
 
@@ -37,7 +37,7 @@ void dump_phy2_regs(uint32_t idx, const fdf::MmioBuffer& mmio) {
 }  // namespace
 
 void UsbPhy2::dump_regs() const {
-  FDF_LOG(INFO, "    UsbPhy2[%d]", idx());
+  fdf::info("    UsbPhy2[{}]", idx());
   dump_phy2_regs(idx(), mmio());
 }
 
@@ -139,12 +139,12 @@ void UsbPhy2::SetModeInternal(fuchsia_hardware_usb_phy::Mode mode, fdf::MmioBuff
        mode != fuchsia_hardware_usb_phy::Mode::kHost) ||
       (dr_mode() == fuchsia_hardware_usb_phy::Mode::kPeripheral &&
        mode != fuchsia_hardware_usb_phy::Mode::kPeripheral)) {
-    FDF_LOG(ERROR, "If dr_mode_ is not USB_MODE_OTG, dr_mode_ must match requested mode.");
+    fdf::error("If dr_mode_ is not USB_MODE_OTG, dr_mode_ must match requested mode.");
     return;
   }
 
-  FDF_LOG(INFO, "Entering USB %s Mode",
-          mode == fuchsia_hardware_usb_phy::Mode::kHost ? "Host" : "Peripheral");
+  fdf::info("Entering USB {} Mode",
+            mode == fuchsia_hardware_usb_phy::Mode::kHost ? "Host" : "Peripheral");
 
   if (mode == phy_mode())
     return;
