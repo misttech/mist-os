@@ -274,7 +274,7 @@ impl CurrentTask {
         // The /proc/pid direectory's ownership is updated when the task's euid
         // or egid changes. See proc(5).
         let mut state = self.proc_pid_directory_cache.lock();
-        TaskDirectory::maybe_force_chown(self, &mut state, &self.creds());
+        TaskDirectory::maybe_force_chown(&mut state, &self.creds());
     }
 
     #[inline(always)]

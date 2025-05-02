@@ -26,6 +26,7 @@ use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::{error, ino_t, statfs};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
+use std::ops::Range;
 use std::sync::{Arc, OnceLock, Weak};
 
 pub const DEFAULT_LRU_CAPACITY: usize = 32;
@@ -318,6 +319,15 @@ impl FileSystem {
     pub fn next_node_id(&self) -> ino_t {
         assert!(!self.ops.generate_node_ids());
         self.next_node_id.next()
+    }
+
+    /// Allocate a contiguous block of node ids.
+    pub fn allocate_node_id(&self, size: usize) -> Range<ino_t> {
+        assert!(!self.ops.generate_node_ids());
+        assert!(size > 0);
+
+        let start = self.next_node_id.add(size as u64);
+        Range { start: start as ino_t, end: start + size as ino_t }
     }
 
     /// Move |renamed| that is at |old_name| in |old_parent| to |new_name| in |new_parent|

@@ -9,41 +9,97 @@ use crate::task::{
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    default_seek, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
+    default_seek, emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
     fileops_impl_noop_sync, fs_node_impl_dir_readonly, parse_i32_file, parse_unsigned_file,
-    serialize_for_file, BytesFile, BytesFileOps, CallbackSymlinkNode, DirectoryEntryType,
-    DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FdNumber, FileObject, FileOps,
-    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    ProcMountinfoFile, ProcMountsFile, SeekTarget, SimpleFileNode, StaticDirectory,
+    serialize_for_file, unbounded_seek, BytesFile, BytesFileOps, CallbackSymlinkNode,
+    DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FdNumber,
+    FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+    FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget, SimpleFileNode,
     StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget, VecDirectory, VecDirectoryEntry,
 };
 
 use itertools::Itertools;
 use regex::Regex;
 use starnix_logging::{bug_ref, track_stub};
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_types::ownership::{OwnedRef, TempRef, WeakRef};
 use starnix_types::time::duration_to_scheduler_clock;
-use starnix_uapi::auth::{Credentials, CAP_SYS_NICE, CAP_SYS_RESOURCE};
+use starnix_uapi::auth::{Credentials, FsCred, CAP_SYS_NICE, CAP_SYS_RESOURCE};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::mode;
+use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    errno, error, gid_t, off_t, pid_t, uapi, uid_t, OOM_ADJUST_MIN, OOM_DISABLE, OOM_SCORE_ADJ_MIN,
-    RLIM_INFINITY,
+    errno, error, gid_t, ino_t, off_t, pid_t, uapi, uid_t, OOM_ADJUST_MIN, OOM_DISABLE,
+    OOM_SCORE_ADJ_MIN, RLIM_INFINITY,
 };
 use std::borrow::Cow;
 use std::ffi::CString;
+use std::ops::Range;
 use std::sync::{Arc, LazyLock};
 
-/// TaskDirectory delegates most of its operations to StaticDirectory, but we need to override
-/// FileOps::as_pid so that these directories can be used in places that expect a pidfd.
+/// Loads entries for the `scope` of a task.
+fn task_entries(scope: TaskEntryScope) -> Vec<(FsString, FileMode)> {
+    // NOTE: keep entries in sync with `TaskDirectory::lookup()`.
+    let mut entries = vec![
+        (b"cgroup".into(), mode!(IFREG, 0o444)),
+        (b"cwd".into(), mode!(IFLNK, 0o777)),
+        (b"exe".into(), mode!(IFLNK, 0o777)),
+        (b"fd".into(), mode!(IFDIR, 0o777)),
+        (b"fdinfo".into(), mode!(IFDIR, 0o777)),
+        (b"io".into(), mode!(IFREG, 0o444)),
+        (b"limits".into(), mode!(IFREG, 0o444)),
+        (b"maps".into(), mode!(IFREG, 0o444)),
+        (b"mem".into(), mode!(IFREG, 0o600)),
+        (b"root".into(), mode!(IFLNK, 0o777)),
+        (b"sched".into(), mode!(IFREG, 0o644)),
+        (b"schedstat".into(), mode!(IFREG, 0o444)),
+        (b"smaps".into(), mode!(IFREG, 0o444)),
+        (b"stat".into(), mode!(IFREG, 0o444)),
+        (b"statm".into(), mode!(IFREG, 0o444)),
+        (b"status".into(), mode!(IFREG, 0o444)),
+        (b"cmdline".into(), mode!(IFREG, 0o444)),
+        (b"environ".into(), mode!(IFREG, 0o444)),
+        (b"auxv".into(), mode!(IFREG, 0o444)),
+        (b"comm".into(), mode!(IFREG, 0o644)),
+        (b"attr".into(), mode!(IFDIR, 0o555)),
+        (b"ns".into(), mode!(IFDIR, 0o777)),
+        (b"mountinfo".into(), mode!(IFREG, 0o444)),
+        (b"mounts".into(), mode!(IFREG, 0o444)),
+        (b"oom_adj".into(), mode!(IFREG, 0o744)),
+        (b"oom_score".into(), mode!(IFREG, 0o444)),
+        (b"oom_score_adj".into(), mode!(IFREG, 0o744)),
+        (b"timerslack_ns".into(), mode!(IFREG, 0o666)),
+        (b"wchan".into(), mode!(IFREG, 0o444)),
+        (b"clear_refs".into(), mode!(IFREG, 0o200)),
+    ];
+
+    if scope == TaskEntryScope::ThreadGroup {
+        entries.push((b"task".into(), mode!(IFDIR, 0o777)));
+    }
+
+    entries
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum TaskEntryScope {
+    Task,
+    ThreadGroup,
+}
+
+/// Represents a directory node for either `/proc/<pid>` or `/proc/<pid>/task/<tid>`.
+///
+/// This directory lazily creates its child entries to save memory.
+///
+/// It pre-allocates a range of inode numbers (`inode_range`) for all its child entries to mark
+/// them as unchanged when re-accessed.
+/// The `creds` stored within is applied to the directory node itself and child entries.
 pub struct TaskDirectory {
-    pid: pid_t,
-    node_ops: Box<dyn FsNodeOps>,
-    file_ops: Box<dyn FileOps>,
+    task_weak: WeakRef<Task>,
+    creds: Mutex<FsCred>,
+    scope: TaskEntryScope,
+    inode_range: Range<ino_t>,
 }
 
 impl TaskDirectory {
@@ -51,27 +107,23 @@ impl TaskDirectory {
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
         task: &TempRef<'_, Task>,
-        dir: StaticDirectoryBuilder<'_>,
+        scope: TaskEntryScope,
+        creds: FsCred,
     ) -> FsNodeHandle {
-        let (node_ops, file_ops) = dir.build_ops();
+        let task_weak = WeakRef::from(task);
         fs.create_node(
             current_task,
-            Arc::new(TaskDirectory { pid: task.id, node_ops, file_ops }),
-            // proc(5): "The files inside each /proc/pid directory are normally
-            // owned by the effective user and effective group ID of the
-            // process."
-            FsNodeInfo::new_factory(mode!(IFDIR, 0o777), task.creds().euid_as_fscred()),
+            Arc::new(TaskDirectory {
+                task_weak,
+                creds: Mutex::new(creds),
+                scope,
+                inode_range: fs.allocate_node_id(task_entries(scope).len()),
+            }),
+            FsNodeInfo::new_factory(mode!(IFDIR, 0o777), creds),
         )
     }
 
-    /// If state is Some and points to a StaticDirectory, change the uid and the
-    /// gid on all reachable files to creds.euid and creds.egid.  See proc(5)
-    /// for details.
-    pub fn maybe_force_chown(
-        current_task: &CurrentTask,
-        state: &mut Option<FsNodeHandle>,
-        creds: &Credentials,
-    ) {
+    pub fn maybe_force_chown(state: &mut Option<FsNodeHandle>, creds: &Credentials) {
         let Some(ref mut pd) = &mut *state else {
             return;
         };
@@ -79,23 +131,16 @@ impl TaskDirectory {
         else {
             return;
         };
-        pd_ops.force_chown(current_task, &pd, Some(creds.euid), Some(creds.egid));
+        pd_ops.force_chown(&pd, creds.euid, creds.egid);
     }
 
-    fn force_chown(
-        &self,
-        current_task: &CurrentTask,
-        node: &FsNodeHandle,
-        uid: Option<uid_t>,
-        gid: Option<gid_t>,
-    ) {
+    fn force_chown(&self, node: &FsNodeHandle, uid: uid_t, gid: gid_t) {
         node.update_info(|info| {
-            info.chown(uid, gid);
+            info.chown(Some(uid), Some(gid));
         });
-        let Some(dir) = self.node_ops.as_any().downcast_ref::<Arc<StaticDirectory>>() else {
-            return;
-        };
-        dir.force_chown(current_task, uid, gid);
+        let mut creds = self.creds.lock();
+        creds.uid = uid;
+        creds.gid = gid;
     }
 }
 
@@ -114,12 +159,122 @@ impl FsNodeOps for Arc<TaskDirectory> {
 
     fn lookup(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        self.node_ops.lookup(locked, node, current_task, name)
+        let task_weak = self.task_weak.clone();
+        let creds = *self.creds.lock();
+        let fs = node.fs();
+        let (mode, inode) = task_entries(self.scope)
+            .into_iter()
+            .enumerate()
+            .find_map(|(index, (n, mode))| {
+                if name == *n {
+                    Some((mode, self.inode_range.start + index as ino_t))
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| errno!(ENOENT))?;
+
+        // NOTE: keep entries in sync with `task_entries()`.
+        let ops: Box<dyn FsNodeOps> = match &**name {
+            b"cgroup" => Box::new(CgroupFile::new_node(task_weak)),
+            b"cwd" => Box::new(CallbackSymlinkNode::new({
+                move || Ok(SymlinkTarget::Node(Task::from_weak(&task_weak)?.fs().cwd()))
+            })),
+            b"exe" => Box::new(CallbackSymlinkNode::new({
+                move || {
+                    let task = Task::from_weak(&task_weak)?;
+                    if let Some(node) = task.mm().and_then(|mm| mm.executable_node()) {
+                        Ok(SymlinkTarget::Node(node))
+                    } else {
+                        error!(ENOENT)
+                    }
+                }
+            })),
+            b"fd" => Box::new(FdDirectory::new(task_weak)),
+            b"fdinfo" => Box::new(FdInfoDirectory::new(task_weak)),
+            b"io" => Box::new(IoFile::new_node()),
+            b"limits" => Box::new(LimitsFile::new_node(task_weak)),
+            b"maps" => Box::new(ProcMapsFile::new_node(task_weak)),
+            b"mem" => Box::new(MemFile::new_node(task_weak)),
+            b"root" => Box::new(CallbackSymlinkNode::new({
+                move || Ok(SymlinkTarget::Node(Task::from_weak(&task_weak)?.fs().root()))
+            })),
+            b"sched" => Box::new(StubEmptyFile::new_node(
+                "/proc/pid/sched",
+                bug_ref!("https://fxbug.dev/322893980"),
+            )),
+            b"schedstat" => Box::new(StubEmptyFile::new_node(
+                "/proc/pid/schedstat",
+                bug_ref!("https://fxbug.dev/322894256"),
+            )),
+            b"smaps" => Box::new(ProcSmapsFile::new_node(task_weak)),
+            b"stat" => Box::new(StatFile::new_node(task_weak, self.scope)),
+            b"statm" => Box::new(StatmFile::new_node(task_weak)),
+            b"status" => Box::new(StatusFile::new_node(task_weak)),
+            b"cmdline" => Box::new(CmdlineFile::new_node(task_weak)),
+            b"environ" => Box::new(EnvironFile::new_node(task_weak)),
+            b"auxv" => Box::new(AuxvFile::new_node(task_weak)),
+            b"comm" => {
+                let task = self.task_weak.upgrade().ok_or_else(|| errno!(ESRCH))?;
+                Box::new(CommFile::new_node(task_weak, task.persistent_info.clone()))
+            }
+            b"attr" => {
+                let mut subdir = StaticDirectoryBuilder::new(&fs);
+                subdir.entry_creds(creds);
+                subdir.dir_creds(creds);
+                for (attr, name) in [
+                    (security::ProcAttr::Current, "current"),
+                    (security::ProcAttr::Exec, "exec"),
+                    (security::ProcAttr::FsCreate, "fscreate"),
+                    (security::ProcAttr::KeyCreate, "keycreate"),
+                    (security::ProcAttr::SockCreate, "sockcreate"),
+                ] {
+                    subdir.entry(
+                        current_task,
+                        name,
+                        AttrNode::new(task_weak.clone(), attr),
+                        mode!(IFREG, 0o666),
+                    );
+                }
+                subdir.entry(
+                    current_task,
+                    "prev",
+                    AttrNode::new(task_weak, security::ProcAttr::Previous),
+                    mode!(IFREG, 0o444),
+                );
+                let (ops, _file_ops) = subdir.build_ops();
+                // We need to return the FsNodeOps, not the FileOps here.
+                // The FsNode will handle creating the FileOps when opened.
+                ops
+            }
+            b"ns" => Box::new(NsDirectory { task: task_weak }),
+            b"mountinfo" => Box::new(ProcMountinfoFile::new_node(task_weak)),
+            b"mounts" => Box::new(ProcMountsFile::new_node(task_weak)),
+            b"oom_adj" => Box::new(OomAdjFile::new_node(task_weak)),
+            b"oom_score" => Box::new(OomScoreFile::new_node(task_weak)),
+            b"oom_score_adj" => Box::new(OomScoreAdjFile::new_node(task_weak)),
+            b"timerslack_ns" => Box::new(TimerslackNsFile::new_node(task_weak)),
+            b"wchan" => Box::new(BytesFile::new_node(b"0".to_vec())),
+            b"clear_refs" => Box::new(ClearRefsFile::new_node(task_weak)),
+            b"task" => {
+                let task = self.task_weak.upgrade().ok_or_else(|| errno!(ESRCH))?;
+                Box::new(TaskListDirectory {
+                    thread_group: OwnedRef::downgrade(&task.thread_group()),
+                    creds,
+                })
+            }
+            name => unreachable!(
+                "entry \"{:?}\" should be supported to keep in sync with task_entries()",
+                name
+            ),
+        };
+
+        Ok(fs.create_node_with_id(current_task, ops, inode, FsNodeInfo::new(inode, mode, creds)))
     }
 }
 
@@ -129,27 +284,41 @@ impl FileOps for TaskDirectory {
 
     fn seek(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
-        file: &FileObject,
-        current_task: &CurrentTask,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        self.file_ops.seek(locked, file, current_task, current_offset, target)
+        unbounded_seek(current_offset, target)
     }
 
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
-        self.file_ops.readdir(locked, file, current_task, sink)
+        emit_dotdot(file, sink)?;
+
+        // Skip through the entries until the current offset is reached.
+        // Subtract 2 from the offset to account for `.` and `..`.
+        for (index, (name, mode)) in
+            task_entries(self.scope).into_iter().enumerate().skip(sink.offset() as usize - 2)
+        {
+            sink.add(
+                self.inode_range.start + index as ino_t,
+                sink.offset() + 1,
+                DirectoryEntryType::from_mode(mode),
+                name.as_ref(),
+            )?;
+        }
+        Ok(())
     }
 
     fn as_pid(&self, _file: &FileObject) -> Result<pid_t, Errno> {
-        Ok(self.pid)
+        Ok(self.task_weak.upgrade().ok_or_else(|| errno!(ESRCH))?.pid)
     }
 }
 
@@ -159,19 +328,11 @@ pub fn pid_directory(
     fs: &FileSystemHandle,
     task: &TempRef<'_, Task>,
 ) -> FsNodeHandle {
-    let mut dir = static_directory_builder_with_common_task_entries(
-        current_task,
-        fs,
-        task,
-        StatsScope::ThreadGroup,
-    );
-    dir.entry(
-        current_task,
-        "task",
-        TaskListDirectory { thread_group: OwnedRef::downgrade(&task.thread_group()) },
-        mode!(IFDIR, 0o777),
-    );
-    let fs_node = TaskDirectory::new(current_task, fs, task, dir);
+    // proc(5): "The files inside each /proc/pid directory are normally
+    // owned by the effective user and effective group ID of the process."
+    let creds = task.creds().euid_as_fscred();
+    let fs_node = TaskDirectory::new(current_task, fs, task, TaskEntryScope::ThreadGroup, creds);
+
     security::task_to_fs_node(current_task, task, &fs_node);
     fs_node
 }
@@ -181,158 +342,9 @@ fn tid_directory(
     current_task: &CurrentTask,
     fs: &FileSystemHandle,
     task: &TempRef<'_, Task>,
+    creds: FsCred,
 ) -> FsNodeHandle {
-    let dir =
-        static_directory_builder_with_common_task_entries(current_task, fs, task, StatsScope::Task);
-    TaskDirectory::new(current_task, fs, task, dir)
-}
-
-/// Creates a [`StaticDirectoryBuilder`] and pre-populates it with files that are present in both
-/// `/pid/<pid>` and `/pid/<pid>/task/<tid>`.
-fn static_directory_builder_with_common_task_entries<'a>(
-    current_task: &CurrentTask,
-    fs: &'a FileSystemHandle,
-    task: &TempRef<'_, Task>,
-    scope: StatsScope,
-) -> StaticDirectoryBuilder<'a> {
-    let mut dir = StaticDirectoryBuilder::new(fs);
-    // proc(5): "The files inside each /proc/pid directory are normally owned by
-    // the effective user and effective group ID of the process."
-    dir.entry_creds(task.creds().euid_as_fscred());
-    dir.entry(current_task, "cgroup", CgroupFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(
-        current_task,
-        "cwd",
-        CallbackSymlinkNode::new({
-            let task = WeakRef::from(task);
-            move || Ok(SymlinkTarget::Node(Task::from_weak(&task)?.fs().cwd()))
-        }),
-        mode!(IFLNK, 0o777),
-    );
-    dir.entry(
-        current_task,
-        "exe",
-        CallbackSymlinkNode::new({
-            let task = WeakRef::from(task);
-            move || {
-                // /proc/<pid>/exe is not a valid symlink for kthreads
-                if let Some(node) =
-                    Task::from_weak(&task)?.mm().map(|mm| mm.executable_node()).flatten()
-                {
-                    Ok(SymlinkTarget::Node(node))
-                } else {
-                    error!(ENOENT)
-                }
-            }
-        }),
-        mode!(IFLNK, 0o777),
-    );
-    dir.entry(current_task, "fd", FdDirectory::new(task.into()), mode!(IFDIR, 0o777));
-    dir.entry(current_task, "fdinfo", FdInfoDirectory::new(task.into()), mode!(IFDIR, 0o777));
-    dir.entry(current_task, "io", IoFile::new_node(), mode!(IFREG, 0o444));
-    dir.entry(current_task, "limits", LimitsFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(current_task, "maps", ProcMapsFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(current_task, "mem", MemFile::new_node(task.into()), mode!(IFREG, 0o600));
-    dir.entry(
-        current_task,
-        "root",
-        CallbackSymlinkNode::new({
-            let task = WeakRef::from(task);
-            move || Ok(SymlinkTarget::Node(Task::from_weak(&task)?.fs().root()))
-        }),
-        mode!(IFLNK, 0o777),
-    );
-    dir.entry(
-        current_task,
-        "sched",
-        StubEmptyFile::new_node("/proc/pid/sched", bug_ref!("https://fxbug.dev/322893980")),
-        mode!(IFREG, 0o644),
-    );
-    dir.entry(
-        current_task,
-        "schedstat",
-        StubEmptyFile::new_node("/proc/pid/schedstat", bug_ref!("https://fxbug.dev/322894256")),
-        mode!(IFREG, 0o444),
-    );
-    dir.entry(current_task, "smaps", ProcSmapsFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(current_task, "stat", StatFile::new_node(task.into(), scope), mode!(IFREG, 0o444));
-    dir.entry(current_task, "statm", StatmFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(
-        current_task,
-        "status",
-        StatusFile::new_node(task.into(), task.persistent_info.clone()),
-        mode!(IFREG, 0o444),
-    );
-    dir.entry(current_task, "cmdline", CmdlineFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(current_task, "environ", EnvironFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(current_task, "auxv", AuxvFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(
-        current_task,
-        "comm",
-        CommFile::new_node(task.into(), task.persistent_info.clone()),
-        mode!(IFREG, 0o644),
-    );
-    dir.subdir(current_task, "attr", 0o555, |dir| {
-        // proc(5): "The files inside each /proc/pid directory are normally
-        // owned by the effective user and effective group ID of the process."
-        dir.entry_creds(task.creds().euid_as_fscred());
-        dir.dir_creds(task.creds().euid_as_fscred());
-
-        let task = WeakRef::from(task);
-        for (attr, name) in [
-            (security::ProcAttr::Current, "current"),
-            (security::ProcAttr::Exec, "exec"),
-            (security::ProcAttr::FsCreate, "fscreate"),
-            (security::ProcAttr::KeyCreate, "keycreate"),
-            (security::ProcAttr::SockCreate, "sockcreate"),
-        ] {
-            dir.entry(current_task, name, AttrNode::new(task.clone(), attr), mode!(IFREG, 0o666));
-        }
-
-        dir.entry(
-            current_task,
-            "prev",
-            AttrNode::new(task, security::ProcAttr::Previous),
-            mode!(IFREG, 0o444),
-        );
-    });
-    dir.entry(current_task, "ns", NsDirectory { task: task.into() }, mode!(IFDIR, 0o777));
-    dir.entry(
-        current_task,
-        "mountinfo",
-        ProcMountinfoFile::new_node(task.into()),
-        mode!(IFREG, 0o444),
-    );
-    dir.entry(current_task, "mounts", ProcMountsFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(current_task, "oom_adj", OomAdjFile::new_node(task.into()), mode!(IFREG, 0o744));
-    dir.entry(current_task, "oom_score", OomScoreFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(
-        current_task,
-        "oom_score_adj",
-        OomScoreAdjFile::new_node(task.into()),
-        mode!(IFREG, 0o744),
-    );
-    dir.entry(
-        current_task,
-        "timerslack_ns",
-        TimerslackNsFile::new_node(task.into()),
-        mode!(IFREG, 0o666),
-    );
-    // TODO(https://fxbug.dev/378715232): For now, we return '0' to allow tools that
-    // attempt to dump process information to read this value, but later work should
-    // return a proper 'wchan'.
-    dir.entry(current_task, "wchan", BytesFile::new_node(b"0".to_vec()), mode!(IFREG, 0o444));
-    dir.entry(
-        current_task,
-        "clear_refs",
-        ClearRefsFile::new_node(task.into()),
-        // Not a typo, this is a write-only file.
-        mode!(IFREG, 0o200),
-    );
-    // proc(5): "The files inside each /proc/pid directory are normally owned by
-    // the effective user and effective group ID of the process."
-    dir.dir_creds(task.creds().euid_as_fscred());
-    dir
+    TaskDirectory::new(current_task, fs, task, TaskEntryScope::Task, creds)
 }
 
 /// `FdDirectory` implements the directory listing operations for a `proc/<pid>/fd` directory.
@@ -616,6 +628,7 @@ fn fds_to_directory_entries(fds: Vec<FdNumber>) -> Vec<VecDirectoryEntry> {
 /// Directory that lists the task IDs (tid) in a process. Located at `/proc/<pid>/task/`.
 struct TaskListDirectory {
     thread_group: WeakRef<ThreadGroup>,
+    creds: FsCred,
 }
 
 impl TaskListDirectory {
@@ -669,7 +682,7 @@ impl FsNodeOps for TaskListDirectory {
         let task = weak_task.upgrade().ok_or_else(|| errno!(ENOENT))?;
         std::mem::drop(pid_state);
 
-        Ok(tid_directory(current_task, &node.fs(), &task))
+        Ok(tid_directory(current_task, &node.fs(), &task, self.creds))
     }
 }
 
@@ -984,20 +997,14 @@ impl FileOps for MemFile {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum StatsScope {
-    Task,
-    ThreadGroup,
-}
-
 #[derive(Clone)]
 pub struct StatFile {
     task: WeakRef<Task>,
-    scope: StatsScope,
+    scope: TaskEntryScope,
 }
 
 impl StatFile {
-    pub fn new_node(task: WeakRef<Task>, scope: StatsScope) -> impl FsNodeOps {
+    pub fn new_node(task: WeakRef<Task>, scope: TaskEntryScope) -> impl FsNodeOps {
         DynamicFile::new_node(Self { task, scope })
     }
 }
@@ -1089,8 +1096,8 @@ impl DynamicFileSource for StatFile {
         }
 
         let time_stats = match self.scope {
-            StatsScope::Task => task.time_stats(),
-            StatsScope::ThreadGroup => task.thread_group().time_stats(),
+            TaskEntryScope::Task => task.time_stats(),
+            TaskEntryScope::ThreadGroup => task.thread_group().time_stats(),
         };
         utime = duration_to_scheduler_clock(time_stats.user_time);
         stime = duration_to_scheduler_clock(time_stats.system_time);
@@ -1158,39 +1165,44 @@ impl DynamicFileSource for StatmFile {
 }
 
 #[derive(Clone)]
-pub struct StatusFile(WeakRef<Task>, TaskPersistentInfo);
+pub struct StatusFile(WeakRef<Task>);
 impl StatusFile {
-    pub fn new_node(task: WeakRef<Task>, info: TaskPersistentInfo) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(task, info))
+    pub fn new_node(task: WeakRef<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task))
     }
 }
 impl DynamicFileSource for StatusFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let task = &self.0.upgrade();
         let (tgid, pid, creds_string) = {
-            // Collect everything stored in info in this block.  There is a lock ordering
-            // issue with the task lock acquired below, and cloning info is
-            // expensive.
-            let info = self.1.lock();
-            write!(sink, "Name:\t")?;
-            sink.write(info.command().as_bytes());
-            let creds = info.creds();
-            (
-                info.pid(),
-                info.tid(),
-                format!(
-                    "Uid:\t{}\t{}\t{}\t{}\nGid:\t{}\t{}\t{}\t{}\nGroups:\t{}",
-                    creds.uid,
-                    creds.euid,
-                    creds.saved_uid,
-                    creds.fsuid,
-                    creds.gid,
-                    creds.egid,
-                    creds.saved_gid,
-                    creds.fsgid,
-                    creds.groups.iter().map(|n| n.to_string()).join(" ")
-                ),
-            )
+            if let Some(task) = task {
+                track_stub!(TODO("https://fxbug.dev/297440106"), "/proc/pid/status zombies");
+                // Collect everything stored in info in this block.  There is a lock ordering
+                // issue with the task lock acquired below, and cloning info is
+                // expensive.
+                let info = task.persistent_info.lock();
+                write!(sink, "Name:\t")?;
+                sink.write(info.command().as_bytes());
+                let creds = info.creds();
+                (
+                    Some(info.pid()),
+                    Some(info.tid()),
+                    Some(format!(
+                        "Uid:\t{}\t{}\t{}\t{}\nGid:\t{}\t{}\t{}\t{}\nGroups:\t{}",
+                        creds.uid,
+                        creds.euid,
+                        creds.saved_uid,
+                        creds.fsuid,
+                        creds.gid,
+                        creds.egid,
+                        creds.saved_gid,
+                        creds.fsgid,
+                        creds.groups.iter().map(|n| n.to_string()).join(" ")
+                    )),
+                )
+            } else {
+                (None, None, None)
+            }
         };
 
         writeln!(sink)?;
@@ -1211,20 +1223,25 @@ impl DynamicFileSource for StatusFile {
             if let Some(task) = task { task.state_code() } else { TaskStateCode::Zombie };
         writeln!(sink, "State:\t{} ({})", state_code.code_char(), state_code.name())?;
 
-        writeln!(sink, "Tgid:\t{}", tgid)?;
-        writeln!(sink, "Pid:\t{}", pid)?;
+        if let Some(tgid) = tgid {
+            writeln!(sink, "Tgid:\t{}", tgid)?;
+        }
+        if let Some(pid) = pid {
+            writeln!(sink, "Pid:\t{}", pid)?;
+        }
         let (ppid, threads, tracer_pid) = if let Some(task) = task {
             let tracer_pid = task.read().ptrace.as_ref().map_or(0, |p| p.get_pid());
             let task_group = task.thread_group().read();
             (task_group.get_ppid(), task_group.tasks_count(), tracer_pid)
         } else {
-            track_stub!(TODO("https://fxbug.dev/297440106"), "/proc/pid/status zombies");
             (1, 1, 0)
         };
         writeln!(sink, "PPid:\t{}", ppid)?;
         writeln!(sink, "TracerPid:\t{}", tracer_pid)?;
 
-        writeln!(sink, "{}", creds_string)?;
+        if let Some(creds_string) = creds_string {
+            writeln!(sink, "{}", creds_string)?;
+        }
 
         if let Some(task) = task {
             if let Some(mm) = task.mm() {
