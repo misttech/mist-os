@@ -10,9 +10,6 @@ the bottom of the dependency chain.
 
 This library defines the Zircon system ABI.
 
-TODO(kulakowski) Talk about how this is not quite the kernel
-syscall interface, since the VDSO abstracts that.
-
 ## libzx
 
 libzircon defines C types and function calls acting on those
