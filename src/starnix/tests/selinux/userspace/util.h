@@ -12,6 +12,8 @@
 
 #include <gmock/gmock.h>
 
+#include "src/starnix/tests/syscalls/cpp/syscall_matchers.h"
+
 /// Loads the policy |name|.
 void LoadPolicy(const std::string& name);
 
@@ -103,27 +105,6 @@ MATCHER_P(IsOk, expected_value, std::string("fit::result<> is fit::ok(") + expec
   }
   ::testing::Matcher<fit::result<int, std::string>> expected = ::testing::Eq(expected_value);
   return expected.MatchAndExplain(arg, result_listener);
-}
-
-MATCHER(SyscallSucceeds, "syscall succeeds") {
-  if (arg != -1) {
-    return true;
-  }
-  *result_listener << "syscall failed with error " << strerror(errno);
-  return false;
-}
-
-MATCHER_P(SyscallFailsWithErrno, expected_errno,
-          std::string("syscall fails with error ") + strerror(expected_errno)) {
-  if (arg != -1) {
-    *result_listener << "syscall succeeded";
-    return false;
-  } else if (errno == expected_errno) {
-    return true;
-  } else {
-    *result_listener << "syscall failed with error " << strerror(errno);
-    return false;
-  }
 }
 
 namespace fit {
