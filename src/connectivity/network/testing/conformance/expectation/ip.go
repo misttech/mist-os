@@ -149,7 +149,7 @@ var ipExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]ou
 	{7, 3}:  Pass,
 	// TODO(https://fxbug.dev/414413500) Consider the TTL of IPv4 fragments when
 	// setting the reassembly timeout.
-	{7, 4}: Inconclusive,
+	{7, 4}: Flaky,
 	{7, 5}: Pass,
 	{7, 6}: Pass,
 }
