@@ -17,7 +17,7 @@ use selinux::{
     CommonFsNodePermission, CommonSocketPermission, FsNodeClass, InitialSid, KernelPermission,
     SecurityId, SecurityServer, SocketClass, UnixStreamSocketPermission,
 };
-use starnix_logging::BugRef;
+use starnix_logging::{track_stub, BugRef};
 use starnix_uapi::errors::Errno;
 
 /// Checks that `current_task` has the specified `permission` for the `socket_node`.
@@ -203,7 +203,7 @@ pub(in crate::security) fn check_socket_create_access(
 
 /// Computes and sets the security class for `socket`.
 pub(in crate::security) fn socket_post_create(socket: &Socket) {
-    let socket_node = socket.fs_node();
+    let socket_node = socket.fs_node().expect("socket_post_create without FsNode");
     socket_node.security_state.lock().class =
         compute_socket_security_class(socket.domain, socket.socket_type, socket.protocol).into();
 }
@@ -216,7 +216,10 @@ pub(in crate::security) fn check_socket_bind_access(
     socket: &Socket,
     _socket_address: &SocketAddress,
 ) -> Result<(), Errno> {
-    let socket_node = socket.fs_node();
+    let Some(socket_node) = socket.fs_node() else {
+        track_stub!(TODO("https://fxbug.dev/414583985"), "check_socket_bind_access without FsNode");
+        return Ok(());
+    };
 
     let current_sid = current_task.security_state.lock().current_sid;
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
@@ -243,7 +246,13 @@ pub(in crate::security) fn check_socket_connect_access(
     socket: &Socket,
     _socket_peer: &SocketPeer,
 ) -> Result<(), Errno> {
-    let socket_node = socket.fs_node();
+    let Some(socket_node) = socket.fs_node() else {
+        track_stub!(
+            TODO("https://fxbug.dev/414583985"),
+            "check_socket_connect_access without FsNode"
+        );
+        return Ok(());
+    };
 
     let current_sid = current_task.security_state.lock().current_sid;
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
@@ -268,7 +277,14 @@ pub(in crate::security) fn check_socket_listen_access(
     current_task: &CurrentTask,
     socket: &Socket,
 ) -> Result<(), Errno> {
-    let socket_node = socket.fs_node();
+    let Some(socket_node) = socket.fs_node() else {
+        track_stub!(
+            TODO("https://fxbug.dev/414583985"),
+            "check_socket_listen_access without FsNode"
+        );
+        return Ok(());
+    };
+
     let current_sid = current_task.security_state.lock().current_sid;
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
         panic!("check_socket_listen_access called for non-Socket class")
@@ -292,7 +308,14 @@ pub(in crate::security) fn check_socket_shutdown_access(
     socket: &Socket,
     _how: SocketShutdownFlags,
 ) -> Result<(), Errno> {
-    let socket_node = socket.fs_node();
+    let Some(socket_node) = socket.fs_node() else {
+        track_stub!(
+            TODO("https://fxbug.dev/414583985"),
+            "check_socket_shutdown_access without FsNode"
+        );
+        return Ok(());
+    };
+
     let current_sid = current_task.security_state.lock().current_sid;
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
         panic!("check_socket_shutdown_access called for non-Socket class")
@@ -317,8 +340,12 @@ pub(in crate::security) fn unix_may_send(
     sending_socket: &Socket,
     receiving_socket: &Socket,
 ) -> Result<(), Errno> {
-    let sending_node = sending_socket.fs_node();
-    let receiving_node = receiving_socket.fs_node();
+    let (Some(sending_node), Some(receiving_node)) =
+        (sending_socket.fs_node(), receiving_socket.fs_node())
+    else {
+        track_stub!(TODO("https://fxbug.dev/414583985"), "unix_may_send without FsNode");
+        return Ok(());
+    };
 
     let sending_sid = fs_node_effective_sid_and_class(&sending_node).sid;
     let receiving_class = fs_node_effective_sid_and_class(&receiving_node).class;
@@ -346,8 +373,12 @@ pub(in crate::security) fn unix_stream_connect(
     listening_socket: &Socket,
     server_socket: &Socket,
 ) -> Result<(), Errno> {
-    let client_node = client_socket.fs_node();
-    let listening_node = listening_socket.fs_node();
+    let (Some(client_node), Some(listening_node)) =
+        (client_socket.fs_node(), listening_socket.fs_node())
+    else {
+        track_stub!(TODO("https://fxbug.dev/414583985"), "unix_stream_connect without FsNode");
+        return Ok(());
+    };
 
     // Verify whether the `client_socket` has permission to connect to the `listening_socket`.
     let client_sid = fs_node_effective_sid_and_class(&client_node).sid;

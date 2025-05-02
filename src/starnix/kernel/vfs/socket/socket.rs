@@ -1214,9 +1214,10 @@ impl Socket {
     }
 
     /// Returns the [`crate::vfs::FsNode`] unique to this `Socket`.
-    /// Panics if the `Socket` has not yet been wrapped via `new_file()`.
-    pub fn fs_node(&self) -> FsNodeHandle {
-        self.state.lock().fs_node.clone().expect("Socket FsNode requested before being set")
+    // TODO: https://fxbug.dev/414583985 - Create `FsNode` at `Socket` creation and make this
+    // infallible.
+    pub fn fs_node(&self) -> Option<FsNodeHandle> {
+        self.state.lock().fs_node.clone()
     }
 }
 
