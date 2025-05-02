@@ -186,6 +186,16 @@
             },
             {
                 "paths": [
+                    "manifests"
+                ],
+                "notes": [
+                    "The 'manifests' directory holds Jiri manifests that contain pins",
+                    "of third-party dependencies, but the dependencies themselves are",
+                    "checked out elsewhere."
+                ]
+            },
+            {
+                "paths": [
                     "tools/check-licenses/assets"
                 ],
                 "notes": [
