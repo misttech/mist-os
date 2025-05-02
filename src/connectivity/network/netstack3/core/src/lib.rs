@@ -54,7 +54,7 @@ pub mod device {
         MaxEthernetFrameSize, RecvEthernetFrameMeta,
     };
     pub use netstack3_device::loopback::{
-        LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId,
+        LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId, LoopbackWeakDeviceId,
     };
     pub use netstack3_device::pure_ip::{
         PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceId,

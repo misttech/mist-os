@@ -48,7 +48,9 @@ use crate::bindings::socket::{IntoErrno, IpSockAddrExt, SockAddr};
 use crate::bindings::{routes, BindingsCtx, LifetimeExt as _};
 
 mod result_ext;
+mod scope_ext;
 pub(crate) use result_ext::*;
+pub(crate) use scope_ext::*;
 
 /// The value used to specify that a `ForwardingEntry.metric` is unset, and the
 /// entry's metric should track the interface's routing metric.

@@ -37,19 +37,17 @@ mod time;
 mod timers;
 mod util;
 
-use std::convert::Infallible as Never;
 use std::fmt::Debug;
 use std::future::Future;
 use std::ops::Deref;
-use std::pin::pin;
 use std::sync::Arc;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker as _, RequestStream};
 use fidl_fuchsia_net_multicast_ext::FidlMulticastAdminIpExt;
 use fuchsia_inspect::health::Reporter as _;
-use futures::channel::mpsc;
-use futures::{select, FutureExt as _, StreamExt as _};
+use futures::channel::{mpsc, oneshot};
+use futures::{FutureExt as _, StreamExt as _};
 use log::{debug, error, info, warn};
 use packet::{Buf, BufferMut};
 use rand::rngs::OsRng;
@@ -77,7 +75,7 @@ use crate::bindings::bpf::EbpfManager;
 use crate::bindings::counters::BindingsCounters;
 use crate::bindings::interfaces_watcher::AddressPropertiesUpdate;
 use crate::bindings::time::{AtomicStackTime, StackTime};
-use crate::bindings::util::TaskWaitGroup;
+use crate::bindings::util::{ScopeExt as _, TaskWaitGroup};
 use net_types::ethernet::Mac;
 use net_types::ip::{
     AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Mtu,
@@ -814,7 +812,7 @@ impl EventContext<RouterAdvertisementEvent<DeviceId<BindingsCtx>>> for BindingsC
 /// Implements `RcNotifier` for futures oneshot channels.
 ///
 /// We need a newtype here because of orphan rules.
-pub(crate) struct ReferenceNotifier<T>(Option<futures::channel::oneshot::Sender<T>>);
+pub(crate) struct ReferenceNotifier<T>(Option<oneshot::Sender<T>>);
 
 impl<T: Send> netstack3_core::sync::RcNotifier<T> for ReferenceNotifier<T> {
     fn notify(&mut self, data: T) {
@@ -830,7 +828,7 @@ impl<T: Send> netstack3_core::sync::RcNotifier<T> for ReferenceNotifier<T> {
 }
 
 pub(crate) struct ReferenceReceiver<T> {
-    pub(crate) receiver: futures::channel::oneshot::Receiver<T>,
+    pub(crate) receiver: oneshot::Receiver<T>,
     pub(crate) debug_references: DynDebugReferences,
 }
 
@@ -872,7 +870,7 @@ impl ReferenceNotifiers for BindingsCtx {
     fn new_reference_notifier<T: Send + 'static>(
         debug_references: DynDebugReferences,
     ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
-        let (sender, receiver) = futures::channel::oneshot::channel();
+        let (sender, receiver) = oneshot::channel();
         (ReferenceNotifier(Some(sender)), ReferenceReceiver { receiver, debug_references })
     }
 }
@@ -1098,11 +1096,10 @@ impl Netstack {
 
     async fn add_loopback(
         &mut self,
-    ) -> (
-        futures::channel::oneshot::Sender<fnet_interfaces_admin::InterfaceRemovedReason>,
-        BindingId,
-        [NamedTask; 2],
-    ) {
+        scope: &fasync::ScopeHandle,
+    ) -> (oneshot::Sender<fnet_interfaces_admin::InterfaceRemovedReason>, BindingId) {
+        let guard = scope.active_guard().expect("scope should be active");
+
         // Add and initialize the loopback interface with the IPv4 and IPv6
         // loopback addresses and on-link routes to the loopback subnets.
         let devices: &Devices<_> = self.ctx.bindings_ctx().as_ref();
@@ -1140,8 +1137,14 @@ impl Netstack {
 
         let LoopbackInfo { static_common_info: _, dynamic_common_info: _, rx_notifier } =
             loopback.external_state();
-        let rx_task =
-            crate::bindings::devices::spawn_rx_task(rx_notifier, self.ctx.clone(), &loopback);
+        let _: fasync::JoinHandle<()> = scope.spawn_guarded_assert_cancelled(
+            guard.clone(),
+            crate::bindings::devices::rx_task(
+                self.ctx.clone(),
+                rx_notifier.watcher(),
+                loopback.downgrade(),
+            ),
+        );
         let loopback: DeviceId<_> = loopback.into();
         self.ctx.bindings_ctx().devices.add_device(binding_id_alloc, loopback.clone());
 
@@ -1183,30 +1186,26 @@ impl Netstack {
         add_loopback_ip_addrs(&mut self.ctx, &loopback).expect("error adding loopback addresses");
         add_loopback_routes(self.ctx.bindings_ctx(), &loopback).await;
 
-        let (stop_sender, stop_receiver) = futures::channel::oneshot::channel();
+        let (stop_sender, stop_receiver) = oneshot::channel();
 
         // Loopback interface can't be removed.
         let removable = false;
         // Loopback doesn't have a defined state stream, provide a stream that
         // never yields anything.
         let state_stream = futures::stream::pending();
-        let control_task = fuchsia_async::Task::spawn(interfaces_admin::run_interface_control(
-            self.ctx.clone(),
-            binding_id,
-            stop_receiver,
-            control_receiver,
-            removable,
-            state_stream,
-            || (),
-        ));
-        (
-            stop_sender,
-            binding_id,
-            [
-                NamedTask::new("loopback control", control_task),
-                NamedTask::new("loopback rx", rx_task),
-            ],
-        )
+        let _: fasync::JoinHandle<()> = scope.spawn_guarded_assert_cancelled(
+            guard,
+            interfaces_admin::run_interface_control(
+                self.ctx.clone(),
+                binding_id,
+                stop_receiver,
+                control_receiver,
+                removable,
+                state_stream,
+                || (),
+            ),
+        );
+        (stop_sender, binding_id)
     }
 }
 
@@ -1263,34 +1262,6 @@ impl<D: DiscoverableProtocolMarker, S: RequestStream<Protocol = D>> RequestStrea
     }
 }
 
-/// A helper struct to have named tasks.
-///
-/// Tasks are already tracked in the executor by spawn location, but long
-/// running tasks are not expected to terminate except during clean shutdown.
-/// Naming these helps root cause debug assertions.
-#[derive(Debug)]
-pub(crate) struct NamedTask {
-    name: &'static str,
-    task: fuchsia_async::Task<()>,
-}
-
-impl NamedTask {
-    /// Creates a new named task from `fut` with `name`.
-    #[track_caller]
-    fn spawn(name: &'static str, fut: impl futures::Future<Output = ()> + Send + 'static) -> Self {
-        Self { name, task: fuchsia_async::Task::spawn(fut) }
-    }
-
-    fn new(name: &'static str, task: fuchsia_async::Task<()>) -> Self {
-        Self { name, task }
-    }
-
-    fn into_future(self) -> impl futures::Future<Output = &'static str> + Send + 'static {
-        let Self { name, task } = self;
-        task.map(move |()| name)
-    }
-}
-
 impl NetstackSeed {
     /// Consumes the netstack and starts serving all the FIDL services it
     /// implements to the outgoing service directory.
@@ -1312,100 +1283,88 @@ impl NetstackSeed {
             mut multicast_admin_workers,
         } = self;
 
+        // Declare distinct levels of workers, organized by shutdown order
+        // requirements.
+        //
+        // - Level 1 workers can be cancelled and terminated as soon as service
+        //   is finished. They may have dependencies on Level 2 workers being
+        //   running.
+        // - Level 2 workers are only cancelled after all level 1 workers are
+        //   done.
+        let level1_workers = fasync::Scope::new_with_name("workers/1");
+        let level2_workers = fasync::Scope::new_with_name("workers/2");
+
         // Start servicing timers.
         let mut timer_handler_ctx = netstack.ctx.clone();
-        let timers_task = NamedTask::new(
-            "timers",
-            netstack.ctx.bindings_ctx().timers.spawn(move |dispatch, timer| {
+        let _: fasync::JoinHandle<()> = netstack.ctx.bindings_ctx().timers.spawn(
+            level1_workers.as_handle(),
+            move |dispatch, timer| {
                 timer_handler_ctx.api().handle_timer(dispatch, timer);
-            }),
+            },
         );
 
         let (dispatchers_v4, dispatchers_v6) = routes_change_runner.update_dispatchers();
 
         // Start executing routes changes.
-        let routes_change_task = NamedTask::spawn("routes_changes", {
-            let ctx = netstack.ctx.clone();
-            async move { routes_change_runner.run(ctx).await }
-        });
-
-        let routes_change_task_fut = routes_change_task.into_future().fuse();
-        let mut routes_change_task_fut = pin!(routes_change_task_fut);
+        let routes_change_task = level2_workers
+            .spawn_new_guard_assert_cancelled({
+                let ctx = netstack.ctx.clone();
+                async move { routes_change_runner.run(ctx).await }
+            })
+            .expect("scope cancelled");
 
         // Start running the multicast admin worker.
-        let multicast_admin_task = NamedTask::spawn("multicast_admin", {
-            let ctx = netstack.ctx.clone();
-            async move { multicast_admin_workers.run(ctx).await }
-        });
-        let multicast_admin_task_fut = multicast_admin_task.into_future().fuse();
-        let mut multicast_admin_task_fut = pin!(multicast_admin_task_fut);
+        let multicast_admin_task = level2_workers
+            .spawn_new_guard_assert_cancelled({
+                let ctx = netstack.ctx.clone();
+                async move { multicast_admin_workers.run(ctx).await }
+            })
+            .expect("scope cancelled");
 
         // Start executing delayed resource removal.
-        let resource_removal_task =
-            NamedTask::spawn("resource_removal", resource_removal_worker.run());
-        let resource_removal_task_fut = resource_removal_task.into_future().fuse();
-        let mut resource_removal_task_fut = pin!(resource_removal_task_fut);
+        let resource_removal_task = level2_workers
+            .spawn_new_guard_assert_cancelled(resource_removal_worker.run())
+            .expect("scope cancelled");
 
         netstack.add_default_rule::<Ipv4>().await;
         netstack.add_default_rule::<Ipv6>().await;
 
-        let (loopback_stopper, _, loopback_tasks): (
-            futures::channel::oneshot::Sender<_>,
-            BindingId,
-            _,
-        ) = netstack.add_loopback().await;
+        let loopback_scope = level1_workers.new_child_with_name("loopback");
+        let (loopback_stopper, _): (_, BindingId) =
+            netstack.add_loopback(loopback_scope.as_handle()).await;
+        // We observe loopback terminating from the worker scope.
+        loopback_scope.detach();
 
-        let interfaces_worker_task = NamedTask::spawn("interfaces worker", async move {
-            let result = interfaces_worker.run().await;
-            let watchers = result.expect("interfaces worker ended with an error");
-            info!("interfaces worker shutting down, waiting for watchers to end");
-            watchers
-                .map(|res| match res {
-                    Ok(()) => (),
-                    Err(e) => {
-                        if !e.is_closed() {
-                            error!("error {e:?} collecting watchers");
+        let _: fasync::JoinHandle<()> = level1_workers
+            .spawn_new_guard_assert_cancelled(async move {
+                let result = interfaces_worker.run().await;
+                let watchers = result.expect("interfaces worker ended with an error");
+                info!("interfaces worker shutting down, waiting for watchers to end");
+                watchers
+                    .map(|res| match res {
+                        Ok(()) => (),
+                        Err(e) => {
+                            if !e.is_closed() {
+                                error!("error {e:?} collecting watchers");
+                            }
                         }
-                    }
-                })
-                .collect::<()>()
-                .await;
-            info!("all interface watchers closed, interfaces worker shutdown is complete");
-        });
-        let ndp_watcher_worker_task =
-            NamedTask::spawn("ndp watcher worker", ndp_watcher_worker.run());
+                    })
+                    .collect::<()>()
+                    .await;
+                info!("all interface watchers closed, interfaces worker shutdown is complete");
+            })
+            .expect("scope cancelled");
 
-        let neighbor_worker_task = NamedTask::spawn("neighbor worker", {
-            let ctx = netstack.ctx.clone();
-            neighbor_worker.run(ctx)
-        });
+        let _: fasync::JoinHandle<()> = level1_workers
+            .spawn_new_guard_assert_cancelled(ndp_watcher_worker.run())
+            .expect("scope cancelled");
 
-        let no_finish_tasks = loopback_tasks.into_iter().chain([
-            interfaces_worker_task,
-            ndp_watcher_worker_task,
-            timers_task,
-            neighbor_worker_task,
-        ]);
-        let mut no_finish_tasks = futures::stream::FuturesUnordered::from_iter(
-            no_finish_tasks.map(NamedTask::into_future),
-        );
-
-        let unexpected_early_finish_fut = async {
-            let no_finish_tasks_fut = no_finish_tasks.by_ref().next().fuse();
-            let mut no_finish_tasks_fut = pin!(no_finish_tasks_fut);
-
-            let name = select! {
-                name = no_finish_tasks_fut => name,
-                name = routes_change_task_fut => Some(name),
-                name = resource_removal_task_fut => Some(name),
-                name = multicast_admin_task_fut => Some(name),
-            };
-            match name {
-                Some(name) => panic!("task {name} ended unexpectedly"),
-                None => panic!("unexpected end of infinite task stream"),
-            }
-        }
-        .fuse();
+        let _: fasync::JoinHandle<()> = level1_workers
+            .spawn_new_guard_assert_cancelled({
+                let ctx = netstack.ctx.clone();
+                neighbor_worker.run(ctx)
+            })
+            .expect("scope cancelled");
 
         let inspector = inspect_publisher.inspector();
         let inspect_nodes = {
@@ -1774,25 +1733,12 @@ impl NetstackSeed {
         // to the lifecycle of the entire component.
         let _inspect_task = inspect_publisher.publish();
 
-        {
-            let services_fut = services_fut.fuse();
-            // Pin services_fut to this block scope so it's dropped after the
-            // select.
-            let mut services_fut = pin!(services_fut);
-
-            // Do likewise for unexpected_early_finish_fut.
-            let mut unexpected_early_finish_fut = pin!(unexpected_early_finish_fut);
-
-            let () = futures::select! {
-                () = services_fut => (),
-                never = unexpected_early_finish_fut => {
-                    let never: Never = never;
-                    match never {}
-                },
-            };
-        }
+        // Wait for services to stop.
+        services_fut.await;
 
         info!("all services terminated, starting shutdown");
+        let level1_workers = level1_workers.cancel();
+
         let ctx = teardown_ctx;
         // Stop the loopback interface.
         loopback_stopper
@@ -1810,26 +1756,33 @@ impl NetstackSeed {
         // Collect the routes admin waitgroup.
         route_waitgroup.await;
 
-        // We've signalled all long running tasks, now we can collect them.
-        no_finish_tasks.map(|name| info!("{name} finished")).collect::<()>().await;
+        // We've signalled all the level 1 workers. Wait for them to finish.
+        level1_workers.await;
+
+        // Now get rid of level2 workers that must exit after level1. Here we
+        // carefully end each task separately.
+        let level2_workers = level2_workers.cancel();
 
         // Stop the routes change runner.
         // NB: All devices must be removed before stopping the routes change
         // runner, otherwise device removal will fail when purging references
         // from the routing table.
         ctx.bindings_ctx().routes.close_senders();
-        let _task_name: &str = routes_change_task_fut.await;
+        routes_change_task.await;
 
         // Stop the multicast admin worker.
         // NB: All devices must be removed before stopping the multicast admin
         // worker, otherwise device removal will fail when purging references
         // from the multicast routing table.
         ctx.bindings_ctx().multicast_admin.close();
-        let _task_name: &str = multicast_admin_task_fut.await;
+        multicast_admin_task.await;
 
         // Stop the resource removal worker.
         ctx.bindings_ctx().resource_removal.close();
-        let _task_name: &str = resource_removal_task_fut.await;
+        resource_removal_task.await;
+
+        // All level2 workers should've finished.
+        level2_workers.await;
 
         // Drop all inspector data, it holds ctx clones.
         std::mem::drop(inspect_nodes);

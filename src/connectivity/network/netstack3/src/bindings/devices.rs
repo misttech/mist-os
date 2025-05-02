@@ -11,6 +11,7 @@ use super::util::NeedsDataWatcher;
 use super::DeviceIdExt;
 use assert_matches::assert_matches;
 use derivative::Derivative;
+use fuchsia_async as fasync;
 use futures::future::FusedFuture;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
 use itertools::Itertools as _;
@@ -19,7 +20,7 @@ use net_types::ip::{IpAddr, Mtu};
 use net_types::{SpecifiedAddr, UnicastAddr};
 use netstack3_core::device::{
     BatchSize, DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceSendFrameError,
-    EthernetLinkDevice, LoopbackDeviceId, PureIpDevice, WeakDeviceId,
+    EthernetLinkDevice, LoopbackWeakDeviceId, PureIpDevice, WeakDeviceId,
 };
 use netstack3_core::sync::RwLock as CoreRwLock;
 use netstack3_core::trace::trace_duration;
@@ -323,39 +324,34 @@ impl DeviceSpecificInfo<'_> {
     }
 }
 
-pub(crate) fn spawn_rx_task(
-    notifier: &NeedsDataNotifier,
+pub(crate) async fn rx_task(
     mut ctx: Ctx,
-    device_id: &LoopbackDeviceId<BindingsCtx>,
-) -> fuchsia_async::Task<()> {
-    let mut watcher = notifier.watcher();
-    let device_id = device_id.downgrade();
+    mut watcher: NeedsDataWatcher,
+    device_id: LoopbackWeakDeviceId<BindingsCtx>,
+) {
+    let mut yield_fut = futures::future::OptionFuture::default();
+    loop {
+        // Loop while we are woken up to handle enqueued RX packets.
+        let r = futures::select! {
+            w = watcher.next().fuse() => w,
+            y = yield_fut => Some(y.expect("OptionFuture is only selected when non-empty")),
+        };
 
-    fuchsia_async::Task::spawn(async move {
-        let mut yield_fut = futures::future::OptionFuture::default();
-        loop {
-            // Loop while we are woken up to handle enqueued RX packets.
-            let r = futures::select! {
-                w = watcher.next().fuse() => w,
-                y = yield_fut => Some(y.expect("OptionFuture is only selected when non-empty")),
-            };
+        let r = r.and_then(|()| {
+            device_id
+                .upgrade()
+                .map(|device_id| ctx.api().receive_queue().handle_queued_frames(&device_id))
+        });
 
-            let r = r.and_then(|()| {
-                device_id
-                    .upgrade()
-                    .map(|device_id| ctx.api().receive_queue().handle_queued_frames(&device_id))
-            });
-
-            match r {
-                Some(WorkQueueReport::AllDone) => (),
-                Some(WorkQueueReport::Pending) => {
-                    // Yield the task to the executor once.
-                    yield_fut = Some(async_utils::futures::YieldToExecutorOnce::new()).into();
-                }
-                None => break,
+        match r {
+            Some(WorkQueueReport::AllDone) => (),
+            Some(WorkQueueReport::Pending) => {
+                // Yield the task to the executor once.
+                yield_fut = Some(async_utils::futures::YieldToExecutorOnce::new()).into();
             }
+            None => break,
         }
-    })
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -367,7 +363,7 @@ pub(crate) enum TxTaskError {
 }
 
 pub(crate) struct TxTask {
-    task: fuchsia_async::Task<Result<(), TxTaskError>>,
+    task: fasync::Task<Result<(), TxTaskError>>,
     cancel: futures::future::AbortHandle,
 }
 
@@ -382,7 +378,7 @@ impl TxTask {
             Ok(o) => o,
             Err(futures::future::Aborted) => Err(TxTaskError::Aborted),
         });
-        let task = fuchsia_async::Task::spawn(fut);
+        let task = fasync::Task::spawn(fut);
         Self { task, cancel }
     }
 
@@ -639,7 +635,7 @@ pub(crate) struct AddressInfo {
 pub(crate) struct FidlWorkerInfo<R> {
     // The worker `Task`, wrapped in a `Shared` future so that it can be awaited
     // multiple times.
-    pub(crate) worker: futures::future::Shared<fuchsia_async::Task<()>>,
+    pub(crate) worker: futures::future::Shared<fasync::Task<()>>,
     // Mechanism to cancel the worker with reason `R`. If `Some`, the worker is
     // active (and holds the `Receiver`). Otherwise, the worker has been
     // canceled.

@@ -153,6 +153,7 @@ common_sources = [
   "src/bindings/timers.rs",
   "src/bindings/util.rs",
   "src/bindings/util/result_ext.rs",
+  "src/bindings/util/scope_ext.rs",
   "src/main.rs",
 ]
 
