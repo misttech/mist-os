@@ -695,8 +695,9 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
 
     /// Starts the clock on the requested reference->utc transform, recording diagnostic events.
     fn start_clock(&mut self, estimate_transform: &UtcTransform) {
-        let mono = fasync::BootInstant::now();
-        let clock_update = estimate_transform.jump_to(mono.into());
+        // This reading is affected by the clock injected in the current executor.
+        let boot_now = fasync::BootInstant::now();
+        let clock_update = estimate_transform.jump_to(boot_now.into());
         self.update_clock(clock_update);
 
         self.diagnostics.record(Event::StartClock {
@@ -705,7 +706,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         });
 
         let utc_chrono =
-            Utc.timestamp_nanos(estimate_transform.synthetic(mono.into()).into_nanos());
+            Utc.timestamp_nanos(estimate_transform.synthetic(boot_now.into()).into_nanos());
         info!("started {:?} clock from external source at {}", self.track, utc_chrono);
         self.set_delayed_update_task(vec![], estimate_transform);
     }
@@ -717,11 +718,14 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         self.delayed_updates = None;
 
         let current_transform = UtcTransform::from(self.clock.as_ref());
-        let mono = fasync::BootInstant::now();
+        let boot_now = fasync::BootInstant::now();
 
-        let correction =
-            ClockCorrection::for_transition(mono.into(), &current_transform, estimate_transform);
-        self.record_correction(correction, estimate_transform, mono.into());
+        let correction = ClockCorrection::for_transition(
+            boot_now.into(),
+            &current_transform,
+            estimate_transform,
+        );
+        self.record_correction(correction, estimate_transform, boot_now.into());
     }
 
     /// Records this particular clock correction.
@@ -729,7 +733,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         &mut self,
         correction: ClockCorrection,
         estimate_transform: &UtcTransform,
-        mono: zx::BootInstant,
+        boot_reference: zx::BootInstant,
     ) {
         self.record_clock_correction(correction.difference(), correction.strategy());
         match correction {
@@ -756,7 +760,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                 self.record_clock_update(ClockUpdateReason::TimeStep);
 
                 let utc_chrono =
-                    Utc.timestamp_nanos(estimate_transform.synthetic(mono).into_nanos());
+                    Utc.timestamp_nanos(estimate_transform.synthetic(boot_reference).into_nanos());
                 info!("stepped {:?} clock to {}", self.track, utc_chrono);
 
                 // Create a task to asynchronously increase error bound over time.
@@ -894,7 +898,8 @@ mod tests {
     use crate::rtc::FakeRtc;
     use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
     use crate::{
-        make_test_config, make_test_config_with_delay, make_test_config_with_fn, run_in_fake_time,
+        clone_system_time, make_test_config, make_test_config_with_delay, make_test_config_with_fn,
+        run_in_fake_time,
     };
     use assert_matches::assert_matches;
     use fidl_fuchsia_time_external::{self as ftexternal, Status};
@@ -1005,28 +1010,28 @@ mod tests {
 
     #[fuchsia::test]
     fn clock_correction_for_transition_nominal_rate_slew() {
-        let mono = zx::BootInstant::get();
+        let boot_now = zx::BootInstant::get();
         // Note the initial transform has a reference point before reference and has been
         // running since then with a small rate adjustment.
         let initial_transform = create_transform(
-            mono - zx::BootDuration::from_minutes(1),
+            boot_now - zx::BootDuration::from_minutes(1),
             UtcInstant::from_nanos(
-                (mono - zx::BootDuration::from_minutes(1) + OFFSET).into_nanos(),
+                (boot_now - zx::BootDuration::from_minutes(1) + OFFSET).into_nanos(),
             ),
             BASE_RATE,
             zx::BootDuration::from_nanos(0),
         );
         let final_transform = create_transform(
-            mono,
+            boot_now,
             UtcInstant::from_nanos(
-                (mono + OFFSET + zx::BootDuration::from_millis(50)).into_nanos(),
+                (boot_now + OFFSET + zx::BootDuration::from_millis(50)).into_nanos(),
             ),
             BASE_RATE_2,
             STD_DEV,
         );
 
         let correction =
-            ClockCorrection::for_transition(mono, &initial_transform, &final_transform);
+            ClockCorrection::for_transition(boot_now, &initial_transform, &final_transform);
         let expected_difference = zx::BootDuration::from_nanos(
             zx::BootDuration::from_minutes(1).into_nanos() * -BASE_RATE as i64 / MILLION,
         ) + zx::BootDuration::from_millis(50);
@@ -1038,8 +1043,8 @@ mod tests {
         // The values chosen for rates and offset differences mean this is a nominal rate slew.
         let expected_duration = (expected_difference * MILLION) / NOMINAL_RATE_CORRECTION_PPM;
         let expected_start_error_bound =
-            final_transform.error_bound(mono) + expected_difference.into_nanos() as u64;
-        let expected_end_error_bound = final_transform.error_bound(mono + expected_duration);
+            final_transform.error_bound(boot_now) + expected_difference.into_nanos() as u64;
+        let expected_end_error_bound = final_transform.error_bound(boot_now + expected_duration);
 
         assert_eq!(correction.strategy(), ClockCorrectionStrategy::NominalRateSlew);
         match correction {
@@ -1057,24 +1062,24 @@ mod tests {
 
     #[fuchsia::test]
     fn clock_correction_for_transition_max_duration_slew() {
-        let mono = zx::BootInstant::get();
+        let boot_now = zx::BootInstant::get();
         let initial_transform = create_transform(
-            mono,
-            UtcInstant::from_nanos((mono + OFFSET).into_nanos()),
+            boot_now,
+            UtcInstant::from_nanos((boot_now + OFFSET).into_nanos()),
             BASE_RATE,
             STD_DEV,
         );
         let final_transform = create_transform(
-            mono,
+            boot_now,
             UtcInstant::from_nanos(
-                (mono + OFFSET - zx::BootDuration::from_millis(500)).into_nanos(),
+                (boot_now + OFFSET - zx::BootDuration::from_millis(500)).into_nanos(),
             ),
             BASE_RATE,
             STD_DEV,
         );
 
         let correction =
-            ClockCorrection::for_transition(mono, &initial_transform, &final_transform);
+            ClockCorrection::for_transition(boot_now, &initial_transform, &final_transform);
         let expected_difference = zx::BootDuration::from_millis(-500);
         // Note there is a slight loss of precision in converting from a difference to a rate for
         // a duration.
@@ -1083,9 +1088,9 @@ mod tests {
         // The value chosen for offset difference means this is a max duration slew.
         let expected_duration = zx::BootDuration::from_nanos(5376344086021);
         let expected_rate = -93;
-        let expected_start_error_bound =
-            final_transform.error_bound(mono) + correction.difference().into_nanos().abs() as u64;
-        let expected_end_error_bound = final_transform.error_bound(mono + expected_duration);
+        let expected_start_error_bound = final_transform.error_bound(boot_now)
+            + correction.difference().into_nanos().abs() as u64;
+        let expected_end_error_bound = final_transform.error_bound(boot_now + expected_duration);
 
         assert_eq!(correction.strategy(), ClockCorrectionStrategy::MaxDurationSlew);
         match correction {
@@ -1103,30 +1108,32 @@ mod tests {
 
     #[fuchsia::test]
     fn clock_correction_for_transition_step() {
-        let mono = zx::BootInstant::get();
+        let boot_now = zx::BootInstant::get();
         let initial_transform = create_transform(
-            mono - zx::BootDuration::from_minutes(1),
+            boot_now - zx::BootDuration::from_minutes(1),
             UtcInstant::from_nanos(
-                (mono - zx::BootDuration::from_minutes(1) + OFFSET).into_nanos(),
+                (boot_now - zx::BootDuration::from_minutes(1) + OFFSET).into_nanos(),
             ),
             0,
             zx::BootDuration::from_nanos(0),
         );
         let final_transform = create_transform(
-            mono,
-            UtcInstant::from_nanos((mono + OFFSET + zx::BootDuration::from_hours(1)).into_nanos()),
+            boot_now,
+            UtcInstant::from_nanos(
+                (boot_now + OFFSET + zx::BootDuration::from_hours(1)).into_nanos(),
+            ),
             BASE_RATE_2,
             STD_DEV,
         );
 
         let correction =
-            ClockCorrection::for_transition(mono, &initial_transform, &final_transform);
+            ClockCorrection::for_transition(boot_now, &initial_transform, &final_transform);
         let expected_difference = UtcDuration::from_hours(1);
         assert_eq!(correction.difference(), expected_difference);
         assert_eq!(correction.strategy(), ClockCorrectionStrategy::Step);
         match correction {
             ClockCorrection::Step(step) => {
-                assert_eq!(step.clock_update(), final_transform.jump_to(mono));
+                assert_eq!(step.clock_update(), final_transform.jump_to(boot_now));
             }
             _ => panic!("incorrect clock correction type returned"),
         };
@@ -1281,7 +1288,7 @@ mod tests {
             Event::TimeSourceStatus { role: TEST_ROLE, status: Status::Ok },
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
-                reference: reference,
+                reference,
                 utc: UtcInstant::from_nanos((reference + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
@@ -1293,6 +1300,7 @@ mod tests {
     #[fuchsia::test]
     fn fail_when_no_initial_delay() {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
+        let (_, _) = clone_system_time(&mut executor);
 
         let clock = create_clock();
         let rtc = FakeRtc::valid(BACKSTOP_TIME);
@@ -1493,10 +1501,8 @@ mod tests {
     #[fuchsia::test]
     fn subsequent_updates_accepted() {
         // Start from the system time.
-        let real_mono_now = zx::MonotonicInstant::get();
-
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time((real_mono_now + zx::MonotonicDuration::from_nanos(1000)).into());
+        let (_, _) = clone_system_time(&mut executor);
         let (ts, mut tr) = mpsc::channel(2);
 
         let clock = create_clock();
@@ -1599,8 +1605,7 @@ mod tests {
         // time. This works around validation checks in TimeSourceManager, which use actual time as
         // reference. These checks are valid at real runtime, but not at fake time.
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        let actual_time = zx::MonotonicInstant::get();
-        executor.set_fake_time(actual_time.into());
+        let (_, _) = clone_system_time(&mut executor);
 
         // Calculate a small change in offset that will be corrected by slewing and is large enough
         // to require an error bound reduction. Note the tests doesn't have to actually wait this
@@ -1817,25 +1822,6 @@ mod tests {
             ),
             Err(_)
         );
-    }
-
-    // Sets up the given `executor` to the current system time.
-    //
-    // # Returns
-    // - The applied monotonic and boot instants.
-    fn clone_system_time(
-        executor: &mut fasync::TestExecutor,
-    ) -> (zx::MonotonicInstant, zx::BootInstant) {
-        let real_now = zx::MonotonicInstant::get();
-        let real_boot_now = zx::BootInstant::get();
-        let offset_nanos = real_boot_now.into_nanos() - real_now.into_nanos();
-        // Offset is nonnegative by definition, since the boot time reading is at least
-        // the monotonic time reading.
-        assert!(offset_nanos >= 0, "offset can not be negative: {:?}", offset_nanos);
-        executor.set_fake_time(real_now.into());
-        let offset = zx::BootDuration::from_nanos(offset_nanos);
-        executor.set_fake_boot_to_mono_offset(offset);
-        (real_now, real_boot_now)
     }
 
     #[fuchsia::test]

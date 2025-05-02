@@ -695,7 +695,8 @@ async fn maintain_utc<R: Rtc, D: 'static>(
 // Reexport test config creation to be used in other tests.
 #[cfg(test)]
 use tests::{
-    make_test_config, make_test_config_with_delay, make_test_config_with_fn, run_in_fake_time,
+    clone_system_time, make_test_config, make_test_config_with_delay, make_test_config_with_fn,
+    run_in_fake_time,
 };
 
 #[cfg(test)]
@@ -725,6 +726,30 @@ mod tests {
 
     lazy_static! {
         static ref CLOCK_OPTS: zx::ClockOpts = zx::ClockOpts::empty();
+    }
+
+    // Sets up the given `executor` to the current system time.
+    //
+    // Most importantly, handles possible discrepancy between the boot and monotonic
+    // timelines, which can make a difference in the case of timekeeping tests.
+    //
+    // # Returns
+    // - The applied monotonic and boot instants as a tuple, in that order.
+    pub fn clone_system_time(
+        executor: &mut fasync::TestExecutor,
+    ) -> (zx::MonotonicInstant, zx::BootInstant) {
+        let real_now = zx::MonotonicInstant::get();
+        let real_boot_now = zx::BootInstant::get();
+        let offset_nanos = real_boot_now.into_nanos() - real_now.into_nanos();
+
+        // Offset is nonnegative by definition, since the boot time reading is at least
+        // the monotonic time reading.
+        assert!(offset_nanos >= 0, "offset can not be negative: {:?}", offset_nanos);
+
+        executor.set_fake_time(real_now.into());
+        let offset = zx::BootDuration::from_nanos(offset_nanos);
+        executor.set_fake_boot_to_mono_offset(offset);
+        (real_now, real_boot_now)
     }
 
     // Run the future `main_fut` in fake time.  The fake time is being advanced
@@ -1027,12 +1052,10 @@ mod tests {
 
     #[fuchsia::test]
     fn fail_when_no_delays() {
-        let actual_now = zx::MonotonicInstant::get();
-
         let mut executor = fasync::TestExecutor::new_with_fake_time();
         // Ensure that we don't hit hard limitations such as backstop but that
         // we still run in fake time.
-        executor.set_fake_time(actual_now.into());
+        clone_system_time(&mut executor);
 
         let (primary_clock, primary_ticks) = create_clock();
         let rtc = FakeRtc::valid(INVALID_RTC_TIME);
@@ -1085,9 +1108,8 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_invalid_rtc() {
-        let real_boot_now = zx::MonotonicInstant::get();
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(real_boot_now.into());
+        clone_system_time(&mut executor);
 
         let (clock, initial_update_ticks) = create_clock();
         let rtc = FakeRtc::valid(INVALID_RTC_TIME);
@@ -1136,10 +1158,8 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_invalid_rtc_force_start() {
-        let real_boot_now = zx::MonotonicInstant::get();
-
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time((real_boot_now + zx::MonotonicDuration::from_nanos(1000)).into());
+        clone_system_time(&mut executor);
 
         let (clock, initial_update_ticks) = create_clock();
         let rtc = FakeRtc::valid(INVALID_RTC_TIME);
@@ -1196,9 +1216,8 @@ mod tests {
     #[fuchsia::test]
     fn no_update_valid_rtc() {
         // Start from the system time. Required to work around backstop time issues.
-        let real_boot_now = zx::MonotonicInstant::get();
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(real_boot_now.into());
+        clone_system_time(&mut executor);
 
         let (clock, initial_update_ticks) = create_clock();
         let rtc = FakeRtc::valid(VALID_RTC_TIME);
@@ -1245,9 +1264,8 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_clock_already_running() {
-        let real_boot_now = zx::MonotonicInstant::get();
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(real_boot_now.into());
+        let (_, _) = clone_system_time(&mut executor);
 
         // Create a clock and set it slightly after backstop
         let (clock, _) = create_clock();
