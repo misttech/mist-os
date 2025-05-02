@@ -15,11 +15,10 @@ use ffx_config::EnvironmentContext;
 use ffx_core::{downcast_injector_error, FfxInjectorError, Injector};
 use ffx_daemon::{get_daemon_proxy_single_link, is_daemon_running_at_path, DaemonConfig};
 use ffx_target::{get_remote_proxy, open_target_with_fut};
-use fidl::endpoints::{ClientEnd, Proxy};
+use fidl::endpoints::Proxy;
 use fidl_fuchsia_developer_ffx::{DaemonError, DaemonProxy, TargetInfo, TargetProxy, VersionInfo};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use fidl_fuchsia_io::DirectoryMarker;
-use futures::{FutureExt, SinkExt};
+use futures::FutureExt;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -96,12 +95,8 @@ pub struct Injection {
     node: Arc<overnet_core::Router>,
     daemon_once: ProxyState<DaemonProxy>,
     remote_once: ProxyState<RemoteControlProxy>,
-    fdomain: Mutex<
-        Option<(
-            Arc<fdomain_client::Client>,
-            futures::channel::mpsc::Sender<ClientEnd<DirectoryMarker>>,
-        )>,
-    >,
+    fdomain:
+        Mutex<Option<(Arc<fdomain_client::Client>, Arc<Mutex<fidl_fuchsia_io::DirectoryProxy>>)>>,
 }
 
 pub const CONFIG_DAEMON_AUTOSTART: &str = "daemon.autostart";
@@ -210,6 +205,51 @@ impl Injection {
                 .await,
         )
     }
+
+    async fn remote_factory_fdomain_inner(
+        &self,
+        toolbox: fidl_fuchsia_io::DirectoryProxy,
+    ) -> Result<FRemoteControlProxy> {
+        let fdomain = {
+            let mut fdomain = self.fdomain.lock().unwrap();
+            if let Some((fdomain, proxy)) = &*fdomain {
+                *proxy.lock().unwrap() = toolbox;
+                fdomain.clone()
+            } else {
+                let toolbox = Arc::new(Mutex::new(toolbox));
+                let client_toolbox = Arc::clone(&toolbox);
+                let client = fdomain_local::local_client(move || {
+                    let toolbox = Clone::clone(&*client_toolbox.lock().unwrap());
+
+                    let (client, server) = fidl::endpoints::create_endpoints();
+                    if let Err(error) = toolbox.open(
+                        ".",
+                        fidl_fuchsia_io::Flags::PROTOCOL_DIRECTORY,
+                        &fidl_fuchsia_io::Options::default(),
+                        server.into(),
+                    ) {
+                        tracing::debug!(?error, "Could not open svc folder in toolbox namespace");
+                    };
+                    Ok(client)
+                });
+
+                fdomain.get_or_insert((client, toolbox)).0.clone()
+            }
+        };
+
+        let namespace = fdomain.namespace().await?;
+        let namespace =
+            fdomain_client::fidl::ClientEnd::<fio_fdomain::DirectoryMarker>::new(namespace)
+                .into_proxy();
+        let (proxy, server_end) = fdomain.create_proxy::<FRemoteControlMarker>();
+        namespace.open(
+            FRemoteControlMarker::PROTOCOL_NAME,
+            fio_fdomain::Flags::PROTOCOL_SERVICE,
+            &fio_fdomain::Options::default(),
+            server_end.into_channel(),
+        )?;
+        Ok(proxy)
+    }
 }
 
 #[async_trait(?Send)]
@@ -289,52 +329,9 @@ impl Injector for Injection {
     #[tracing::instrument]
     async fn remote_factory_fdomain(&self) -> Result<FRemoteControlProxy> {
         let rcs = self.remote_factory().await?;
-        let toolbox = rcs::toolbox::open_toolbox(&rcs)
-            .await?
-            .into_client_end()
-            .expect("Directory proxy couldn't become an endpoint despite being brand new!");
+        let toolbox = rcs::toolbox::open_toolbox(&rcs).await?;
 
-        let fdomain = self.fdomain.lock().unwrap().clone();
-        let (fdomain, mut sender) = if let Some(fdomain) = fdomain {
-            fdomain
-        } else {
-            let (sender, receiver) = futures::channel::mpsc::channel(1);
-            let receiver = Mutex::new(receiver);
-            let client = fdomain_local::local_client(move || {
-                let ret = receiver
-                    .lock()
-                    .unwrap()
-                    .try_next()
-                    .map_err(|_| fidl::Status::INTERNAL)
-                    .transpose()
-                    .unwrap_or_else(|| Err(fidl::Status::INTERNAL));
-
-                if ret.is_err() {
-                    tracing::debug!(
-                        "Somehow didn't get the proxy we created to answer this request."
-                    )
-                }
-                ret
-            });
-
-            let mut fdomain = self.fdomain.lock().unwrap();
-            fdomain.get_or_insert((client, sender)).clone()
-        };
-
-        sender.send(toolbox).await?;
-
-        let namespace = fdomain.namespace().await?;
-        let namespace =
-            fdomain_client::fidl::ClientEnd::<fio_fdomain::DirectoryMarker>::new(namespace)
-                .into_proxy();
-        let (proxy, server_end) = fdomain.create_proxy::<FRemoteControlMarker>();
-        namespace.open(
-            FRemoteControlMarker::PROTOCOL_NAME,
-            fio_fdomain::Flags::PROTOCOL_SERVICE,
-            &fio_fdomain::Options::default(),
-            server_end.into_channel(),
-        )?;
-        Ok(proxy)
+        self.remote_factory_fdomain_inner(toolbox).await
     }
 
     async fn is_experiment(&self, key: &str) -> bool {
@@ -474,11 +471,13 @@ mod test {
         TargetCollectionRequest, TargetCollectionRequestStream, TargetConnectionError,
         TargetMarker, TargetRequest,
     };
+    use fidl_fuchsia_developer_remotecontrol::RemoteControlRequestStream;
     use fuchsia_async::Task;
     use futures::{AsyncReadExt, StreamExt, TryStreamExt};
     use netext::{TokioAsyncReadExt, UnixListenerStream};
     use std::path::PathBuf;
     use tokio::net::UnixListener;
+    use vfs::directory::helper::DirectlyMutable;
 
     /// Retry a future until it succeeds or retries run out.
     async fn retry_with_backoff<E, F>(
@@ -999,5 +998,112 @@ mod test {
         assert_eq!(err, TargetConnectionError::KeyVerificationFailure);
         // We should still get the target info even during failure.
         assert_eq!(target_info.unwrap().nodename.unwrap(), "target_name".to_owned());
+    }
+
+    #[fuchsia::test]
+    async fn test_rcs_connection_fdomain() {
+        let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
+        let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
+        let local_node = overnet_core::Router::new(None).unwrap();
+        fn start_target_task(target_handle: ServerEnd<TargetMarker>) -> Task<()> {
+            let mut stream = target_handle.into_stream();
+
+            Task::local(async move {
+                while let Some(request) = stream.try_next().await.unwrap() {
+                    match request {
+                        TargetRequest::Identity { responder } => {
+                            responder
+                                .send(&TargetInfo {
+                                    nodename: Some("target_name".into()),
+                                    ..TargetInfo::default()
+                                })
+                                .unwrap();
+                        }
+                        TargetRequest::OpenRemoteControl { remote_control, responder } => {
+                            Task::local(async move {
+                                let mut stream = remote_control.into_stream();
+                                while let Ok(Some(request)) = stream.try_next().await {
+                                    eprintln!("Got a request for RCS proxy: {request:?}");
+                                }
+                            })
+                            .detach();
+                            responder.send(Ok(())).unwrap();
+                        }
+                        TargetRequest::GetSshLogs { responder } => responder.send("").unwrap(),
+                        _ => {
+                            eprintln!("unhandled request: {request:?}");
+                            panic!("unhandled: {request:?}")
+                        }
+                    }
+                }
+            })
+        }
+
+        fn start_target_collection_task(channel: fidl::AsyncChannel) -> Task<()> {
+            let mut stream = TargetCollectionRequestStream::from_channel(channel);
+            Task::local(async move {
+                while let Some(request) = stream.try_next().await.unwrap() {
+                    eprintln!("{request:?}");
+                    match request {
+                        TargetCollectionRequest::OpenTarget {
+                            query: _,
+                            target_handle,
+                            responder,
+                        } => {
+                            start_target_task(target_handle).detach();
+
+                            responder.send(Ok(())).unwrap();
+                        }
+                        _ => panic!("unhandled: {request:?}"),
+                    }
+                }
+            })
+        }
+
+        let daemon_request_handler = move |request| async move {
+            match request {
+                DaemonRequest::ConnectToProtocol { name, server_end, responder }
+                    if name == TargetCollectionMarker::PROTOCOL_NAME =>
+                {
+                    start_target_collection_task(fidl::AsyncChannel::from_channel(server_end))
+                        .detach();
+                    responder.send(Ok(()))?;
+                }
+                _ => panic!("unhandled request: {request:?}"),
+            }
+            Ok(())
+        };
+
+        let sockpath1 = sockpath.to_owned();
+        let local_node1 = Arc::clone(&local_node);
+        test_daemon_custom(
+            local_node1,
+            sockpath1.to_owned(),
+            "testcurrenthash",
+            0,
+            daemon_request_handler,
+        )
+        .await
+        .detach();
+
+        let injection = Injection::new(
+            test_env.context.clone(),
+            DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
+            local_node,
+            Some("".into()),
+        );
+
+        let dir = vfs::directory::immutable::simple();
+        dir.add_entry(
+            "fuchsia.developer.remotecontrol.RemoteControl",
+            vfs::service::host(|mut request_stream: RemoteControlRequestStream| async move {
+                while let Ok(Some(request)) = request_stream.try_next().await {
+                    eprintln!("Got a request for RCS proxy: {request:?}");
+                }
+            }),
+        )
+        .unwrap();
+        let dir_proxy = vfs::directory::serve_read_only(Arc::clone(&dir));
+        assert!(injection.remote_factory_fdomain_inner(dir_proxy).await.is_ok());
     }
 }

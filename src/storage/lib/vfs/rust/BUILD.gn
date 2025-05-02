@@ -165,6 +165,7 @@ if (is_host) {
     visibility = [
       "../*",
       "//sdk/lib/device-watcher/rust:*",
+      "//src/developer/ffx/daemon/proxy:*",
       "//src/developer/ffx/playground:*",
       "//src/developer/ffx/tools/playground:*",
       "//src/lib/fuchsia-fs:*",

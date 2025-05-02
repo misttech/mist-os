@@ -44,6 +44,7 @@ rustc_library("lib") {
     "//src/connectivity/overnet/lib/ascendd",
     "//src/developer/ffx/lib/netext:lib",
     "//src/lib/fuchsia",
+    "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:tokio",
   ]
