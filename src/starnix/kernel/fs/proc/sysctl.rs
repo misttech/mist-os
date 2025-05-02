@@ -196,6 +196,12 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.entry(
             current_task,
+            "ngroups_max",
+            BytesFile::new_node(b"65536\n".to_vec()),
+            mode!(IFREG, 0o444),
+        );
+        dir.entry(
+            current_task,
             "panic_on_oops",
             StubSysctl::new_node(
                 "/proc/sys/kernel/panic_on_oops",
