@@ -47,12 +47,10 @@ class TableWithHandle {
   TableWithHandle(TableWithHandle&&) noexcept = default;
   TableWithHandle& operator=(TableWithHandle&&) noexcept = default;
 
-  bool IsEmpty() const {
-    return !(storage_.h.has_value());
-  }
+  bool IsEmpty() const;
 
-  const std::optional<::zx::vmo>& h() const { return storage_.h; }
-  ::std::optional<::zx::vmo>& h() { return storage_.h; }
+  const std::optional<::zx::vmo>& h() const;
+  ::std::optional<::zx::vmo>& h();
 
   // Setter for h.
   //
@@ -87,47 +85,21 @@ class UnionWithHandle {
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
 
-  UnionWithHandle(UnionWithHandle&& other) noexcept
-      : UnionWithHandle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
-    *storage_ = std::move(*other.storage_);
-  }
-  UnionWithHandle& operator=(UnionWithHandle&& other) noexcept {
-    if (this != &other) {
-      *storage_ = std::move(*other.storage_);
-    }
-    return *this;
-  }
-  constexpr bool IsUnknown() const {
-    return Which() == ::test_handlesintypes::UnionWithHandle::Tag::_do_not_handle_this__write_a_default_case_instead;
-  }
+  UnionWithHandle(UnionWithHandle&& other) noexcept;
+  UnionWithHandle& operator=(UnionWithHandle&& other) noexcept;
+  bool IsUnknown() const;
 
-  constexpr ::test_handlesintypes::UnionWithHandle::Tag Which() const {
-    return UnionWithHandle::IndexToTag(storage_->index()).value();
-  }
-  static UnionWithHandle WithH(::zx::vmo val) {
-    return UnionWithHandle(std::make_shared<Storage_>(
-        std::in_place_index_t<1>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<1, Storage_> h() const {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<1, Storage_> h() {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
+  ::test_handlesintypes::UnionWithHandle::Tag Which() const;
+  static UnionWithHandle WithH(::zx::vmo val);
+  const ::fidl::internal::UnionMemberView<1, Storage_> h() const;
+  ::fidl::internal::UnionMemberView<1, Storage_> h();
 
   // Sets the union to hold the h member.
   //
 
-  UnionWithHandle& h(::zx::vmo value) {
-    storage_->emplace<1>(std::move(value));
-    return *this;
-  }
+  UnionWithHandle& h(::zx::vmo value);
 
-  UnionWithHandle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
-      : storage_(std::make_shared<Storage_>()) {}
+  UnionWithHandle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -135,26 +107,10 @@ class UnionWithHandle {
   static constexpr auto kMembers = std::make_tuple(
       ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintHandle<ZX_OBJ_TYPE_VMO, 0x80000000, false>>());
 
-  explicit UnionWithHandle(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+  explicit UnionWithHandle(std::shared_ptr<Storage_> storage);
 
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_handlesintypes::UnionWithHandle::Tag tag) {
-    switch (tag) {
-      case ::test_handlesintypes::UnionWithHandle::Tag::kH:
-        return 1;
-      default: {
-        return 0;
-      }
-    }
-  }
-
-  static constexpr std::optional<::test_handlesintypes::UnionWithHandle::Tag> IndexToTag(size_t index) {
-    switch (index) {
-      case 1:
-        return ::test_handlesintypes::UnionWithHandle::Tag::kH;
-      default:
-        return ::test_handlesintypes::UnionWithHandle::Tag::_do_not_handle_this__write_a_default_case_instead;
-    }
-  }
+  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_handlesintypes::UnionWithHandle::Tag tag);
+  static std::optional<::test_handlesintypes::UnionWithHandle::Tag> IndexToTag(size_t index);
 };
 
 class HandlesInTypes {
@@ -175,13 +131,9 @@ class HandlesInTypes {
   HandlesInTypes& operator=(HandlesInTypes&&) noexcept = default;
 
   const ::zx::vmo&
-  normal_handle() const {
-    return storage_.normal_handle;
-  }
+  normal_handle() const;
 
-  ::zx::vmo& normal_handle() {
-    return storage_.normal_handle;
-  }
+  ::zx::vmo& normal_handle();
 
   // Setter for normal_handle.
   //
@@ -189,13 +141,9 @@ class HandlesInTypes {
   HandlesInTypes& normal_handle(::zx::vmo value);
 
   const ::std::vector<::zx::vmo>&
-  handle_in_vec() const {
-    return storage_.handle_in_vec;
-  }
+  handle_in_vec() const;
 
-  ::std::vector<::zx::vmo>& handle_in_vec() {
-    return storage_.handle_in_vec;
-  }
+  ::std::vector<::zx::vmo>& handle_in_vec();
 
   // Setter for handle_in_vec.
   //
@@ -203,13 +151,9 @@ class HandlesInTypes {
   HandlesInTypes& handle_in_vec(::std::vector<::zx::vmo> value);
 
   const ::std::array<::zx::vmo, 5>&
-  handle_in_array() const {
-    return storage_.handle_in_array;
-  }
+  handle_in_array() const;
 
-  ::std::array<::zx::vmo, 5>& handle_in_array() {
-    return storage_.handle_in_array;
-  }
+  ::std::array<::zx::vmo, 5>& handle_in_array();
 
   // Setter for handle_in_array.
   //
@@ -217,13 +161,9 @@ class HandlesInTypes {
   HandlesInTypes& handle_in_array(::std::array<::zx::vmo, 5> value);
 
   const ::std::vector<::std::array<::zx::vmo, 5>>&
-  handle_in_mixed_vec_array() const {
-    return storage_.handle_in_mixed_vec_array;
-  }
+  handle_in_mixed_vec_array() const;
 
-  ::std::vector<::std::array<::zx::vmo, 5>>& handle_in_mixed_vec_array() {
-    return storage_.handle_in_mixed_vec_array;
-  }
+  ::std::vector<::std::array<::zx::vmo, 5>>& handle_in_mixed_vec_array();
 
   // Setter for handle_in_mixed_vec_array.
   //
@@ -231,13 +171,9 @@ class HandlesInTypes {
   HandlesInTypes& handle_in_mixed_vec_array(::std::vector<::std::array<::zx::vmo, 5>> value);
 
   const ::test_handlesintypes::TableWithHandle&
-  table_with_handle() const {
-    return storage_.table_with_handle;
-  }
+  table_with_handle() const;
 
-  ::test_handlesintypes::TableWithHandle& table_with_handle() {
-    return storage_.table_with_handle;
-  }
+  ::test_handlesintypes::TableWithHandle& table_with_handle();
 
   // Setter for table_with_handle.
   //
@@ -245,13 +181,9 @@ class HandlesInTypes {
   HandlesInTypes& table_with_handle(::test_handlesintypes::TableWithHandle value);
 
   const ::test_handlesintypes::UnionWithHandle&
-  union_with_handle() const {
-    return storage_.union_with_handle;
-  }
+  union_with_handle() const;
 
-  ::test_handlesintypes::UnionWithHandle& union_with_handle() {
-    return storage_.union_with_handle;
-  }
+  ::test_handlesintypes::UnionWithHandle& union_with_handle();
 
   // Setter for union_with_handle.
   //
@@ -305,13 +237,9 @@ class EmptyResourceStruct {
   EmptyResourceStruct& operator=(EmptyResourceStruct&&) noexcept = default;
 
   uint8_t
-  __reserved() const {
-    return storage_.__reserved;
-  }
+  __reserved() const;
 
-  uint8_t& __reserved() {
-    return storage_.__reserved;
-  }
+  uint8_t& __reserved();
 
   // Setter for __reserved.
   //
@@ -344,9 +272,7 @@ class EmptyResourceTable {
   EmptyResourceTable(EmptyResourceTable&&) noexcept = default;
   EmptyResourceTable& operator=(EmptyResourceTable&&) noexcept = default;
 
-  bool IsEmpty() const {
-    return true;
-  }
+  bool IsEmpty() const;
 
   EmptyResourceTable(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
@@ -373,26 +299,13 @@ class EmptyResourceUnion {
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
 
-  EmptyResourceUnion(EmptyResourceUnion&& other) noexcept
-      : EmptyResourceUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
-    *storage_ = std::move(*other.storage_);
-  }
-  EmptyResourceUnion& operator=(EmptyResourceUnion&& other) noexcept {
-    if (this != &other) {
-      *storage_ = std::move(*other.storage_);
-    }
-    return *this;
-  }
-  constexpr bool IsUnknown() const {
-    return Which() == ::test_handlesintypes::EmptyResourceUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
-  }
+  EmptyResourceUnion(EmptyResourceUnion&& other) noexcept;
+  EmptyResourceUnion& operator=(EmptyResourceUnion&& other) noexcept;
+  bool IsUnknown() const;
 
-  constexpr ::test_handlesintypes::EmptyResourceUnion::Tag Which() const {
-    return EmptyResourceUnion::IndexToTag(storage_->index()).value();
-  }
+  ::test_handlesintypes::EmptyResourceUnion::Tag Which() const;
 
-  EmptyResourceUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
-      : storage_(std::make_shared<Storage_>()) {}
+  EmptyResourceUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -400,89 +313,11 @@ class EmptyResourceUnion {
   static constexpr auto kMembers = std::make_tuple(
       ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>());
 
-  explicit EmptyResourceUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+  explicit EmptyResourceUnion(std::shared_ptr<Storage_> storage);
 
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_handlesintypes::EmptyResourceUnion::Tag tag) {
-    switch (tag) {
-      default: {
-        return 0;
-      }
-    }
-  }
-
-  static constexpr std::optional<::test_handlesintypes::EmptyResourceUnion::Tag> IndexToTag(size_t index) {
-    switch (index) {
-      default:
-        return ::test_handlesintypes::EmptyResourceUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
-    }
-  }
+  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_handlesintypes::EmptyResourceUnion::Tag tag);
+  static std::optional<::test_handlesintypes::EmptyResourceUnion::Tag> IndexToTag(size_t index);
 };
-
-inline TableWithHandle::TableWithHandle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-
-inline TableWithHandle::TableWithHandle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TableWithHandle(Storage_{}) {}
-inline TableWithHandle& TableWithHandle::h(std::optional<::zx::vmo> value) {
-  storage_.h = std::move(value);
-  return *this;
-}
-
-inline HandlesInTypes::HandlesInTypes(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline HandlesInTypes::HandlesInTypes(::zx::vmo normal_handle, ::std::vector<::zx::vmo> handle_in_vec, ::std::array<::zx::vmo, 5> handle_in_array, ::std::vector<::std::array<::zx::vmo, 5>> handle_in_mixed_vec_array, ::test_handlesintypes::TableWithHandle table_with_handle, ::test_handlesintypes::UnionWithHandle union_with_handle) noexcept
-    : storage_({.normal_handle = std::move(normal_handle),
-                .handle_in_vec = std::move(handle_in_vec),
-                .handle_in_array = std::move(handle_in_array),
-                .handle_in_mixed_vec_array = std::move(handle_in_mixed_vec_array),
-                .table_with_handle = std::move(table_with_handle),
-                .union_with_handle = std::move(union_with_handle)}) {}
-
-inline HandlesInTypes::HandlesInTypes(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : HandlesInTypes(Storage_{
-                                                                                                        .normal_handle = {},
-                                                                                                        .handle_in_vec = {},
-                                                                                                        .handle_in_array = ::fidl::internal::DefaultConstructPossiblyInvalidObject<::std::array<::zx::vmo, 5>>::Make(),
-                                                                                                        .handle_in_mixed_vec_array = {},
-                                                                                                        .table_with_handle = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                        .union_with_handle = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                    }) {}
-inline HandlesInTypes& HandlesInTypes::normal_handle(::zx::vmo value) {
-  storage_.normal_handle = std::move(value);
-  return *this;
-}
-inline HandlesInTypes& HandlesInTypes::handle_in_vec(::std::vector<::zx::vmo> value) {
-  storage_.handle_in_vec = std::move(value);
-  return *this;
-}
-inline HandlesInTypes& HandlesInTypes::handle_in_array(::std::array<::zx::vmo, 5> value) {
-  storage_.handle_in_array = std::move(value);
-  return *this;
-}
-inline HandlesInTypes& HandlesInTypes::handle_in_mixed_vec_array(::std::vector<::std::array<::zx::vmo, 5>> value) {
-  storage_.handle_in_mixed_vec_array = std::move(value);
-  return *this;
-}
-inline HandlesInTypes& HandlesInTypes::table_with_handle(::test_handlesintypes::TableWithHandle value) {
-  storage_.table_with_handle = std::move(value);
-  return *this;
-}
-inline HandlesInTypes& HandlesInTypes::union_with_handle(::test_handlesintypes::UnionWithHandle value) {
-  storage_.union_with_handle = std::move(value);
-  return *this;
-}
-
-inline EmptyResourceStruct::EmptyResourceStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline EmptyResourceStruct::EmptyResourceStruct(uint8_t __reserved) noexcept
-    : storage_({.__reserved = std::move(__reserved)}) {}
-
-inline EmptyResourceStruct::EmptyResourceStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyResourceStruct(Storage_{
-                                                                                                                  .__reserved = 0u,
-                                                                                                              }) {}
-inline EmptyResourceStruct& EmptyResourceStruct::__reserved(uint8_t value) {
-  storage_.__reserved = std::move(value);
-  return *this;
-}
-
-inline EmptyResourceTable::EmptyResourceTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-
-inline EmptyResourceTable::EmptyResourceTable(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyResourceTable(Storage_{}) {}
 
 #endif  // __Fuchsia__
 
@@ -622,28 +457,8 @@ struct internal::NaturalCodingTraits<::test_handlesintypes::ObjType, ::fidl::int
   static constexpr size_t kInlineSize = sizeof(uint32_t);
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::NaturalEncoder* encoder, ::test_handlesintypes::ObjType* value, size_t offset, size_t recursion_depth) {
-    switch (*value) {
-      case ::test_handlesintypes::ObjType::kNone:
-      case ::test_handlesintypes::ObjType::kVmo:
-        break;
-      default:
-        encoder->SetError(::fidl::internal::kCodingErrorUnknownEnumValue);
-        return;
-    }
-    *encoder->template GetPtr<::test_handlesintypes::ObjType>(offset) = *value;
-  }
-  static void Decode(internal::NaturalDecoder* decoder, ::test_handlesintypes::ObjType* value, size_t offset, size_t recursion_depth) {
-    *value = *decoder->template GetPtr<::test_handlesintypes::ObjType>(offset);
-    switch (*value) {
-      case ::test_handlesintypes::ObjType::kNone:
-      case ::test_handlesintypes::ObjType::kVmo:
-        break;
-      default:
-        decoder->SetError(::fidl::internal::kCodingErrorUnknownEnumValue);
-        return;
-    }
-  }
+  static void Encode(internal::NaturalEncoder* encoder, ::test_handlesintypes::ObjType* value, size_t offset, size_t recursion_depth);
+  static void Decode(internal::NaturalDecoder* decoder, ::test_handlesintypes::ObjType* value, size_t offset, size_t recursion_depth);
 };
 
 #pragma clang diagnostic pop

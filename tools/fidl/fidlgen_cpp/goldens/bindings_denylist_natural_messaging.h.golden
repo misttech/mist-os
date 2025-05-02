@@ -40,10 +40,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::OnlyCppAn
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::OnlyCppAndDeps>> {
  public:
  private:
-  ::fidl::UnownedClientEnd<::test_bindingsdenylist::OnlyCppAndDeps> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_bindingsdenylist::OnlyCppAndDeps>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_bindingsdenylist::OnlyCppAndDeps> _client_end() const;
 };
 
 template <>
@@ -76,8 +73,7 @@ class ::fidl::SyncEventHandler<::test_bindingsdenylist::OnlyCppAndDeps>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::OnlyCppAndDeps> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyCppAndDeps>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyCppAndDeps>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyCppAndDeps>* event_handler);
 };
 
 template <>
@@ -113,11 +109,7 @@ class ::fidl::Server<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fidl::i
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_bindingsdenylist::OnlyCppAndDeps> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -209,7 +201,7 @@ template <>
 class ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart> final : public ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> {
  public:
   using ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse>::result;
-  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> v);
   Response() = delete;
 };
 template <>
@@ -217,13 +209,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_bindingsdenylist::DenyEa
   using DomainObject = ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>& m);
 };
 
 template <>
@@ -239,7 +225,7 @@ template <>
 class ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo> final : public ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> {
  public:
   using ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse>::result;
-  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> v);
   Response() = delete;
 };
 template <>
@@ -247,13 +233,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_bindingsdenylist::DenyEa
   using DomainObject = ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo>& m);
 };
 
 template <>
@@ -269,7 +249,7 @@ template <>
 class ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> final : public ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse> {
  public:
   using ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse>::result;
-  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse> v);
   Response() = delete;
 };
 template <>
@@ -277,13 +257,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_bindingsdenylist::DenyEa
   using DomainObject = ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>& m);
 };
 
 template <>
@@ -299,7 +273,7 @@ template <>
 class ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> final : public ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> {
  public:
   using ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse>::result;
-  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> v);
   Response() = delete;
 };
 template <>
@@ -307,13 +281,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_bindingsdenylist::DenyEa
   using DomainObject = ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust>& m);
 };
 
 template <>
@@ -329,7 +297,7 @@ template <>
 class ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller> final : public ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse> {
  public:
   using ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse>::result;
-  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse> v);
   Response() = delete;
 };
 template <>
@@ -337,13 +305,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_bindingsdenylist::DenyEa
   using DomainObject = ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller>& m);
 };
 
 template <>
@@ -385,10 +347,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::DenyEachB
   ::fidl::Result<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller> OnlyDenySyzkaller(const ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_bindingsdenylist::DenyEachBinding> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_bindingsdenylist::DenyEachBinding>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_bindingsdenylist::DenyEachBinding> _client_end() const;
 };
 
 template <>
@@ -421,8 +380,7 @@ class ::fidl::SyncEventHandler<::test_bindingsdenylist::DenyEachBinding>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::DenyEachBinding> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::DenyEachBinding>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::DenyEachBinding>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::DenyEachBinding>* event_handler);
 };
 
 template <>
@@ -533,11 +491,7 @@ class ::fidl::Server<::test_bindingsdenylist::DenyEachBinding> : public ::fidl::
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_bindingsdenylist::DenyEachBinding> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -572,10 +526,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::Allowed> 
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::Allowed>> {
  public:
  private:
-  ::fidl::UnownedClientEnd<::test_bindingsdenylist::Allowed> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_bindingsdenylist::Allowed>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_bindingsdenylist::Allowed> _client_end() const;
 };
 
 template <>
@@ -608,8 +559,7 @@ class ::fidl::SyncEventHandler<::test_bindingsdenylist::Allowed>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::Allowed> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::Allowed>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::Allowed>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::Allowed>* event_handler);
 };
 
 template <>
@@ -645,11 +595,7 @@ class ::fidl::Server<::test_bindingsdenylist::Allowed> : public ::fidl::internal
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_bindingsdenylist::Allowed> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -705,10 +651,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::ImportsSa
   ::fit::result<::fidl::OneWayError> AlwaysAppearsInImportingLibrary();
 
  private:
-  ::fidl::UnownedClientEnd<::test_bindingsdenylist::ImportsSameNameContext> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_bindingsdenylist::ImportsSameNameContext>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_bindingsdenylist::ImportsSameNameContext> _client_end() const;
 };
 
 template <>
@@ -741,8 +684,7 @@ class ::fidl::SyncEventHandler<::test_bindingsdenylist::ImportsSameNameContext>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::ImportsSameNameContext> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::ImportsSameNameContext>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::ImportsSameNameContext>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::ImportsSameNameContext>* event_handler);
 };
 
 template <>
@@ -788,11 +730,7 @@ class ::fidl::Server<::test_bindingsdenylist::ImportsSameNameContext> : public :
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

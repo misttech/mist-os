@@ -2190,10 +2190,10 @@ class ::fidl::WireAsyncEventHandler<::test_protocolpayloads::MainProtocol>
     : public ::fidl::internal::WireEventHandlerInterface<::test_protocolpayloads::MainProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   WireAsyncEventHandler() = default;
-    void OnComposed(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnComposed>* event) override {}
-    void OnLocal(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnLocal>* event) override {}
-    void OnImport(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnImport>* event) override {}
-    void OnAnon(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnAnon>* event) override {}
+    void OnComposed(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnComposed>* event) override;
+    void OnLocal(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnLocal>* event) override;
+    void OnImport(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnImport>* event) override;
+    void OnAnon(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnAnon>* event) override;
 };
 
   template<>

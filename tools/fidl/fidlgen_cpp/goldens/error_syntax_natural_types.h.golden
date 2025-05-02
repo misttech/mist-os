@@ -49,21 +49,13 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
   ExampleUseOfErrorSyntaxCallWhichMayFailRequest(const ExampleUseOfErrorSyntaxCallWhichMayFailRequest& other) noexcept;
   ExampleUseOfErrorSyntaxCallWhichMayFailRequest& operator=(const ExampleUseOfErrorSyntaxCallWhichMayFailRequest& other) noexcept;
 
-  bool operator==(const ExampleUseOfErrorSyntaxCallWhichMayFailRequest& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, 16>::Equal(this, &other);
-  }
-  bool operator!=(const ExampleUseOfErrorSyntaxCallWhichMayFailRequest& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, 16>::Equal(this, &other);
-  }
+  bool operator==(const ExampleUseOfErrorSyntaxCallWhichMayFailRequest& other) const noexcept;
+  bool operator!=(const ExampleUseOfErrorSyntaxCallWhichMayFailRequest& other) const noexcept;
 
   const ::std::string&
-  s() const {
-    return storage_.s;
-  }
+  s() const;
 
-  ::std::string& s() {
-    return storage_.s;
-  }
+  ::std::string& s();
 
   // Setter for s.
   //
@@ -106,21 +98,13 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResponse {
   ExampleUseOfErrorSyntaxCallWhichMayFailResponse(const ExampleUseOfErrorSyntaxCallWhichMayFailResponse& other) noexcept;
   ExampleUseOfErrorSyntaxCallWhichMayFailResponse& operator=(const ExampleUseOfErrorSyntaxCallWhichMayFailResponse& other) noexcept;
 
-  bool operator==(const ExampleUseOfErrorSyntaxCallWhichMayFailResponse& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse, 8>::Equal(this, &other);
-  }
-  bool operator!=(const ExampleUseOfErrorSyntaxCallWhichMayFailResponse& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse, 8>::Equal(this, &other);
-  }
+  bool operator==(const ExampleUseOfErrorSyntaxCallWhichMayFailResponse& other) const noexcept;
+  bool operator!=(const ExampleUseOfErrorSyntaxCallWhichMayFailResponse& other) const noexcept;
 
   int64_t
-  value() const {
-    return storage_.value;
-  }
+  value() const;
 
-  int64_t& value() {
-    return storage_.value;
-  }
+  int64_t& value();
 
   // Setter for value.
   //
@@ -157,79 +141,32 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResult {
     kErr = 2,       // 0x2
   };
 
-  ExampleUseOfErrorSyntaxCallWhichMayFailResult(ExampleUseOfErrorSyntaxCallWhichMayFailResult&& other) noexcept
-      : ExampleUseOfErrorSyntaxCallWhichMayFailResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
-    *storage_ = std::move(*other.storage_);
-  }
-  ExampleUseOfErrorSyntaxCallWhichMayFailResult& operator=(ExampleUseOfErrorSyntaxCallWhichMayFailResult&& other) noexcept {
-    if (this != &other) {
-      *storage_ = std::move(*other.storage_);
-    }
-    return *this;
-  }
-  ExampleUseOfErrorSyntaxCallWhichMayFailResult(const ExampleUseOfErrorSyntaxCallWhichMayFailResult& other) noexcept : ExampleUseOfErrorSyntaxCallWhichMayFailResult(other.CloneStorage_()) {}
-  ExampleUseOfErrorSyntaxCallWhichMayFailResult& operator=(const ExampleUseOfErrorSyntaxCallWhichMayFailResult& other) noexcept {
-    if (this != &other) {
-      storage_ = other.CloneStorage_();
-    }
-    return *this;
-  }
+  ExampleUseOfErrorSyntaxCallWhichMayFailResult(ExampleUseOfErrorSyntaxCallWhichMayFailResult&& other) noexcept;
+  ExampleUseOfErrorSyntaxCallWhichMayFailResult& operator=(ExampleUseOfErrorSyntaxCallWhichMayFailResult&& other) noexcept;
+  ExampleUseOfErrorSyntaxCallWhichMayFailResult(const ExampleUseOfErrorSyntaxCallWhichMayFailResult& other) noexcept;
+  ExampleUseOfErrorSyntaxCallWhichMayFailResult& operator=(const ExampleUseOfErrorSyntaxCallWhichMayFailResult& other) noexcept;
+  bool operator==(const ExampleUseOfErrorSyntaxCallWhichMayFailResult& other) const noexcept;
+  bool operator!=(const ExampleUseOfErrorSyntaxCallWhichMayFailResult& other) const noexcept;
 
-  bool operator==(const ExampleUseOfErrorSyntaxCallWhichMayFailResult& other) const noexcept {
-    return *storage_ == *other.storage_;
-  }
-  bool operator!=(const ExampleUseOfErrorSyntaxCallWhichMayFailResult& other) const noexcept {
-    return *storage_ != *other.storage_;
-  }
-
-  constexpr ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult::Tag Which() const {
-    return ExampleUseOfErrorSyntaxCallWhichMayFailResult::IndexToTag(storage_->index()).value();
-  }
-  static ExampleUseOfErrorSyntaxCallWhichMayFailResult WithResponse(::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse val) {
-    return ExampleUseOfErrorSyntaxCallWhichMayFailResult(std::make_shared<Storage_>(
-        std::in_place_index_t<1>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<1, Storage_> response() {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
+  ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult::Tag Which() const;
+  static ExampleUseOfErrorSyntaxCallWhichMayFailResult WithResponse(::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse val);
+  const ::fidl::internal::UnionMemberView<1, Storage_> response() const;
+  ::fidl::internal::UnionMemberView<1, Storage_> response();
 
   // Sets the union to hold the response member.
   //
 
-  ExampleUseOfErrorSyntaxCallWhichMayFailResult& response(::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse value) {
-    storage_->emplace<1>(std::move(value));
-    return *this;
-  }
-  static ExampleUseOfErrorSyntaxCallWhichMayFailResult WithErr(uint32_t val) {
-    return ExampleUseOfErrorSyntaxCallWhichMayFailResult(std::make_shared<Storage_>(
-        std::in_place_index_t<2>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<2, Storage_> err() {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
+  ExampleUseOfErrorSyntaxCallWhichMayFailResult& response(::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse value);
+  static ExampleUseOfErrorSyntaxCallWhichMayFailResult WithErr(uint32_t val);
+  const ::fidl::internal::UnionMemberView<2, Storage_> err() const;
+  ::fidl::internal::UnionMemberView<2, Storage_> err();
 
   // Sets the union to hold the err member.
   //
 
-  ExampleUseOfErrorSyntaxCallWhichMayFailResult& err(uint32_t value) {
-    storage_->emplace<2>(std::move(value));
-    return *this;
-  }
+  ExampleUseOfErrorSyntaxCallWhichMayFailResult& err(uint32_t value);
 
-  ExampleUseOfErrorSyntaxCallWhichMayFailResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
-      : storage_(std::make_shared<Storage_>()) {}
+  ExampleUseOfErrorSyntaxCallWhichMayFailResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -238,66 +175,11 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResult {
   static constexpr auto kMembers = std::make_tuple(
       ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
 
-  explicit ExampleUseOfErrorSyntaxCallWhichMayFailResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+  explicit ExampleUseOfErrorSyntaxCallWhichMayFailResult(std::shared_ptr<Storage_> storage);
 
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult::Tag tag) {
-    switch (tag) {
-      case ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult::Tag::kResponse:
-        return 1;
-      case ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult::Tag::kErr:
-        return 2;
-      default: {
-        decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
-        return 0;
-      }
-    }
-  }
-
-  static constexpr std::optional<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult::Tag> IndexToTag(size_t index) {
-    switch (index) {
-      case 1:
-        return ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult::Tag::kResponse;
-      case 2:
-        return ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult::Tag::kErr;
-      default:
-        return std::nullopt;
-    }
-  }
+  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult::Tag tag);
+  static std::optional<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult::Tag> IndexToTag(size_t index);
 };
-
-inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest::ExampleUseOfErrorSyntaxCallWhichMayFailRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest::ExampleUseOfErrorSyntaxCallWhichMayFailRequest(::std::string s) noexcept
-    : storage_({.s = std::move(s)}) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest::ExampleUseOfErrorSyntaxCallWhichMayFailRequest(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest& other) noexcept : ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest(other.CloneStorage_()) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest& ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest::operator=(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest::ExampleUseOfErrorSyntaxCallWhichMayFailRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleUseOfErrorSyntaxCallWhichMayFailRequest(Storage_{
-                                                                                                                                                                        .s = {},
-                                                                                                                                                                    }) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest& ExampleUseOfErrorSyntaxCallWhichMayFailRequest::s(::std::string value) {
-  storage_.s = std::move(value);
-  return *this;
-}
-
-inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse::ExampleUseOfErrorSyntaxCallWhichMayFailResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse::ExampleUseOfErrorSyntaxCallWhichMayFailResponse(int64_t value) noexcept
-    : storage_({.value = std::move(value)}) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse::ExampleUseOfErrorSyntaxCallWhichMayFailResponse(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse& other) noexcept : ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse(other.CloneStorage_()) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse& ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse::operator=(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse::ExampleUseOfErrorSyntaxCallWhichMayFailResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleUseOfErrorSyntaxCallWhichMayFailResponse(Storage_{
-                                                                                                                                                                          .value = {},
-                                                                                                                                                                      }) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse& ExampleUseOfErrorSyntaxCallWhichMayFailResponse::value(int64_t value) {
-  storage_.value = std::move(value);
-  return *this;
-}
 
 }  // namespace test_errorsyntax
 namespace fidl {

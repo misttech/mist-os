@@ -216,7 +216,7 @@ class Union {
     kX = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  constexpr bool IsUnknown() const {
+  bool IsUnknown() const {
     return Which() == ::test_versions::wire::Union::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 

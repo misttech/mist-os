@@ -83,13 +83,9 @@ class Handles {
   Handles& operator=(Handles&&) noexcept = default;
 
   const ::zx::handle&
-  plain_handle() const {
-    return storage_.plain_handle;
-  }
+  plain_handle() const;
 
-  ::zx::handle& plain_handle() {
-    return storage_.plain_handle;
-  }
+  ::zx::handle& plain_handle();
 
   // Setter for plain_handle.
   //
@@ -97,13 +93,9 @@ class Handles {
   Handles& plain_handle(::zx::handle value);
 
   const ::zx::bti&
-  bti_handle() const {
-    return storage_.bti_handle;
-  }
+  bti_handle() const;
 
-  ::zx::bti& bti_handle() {
-    return storage_.bti_handle;
-  }
+  ::zx::bti& bti_handle();
 
   // Setter for bti_handle.
   //
@@ -111,13 +103,9 @@ class Handles {
   Handles& bti_handle(::zx::bti value);
 
   const ::zx::channel&
-  channel_handle() const {
-    return storage_.channel_handle;
-  }
+  channel_handle() const;
 
-  ::zx::channel& channel_handle() {
-    return storage_.channel_handle;
-  }
+  ::zx::channel& channel_handle();
 
   // Setter for channel_handle.
   //
@@ -125,13 +113,9 @@ class Handles {
   Handles& channel_handle(::zx::channel value);
 
   const ::zx::clock&
-  clock_handle() const {
-    return storage_.clock_handle;
-  }
+  clock_handle() const;
 
-  ::zx::clock& clock_handle() {
-    return storage_.clock_handle;
-  }
+  ::zx::clock& clock_handle();
 
   // Setter for clock_handle.
   //
@@ -139,13 +123,9 @@ class Handles {
   Handles& clock_handle(::zx::clock value);
 
   const ::zx::debuglog&
-  debuglog_handle() const {
-    return storage_.debuglog_handle;
-  }
+  debuglog_handle() const;
 
-  ::zx::debuglog& debuglog_handle() {
-    return storage_.debuglog_handle;
-  }
+  ::zx::debuglog& debuglog_handle();
 
   // Setter for debuglog_handle.
   //
@@ -153,13 +133,9 @@ class Handles {
   Handles& debuglog_handle(::zx::debuglog value);
 
   const ::zx::event&
-  event_handle() const {
-    return storage_.event_handle;
-  }
+  event_handle() const;
 
-  ::zx::event& event_handle() {
-    return storage_.event_handle;
-  }
+  ::zx::event& event_handle();
 
   // Setter for event_handle.
   //
@@ -167,13 +143,9 @@ class Handles {
   Handles& event_handle(::zx::event value);
 
   const ::zx::eventpair&
-  eventpair_handle() const {
-    return storage_.eventpair_handle;
-  }
+  eventpair_handle() const;
 
-  ::zx::eventpair& eventpair_handle() {
-    return storage_.eventpair_handle;
-  }
+  ::zx::eventpair& eventpair_handle();
 
   // Setter for eventpair_handle.
   //
@@ -181,13 +153,9 @@ class Handles {
   Handles& eventpair_handle(::zx::eventpair value);
 
   const ::zx::exception&
-  exception_handle() const {
-    return storage_.exception_handle;
-  }
+  exception_handle() const;
 
-  ::zx::exception& exception_handle() {
-    return storage_.exception_handle;
-  }
+  ::zx::exception& exception_handle();
 
   // Setter for exception_handle.
   //
@@ -195,13 +163,9 @@ class Handles {
   Handles& exception_handle(::zx::exception value);
 
   const ::zx::fifo&
-  fifo_handle() const {
-    return storage_.fifo_handle;
-  }
+  fifo_handle() const;
 
-  ::zx::fifo& fifo_handle() {
-    return storage_.fifo_handle;
-  }
+  ::zx::fifo& fifo_handle();
 
   // Setter for fifo_handle.
   //
@@ -209,13 +173,9 @@ class Handles {
   Handles& fifo_handle(::zx::fifo value);
 
   const ::zx::guest&
-  guest_handle() const {
-    return storage_.guest_handle;
-  }
+  guest_handle() const;
 
-  ::zx::guest& guest_handle() {
-    return storage_.guest_handle;
-  }
+  ::zx::guest& guest_handle();
 
   // Setter for guest_handle.
   //
@@ -223,13 +183,9 @@ class Handles {
   Handles& guest_handle(::zx::guest value);
 
   const ::zx::interrupt&
-  interrupt_handle() const {
-    return storage_.interrupt_handle;
-  }
+  interrupt_handle() const;
 
-  ::zx::interrupt& interrupt_handle() {
-    return storage_.interrupt_handle;
-  }
+  ::zx::interrupt& interrupt_handle();
 
   // Setter for interrupt_handle.
   //
@@ -237,13 +193,9 @@ class Handles {
   Handles& interrupt_handle(::zx::interrupt value);
 
   const ::zx::iob&
-  iob_handle() const {
-    return storage_.iob_handle;
-  }
+  iob_handle() const;
 
-  ::zx::iob& iob_handle() {
-    return storage_.iob_handle;
-  }
+  ::zx::iob& iob_handle();
 
   // Setter for iob_handle.
   //
@@ -251,13 +203,9 @@ class Handles {
   Handles& iob_handle(::zx::iob value);
 
   const ::zx::iommu&
-  iommu_handle() const {
-    return storage_.iommu_handle;
-  }
+  iommu_handle() const;
 
-  ::zx::iommu& iommu_handle() {
-    return storage_.iommu_handle;
-  }
+  ::zx::iommu& iommu_handle();
 
   // Setter for iommu_handle.
   //
@@ -265,13 +213,9 @@ class Handles {
   Handles& iommu_handle(::zx::iommu value);
 
   const ::zx::job&
-  job_handle() const {
-    return storage_.job_handle;
-  }
+  job_handle() const;
 
-  ::zx::job& job_handle() {
-    return storage_.job_handle;
-  }
+  ::zx::job& job_handle();
 
   // Setter for job_handle.
   //
@@ -279,13 +223,9 @@ class Handles {
   Handles& job_handle(::zx::job value);
 
   const ::zx::msi&
-  msi_handle() const {
-    return storage_.msi_handle;
-  }
+  msi_handle() const;
 
-  ::zx::msi& msi_handle() {
-    return storage_.msi_handle;
-  }
+  ::zx::msi& msi_handle();
 
   // Setter for msi_handle.
   //
@@ -293,13 +233,9 @@ class Handles {
   Handles& msi_handle(::zx::msi value);
 
   const ::zx::pager&
-  pager_handle() const {
-    return storage_.pager_handle;
-  }
+  pager_handle() const;
 
-  ::zx::pager& pager_handle() {
-    return storage_.pager_handle;
-  }
+  ::zx::pager& pager_handle();
 
   // Setter for pager_handle.
   //
@@ -307,13 +243,9 @@ class Handles {
   Handles& pager_handle(::zx::pager value);
 
   const ::zx::pmt&
-  pmt_handle() const {
-    return storage_.pmt_handle;
-  }
+  pmt_handle() const;
 
-  ::zx::pmt& pmt_handle() {
-    return storage_.pmt_handle;
-  }
+  ::zx::pmt& pmt_handle();
 
   // Setter for pmt_handle.
   //
@@ -321,13 +253,9 @@ class Handles {
   Handles& pmt_handle(::zx::pmt value);
 
   const ::zx::port&
-  port_handle() const {
-    return storage_.port_handle;
-  }
+  port_handle() const;
 
-  ::zx::port& port_handle() {
-    return storage_.port_handle;
-  }
+  ::zx::port& port_handle();
 
   // Setter for port_handle.
   //
@@ -335,13 +263,9 @@ class Handles {
   Handles& port_handle(::zx::port value);
 
   const ::zx::process&
-  process_handle() const {
-    return storage_.process_handle;
-  }
+  process_handle() const;
 
-  ::zx::process& process_handle() {
-    return storage_.process_handle;
-  }
+  ::zx::process& process_handle();
 
   // Setter for process_handle.
   //
@@ -349,13 +273,9 @@ class Handles {
   Handles& process_handle(::zx::process value);
 
   const ::zx::profile&
-  profile_handle() const {
-    return storage_.profile_handle;
-  }
+  profile_handle() const;
 
-  ::zx::profile& profile_handle() {
-    return storage_.profile_handle;
-  }
+  ::zx::profile& profile_handle();
 
   // Setter for profile_handle.
   //
@@ -363,13 +283,9 @@ class Handles {
   Handles& profile_handle(::zx::profile value);
 
   const ::zx::resource&
-  resource_handle() const {
-    return storage_.resource_handle;
-  }
+  resource_handle() const;
 
-  ::zx::resource& resource_handle() {
-    return storage_.resource_handle;
-  }
+  ::zx::resource& resource_handle();
 
   // Setter for resource_handle.
   //
@@ -377,13 +293,9 @@ class Handles {
   Handles& resource_handle(::zx::resource value);
 
   const ::zx::socket&
-  socket_handle() const {
-    return storage_.socket_handle;
-  }
+  socket_handle() const;
 
-  ::zx::socket& socket_handle() {
-    return storage_.socket_handle;
-  }
+  ::zx::socket& socket_handle();
 
   // Setter for socket_handle.
   //
@@ -391,13 +303,9 @@ class Handles {
   Handles& socket_handle(::zx::socket value);
 
   const ::zx::stream&
-  stream_handle() const {
-    return storage_.stream_handle;
-  }
+  stream_handle() const;
 
-  ::zx::stream& stream_handle() {
-    return storage_.stream_handle;
-  }
+  ::zx::stream& stream_handle();
 
   // Setter for stream_handle.
   //
@@ -405,13 +313,9 @@ class Handles {
   Handles& stream_handle(::zx::stream value);
 
   const ::zx::suspend_token&
-  suspendtoken_handle() const {
-    return storage_.suspendtoken_handle;
-  }
+  suspendtoken_handle() const;
 
-  ::zx::suspend_token& suspendtoken_handle() {
-    return storage_.suspendtoken_handle;
-  }
+  ::zx::suspend_token& suspendtoken_handle();
 
   // Setter for suspendtoken_handle.
   //
@@ -419,13 +323,9 @@ class Handles {
   Handles& suspendtoken_handle(::zx::suspend_token value);
 
   const ::zx::thread&
-  thread_handle() const {
-    return storage_.thread_handle;
-  }
+  thread_handle() const;
 
-  ::zx::thread& thread_handle() {
-    return storage_.thread_handle;
-  }
+  ::zx::thread& thread_handle();
 
   // Setter for thread_handle.
   //
@@ -433,13 +333,9 @@ class Handles {
   Handles& thread_handle(::zx::thread value);
 
   const ::zx::timer&
-  timer_handle() const {
-    return storage_.timer_handle;
-  }
+  timer_handle() const;
 
-  ::zx::timer& timer_handle() {
-    return storage_.timer_handle;
-  }
+  ::zx::timer& timer_handle();
 
   // Setter for timer_handle.
   //
@@ -447,13 +343,9 @@ class Handles {
   Handles& timer_handle(::zx::timer value);
 
   const ::zx::vcpu&
-  vcpu_handle() const {
-    return storage_.vcpu_handle;
-  }
+  vcpu_handle() const;
 
-  ::zx::vcpu& vcpu_handle() {
-    return storage_.vcpu_handle;
-  }
+  ::zx::vcpu& vcpu_handle();
 
   // Setter for vcpu_handle.
   //
@@ -461,13 +353,9 @@ class Handles {
   Handles& vcpu_handle(::zx::vcpu value);
 
   const ::zx::vmar&
-  vmar_handle() const {
-    return storage_.vmar_handle;
-  }
+  vmar_handle() const;
 
-  ::zx::vmar& vmar_handle() {
-    return storage_.vmar_handle;
-  }
+  ::zx::vmar& vmar_handle();
 
   // Setter for vmar_handle.
   //
@@ -475,13 +363,9 @@ class Handles {
   Handles& vmar_handle(::zx::vmar value);
 
   const ::zx::vmo&
-  vmo_handle() const {
-    return storage_.vmo_handle;
-  }
+  vmo_handle() const;
 
-  ::zx::vmo& vmo_handle() {
-    return storage_.vmo_handle;
-  }
+  ::zx::vmo& vmo_handle();
 
   // Setter for vmo_handle.
   //
@@ -489,13 +373,9 @@ class Handles {
   Handles& vmo_handle(::zx::vmo value);
 
   const ::zx::vmo&
-  rights_handle() const {
-    return storage_.rights_handle;
-  }
+  rights_handle() const;
 
-  ::zx::vmo& rights_handle() {
-    return storage_.rights_handle;
-  }
+  ::zx::vmo& rights_handle();
 
   // Setter for rights_handle.
   //
@@ -503,13 +383,9 @@ class Handles {
   Handles& rights_handle(::zx::vmo value);
 
   const ::zx::handle&
-  aliased_plain_handle_field() const {
-    return storage_.aliased_plain_handle_field;
-  }
+  aliased_plain_handle_field() const;
 
-  ::zx::handle& aliased_plain_handle_field() {
-    return storage_.aliased_plain_handle_field;
-  }
+  ::zx::handle& aliased_plain_handle_field();
 
   // Setter for aliased_plain_handle_field.
   //
@@ -517,13 +393,9 @@ class Handles {
   Handles& aliased_plain_handle_field(::zx::handle value);
 
   const ::zx::vmo&
-  aliased_subtype_handle_field() const {
-    return storage_.aliased_subtype_handle_field;
-  }
+  aliased_subtype_handle_field() const;
 
-  ::zx::vmo& aliased_subtype_handle_field() {
-    return storage_.aliased_subtype_handle_field;
-  }
+  ::zx::vmo& aliased_subtype_handle_field();
 
   // Setter for aliased_subtype_handle_field.
   //
@@ -531,13 +403,9 @@ class Handles {
   Handles& aliased_subtype_handle_field(::zx::vmo value);
 
   const ::zx::vmo&
-  aliased_rights_handle_field() const {
-    return storage_.aliased_rights_handle_field;
-  }
+  aliased_rights_handle_field() const;
 
-  ::zx::vmo& aliased_rights_handle_field() {
-    return storage_.aliased_rights_handle_field;
-  }
+  ::zx::vmo& aliased_rights_handle_field();
 
   // Setter for aliased_rights_handle_field.
   //
@@ -545,13 +413,9 @@ class Handles {
   Handles& aliased_rights_handle_field(::zx::vmo value);
 
   const ::fidl::ClientEnd<::test_handles::SomeProtocol>&
-  some_protocol() const {
-    return storage_.some_protocol;
-  }
+  some_protocol() const;
 
-  ::fidl::ClientEnd<::test_handles::SomeProtocol>& some_protocol() {
-    return storage_.some_protocol;
-  }
+  ::fidl::ClientEnd<::test_handles::SomeProtocol>& some_protocol();
 
   // Setter for some_protocol.
   //
@@ -559,13 +423,9 @@ class Handles {
   Handles& some_protocol(::fidl::ClientEnd<::test_handles::SomeProtocol> value);
 
   const ::fidl::ServerEnd<::test_handles::SomeProtocol>&
-  request_some_protocol() const {
-    return storage_.request_some_protocol;
-  }
+  request_some_protocol() const;
 
-  ::fidl::ServerEnd<::test_handles::SomeProtocol>& request_some_protocol() {
-    return storage_.request_some_protocol;
-  }
+  ::fidl::ServerEnd<::test_handles::SomeProtocol>& request_some_protocol();
 
   // Setter for request_some_protocol.
   //
@@ -641,13 +501,9 @@ class FdfHandles {
   FdfHandles& operator=(FdfHandles&&) noexcept = default;
 
   const ::fdf::Channel&
-  fdf_channel_handle() const {
-    return storage_.fdf_channel_handle;
-  }
+  fdf_channel_handle() const;
 
-  ::fdf::Channel& fdf_channel_handle() {
-    return storage_.fdf_channel_handle;
-  }
+  ::fdf::Channel& fdf_channel_handle();
 
   // Setter for fdf_channel_handle.
   //
@@ -655,13 +511,9 @@ class FdfHandles {
   FdfHandles& fdf_channel_handle(::fdf::Channel value);
 
   const ::fdf::ClientEnd<::test_handles::DriverProtocol>&
-  client_end_driver() const {
-    return storage_.client_end_driver;
-  }
+  client_end_driver() const;
 
-  ::fdf::ClientEnd<::test_handles::DriverProtocol>& client_end_driver() {
-    return storage_.client_end_driver;
-  }
+  ::fdf::ClientEnd<::test_handles::DriverProtocol>& client_end_driver();
 
   // Setter for client_end_driver.
   //
@@ -669,13 +521,9 @@ class FdfHandles {
   FdfHandles& client_end_driver(::fdf::ClientEnd<::test_handles::DriverProtocol> value);
 
   const ::fdf::ServerEnd<::test_handles::DriverProtocol>&
-  server_end_driver() const {
-    return storage_.server_end_driver;
-  }
+  server_end_driver() const;
 
-  ::fdf::ServerEnd<::test_handles::DriverProtocol>& server_end_driver() {
-    return storage_.server_end_driver;
-  }
+  ::fdf::ServerEnd<::test_handles::DriverProtocol>& server_end_driver();
 
   // Setter for server_end_driver.
   //
@@ -700,246 +548,6 @@ class FdfHandles {
                                                    ::fidl::internal::NaturalStructMember<Storage_, ::fdf::ClientEnd<::test_handles::DriverProtocol>, fidl::internal::NaturalCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>>{&Storage_::client_end_driver, 4}, ::fidl::internal::NaturalStructMember<Storage_, ::fdf::ServerEnd<::test_handles::DriverProtocol>, fidl::internal::NaturalCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>>{&Storage_::server_end_driver, 8});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-inline Handles::Handles(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Handles::Handles(::zx::handle plain_handle, ::zx::bti bti_handle, ::zx::channel channel_handle, ::zx::clock clock_handle, ::zx::debuglog debuglog_handle, ::zx::event event_handle, ::zx::eventpair eventpair_handle, ::zx::exception exception_handle, ::zx::fifo fifo_handle, ::zx::guest guest_handle, ::zx::interrupt interrupt_handle, ::zx::iob iob_handle, ::zx::iommu iommu_handle, ::zx::job job_handle, ::zx::msi msi_handle, ::zx::pager pager_handle, ::zx::pmt pmt_handle, ::zx::port port_handle, ::zx::process process_handle, ::zx::profile profile_handle, ::zx::resource resource_handle, ::zx::socket socket_handle, ::zx::stream stream_handle, ::zx::suspend_token suspendtoken_handle, ::zx::thread thread_handle, ::zx::timer timer_handle, ::zx::vcpu vcpu_handle, ::zx::vmar vmar_handle, ::zx::vmo vmo_handle, ::zx::vmo rights_handle, ::zx::handle aliased_plain_handle_field, ::zx::vmo aliased_subtype_handle_field, ::zx::vmo aliased_rights_handle_field, ::fidl::ClientEnd<::test_handles::SomeProtocol> some_protocol, ::fidl::ServerEnd<::test_handles::SomeProtocol> request_some_protocol) noexcept
-    : storage_({.plain_handle = std::move(plain_handle),
-                .bti_handle = std::move(bti_handle),
-                .channel_handle = std::move(channel_handle),
-                .clock_handle = std::move(clock_handle),
-                .debuglog_handle = std::move(debuglog_handle),
-                .event_handle = std::move(event_handle),
-                .eventpair_handle = std::move(eventpair_handle),
-                .exception_handle = std::move(exception_handle),
-                .fifo_handle = std::move(fifo_handle),
-                .guest_handle = std::move(guest_handle),
-                .interrupt_handle = std::move(interrupt_handle),
-                .iob_handle = std::move(iob_handle),
-                .iommu_handle = std::move(iommu_handle),
-                .job_handle = std::move(job_handle),
-                .msi_handle = std::move(msi_handle),
-                .pager_handle = std::move(pager_handle),
-                .pmt_handle = std::move(pmt_handle),
-                .port_handle = std::move(port_handle),
-                .process_handle = std::move(process_handle),
-                .profile_handle = std::move(profile_handle),
-                .resource_handle = std::move(resource_handle),
-                .socket_handle = std::move(socket_handle),
-                .stream_handle = std::move(stream_handle),
-                .suspendtoken_handle = std::move(suspendtoken_handle),
-                .thread_handle = std::move(thread_handle),
-                .timer_handle = std::move(timer_handle),
-                .vcpu_handle = std::move(vcpu_handle),
-                .vmar_handle = std::move(vmar_handle),
-                .vmo_handle = std::move(vmo_handle),
-                .rights_handle = std::move(rights_handle),
-                .aliased_plain_handle_field = std::move(aliased_plain_handle_field),
-                .aliased_subtype_handle_field = std::move(aliased_subtype_handle_field),
-                .aliased_rights_handle_field = std::move(aliased_rights_handle_field),
-                .some_protocol = std::move(some_protocol),
-                .request_some_protocol = std::move(request_some_protocol)}) {}
-
-inline Handles::Handles(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Handles(Storage_{
-                                                                                          .plain_handle = {},
-                                                                                          .bti_handle = {},
-                                                                                          .channel_handle = {},
-                                                                                          .clock_handle = {},
-                                                                                          .debuglog_handle = {},
-                                                                                          .event_handle = {},
-                                                                                          .eventpair_handle = {},
-                                                                                          .exception_handle = {},
-                                                                                          .fifo_handle = {},
-                                                                                          .guest_handle = {},
-                                                                                          .interrupt_handle = {},
-                                                                                          .iob_handle = {},
-                                                                                          .iommu_handle = {},
-                                                                                          .job_handle = {},
-                                                                                          .msi_handle = {},
-                                                                                          .pager_handle = {},
-                                                                                          .pmt_handle = {},
-                                                                                          .port_handle = {},
-                                                                                          .process_handle = {},
-                                                                                          .profile_handle = {},
-                                                                                          .resource_handle = {},
-                                                                                          .socket_handle = {},
-                                                                                          .stream_handle = {},
-                                                                                          .suspendtoken_handle = {},
-                                                                                          .thread_handle = {},
-                                                                                          .timer_handle = {},
-                                                                                          .vcpu_handle = {},
-                                                                                          .vmar_handle = {},
-                                                                                          .vmo_handle = {},
-                                                                                          .rights_handle = {},
-                                                                                          .aliased_plain_handle_field = {},
-                                                                                          .aliased_subtype_handle_field = {},
-                                                                                          .aliased_rights_handle_field = {},
-                                                                                          .some_protocol = {},
-                                                                                          .request_some_protocol = {},
-                                                                                      }) {}
-inline Handles& Handles::plain_handle(::zx::handle value) {
-  storage_.plain_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::bti_handle(::zx::bti value) {
-  storage_.bti_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::channel_handle(::zx::channel value) {
-  storage_.channel_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::clock_handle(::zx::clock value) {
-  storage_.clock_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::debuglog_handle(::zx::debuglog value) {
-  storage_.debuglog_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::event_handle(::zx::event value) {
-  storage_.event_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::eventpair_handle(::zx::eventpair value) {
-  storage_.eventpair_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::exception_handle(::zx::exception value) {
-  storage_.exception_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::fifo_handle(::zx::fifo value) {
-  storage_.fifo_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::guest_handle(::zx::guest value) {
-  storage_.guest_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::interrupt_handle(::zx::interrupt value) {
-  storage_.interrupt_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::iob_handle(::zx::iob value) {
-  storage_.iob_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::iommu_handle(::zx::iommu value) {
-  storage_.iommu_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::job_handle(::zx::job value) {
-  storage_.job_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::msi_handle(::zx::msi value) {
-  storage_.msi_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::pager_handle(::zx::pager value) {
-  storage_.pager_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::pmt_handle(::zx::pmt value) {
-  storage_.pmt_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::port_handle(::zx::port value) {
-  storage_.port_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::process_handle(::zx::process value) {
-  storage_.process_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::profile_handle(::zx::profile value) {
-  storage_.profile_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::resource_handle(::zx::resource value) {
-  storage_.resource_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::socket_handle(::zx::socket value) {
-  storage_.socket_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::stream_handle(::zx::stream value) {
-  storage_.stream_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::suspendtoken_handle(::zx::suspend_token value) {
-  storage_.suspendtoken_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::thread_handle(::zx::thread value) {
-  storage_.thread_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::timer_handle(::zx::timer value) {
-  storage_.timer_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::vcpu_handle(::zx::vcpu value) {
-  storage_.vcpu_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::vmar_handle(::zx::vmar value) {
-  storage_.vmar_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::vmo_handle(::zx::vmo value) {
-  storage_.vmo_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::rights_handle(::zx::vmo value) {
-  storage_.rights_handle = std::move(value);
-  return *this;
-}
-inline Handles& Handles::aliased_plain_handle_field(::zx::handle value) {
-  storage_.aliased_plain_handle_field = std::move(value);
-  return *this;
-}
-inline Handles& Handles::aliased_subtype_handle_field(::zx::vmo value) {
-  storage_.aliased_subtype_handle_field = std::move(value);
-  return *this;
-}
-inline Handles& Handles::aliased_rights_handle_field(::zx::vmo value) {
-  storage_.aliased_rights_handle_field = std::move(value);
-  return *this;
-}
-inline Handles& Handles::some_protocol(::fidl::ClientEnd<::test_handles::SomeProtocol> value) {
-  storage_.some_protocol = std::move(value);
-  return *this;
-}
-inline Handles& Handles::request_some_protocol(::fidl::ServerEnd<::test_handles::SomeProtocol> value) {
-  storage_.request_some_protocol = std::move(value);
-  return *this;
-}
-
-inline FdfHandles::FdfHandles(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline FdfHandles::FdfHandles(::fdf::Channel fdf_channel_handle, ::fdf::ClientEnd<::test_handles::DriverProtocol> client_end_driver, ::fdf::ServerEnd<::test_handles::DriverProtocol> server_end_driver) noexcept
-    : storage_({.fdf_channel_handle = std::move(fdf_channel_handle),
-                .client_end_driver = std::move(client_end_driver),
-                .server_end_driver = std::move(server_end_driver)}) {}
-
-inline FdfHandles::FdfHandles(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : FdfHandles(Storage_{
-                                                                                                .fdf_channel_handle = {},
-                                                                                                .client_end_driver = {},
-                                                                                                .server_end_driver = {},
-                                                                                            }) {}
-inline FdfHandles& FdfHandles::fdf_channel_handle(::fdf::Channel value) {
-  storage_.fdf_channel_handle = std::move(value);
-  return *this;
-}
-inline FdfHandles& FdfHandles::client_end_driver(::fdf::ClientEnd<::test_handles::DriverProtocol> value) {
-  storage_.client_end_driver = std::move(value);
-  return *this;
-}
-inline FdfHandles& FdfHandles::server_end_driver(::fdf::ServerEnd<::test_handles::DriverProtocol> value) {
-  storage_.server_end_driver = std::move(value);
-  return *this;
-}
 
 #endif  // __Fuchsia__
 

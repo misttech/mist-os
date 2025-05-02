@@ -37,8 +37,7 @@ class ::fdf::AsyncEventHandler<::test_handles::DriverProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_handles::DriverProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_handles::DriverProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_handles::DriverProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_handles::DriverProtocol>* event_handler);
 };
 
 #endif  // __Fuchsia__
@@ -61,11 +60,7 @@ class ::fdf::Server<::test_handles::DriverProtocol> : public ::fidl::internal::I
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(fdf_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_handles::DriverProtocol> request) {
-      (void)::fdf::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(fdf_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

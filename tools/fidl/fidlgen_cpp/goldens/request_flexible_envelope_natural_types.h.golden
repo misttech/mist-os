@@ -49,82 +49,33 @@ class FlexibleFoo {
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
 
-  FlexibleFoo(FlexibleFoo&& other) noexcept
-      : FlexibleFoo(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
-    *storage_ = std::move(*other.storage_);
-  }
-  FlexibleFoo& operator=(FlexibleFoo&& other) noexcept {
-    if (this != &other) {
-      *storage_ = std::move(*other.storage_);
-    }
-    return *this;
-  }
-  FlexibleFoo(const FlexibleFoo& other) noexcept : FlexibleFoo(other.CloneStorage_()) {}
-  FlexibleFoo& operator=(const FlexibleFoo& other) noexcept {
-    if (this != &other) {
-      storage_ = other.CloneStorage_();
-    }
-    return *this;
-  }
+  FlexibleFoo(FlexibleFoo&& other) noexcept;
+  FlexibleFoo& operator=(FlexibleFoo&& other) noexcept;
+  FlexibleFoo(const FlexibleFoo& other) noexcept;
+  FlexibleFoo& operator=(const FlexibleFoo& other) noexcept;
+  bool operator==(const FlexibleFoo& other) const noexcept;
+  bool operator!=(const FlexibleFoo& other) const noexcept;
+  bool IsUnknown() const;
 
-  bool operator==(const FlexibleFoo& other) const noexcept {
-    return *storage_ == *other.storage_;
-  }
-  bool operator!=(const FlexibleFoo& other) const noexcept {
-    return *storage_ != *other.storage_;
-  }
-  constexpr bool IsUnknown() const {
-    return Which() == ::test_requestflexibleenvelope::FlexibleFoo::Tag::_do_not_handle_this__write_a_default_case_instead;
-  }
-
-  constexpr ::test_requestflexibleenvelope::FlexibleFoo::Tag Which() const {
-    return FlexibleFoo::IndexToTag(storage_->index()).value();
-  }
-  static FlexibleFoo WithS(::std::string val) {
-    return FlexibleFoo(std::make_shared<Storage_>(
-        std::in_place_index_t<1>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<1, Storage_> s() const {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<1, Storage_> s() {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
+  ::test_requestflexibleenvelope::FlexibleFoo::Tag Which() const;
+  static FlexibleFoo WithS(::std::string val);
+  const ::fidl::internal::UnionMemberView<1, Storage_> s() const;
+  ::fidl::internal::UnionMemberView<1, Storage_> s();
 
   // Sets the union to hold the s member.
   //
 
-  FlexibleFoo& s(::std::string value) {
-    storage_->emplace<1>(std::move(value));
-    return *this;
-  }
-  static FlexibleFoo WithI(int32_t val) {
-    return FlexibleFoo(std::make_shared<Storage_>(
-        std::in_place_index_t<2>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<2, Storage_> i() const {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<2, Storage_> i() {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
+  FlexibleFoo& s(::std::string value);
+  static FlexibleFoo WithI(int32_t val);
+  const ::fidl::internal::UnionMemberView<2, Storage_> i() const;
+  ::fidl::internal::UnionMemberView<2, Storage_> i();
 
   // Sets the union to hold the i member.
   //
 
-  FlexibleFoo& i(int32_t value) {
-    storage_->emplace<2>(std::move(value));
-    return *this;
-  }
+  FlexibleFoo& i(int32_t value);
 
-  FlexibleFoo(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
-      : storage_(std::make_shared<Storage_>()) {}
+  FlexibleFoo(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -133,30 +84,10 @@ class FlexibleFoo {
   static constexpr auto kMembers = std::make_tuple(
       ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintString<>>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
 
-  explicit FlexibleFoo(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+  explicit FlexibleFoo(std::shared_ptr<Storage_> storage);
 
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_requestflexibleenvelope::FlexibleFoo::Tag tag) {
-    switch (tag) {
-      case ::test_requestflexibleenvelope::FlexibleFoo::Tag::kS:
-        return 1;
-      case ::test_requestflexibleenvelope::FlexibleFoo::Tag::kI:
-        return 2;
-      default: {
-        return 0;
-      }
-    }
-  }
-
-  static constexpr std::optional<::test_requestflexibleenvelope::FlexibleFoo::Tag> IndexToTag(size_t index) {
-    switch (index) {
-      case 1:
-        return ::test_requestflexibleenvelope::FlexibleFoo::Tag::kS;
-      case 2:
-        return ::test_requestflexibleenvelope::FlexibleFoo::Tag::kI;
-      default:
-        return ::test_requestflexibleenvelope::FlexibleFoo::Tag::_do_not_handle_this__write_a_default_case_instead;
-    }
-  }
+  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_requestflexibleenvelope::FlexibleFoo::Tag tag);
+  static std::optional<::test_requestflexibleenvelope::FlexibleFoo::Tag> IndexToTag(size_t index);
 };
 
 class StrictFoo {
@@ -172,79 +103,32 @@ class StrictFoo {
     kI = 2,  // 0x2
   };
 
-  StrictFoo(StrictFoo&& other) noexcept
-      : StrictFoo(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
-    *storage_ = std::move(*other.storage_);
-  }
-  StrictFoo& operator=(StrictFoo&& other) noexcept {
-    if (this != &other) {
-      *storage_ = std::move(*other.storage_);
-    }
-    return *this;
-  }
-  StrictFoo(const StrictFoo& other) noexcept : StrictFoo(other.CloneStorage_()) {}
-  StrictFoo& operator=(const StrictFoo& other) noexcept {
-    if (this != &other) {
-      storage_ = other.CloneStorage_();
-    }
-    return *this;
-  }
+  StrictFoo(StrictFoo&& other) noexcept;
+  StrictFoo& operator=(StrictFoo&& other) noexcept;
+  StrictFoo(const StrictFoo& other) noexcept;
+  StrictFoo& operator=(const StrictFoo& other) noexcept;
+  bool operator==(const StrictFoo& other) const noexcept;
+  bool operator!=(const StrictFoo& other) const noexcept;
 
-  bool operator==(const StrictFoo& other) const noexcept {
-    return *storage_ == *other.storage_;
-  }
-  bool operator!=(const StrictFoo& other) const noexcept {
-    return *storage_ != *other.storage_;
-  }
-
-  constexpr ::test_requestflexibleenvelope::StrictFoo::Tag Which() const {
-    return StrictFoo::IndexToTag(storage_->index()).value();
-  }
-  static StrictFoo WithS(::std::string val) {
-    return StrictFoo(std::make_shared<Storage_>(
-        std::in_place_index_t<1>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<1, Storage_> s() const {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<1, Storage_> s() {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
+  ::test_requestflexibleenvelope::StrictFoo::Tag Which() const;
+  static StrictFoo WithS(::std::string val);
+  const ::fidl::internal::UnionMemberView<1, Storage_> s() const;
+  ::fidl::internal::UnionMemberView<1, Storage_> s();
 
   // Sets the union to hold the s member.
   //
 
-  StrictFoo& s(::std::string value) {
-    storage_->emplace<1>(std::move(value));
-    return *this;
-  }
-  static StrictFoo WithI(int32_t val) {
-    return StrictFoo(std::make_shared<Storage_>(
-        std::in_place_index_t<2>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<2, Storage_> i() const {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<2, Storage_> i() {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
+  StrictFoo& s(::std::string value);
+  static StrictFoo WithI(int32_t val);
+  const ::fidl::internal::UnionMemberView<2, Storage_> i() const;
+  ::fidl::internal::UnionMemberView<2, Storage_> i();
 
   // Sets the union to hold the i member.
   //
 
-  StrictFoo& i(int32_t value) {
-    storage_->emplace<2>(std::move(value));
-    return *this;
-  }
+  StrictFoo& i(int32_t value);
 
-  StrictFoo(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
-      : storage_(std::make_shared<Storage_>()) {}
+  StrictFoo(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -253,31 +137,10 @@ class StrictFoo {
   static constexpr auto kMembers = std::make_tuple(
       ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintString<>>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
 
-  explicit StrictFoo(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+  explicit StrictFoo(std::shared_ptr<Storage_> storage);
 
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_requestflexibleenvelope::StrictFoo::Tag tag) {
-    switch (tag) {
-      case ::test_requestflexibleenvelope::StrictFoo::Tag::kS:
-        return 1;
-      case ::test_requestflexibleenvelope::StrictFoo::Tag::kI:
-        return 2;
-      default: {
-        decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
-        return 0;
-      }
-    }
-  }
-
-  static constexpr std::optional<::test_requestflexibleenvelope::StrictFoo::Tag> IndexToTag(size_t index) {
-    switch (index) {
-      case 1:
-        return ::test_requestflexibleenvelope::StrictFoo::Tag::kS;
-      case 2:
-        return ::test_requestflexibleenvelope::StrictFoo::Tag::kI;
-      default:
-        return std::nullopt;
-    }
-  }
+  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_requestflexibleenvelope::StrictFoo::Tag tag);
+  static std::optional<::test_requestflexibleenvelope::StrictFoo::Tag> IndexToTag(size_t index);
 };
 
 class ProtocolRequestStrictResponseFlexibleRequest {
@@ -299,21 +162,13 @@ class ProtocolRequestStrictResponseFlexibleRequest {
   ProtocolRequestStrictResponseFlexibleRequest(const ProtocolRequestStrictResponseFlexibleRequest& other) noexcept;
   ProtocolRequestStrictResponseFlexibleRequest& operator=(const ProtocolRequestStrictResponseFlexibleRequest& other) noexcept;
 
-  bool operator==(const ProtocolRequestStrictResponseFlexibleRequest& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest, 16>::Equal(this, &other);
-  }
-  bool operator!=(const ProtocolRequestStrictResponseFlexibleRequest& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest, 16>::Equal(this, &other);
-  }
+  bool operator==(const ProtocolRequestStrictResponseFlexibleRequest& other) const noexcept;
+  bool operator!=(const ProtocolRequestStrictResponseFlexibleRequest& other) const noexcept;
 
   const ::test_requestflexibleenvelope::StrictFoo&
-  s() const {
-    return storage_.s;
-  }
+  s() const;
 
-  ::test_requestflexibleenvelope::StrictFoo& s() {
-    return storage_.s;
-  }
+  ::test_requestflexibleenvelope::StrictFoo& s();
 
   // Setter for s.
   //
@@ -356,21 +211,13 @@ class ProtocolRequestStrictResponseFlexibleResponse {
   ProtocolRequestStrictResponseFlexibleResponse(const ProtocolRequestStrictResponseFlexibleResponse& other) noexcept;
   ProtocolRequestStrictResponseFlexibleResponse& operator=(const ProtocolRequestStrictResponseFlexibleResponse& other) noexcept;
 
-  bool operator==(const ProtocolRequestStrictResponseFlexibleResponse& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse, 16>::Equal(this, &other);
-  }
-  bool operator!=(const ProtocolRequestStrictResponseFlexibleResponse& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse, 16>::Equal(this, &other);
-  }
+  bool operator==(const ProtocolRequestStrictResponseFlexibleResponse& other) const noexcept;
+  bool operator!=(const ProtocolRequestStrictResponseFlexibleResponse& other) const noexcept;
 
   const ::test_requestflexibleenvelope::FlexibleFoo&
-  f() const {
-    return storage_.f;
-  }
+  f() const;
 
-  ::test_requestflexibleenvelope::FlexibleFoo& f() {
-    return storage_.f;
-  }
+  ::test_requestflexibleenvelope::FlexibleFoo& f();
 
   // Setter for f.
   //
@@ -413,21 +260,13 @@ class ProtocolRequestFlexibleResponseStrictRequest {
   ProtocolRequestFlexibleResponseStrictRequest(const ProtocolRequestFlexibleResponseStrictRequest& other) noexcept;
   ProtocolRequestFlexibleResponseStrictRequest& operator=(const ProtocolRequestFlexibleResponseStrictRequest& other) noexcept;
 
-  bool operator==(const ProtocolRequestFlexibleResponseStrictRequest& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest, 16>::Equal(this, &other);
-  }
-  bool operator!=(const ProtocolRequestFlexibleResponseStrictRequest& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest, 16>::Equal(this, &other);
-  }
+  bool operator==(const ProtocolRequestFlexibleResponseStrictRequest& other) const noexcept;
+  bool operator!=(const ProtocolRequestFlexibleResponseStrictRequest& other) const noexcept;
 
   const ::test_requestflexibleenvelope::FlexibleFoo&
-  s() const {
-    return storage_.s;
-  }
+  s() const;
 
-  ::test_requestflexibleenvelope::FlexibleFoo& s() {
-    return storage_.s;
-  }
+  ::test_requestflexibleenvelope::FlexibleFoo& s();
 
   // Setter for s.
   //
@@ -470,21 +309,13 @@ class ProtocolRequestFlexibleResponseStrictResponse {
   ProtocolRequestFlexibleResponseStrictResponse(const ProtocolRequestFlexibleResponseStrictResponse& other) noexcept;
   ProtocolRequestFlexibleResponseStrictResponse& operator=(const ProtocolRequestFlexibleResponseStrictResponse& other) noexcept;
 
-  bool operator==(const ProtocolRequestFlexibleResponseStrictResponse& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse, 16>::Equal(this, &other);
-  }
-  bool operator!=(const ProtocolRequestFlexibleResponseStrictResponse& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse, 16>::Equal(this, &other);
-  }
+  bool operator==(const ProtocolRequestFlexibleResponseStrictResponse& other) const noexcept;
+  bool operator!=(const ProtocolRequestFlexibleResponseStrictResponse& other) const noexcept;
 
   const ::test_requestflexibleenvelope::StrictFoo&
-  f() const {
-    return storage_.f;
-  }
+  f() const;
 
-  ::test_requestflexibleenvelope::StrictFoo& f() {
-    return storage_.f;
-  }
+  ::test_requestflexibleenvelope::StrictFoo& f();
 
   // Setter for f.
   //
@@ -507,74 +338,6 @@ class ProtocolRequestFlexibleResponseStrictResponse {
       &Storage_::f, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictResponseFlexibleRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictResponseFlexibleRequest(::test_requestflexibleenvelope::StrictFoo s) noexcept
-    : storage_({.s = std::move(s)}) {}
-inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictResponseFlexibleRequest(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest(other.CloneStorage_()) {}
-inline ProtocolRequestStrictResponseFlexibleRequest& ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest::operator=(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictResponseFlexibleRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolRequestStrictResponseFlexibleRequest(Storage_{
-                                                                                                                                                                    .s = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                                                                                }) {}
-inline ProtocolRequestStrictResponseFlexibleRequest& ProtocolRequestStrictResponseFlexibleRequest::s(::test_requestflexibleenvelope::StrictFoo value) {
-  storage_.s = std::move(value);
-  return *this;
-}
-
-inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse(::test_requestflexibleenvelope::FlexibleFoo f) noexcept
-    : storage_({.f = std::move(f)}) {}
-inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse(other.CloneStorage_()) {}
-inline ProtocolRequestStrictResponseFlexibleResponse& ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse::operator=(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolRequestStrictResponseFlexibleResponse(Storage_{
-                                                                                                                                                                      .f = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                                                                                  }) {}
-inline ProtocolRequestStrictResponseFlexibleResponse& ProtocolRequestStrictResponseFlexibleResponse::f(::test_requestflexibleenvelope::FlexibleFoo value) {
-  storage_.f = std::move(value);
-  return *this;
-}
-
-inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResponseStrictRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResponseStrictRequest(::test_requestflexibleenvelope::FlexibleFoo s) noexcept
-    : storage_({.s = std::move(s)}) {}
-inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResponseStrictRequest(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest(other.CloneStorage_()) {}
-inline ProtocolRequestFlexibleResponseStrictRequest& ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest::operator=(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResponseStrictRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolRequestFlexibleResponseStrictRequest(Storage_{
-                                                                                                                                                                    .s = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                                                                                }) {}
-inline ProtocolRequestFlexibleResponseStrictRequest& ProtocolRequestFlexibleResponseStrictRequest::s(::test_requestflexibleenvelope::FlexibleFoo value) {
-  storage_.s = std::move(value);
-  return *this;
-}
-
-inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleResponseStrictResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleResponseStrictResponse(::test_requestflexibleenvelope::StrictFoo f) noexcept
-    : storage_({.f = std::move(f)}) {}
-inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleResponseStrictResponse(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse(other.CloneStorage_()) {}
-inline ProtocolRequestFlexibleResponseStrictResponse& ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse::operator=(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleResponseStrictResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolRequestFlexibleResponseStrictResponse(Storage_{
-                                                                                                                                                                      .f = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                                                                                  }) {}
-inline ProtocolRequestFlexibleResponseStrictResponse& ProtocolRequestFlexibleResponseStrictResponse::f(::test_requestflexibleenvelope::StrictFoo value) {
-  storage_.f = std::move(value);
-  return *this;
-}
 
 }  // namespace test_requestflexibleenvelope
 namespace fidl {

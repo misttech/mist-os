@@ -14,6 +14,9 @@ fidl("benchmark_suite_fidl") {
   public_deps = [ "//zircon/vdso/zx" ]
   enable_hlcpp = true
   contains_drivers = true
+
+  # benchmark libraries can get large.
+  additional_cpp_configs = [ "//build/config:compile_big_rbe_machine" ]
 }
 
 template("benchmark_fidl") {
@@ -43,6 +46,9 @@ template("benchmark_fidl") {
     enable_hlcpp = true
     disable_rustdoc = true
     forward_variables_from(invoker, [ "contains_drivers" ])
+
+    # benchmark libraries can get large.
+    additional_cpp_configs = [ "//build/config:compile_big_rbe_machine" ]
   }
 }
 

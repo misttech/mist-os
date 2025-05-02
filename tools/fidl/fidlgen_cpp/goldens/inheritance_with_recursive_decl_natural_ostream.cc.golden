@@ -27,8 +27,38 @@ std::ostream& fidl::ostream::Formatter<::test_inheritancewithrecursivedecl::Chil
   return os;
 }
 
-#endif  // __Fuchsia__
+std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_inheritancewithrecursivedecl::Parent>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_inheritancewithrecursivedecl::Parent>& value) {
+  return os << "ClientEnd<" << "test_inheritancewithrecursivedecl::Parent" << ">(" << value.channel().get() << ")";
+}
 
+std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>& value) {
+  return os << "ServerEnd<" << "test_inheritancewithrecursivedecl::Parent" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_inheritancewithrecursivedecl::Parent>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_inheritancewithrecursivedecl::Parent>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>>::Format(os, value);
+}
+std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_inheritancewithrecursivedecl::Child>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_inheritancewithrecursivedecl::Child>& value) {
+  return os << "ClientEnd<" << "test_inheritancewithrecursivedecl::Child" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child>& value) {
+  return os << "ServerEnd<" << "test_inheritancewithrecursivedecl::Child" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_inheritancewithrecursivedecl::Child>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_inheritancewithrecursivedecl::Child>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child>>::Format(os, value);
+}
+
+#endif  // __Fuchsia__
 namespace test_inheritancewithrecursivedecl {
 
 #ifdef __Fuchsia__

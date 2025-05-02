@@ -134,6 +134,26 @@
     {{- end }}
   {{- end }}
 
+  {{- IfdefFuchsia }}
+  {{- range .Protocols }}
+      std::ostream& fidl::ostream::Formatter<{{ .ClientEnd }}>::Format(std::ostream& os, const {{ .ClientEnd }}& value) {
+        return os << "ClientEnd<" << "{{ .NoLeading }}" << ">(" << value.channel().get() << ")";
+      }
+
+      std::ostream& fidl::ostream::Formatter<{{ .ServerEnd }}>::Format(std::ostream& os, const {{ .ServerEnd }}& value) {
+        return os << "ServerEnd<" << "{{ .NoLeading }}" << ">(" << value.channel().get() << ")";
+      }
+
+      std::ostream& operator<<(std::ostream& os, const {{ .ClientEnd }}& value) {
+        return fidl::ostream::Formatter<{{ .ClientEnd }}>::Format(os, value);
+      }
+
+      std::ostream& operator<<(std::ostream& os, const {{ .ServerEnd }}& value) {
+          return fidl::ostream::Formatter<{{ .ServerEnd }}>::Format(os, value);
+      }
+  {{- end }}
+  {{- EndifFuchsia -}}
+
   {{ range .Decls }}
     {{- if and (ne .Kind Kinds.Alias) (ne .Kind Kinds.Const) (ne .Kind Kinds.Protocol) (ne .Kind Kinds.Service) }}
       {{- EnsureNamespace . }}

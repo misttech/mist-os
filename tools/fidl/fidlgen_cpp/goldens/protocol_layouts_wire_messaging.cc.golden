@@ -1664,6 +1664,11 @@
         return ::fidl::Status::UnknownOrdinal();
     }
   }
+void fidl::WireAsyncEventHandler<::test_protocollayouts::MainProtocol>::OnAnonComposed(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnAnonComposed>* event) {}
+void fidl::WireAsyncEventHandler<::test_protocollayouts::MainProtocol>::OnNamedComposed(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnNamedComposed>* event) {}
+void fidl::WireAsyncEventHandler<::test_protocollayouts::MainProtocol>::OnImport(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnImport>* event) {}
+void fidl::WireAsyncEventHandler<::test_protocollayouts::MainProtocol>::OnLocal(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnLocal>* event) {}
+void fidl::WireAsyncEventHandler<::test_protocollayouts::MainProtocol>::OnAnon(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnAnon>* event) {}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_protocollayouts::MainProtocol>::entries_[] = {
     { ::test_protocollayouts::kMainProtocol_OneWayAnonComposed_Ordinal,
@@ -4847,6 +4852,8 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts:
         return ::fidl::Status::UnknownOrdinal();
     }
   }
+void fidl::WireAsyncEventHandler<::test_protocollayouts::OpenProtocol>::FlexibleEvent(::fidl::WireEvent<::test_protocollayouts::OpenProtocol::FlexibleEvent>* event) {}
+void fidl::WireAsyncEventHandler<::test_protocollayouts::OpenProtocol>::StrictEvent(::fidl::WireEvent<::test_protocollayouts::OpenProtocol::StrictEvent>* event) {}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_protocollayouts::OpenProtocol>::entries_[] = {
     { ::test_protocollayouts::kOpenProtocol_FlexibleOneWay_Ordinal,

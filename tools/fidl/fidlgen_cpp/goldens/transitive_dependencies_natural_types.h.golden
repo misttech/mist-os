@@ -38,21 +38,13 @@ class Baz {
   Baz(const Baz& other) noexcept;
   Baz& operator=(const Baz& other) noexcept;
 
-  bool operator==(const Baz& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_transitivedependencies::Baz, 4>::Equal(this, &other);
-  }
-  bool operator!=(const Baz& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_transitivedependencies::Baz, 4>::Equal(this, &other);
-  }
+  bool operator==(const Baz& other) const noexcept;
+  bool operator!=(const Baz& other) const noexcept;
 
   const ::test_middle::Bar&
-  g() const {
-    return storage_.g;
-  }
+  g() const;
 
-  ::test_middle::Bar& g() {
-    return storage_.g;
-  }
+  ::test_middle::Bar& g();
 
   // Setter for g.
   //
@@ -75,23 +67,6 @@ class Baz {
       &Storage_::g, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-inline Baz::Baz(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Baz::Baz(::test_middle::Bar g) noexcept
-    : storage_({.g = std::move(g)}) {}
-inline Baz::Baz(const ::test_transitivedependencies::Baz& other) noexcept : ::test_transitivedependencies::Baz(other.CloneStorage_()) {}
-inline Baz& ::test_transitivedependencies::Baz::operator=(const ::test_transitivedependencies::Baz& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Baz::Baz(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Baz(Storage_{
-                                                                                  .g = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                              }) {}
-inline Baz& Baz::g(::test_middle::Bar value) {
-  storage_.g = std::move(value);
-  return *this;
-}
 
 }  // namespace test_transitivedependencies
 namespace fidl {

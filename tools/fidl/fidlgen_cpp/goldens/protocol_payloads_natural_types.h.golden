@@ -63,21 +63,13 @@ class LocalStructPayload {
   LocalStructPayload(const LocalStructPayload& other) noexcept;
   LocalStructPayload& operator=(const LocalStructPayload& other) noexcept;
 
-  bool operator==(const LocalStructPayload& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::LocalStructPayload, 8>::Equal(this, &other);
-  }
-  bool operator!=(const LocalStructPayload& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::LocalStructPayload, 8>::Equal(this, &other);
-  }
+  bool operator==(const LocalStructPayload& other) const noexcept;
+  bool operator!=(const LocalStructPayload& other) const noexcept;
 
   uint32_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint32_t& a() {
-    return storage_.a;
-  }
+  uint32_t& a();
 
   // Setter for a.
   //
@@ -85,13 +77,9 @@ class LocalStructPayload {
   LocalStructPayload& a(uint32_t value);
 
   uint32_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint32_t& b() {
-    return storage_.b;
-  }
+  uint32_t& b();
 
   // Setter for b.
   //
@@ -130,79 +118,32 @@ class MainProtocolTwoWayLocalWithErrorResult {
     kErr = 2,       // 0x2
   };
 
-  MainProtocolTwoWayLocalWithErrorResult(MainProtocolTwoWayLocalWithErrorResult&& other) noexcept
-      : MainProtocolTwoWayLocalWithErrorResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
-    *storage_ = std::move(*other.storage_);
-  }
-  MainProtocolTwoWayLocalWithErrorResult& operator=(MainProtocolTwoWayLocalWithErrorResult&& other) noexcept {
-    if (this != &other) {
-      *storage_ = std::move(*other.storage_);
-    }
-    return *this;
-  }
-  MainProtocolTwoWayLocalWithErrorResult(const MainProtocolTwoWayLocalWithErrorResult& other) noexcept : MainProtocolTwoWayLocalWithErrorResult(other.CloneStorage_()) {}
-  MainProtocolTwoWayLocalWithErrorResult& operator=(const MainProtocolTwoWayLocalWithErrorResult& other) noexcept {
-    if (this != &other) {
-      storage_ = other.CloneStorage_();
-    }
-    return *this;
-  }
+  MainProtocolTwoWayLocalWithErrorResult(MainProtocolTwoWayLocalWithErrorResult&& other) noexcept;
+  MainProtocolTwoWayLocalWithErrorResult& operator=(MainProtocolTwoWayLocalWithErrorResult&& other) noexcept;
+  MainProtocolTwoWayLocalWithErrorResult(const MainProtocolTwoWayLocalWithErrorResult& other) noexcept;
+  MainProtocolTwoWayLocalWithErrorResult& operator=(const MainProtocolTwoWayLocalWithErrorResult& other) noexcept;
+  bool operator==(const MainProtocolTwoWayLocalWithErrorResult& other) const noexcept;
+  bool operator!=(const MainProtocolTwoWayLocalWithErrorResult& other) const noexcept;
 
-  bool operator==(const MainProtocolTwoWayLocalWithErrorResult& other) const noexcept {
-    return *storage_ == *other.storage_;
-  }
-  bool operator!=(const MainProtocolTwoWayLocalWithErrorResult& other) const noexcept {
-    return *storage_ != *other.storage_;
-  }
-
-  constexpr ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult::Tag Which() const {
-    return MainProtocolTwoWayLocalWithErrorResult::IndexToTag(storage_->index()).value();
-  }
-  static MainProtocolTwoWayLocalWithErrorResult WithResponse(::test_protocolpayloads::LocalStructPayload val) {
-    return MainProtocolTwoWayLocalWithErrorResult(std::make_shared<Storage_>(
-        std::in_place_index_t<1>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<1, Storage_> response() {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
+  ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult::Tag Which() const;
+  static MainProtocolTwoWayLocalWithErrorResult WithResponse(::test_protocolpayloads::LocalStructPayload val);
+  const ::fidl::internal::UnionMemberView<1, Storage_> response() const;
+  ::fidl::internal::UnionMemberView<1, Storage_> response();
 
   // Sets the union to hold the response member.
   //
 
-  MainProtocolTwoWayLocalWithErrorResult& response(::test_protocolpayloads::LocalStructPayload value) {
-    storage_->emplace<1>(std::move(value));
-    return *this;
-  }
-  static MainProtocolTwoWayLocalWithErrorResult WithErr(uint32_t val) {
-    return MainProtocolTwoWayLocalWithErrorResult(std::make_shared<Storage_>(
-        std::in_place_index_t<2>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<2, Storage_> err() {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
+  MainProtocolTwoWayLocalWithErrorResult& response(::test_protocolpayloads::LocalStructPayload value);
+  static MainProtocolTwoWayLocalWithErrorResult WithErr(uint32_t val);
+  const ::fidl::internal::UnionMemberView<2, Storage_> err() const;
+  ::fidl::internal::UnionMemberView<2, Storage_> err();
 
   // Sets the union to hold the err member.
   //
 
-  MainProtocolTwoWayLocalWithErrorResult& err(uint32_t value) {
-    storage_->emplace<2>(std::move(value));
-    return *this;
-  }
+  MainProtocolTwoWayLocalWithErrorResult& err(uint32_t value);
 
-  MainProtocolTwoWayLocalWithErrorResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
-      : storage_(std::make_shared<Storage_>()) {}
+  MainProtocolTwoWayLocalWithErrorResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -211,31 +152,10 @@ class MainProtocolTwoWayLocalWithErrorResult {
   static constexpr auto kMembers = std::make_tuple(
       ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
 
-  explicit MainProtocolTwoWayLocalWithErrorResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+  explicit MainProtocolTwoWayLocalWithErrorResult(std::shared_ptr<Storage_> storage);
 
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult::Tag tag) {
-    switch (tag) {
-      case ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult::Tag::kResponse:
-        return 1;
-      case ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult::Tag::kErr:
-        return 2;
-      default: {
-        decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
-        return 0;
-      }
-    }
-  }
-
-  static constexpr std::optional<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult::Tag> IndexToTag(size_t index) {
-    switch (index) {
-      case 1:
-        return ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult::Tag::kResponse;
-      case 2:
-        return ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult::Tag::kErr;
-      default:
-        return std::nullopt;
-    }
-  }
+  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult::Tag tag);
+  static std::optional<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult::Tag> IndexToTag(size_t index);
 };
 
 class MainProtocolOneWayAnonRequest {
@@ -257,21 +177,13 @@ class MainProtocolOneWayAnonRequest {
   MainProtocolOneWayAnonRequest(const MainProtocolOneWayAnonRequest& other) noexcept;
   MainProtocolOneWayAnonRequest& operator=(const MainProtocolOneWayAnonRequest& other) noexcept;
 
-  bool operator==(const MainProtocolOneWayAnonRequest& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOneWayAnonRequest, 8>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolOneWayAnonRequest& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOneWayAnonRequest, 8>::Equal(this, &other);
-  }
+  bool operator==(const MainProtocolOneWayAnonRequest& other) const noexcept;
+  bool operator!=(const MainProtocolOneWayAnonRequest& other) const noexcept;
 
   uint32_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint32_t& a() {
-    return storage_.a;
-  }
+  uint32_t& a();
 
   // Setter for a.
   //
@@ -279,13 +191,9 @@ class MainProtocolOneWayAnonRequest {
   MainProtocolOneWayAnonRequest& a(uint32_t value);
 
   uint32_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint32_t& b() {
-    return storage_.b;
-  }
+  uint32_t& b();
 
   // Setter for b.
   //
@@ -330,21 +238,13 @@ class MainProtocolTwoWayAnonRequest {
   MainProtocolTwoWayAnonRequest(const MainProtocolTwoWayAnonRequest& other) noexcept;
   MainProtocolTwoWayAnonRequest& operator=(const MainProtocolTwoWayAnonRequest& other) noexcept;
 
-  bool operator==(const MainProtocolTwoWayAnonRequest& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonRequest, 8>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolTwoWayAnonRequest& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonRequest, 8>::Equal(this, &other);
-  }
+  bool operator==(const MainProtocolTwoWayAnonRequest& other) const noexcept;
+  bool operator!=(const MainProtocolTwoWayAnonRequest& other) const noexcept;
 
   uint32_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint32_t& a() {
-    return storage_.a;
-  }
+  uint32_t& a();
 
   // Setter for a.
   //
@@ -352,13 +252,9 @@ class MainProtocolTwoWayAnonRequest {
   MainProtocolTwoWayAnonRequest& a(uint32_t value);
 
   uint32_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint32_t& b() {
-    return storage_.b;
-  }
+  uint32_t& b();
 
   // Setter for b.
   //
@@ -403,21 +299,13 @@ class MainProtocolTwoWayAnonResponse {
   MainProtocolTwoWayAnonResponse(const MainProtocolTwoWayAnonResponse& other) noexcept;
   MainProtocolTwoWayAnonResponse& operator=(const MainProtocolTwoWayAnonResponse& other) noexcept;
 
-  bool operator==(const MainProtocolTwoWayAnonResponse& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonResponse, 8>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolTwoWayAnonResponse& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonResponse, 8>::Equal(this, &other);
-  }
+  bool operator==(const MainProtocolTwoWayAnonResponse& other) const noexcept;
+  bool operator!=(const MainProtocolTwoWayAnonResponse& other) const noexcept;
 
   uint32_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint32_t& a() {
-    return storage_.a;
-  }
+  uint32_t& a();
 
   // Setter for a.
   //
@@ -425,13 +313,9 @@ class MainProtocolTwoWayAnonResponse {
   MainProtocolTwoWayAnonResponse& a(uint32_t value);
 
   uint32_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint32_t& b() {
-    return storage_.b;
-  }
+  uint32_t& b();
 
   // Setter for b.
   //
@@ -476,21 +360,13 @@ class MainProtocolTwoWayAnonWithErrorRequest {
   MainProtocolTwoWayAnonWithErrorRequest(const MainProtocolTwoWayAnonWithErrorRequest& other) noexcept;
   MainProtocolTwoWayAnonWithErrorRequest& operator=(const MainProtocolTwoWayAnonWithErrorRequest& other) noexcept;
 
-  bool operator==(const MainProtocolTwoWayAnonWithErrorRequest& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest, 8>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolTwoWayAnonWithErrorRequest& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest, 8>::Equal(this, &other);
-  }
+  bool operator==(const MainProtocolTwoWayAnonWithErrorRequest& other) const noexcept;
+  bool operator!=(const MainProtocolTwoWayAnonWithErrorRequest& other) const noexcept;
 
   uint32_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint32_t& a() {
-    return storage_.a;
-  }
+  uint32_t& a();
 
   // Setter for a.
   //
@@ -498,13 +374,9 @@ class MainProtocolTwoWayAnonWithErrorRequest {
   MainProtocolTwoWayAnonWithErrorRequest& a(uint32_t value);
 
   uint32_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint32_t& b() {
-    return storage_.b;
-  }
+  uint32_t& b();
 
   // Setter for b.
   //
@@ -549,21 +421,13 @@ class MainProtocolTwoWayAnonWithErrorResponse {
   MainProtocolTwoWayAnonWithErrorResponse(const MainProtocolTwoWayAnonWithErrorResponse& other) noexcept;
   MainProtocolTwoWayAnonWithErrorResponse& operator=(const MainProtocolTwoWayAnonWithErrorResponse& other) noexcept;
 
-  bool operator==(const MainProtocolTwoWayAnonWithErrorResponse& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse, 8>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolTwoWayAnonWithErrorResponse& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse, 8>::Equal(this, &other);
-  }
+  bool operator==(const MainProtocolTwoWayAnonWithErrorResponse& other) const noexcept;
+  bool operator!=(const MainProtocolTwoWayAnonWithErrorResponse& other) const noexcept;
 
   uint32_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint32_t& a() {
-    return storage_.a;
-  }
+  uint32_t& a();
 
   // Setter for a.
   //
@@ -571,13 +435,9 @@ class MainProtocolTwoWayAnonWithErrorResponse {
   MainProtocolTwoWayAnonWithErrorResponse& a(uint32_t value);
 
   uint32_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint32_t& b() {
-    return storage_.b;
-  }
+  uint32_t& b();
 
   // Setter for b.
   //
@@ -616,79 +476,32 @@ class MainProtocolTwoWayAnonWithErrorResult {
     kErr = 2,       // 0x2
   };
 
-  MainProtocolTwoWayAnonWithErrorResult(MainProtocolTwoWayAnonWithErrorResult&& other) noexcept
-      : MainProtocolTwoWayAnonWithErrorResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
-    *storage_ = std::move(*other.storage_);
-  }
-  MainProtocolTwoWayAnonWithErrorResult& operator=(MainProtocolTwoWayAnonWithErrorResult&& other) noexcept {
-    if (this != &other) {
-      *storage_ = std::move(*other.storage_);
-    }
-    return *this;
-  }
-  MainProtocolTwoWayAnonWithErrorResult(const MainProtocolTwoWayAnonWithErrorResult& other) noexcept : MainProtocolTwoWayAnonWithErrorResult(other.CloneStorage_()) {}
-  MainProtocolTwoWayAnonWithErrorResult& operator=(const MainProtocolTwoWayAnonWithErrorResult& other) noexcept {
-    if (this != &other) {
-      storage_ = other.CloneStorage_();
-    }
-    return *this;
-  }
+  MainProtocolTwoWayAnonWithErrorResult(MainProtocolTwoWayAnonWithErrorResult&& other) noexcept;
+  MainProtocolTwoWayAnonWithErrorResult& operator=(MainProtocolTwoWayAnonWithErrorResult&& other) noexcept;
+  MainProtocolTwoWayAnonWithErrorResult(const MainProtocolTwoWayAnonWithErrorResult& other) noexcept;
+  MainProtocolTwoWayAnonWithErrorResult& operator=(const MainProtocolTwoWayAnonWithErrorResult& other) noexcept;
+  bool operator==(const MainProtocolTwoWayAnonWithErrorResult& other) const noexcept;
+  bool operator!=(const MainProtocolTwoWayAnonWithErrorResult& other) const noexcept;
 
-  bool operator==(const MainProtocolTwoWayAnonWithErrorResult& other) const noexcept {
-    return *storage_ == *other.storage_;
-  }
-  bool operator!=(const MainProtocolTwoWayAnonWithErrorResult& other) const noexcept {
-    return *storage_ != *other.storage_;
-  }
-
-  constexpr ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult::Tag Which() const {
-    return MainProtocolTwoWayAnonWithErrorResult::IndexToTag(storage_->index()).value();
-  }
-  static MainProtocolTwoWayAnonWithErrorResult WithResponse(::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse val) {
-    return MainProtocolTwoWayAnonWithErrorResult(std::make_shared<Storage_>(
-        std::in_place_index_t<1>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<1, Storage_> response() {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
+  ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult::Tag Which() const;
+  static MainProtocolTwoWayAnonWithErrorResult WithResponse(::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse val);
+  const ::fidl::internal::UnionMemberView<1, Storage_> response() const;
+  ::fidl::internal::UnionMemberView<1, Storage_> response();
 
   // Sets the union to hold the response member.
   //
 
-  MainProtocolTwoWayAnonWithErrorResult& response(::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse value) {
-    storage_->emplace<1>(std::move(value));
-    return *this;
-  }
-  static MainProtocolTwoWayAnonWithErrorResult WithErr(uint32_t val) {
-    return MainProtocolTwoWayAnonWithErrorResult(std::make_shared<Storage_>(
-        std::in_place_index_t<2>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<2, Storage_> err() {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
+  MainProtocolTwoWayAnonWithErrorResult& response(::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse value);
+  static MainProtocolTwoWayAnonWithErrorResult WithErr(uint32_t val);
+  const ::fidl::internal::UnionMemberView<2, Storage_> err() const;
+  ::fidl::internal::UnionMemberView<2, Storage_> err();
 
   // Sets the union to hold the err member.
   //
 
-  MainProtocolTwoWayAnonWithErrorResult& err(uint32_t value) {
-    storage_->emplace<2>(std::move(value));
-    return *this;
-  }
+  MainProtocolTwoWayAnonWithErrorResult& err(uint32_t value);
 
-  MainProtocolTwoWayAnonWithErrorResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
-      : storage_(std::make_shared<Storage_>()) {}
+  MainProtocolTwoWayAnonWithErrorResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -697,31 +510,10 @@ class MainProtocolTwoWayAnonWithErrorResult {
   static constexpr auto kMembers = std::make_tuple(
       ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
 
-  explicit MainProtocolTwoWayAnonWithErrorResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+  explicit MainProtocolTwoWayAnonWithErrorResult(std::shared_ptr<Storage_> storage);
 
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult::Tag tag) {
-    switch (tag) {
-      case ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult::Tag::kResponse:
-        return 1;
-      case ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult::Tag::kErr:
-        return 2;
-      default: {
-        decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
-        return 0;
-      }
-    }
-  }
-
-  static constexpr std::optional<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult::Tag> IndexToTag(size_t index) {
-    switch (index) {
-      case 1:
-        return ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult::Tag::kResponse;
-      case 2:
-        return ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult::Tag::kErr;
-      default:
-        return std::nullopt;
-    }
-  }
+  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult::Tag tag);
+  static std::optional<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult::Tag> IndexToTag(size_t index);
 };
 
 class MainProtocolOnAnonRequest {
@@ -743,21 +535,13 @@ class MainProtocolOnAnonRequest {
   MainProtocolOnAnonRequest(const MainProtocolOnAnonRequest& other) noexcept;
   MainProtocolOnAnonRequest& operator=(const MainProtocolOnAnonRequest& other) noexcept;
 
-  bool operator==(const MainProtocolOnAnonRequest& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnAnonRequest, 8>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolOnAnonRequest& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnAnonRequest, 8>::Equal(this, &other);
-  }
+  bool operator==(const MainProtocolOnAnonRequest& other) const noexcept;
+  bool operator!=(const MainProtocolOnAnonRequest& other) const noexcept;
 
   uint32_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint32_t& a() {
-    return storage_.a;
-  }
+  uint32_t& a();
 
   // Setter for a.
   //
@@ -765,13 +549,9 @@ class MainProtocolOnAnonRequest {
   MainProtocolOnAnonRequest& a(uint32_t value);
 
   uint32_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint32_t& b() {
-    return storage_.b;
-  }
+  uint32_t& b();
 
   // Setter for b.
   //
@@ -810,79 +590,32 @@ class MainProtocolTwoWayImportWithErrorResult {
     kErr = 2,       // 0x2
   };
 
-  MainProtocolTwoWayImportWithErrorResult(MainProtocolTwoWayImportWithErrorResult&& other) noexcept
-      : MainProtocolTwoWayImportWithErrorResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
-    *storage_ = std::move(*other.storage_);
-  }
-  MainProtocolTwoWayImportWithErrorResult& operator=(MainProtocolTwoWayImportWithErrorResult&& other) noexcept {
-    if (this != &other) {
-      *storage_ = std::move(*other.storage_);
-    }
-    return *this;
-  }
-  MainProtocolTwoWayImportWithErrorResult(const MainProtocolTwoWayImportWithErrorResult& other) noexcept : MainProtocolTwoWayImportWithErrorResult(other.CloneStorage_()) {}
-  MainProtocolTwoWayImportWithErrorResult& operator=(const MainProtocolTwoWayImportWithErrorResult& other) noexcept {
-    if (this != &other) {
-      storage_ = other.CloneStorage_();
-    }
-    return *this;
-  }
+  MainProtocolTwoWayImportWithErrorResult(MainProtocolTwoWayImportWithErrorResult&& other) noexcept;
+  MainProtocolTwoWayImportWithErrorResult& operator=(MainProtocolTwoWayImportWithErrorResult&& other) noexcept;
+  MainProtocolTwoWayImportWithErrorResult(const MainProtocolTwoWayImportWithErrorResult& other) noexcept;
+  MainProtocolTwoWayImportWithErrorResult& operator=(const MainProtocolTwoWayImportWithErrorResult& other) noexcept;
+  bool operator==(const MainProtocolTwoWayImportWithErrorResult& other) const noexcept;
+  bool operator!=(const MainProtocolTwoWayImportWithErrorResult& other) const noexcept;
 
-  bool operator==(const MainProtocolTwoWayImportWithErrorResult& other) const noexcept {
-    return *storage_ == *other.storage_;
-  }
-  bool operator!=(const MainProtocolTwoWayImportWithErrorResult& other) const noexcept {
-    return *storage_ != *other.storage_;
-  }
-
-  constexpr ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult::Tag Which() const {
-    return MainProtocolTwoWayImportWithErrorResult::IndexToTag(storage_->index()).value();
-  }
-  static MainProtocolTwoWayImportWithErrorResult WithResponse(::test_protocolpayloads_imported::ImportStructPayload val) {
-    return MainProtocolTwoWayImportWithErrorResult(std::make_shared<Storage_>(
-        std::in_place_index_t<1>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<1, Storage_> response() {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
+  ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult::Tag Which() const;
+  static MainProtocolTwoWayImportWithErrorResult WithResponse(::test_protocolpayloads_imported::ImportStructPayload val);
+  const ::fidl::internal::UnionMemberView<1, Storage_> response() const;
+  ::fidl::internal::UnionMemberView<1, Storage_> response();
 
   // Sets the union to hold the response member.
   //
 
-  MainProtocolTwoWayImportWithErrorResult& response(::test_protocolpayloads_imported::ImportStructPayload value) {
-    storage_->emplace<1>(std::move(value));
-    return *this;
-  }
-  static MainProtocolTwoWayImportWithErrorResult WithErr(uint32_t val) {
-    return MainProtocolTwoWayImportWithErrorResult(std::make_shared<Storage_>(
-        std::in_place_index_t<2>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<2, Storage_> err() {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
+  MainProtocolTwoWayImportWithErrorResult& response(::test_protocolpayloads_imported::ImportStructPayload value);
+  static MainProtocolTwoWayImportWithErrorResult WithErr(uint32_t val);
+  const ::fidl::internal::UnionMemberView<2, Storage_> err() const;
+  ::fidl::internal::UnionMemberView<2, Storage_> err();
 
   // Sets the union to hold the err member.
   //
 
-  MainProtocolTwoWayImportWithErrorResult& err(uint32_t value) {
-    storage_->emplace<2>(std::move(value));
-    return *this;
-  }
+  MainProtocolTwoWayImportWithErrorResult& err(uint32_t value);
 
-  MainProtocolTwoWayImportWithErrorResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
-      : storage_(std::make_shared<Storage_>()) {}
+  MainProtocolTwoWayImportWithErrorResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -891,193 +624,11 @@ class MainProtocolTwoWayImportWithErrorResult {
   static constexpr auto kMembers = std::make_tuple(
       ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
 
-  explicit MainProtocolTwoWayImportWithErrorResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+  explicit MainProtocolTwoWayImportWithErrorResult(std::shared_ptr<Storage_> storage);
 
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult::Tag tag) {
-    switch (tag) {
-      case ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult::Tag::kResponse:
-        return 1;
-      case ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult::Tag::kErr:
-        return 2;
-      default: {
-        decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
-        return 0;
-      }
-    }
-  }
-
-  static constexpr std::optional<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult::Tag> IndexToTag(size_t index) {
-    switch (index) {
-      case 1:
-        return ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult::Tag::kResponse;
-      case 2:
-        return ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult::Tag::kErr;
-      default:
-        return std::nullopt;
-    }
-  }
+  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult::Tag tag);
+  static std::optional<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult::Tag> IndexToTag(size_t index);
 };
-
-inline LocalStructPayload::LocalStructPayload(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline LocalStructPayload::LocalStructPayload(uint32_t a, uint32_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline LocalStructPayload::LocalStructPayload(const ::test_protocolpayloads::LocalStructPayload& other) noexcept : ::test_protocolpayloads::LocalStructPayload(other.CloneStorage_()) {}
-inline LocalStructPayload& ::test_protocolpayloads::LocalStructPayload::operator=(const ::test_protocolpayloads::LocalStructPayload& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline LocalStructPayload::LocalStructPayload(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : LocalStructPayload(Storage_{
-                                                                                                                .a = {},
-                                                                                                                .b = {},
-                                                                                                            }) {}
-inline LocalStructPayload& LocalStructPayload::a(uint32_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline LocalStructPayload& LocalStructPayload::b(uint32_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline MainProtocolOneWayAnonRequest::MainProtocolOneWayAnonRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline MainProtocolOneWayAnonRequest::MainProtocolOneWayAnonRequest(uint32_t a, uint32_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline MainProtocolOneWayAnonRequest::MainProtocolOneWayAnonRequest(const ::test_protocolpayloads::MainProtocolOneWayAnonRequest& other) noexcept : ::test_protocolpayloads::MainProtocolOneWayAnonRequest(other.CloneStorage_()) {}
-inline MainProtocolOneWayAnonRequest& ::test_protocolpayloads::MainProtocolOneWayAnonRequest::operator=(const ::test_protocolpayloads::MainProtocolOneWayAnonRequest& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline MainProtocolOneWayAnonRequest::MainProtocolOneWayAnonRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolOneWayAnonRequest(Storage_{
-                                                                                                                                      .a = {},
-                                                                                                                                      .b = {},
-                                                                                                                                  }) {}
-inline MainProtocolOneWayAnonRequest& MainProtocolOneWayAnonRequest::a(uint32_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline MainProtocolOneWayAnonRequest& MainProtocolOneWayAnonRequest::b(uint32_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline MainProtocolTwoWayAnonRequest::MainProtocolTwoWayAnonRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline MainProtocolTwoWayAnonRequest::MainProtocolTwoWayAnonRequest(uint32_t a, uint32_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline MainProtocolTwoWayAnonRequest::MainProtocolTwoWayAnonRequest(const ::test_protocolpayloads::MainProtocolTwoWayAnonRequest& other) noexcept : ::test_protocolpayloads::MainProtocolTwoWayAnonRequest(other.CloneStorage_()) {}
-inline MainProtocolTwoWayAnonRequest& ::test_protocolpayloads::MainProtocolTwoWayAnonRequest::operator=(const ::test_protocolpayloads::MainProtocolTwoWayAnonRequest& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline MainProtocolTwoWayAnonRequest::MainProtocolTwoWayAnonRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayAnonRequest(Storage_{
-                                                                                                                                      .a = {},
-                                                                                                                                      .b = {},
-                                                                                                                                  }) {}
-inline MainProtocolTwoWayAnonRequest& MainProtocolTwoWayAnonRequest::a(uint32_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline MainProtocolTwoWayAnonRequest& MainProtocolTwoWayAnonRequest::b(uint32_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse(uint32_t a, uint32_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse(const ::test_protocolpayloads::MainProtocolTwoWayAnonResponse& other) noexcept : ::test_protocolpayloads::MainProtocolTwoWayAnonResponse(other.CloneStorage_()) {}
-inline MainProtocolTwoWayAnonResponse& ::test_protocolpayloads::MainProtocolTwoWayAnonResponse::operator=(const ::test_protocolpayloads::MainProtocolTwoWayAnonResponse& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayAnonResponse(Storage_{
-                                                                                                                                        .a = {},
-                                                                                                                                        .b = {},
-                                                                                                                                    }) {}
-inline MainProtocolTwoWayAnonResponse& MainProtocolTwoWayAnonResponse::a(uint32_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline MainProtocolTwoWayAnonResponse& MainProtocolTwoWayAnonResponse::b(uint32_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline MainProtocolTwoWayAnonWithErrorRequest::MainProtocolTwoWayAnonWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline MainProtocolTwoWayAnonWithErrorRequest::MainProtocolTwoWayAnonWithErrorRequest(uint32_t a, uint32_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline MainProtocolTwoWayAnonWithErrorRequest::MainProtocolTwoWayAnonWithErrorRequest(const ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest& other) noexcept : ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest(other.CloneStorage_()) {}
-inline MainProtocolTwoWayAnonWithErrorRequest& ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest::operator=(const ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline MainProtocolTwoWayAnonWithErrorRequest::MainProtocolTwoWayAnonWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayAnonWithErrorRequest(Storage_{
-                                                                                                                                                        .a = {},
-                                                                                                                                                        .b = {},
-                                                                                                                                                    }) {}
-inline MainProtocolTwoWayAnonWithErrorRequest& MainProtocolTwoWayAnonWithErrorRequest::a(uint32_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline MainProtocolTwoWayAnonWithErrorRequest& MainProtocolTwoWayAnonWithErrorRequest::b(uint32_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline MainProtocolTwoWayAnonWithErrorResponse::MainProtocolTwoWayAnonWithErrorResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline MainProtocolTwoWayAnonWithErrorResponse::MainProtocolTwoWayAnonWithErrorResponse(uint32_t a, uint32_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline MainProtocolTwoWayAnonWithErrorResponse::MainProtocolTwoWayAnonWithErrorResponse(const ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse& other) noexcept : ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse(other.CloneStorage_()) {}
-inline MainProtocolTwoWayAnonWithErrorResponse& ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse::operator=(const ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline MainProtocolTwoWayAnonWithErrorResponse::MainProtocolTwoWayAnonWithErrorResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayAnonWithErrorResponse(Storage_{
-                                                                                                                                                          .a = {},
-                                                                                                                                                          .b = {},
-                                                                                                                                                      }) {}
-inline MainProtocolTwoWayAnonWithErrorResponse& MainProtocolTwoWayAnonWithErrorResponse::a(uint32_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline MainProtocolTwoWayAnonWithErrorResponse& MainProtocolTwoWayAnonWithErrorResponse::b(uint32_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline MainProtocolOnAnonRequest::MainProtocolOnAnonRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline MainProtocolOnAnonRequest::MainProtocolOnAnonRequest(uint32_t a, uint32_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline MainProtocolOnAnonRequest::MainProtocolOnAnonRequest(const ::test_protocolpayloads::MainProtocolOnAnonRequest& other) noexcept : ::test_protocolpayloads::MainProtocolOnAnonRequest(other.CloneStorage_()) {}
-inline MainProtocolOnAnonRequest& ::test_protocolpayloads::MainProtocolOnAnonRequest::operator=(const ::test_protocolpayloads::MainProtocolOnAnonRequest& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline MainProtocolOnAnonRequest::MainProtocolOnAnonRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolOnAnonRequest(Storage_{
-                                                                                                                              .a = {},
-                                                                                                                              .b = {},
-                                                                                                                          }) {}
-inline MainProtocolOnAnonRequest& MainProtocolOnAnonRequest::a(uint32_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline MainProtocolOnAnonRequest& MainProtocolOnAnonRequest::b(uint32_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
 
 }  // namespace test_protocolpayloads
 namespace fidl {

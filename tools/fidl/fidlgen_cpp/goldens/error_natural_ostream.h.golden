@@ -39,28 +39,17 @@ std::ostream& operator<<(std::ostream& os, const ::test_error::ExampleFooResult&
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_error::Example>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_error::Example>& value) {
-    return os << "ClientEnd<" << "test_error::Example" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_error::Example>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_error::Example>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_error::Example>& value) {
-    return os << "ServerEnd<" << "test_error::Example" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_error::Example>& value);
 };
 
-namespace fidl {
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_error::Example>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_error::Example>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_error::Example>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_error::Example>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_error::Example>>::Format(os, value);
-}
-}  // namespace fidl
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_error::Example>& value);
 
 #endif  // __Fuchsia__
 

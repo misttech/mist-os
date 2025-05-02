@@ -40,7 +40,7 @@ template <>
 class ::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> final : public ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
  public:
   using ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse;
-  Response(::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse v) : TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(std::move(v)) {}
+  Response(::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse v);
 };
 
 template <>
@@ -56,7 +56,7 @@ template <>
 class ::fidl::Response<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> final : public ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
  public:
   using ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse;
-  Response(::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse v) : TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(std::move(v)) {}
+  Response(::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse v);
 };
 
 template <>
@@ -86,10 +86,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_union::TestProtocol> final
   ::fidl::Result<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> FlexibleUnionHenceResponseMustBeHeapAllocated();
 
  private:
-  ::fidl::UnownedClientEnd<::test_union::TestProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_union::TestProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_union::TestProtocol> _client_end() const;
 };
 
 template <>
@@ -122,8 +119,7 @@ class ::fidl::SyncEventHandler<::test_union::TestProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_union::TestProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_union::TestProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_union::TestProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_union::TestProtocol>* event_handler);
 };
 
 template <>
@@ -187,11 +183,7 @@ class ::fidl::Server<::test_union::TestProtocol> : public ::fidl::internal::Inco
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_union::TestProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

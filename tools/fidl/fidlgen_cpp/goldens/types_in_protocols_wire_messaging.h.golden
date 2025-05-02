@@ -4793,15 +4793,15 @@ class ::fidl::WireAsyncEventHandler<::test_typesinprotocols::Protocol>
     : public ::fidl::internal::WireEventHandlerInterface<::test_typesinprotocols::Protocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   WireAsyncEventHandler() = default;
-    void EventBasic(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventBasic>* event) override {}
-    void EventCompound(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventCompound>* event) override {}
-    void EventArrayBasic(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventArrayBasic>* event) override {}
-    void EventArrayCompound(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventArrayCompound>* event) override {}
-    void EventVectorBasic(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventVectorBasic>* event) override {}
-    void EventVectorCompound(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventVectorCompound>* event) override {}
-    void EventVectorOptional(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventVectorOptional>* event) override {}
-    void EventArrayVectorNested(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventArrayVectorNested>* event) override {}
-    void EventResource(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventResource>* event) override {}
+    void EventBasic(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventBasic>* event) override;
+    void EventCompound(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventCompound>* event) override;
+    void EventArrayBasic(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventArrayBasic>* event) override;
+    void EventArrayCompound(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventArrayCompound>* event) override;
+    void EventVectorBasic(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventVectorBasic>* event) override;
+    void EventVectorCompound(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventVectorCompound>* event) override;
+    void EventVectorOptional(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventVectorOptional>* event) override;
+    void EventArrayVectorNested(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventArrayVectorNested>* event) override;
+    void EventResource(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventResource>* event) override;
 };
 
   template<>

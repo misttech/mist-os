@@ -56,49 +56,29 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocolrequest::ParentT
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocolrequest::Child>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocolrequest::Child>& value) {
-    return os << "ClientEnd<" << "test_protocolrequest::Child" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocolrequest::Child>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocolrequest::Child>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocolrequest::Child>& value) {
-    return os << "ServerEnd<" << "test_protocolrequest::Child" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocolrequest::Child>& value);
 };
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocolrequest::Parent>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocolrequest::Parent>& value) {
-    return os << "ClientEnd<" << "test_protocolrequest::Parent" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocolrequest::Parent>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocolrequest::Parent>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocolrequest::Parent>& value) {
-    return os << "ServerEnd<" << "test_protocolrequest::Parent" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocolrequest::Parent>& value);
 };
 
-namespace fidl {
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocolrequest::Child>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocolrequest::Child>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocolrequest::Child>>::Format(os, value);
-}
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocolrequest::Child>& value);
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocolrequest::Parent>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocolrequest::Child>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocolrequest::Child>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocolrequest::Parent>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocolrequest::Parent>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocolrequest::Parent>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocolrequest::Parent>>::Format(os, value);
-}
-}  // namespace fidl
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocolrequest::Parent>& value);
 
 #endif  // __Fuchsia__
 

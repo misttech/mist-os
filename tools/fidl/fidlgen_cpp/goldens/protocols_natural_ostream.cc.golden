@@ -423,7 +423,160 @@ std::ostream& fidl::ostream::Formatter<::test_protocols::TheUnion>::Format(std::
   }
   return os;
 }
+#ifdef __Fuchsia__
 
+std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::WithAndWithoutRequestResponse>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::WithAndWithoutRequestResponse>& value) {
+  return os << "ClientEnd<" << "test_protocols::WithAndWithoutRequestResponse" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::WithAndWithoutRequestResponse>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::WithAndWithoutRequestResponse>& value) {
+  return os << "ServerEnd<" << "test_protocols::WithAndWithoutRequestResponse" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::WithAndWithoutRequestResponse>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::WithAndWithoutRequestResponse>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::WithAndWithoutRequestResponse>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::WithAndWithoutRequestResponse>>::Format(os, value);
+}
+std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::WithErrorSyntax>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::WithErrorSyntax>& value) {
+  return os << "ClientEnd<" << "test_protocols::WithErrorSyntax" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::WithErrorSyntax>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::WithErrorSyntax>& value) {
+  return os << "ServerEnd<" << "test_protocols::WithErrorSyntax" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::WithErrorSyntax>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::WithErrorSyntax>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::WithErrorSyntax>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::WithErrorSyntax>>::Format(os, value);
+}
+std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::ChannelProtocol>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::ChannelProtocol>& value) {
+  return os << "ClientEnd<" << "test_protocols::ChannelProtocol" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::ChannelProtocol>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::ChannelProtocol>& value) {
+  return os << "ServerEnd<" << "test_protocols::ChannelProtocol" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::ChannelProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::ChannelProtocol>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::ChannelProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::ChannelProtocol>>::Format(os, value);
+}
+std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>& value) {
+  return os << "ClientEnd<" << "test_protocols::DiscoverableProtocol" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>& value) {
+  return os << "ServerEnd<" << "test_protocols::DiscoverableProtocol" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>>::Format(os, value);
+}
+std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::AnotherDiscoverableProtocol>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::AnotherDiscoverableProtocol>& value) {
+  return os << "ClientEnd<" << "test_protocols::AnotherDiscoverableProtocol" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::AnotherDiscoverableProtocol>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::AnotherDiscoverableProtocol>& value) {
+  return os << "ServerEnd<" << "test_protocols::AnotherDiscoverableProtocol" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::AnotherDiscoverableProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::AnotherDiscoverableProtocol>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::AnotherDiscoverableProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::AnotherDiscoverableProtocol>>::Format(os, value);
+}
+std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::PlatformServer>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::PlatformServer>& value) {
+  return os << "ClientEnd<" << "test_protocols::PlatformServer" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::PlatformServer>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::PlatformServer>& value) {
+  return os << "ServerEnd<" << "test_protocols::PlatformServer" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::PlatformServer>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::PlatformServer>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::PlatformServer>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::PlatformServer>>::Format(os, value);
+}
+std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::HandleRightsProtocol>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::HandleRightsProtocol>& value) {
+  return os << "ClientEnd<" << "test_protocols::HandleRightsProtocol" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::HandleRightsProtocol>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::HandleRightsProtocol>& value) {
+  return os << "ServerEnd<" << "test_protocols::HandleRightsProtocol" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::HandleRightsProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::HandleRightsProtocol>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::HandleRightsProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::HandleRightsProtocol>>::Format(os, value);
+}
+std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::WithProtocolEnds>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::WithProtocolEnds>& value) {
+  return os << "ClientEnd<" << "test_protocols::WithProtocolEnds" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::WithProtocolEnds>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::WithProtocolEnds>& value) {
+  return os << "ServerEnd<" << "test_protocols::WithProtocolEnds" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::WithProtocolEnds>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::WithProtocolEnds>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::WithProtocolEnds>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::WithProtocolEnds>>::Format(os, value);
+}
+std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::ManyParameters>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::ManyParameters>& value) {
+  return os << "ClientEnd<" << "test_protocols::ManyParameters" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::ManyParameters>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::ManyParameters>& value) {
+  return os << "ServerEnd<" << "test_protocols::ManyParameters" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::ManyParameters>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::ManyParameters>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::ManyParameters>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::ManyParameters>>::Format(os, value);
+}
+std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::MethodWithUnion>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::MethodWithUnion>& value) {
+  return os << "ClientEnd<" << "test_protocols::MethodWithUnion" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::MethodWithUnion>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::MethodWithUnion>& value) {
+  return os << "ServerEnd<" << "test_protocols::MethodWithUnion" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocols::MethodWithUnion>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::MethodWithUnion>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::MethodWithUnion>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::MethodWithUnion>>::Format(os, value);
+}
+
+#endif  // __Fuchsia__
 namespace test_protocols {
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse& value) {

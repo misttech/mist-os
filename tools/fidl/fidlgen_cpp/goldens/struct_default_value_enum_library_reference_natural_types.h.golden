@@ -38,21 +38,13 @@ class Foo {
   Foo(const Foo& other) noexcept;
   Foo& operator=(const Foo& other) noexcept;
 
-  bool operator==(const Foo& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_structdefaultvalueenumlibraryreference::Foo, 4>::Equal(this, &other);
-  }
-  bool operator!=(const Foo& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_structdefaultvalueenumlibraryreference::Foo, 4>::Equal(this, &other);
-  }
+  bool operator==(const Foo& other) const noexcept;
+  bool operator!=(const Foo& other) const noexcept;
 
   ::test_dependent::MyEnum
-  field() const {
-    return storage_.field;
-  }
+  field() const;
 
-  ::test_dependent::MyEnum& field() {
-    return storage_.field;
-  }
+  ::test_dependent::MyEnum& field();
 
   // Setter for field.
   //
@@ -75,23 +67,6 @@ class Foo {
       &Storage_::field, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-inline Foo::Foo(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Foo::Foo(::test_dependent::MyEnum field) noexcept
-    : storage_({.field = std::move(field)}) {}
-inline Foo::Foo(const ::test_structdefaultvalueenumlibraryreference::Foo& other) noexcept : ::test_structdefaultvalueenumlibraryreference::Foo(other.CloneStorage_()) {}
-inline Foo& ::test_structdefaultvalueenumlibraryreference::Foo::operator=(const ::test_structdefaultvalueenumlibraryreference::Foo& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Foo::Foo(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Foo(Storage_{
-                                                                                  .field = ::test_dependent::MyEnum::kA,
-                                                                              }) {}
-inline Foo& Foo::field(::test_dependent::MyEnum value) {
-  storage_.field = std::move(value);
-  return *this;
-}
 
 }  // namespace test_structdefaultvalueenumlibraryreference
 namespace fidl {

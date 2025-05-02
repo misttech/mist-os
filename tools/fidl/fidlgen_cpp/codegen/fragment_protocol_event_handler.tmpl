@@ -28,7 +28,7 @@ class {{ .WireAsyncEventHandler }}
   {{ .WireAsyncEventHandler.Self }}() = default;
   {{- range .Events -}}
     {{- .Docs }}
-    void {{ .Name }}({{ if .HasResponsePayload }}{{ .WireEvent }}* event{{ end }}) override {}
+    void {{ .Name }}({{ if .HasResponsePayload }}{{ .WireEvent }}* event{{ end }}) override;
   {{- end }}
 };
 
@@ -131,6 +131,12 @@ class {{ .WireEventDispatcher }} final :
   }
 {{- end }}
 
+
+{{- range .Events }}
+void {{ $.WireAsyncEventHandler.NoLeading }}::{{ .Name }}({{ if .HasResponsePayload }}{{ .WireEvent }}* event{{ end }}) {}
+{{- end }}
+
+
 {{- EndifFuchsia }}
 {{- end }}
 
@@ -161,7 +167,7 @@ class {{ .NaturalAsyncEventHandler }}
 
   {{- range .Events -}}
     {{- .Docs }}
-    void {{ .Name }}({{ if .HasResponsePayload }}{{ .NaturalEvent }}&{{ end }}) override {}
+    void {{ .Name }}({{ if .HasResponsePayload }}{{ .NaturalEvent }}&{{ end }}) override;
   {{- end }}
 };
 
@@ -184,8 +190,7 @@ template <>
 class {{ .NaturalEventDispatcher }} final :
     public ::fidl::internal::IncomingEventDispatcher<{{ .NaturalEventHandlerInterface }}> {
  public:
-  explicit {{ .NaturalEventDispatcher.Self }}({{ .NaturalEventHandlerInterface }}* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit {{ .NaturalEventDispatcher.Self }}({{ .NaturalEventHandlerInterface }}* event_handler);
 
   {{- if or .Events .HandlesOneWayUnknownInteractions }}
     ::fidl::Status DispatchEvent(
@@ -260,6 +265,14 @@ class {{ .NaturalEventDispatcher }} final :
     }
   }
 {{- end }}
+
+{{ .NaturalEventDispatcher }}::{{ .NaturalEventDispatcher.Self }}({{ .NaturalEventHandlerInterface }}* event_handler)
+: IncomingEventDispatcher(event_handler) {}
+
+{{- range .Events }}
+void {{ $.NaturalAsyncEventHandler.NoLeading }}::{{ .Name }}({{ if .HasResponsePayload }}{{ .NaturalEvent }}&{{ end }}) {}
+{{- end }}
+
 
 {{- EndifFuchsia }}
 {{- end }}

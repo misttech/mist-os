@@ -82,28 +82,17 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocolpayloads::MainPr
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocolpayloads::MainProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocolpayloads::MainProtocol>& value) {
-    return os << "ClientEnd<" << "test_protocolpayloads::MainProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocolpayloads::MainProtocol>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocolpayloads::MainProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocolpayloads::MainProtocol>& value) {
-    return os << "ServerEnd<" << "test_protocolpayloads::MainProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocolpayloads::MainProtocol>& value);
 };
 
-namespace fidl {
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocolpayloads::MainProtocol>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocolpayloads::MainProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocolpayloads::MainProtocol>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocolpayloads::MainProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocolpayloads::MainProtocol>>::Format(os, value);
-}
-}  // namespace fidl
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocolpayloads::MainProtocol>& value);
 
 #endif  // __Fuchsia__
 

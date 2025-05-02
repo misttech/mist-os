@@ -33,7 +33,7 @@ template <>
 class ::fidl::Response<::test_inheritance::Super::Foo> final : public ::test_inheritance::SuperFooResponse {
  public:
   using ::test_inheritance::SuperFooResponse::SuperFooResponse;
-  Response(::test_inheritance::SuperFooResponse v) : SuperFooResponse(std::move(v)) {}
+  Response(::test_inheritance::SuperFooResponse v);
 };
 
 template <>
@@ -59,10 +59,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_inheritance::Super> final
   ::fidl::Result<::test_inheritance::Super::Foo> Foo(const ::fidl::Request<::test_inheritance::Super::Foo>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_inheritance::Super> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_inheritance::Super>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_inheritance::Super> _client_end() const;
 };
 
 template <>
@@ -95,8 +92,7 @@ class ::fidl::SyncEventHandler<::test_inheritance::Super>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_inheritance::Super> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_inheritance::Super>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritance::Super>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritance::Super>* event_handler);
 };
 
 template <>
@@ -147,11 +143,7 @@ class ::fidl::Server<::test_inheritance::Super> : public ::fidl::internal::Incom
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_inheritance::Super> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -194,7 +186,7 @@ template <>
 class ::fidl::Response<::test_inheritance::Sub::Foo> final : public ::test_inheritance::SuperFooResponse {
  public:
   using ::test_inheritance::SuperFooResponse::SuperFooResponse;
-  Response(::test_inheritance::SuperFooResponse v) : SuperFooResponse(std::move(v)) {}
+  Response(::test_inheritance::SuperFooResponse v);
 };
 
 template <>
@@ -220,10 +212,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_inheritance::Sub> final
   ::fidl::Result<::test_inheritance::Sub::Foo> Foo(const ::fidl::Request<::test_inheritance::Sub::Foo>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_inheritance::Sub> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_inheritance::Sub>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_inheritance::Sub> _client_end() const;
 };
 
 template <>
@@ -256,8 +245,7 @@ class ::fidl::SyncEventHandler<::test_inheritance::Sub>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_inheritance::Sub> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_inheritance::Sub>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritance::Sub>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritance::Sub>* event_handler);
 };
 
 template <>
@@ -308,11 +296,7 @@ class ::fidl::Server<::test_inheritance::Sub> : public ::fidl::internal::Incomin
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_inheritance::Sub> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

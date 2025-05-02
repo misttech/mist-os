@@ -7,4 +7,24 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
+#ifdef __Fuchsia__
+
+std::ostream& fidl::ostream::Formatter<::fdf::ClientEnd<::test_driverservice::SomeDriverProtocol>>::Format(std::ostream& os, const ::fdf::ClientEnd<::test_driverservice::SomeDriverProtocol>& value) {
+  return os << "ClientEnd<" << "test_driverservice::SomeDriverProtocol" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fdf::ServerEnd<::test_driverservice::SomeDriverProtocol>>::Format(std::ostream& os, const ::fdf::ServerEnd<::test_driverservice::SomeDriverProtocol>& value) {
+  return os << "ServerEnd<" << "test_driverservice::SomeDriverProtocol" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_driverservice::SomeDriverProtocol>& value) {
+  return fidl::ostream::Formatter<::fdf::ClientEnd<::test_driverservice::SomeDriverProtocol>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_driverservice::SomeDriverProtocol>& value) {
+  return fidl::ostream::Formatter<::fdf::ServerEnd<::test_driverservice::SomeDriverProtocol>>::Format(os, value);
+}
+
+#endif  // __Fuchsia__
+
 #pragma clang diagnostic pop

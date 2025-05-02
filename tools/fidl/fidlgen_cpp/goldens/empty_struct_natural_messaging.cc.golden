@@ -32,6 +32,8 @@ constexpr inline ::fidl::MessageDynamicFlags kEmptyProtocol_SendAndReceive_Dynam
 #ifdef __Fuchsia__
 }  // namespace test_emptystruct
 
+::fidl::Response<::test_emptystruct::EmptyProtocol::SendAndReceive>::Response(::test_emptystruct::EmptyProtocolSendAndReceiveResponse v) : EmptyProtocolSendAndReceiveResponse(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_emptystruct::EmptyProtocol::SendAndReceive>
 fidl::internal::NaturalClientImpl<::test_emptystruct::EmptyProtocol>::SendAndReceive(const ::fidl::Request<::test_emptystruct::EmptyProtocol::SendAndReceive>& request) const {
   return ::fidl::internal::NaturalThenable<::test_emptystruct::EmptyProtocol::SendAndReceive>(
@@ -88,6 +90,11 @@ fidl::internal::NaturalSyncClientImpl<::test_emptystruct::EmptyProtocol>::Send(c
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
+::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol> fidl::internal::NaturalSyncClientImpl<::test_emptystruct::EmptyProtocol>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
+
 ::fidl::Status fidl::SyncEventHandler<::test_emptystruct::EmptyProtocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_emptystruct::EmptyProtocol> event_storage;
@@ -116,6 +123,10 @@ fidl::internal::NaturalEventDispatcher<::test_emptystruct::EmptyProtocol>::Dispa
   }
 }
 
+::fidl::internal::NaturalEventDispatcher<::test_emptystruct::EmptyProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_emptystruct::EmptyProtocol>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
+void fidl::AsyncEventHandler<::test_emptystruct::EmptyProtocol>::Receive(::fidl::Event<::test_emptystruct::EmptyProtocol::Receive>&) {}
+
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_emptystruct::EmptyProtocol>::Receive(const ::test_emptystruct::EmptyProtocolReceiveRequest& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_emptystruct::kEmptyProtocol_Receive_Ordinal, ::test_emptystruct::kEmptyProtocol_Receive_DynamicFlags};
@@ -142,6 +153,12 @@ void fidl::internal::NaturalCompleterBase<::test_emptystruct::EmptyProtocol::Sen
       ::fidl::internal::ResponseMessageConverter<::test_emptystruct::EmptyProtocol::SendAndReceive>::IntoDomainObject(response));
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
+::fidl::ProtocolHandler<::test_emptystruct::EmptyProtocol> fidl::Server<::test_emptystruct::EmptyProtocol>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_emptystruct::EmptyProtocol> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
 }
 
 #ifdef __Fuchsia__
