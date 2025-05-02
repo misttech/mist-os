@@ -1617,6 +1617,12 @@ pub trait IcmpMessage<I: IpExt>: icmp::IcmpMessage<I> + MaybeTransportPacket {
     /// Whether this ICMP message supports rewriting the ID.
     const IS_REWRITABLE: bool;
 
+    /// The same as [`IcmpMessage::IS_REWRITABLE`], but for when you have an
+    /// object, rather than a type.
+    fn is_rewritable(&self) -> bool {
+        Self::IS_REWRITABLE
+    }
+
     /// Sets the ICMP ID for the message, returning the previous value.
     ///
     /// The ICMP ID is both the *src* AND *dst* ports for conntrack entries.
@@ -2524,8 +2530,11 @@ impl<'a, I: IpExt> TransportPacketMut<I> for ParsedTransportHeaderMut<'a, I> {
                         packet_formats::icmpv4_dispatch!(
                             packet: raw,
                             p => {
-                                let old = p.message_impl_mut().update_icmp_id(port.get());
-                                p.update_checksum_header_field_u16(old, port.get())
+                                let message = p.message_impl_mut();
+                                if  message.is_rewritable() {
+                                    let old = message.update_icmp_id(port.get());
+                                    p.update_checksum_header_field_u16(old, port.get())
+                                }
                             }
                         );
                     },
@@ -2533,8 +2542,11 @@ impl<'a, I: IpExt> TransportPacketMut<I> for ParsedTransportHeaderMut<'a, I> {
                         packet_formats::icmpv6_dispatch!(
                             packet: raw,
                             p => {
-                                let old = p.message_impl_mut().update_icmp_id(port.get());
-                                p.update_checksum_header_field_u16(old, port.get())
+                                let message = p.message_impl_mut();
+                                if  message.is_rewritable() {
+                                    let old = message.update_icmp_id(port.get());
+                                    p.update_checksum_header_field_u16(old, port.get())
+                                }
                             }
                         );
                     },
@@ -2554,8 +2566,11 @@ impl<'a, I: IpExt> TransportPacketMut<I> for ParsedTransportHeaderMut<'a, I> {
                         packet_formats::icmpv4_dispatch!(
                             packet:raw,
                             p => {
-                                let old = p.message_impl_mut().update_icmp_id(port.get());
-                                p.update_checksum_header_field_u16(old, port.get())
+                                let message = p.message_impl_mut();
+                                if  message.is_rewritable() {
+                                    let old = message.update_icmp_id(port.get());
+                                    p.update_checksum_header_field_u16(old, port.get())
+                                }
                             }
                         );
                     },
@@ -2563,8 +2578,11 @@ impl<'a, I: IpExt> TransportPacketMut<I> for ParsedTransportHeaderMut<'a, I> {
                         packet_formats::icmpv6_dispatch!(
                             packet:raw,
                             p => {
-                                let old = p.message_impl_mut().update_icmp_id(port.get());
-                                p.update_checksum_header_field_u16(old, port.get())
+                                let message = p.message_impl_mut();
+                                if  message.is_rewritable() {
+                                    let old = message.update_icmp_id(port.get());
+                                    p.update_checksum_header_field_u16(old, port.get())
+                                }
                             }
                         );
                     },
