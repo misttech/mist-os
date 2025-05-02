@@ -1,0 +1,30 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_library.gni")
+
+rustc_library("affordances") {
+  edition = "2021"
+
+  name = "fuchsia_bt_test_affordances"
+
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
+    "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
+    "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_rust",
+    "//sdk/rust/zx",
+    "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
+    "//src/lib/async-utils",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-sync",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+  ]
+
+  sources = [ "src/lib.rs" ]
+}
