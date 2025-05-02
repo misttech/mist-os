@@ -11,7 +11,9 @@ use zx::sys::zx_page_request_command_t::{ZX_PAGER_VMO_COMPLETE, ZX_PAGER_VMO_REA
 
 use fidl_fuchsia_starnix_runner as fstarnixrunner;
 use futures::TryStreamExt;
-use starnix_logging::{log_debug, log_error, log_warn, with_zx_name};
+use starnix_logging::{
+    log_debug, log_error, log_warn, trace_duration, trace_instant, with_zx_name,
+};
 use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
@@ -22,9 +24,12 @@ use std::sync::Arc;
 
 // N.B. At time of writing, no particular science has gone into picking these numbers; tweaking
 // these numbers might or might not give us better performance.
-const PAGER_THREADS: usize = 2;
+const PAGER_THREADS: usize = 1;
 const TRANSFER_VMO_SIZE: u64 = 1 * 1024 * 1024;
 const ZERO_VMO_SIZE: u64 = 1 * 1024 * 1024;
+
+/// Tracing category used to trace the pager.
+const CATEGORY_STARNIX_PAGER: &'static std::ffi::CStr = c"starnix:pager";
 
 pub async fn run_pager(pager_request: fstarnixrunner::ManagerCreatePagerRequest) {
     let fstarnixrunner::ManagerCreatePagerRequest {
@@ -60,6 +65,11 @@ pub async fn run_pager(pager_request: fstarnixrunner::ManagerCreatePagerRequest)
                 responder,
                 ..
             } => {
+                trace_instant!(
+                    CATEGORY_STARNIX_PAGER,
+                    c"file_register",
+                    fuchsia_trace::Scope::Thread
+                );
                 match pager.register(
                     &name,
                     inode_num,
@@ -137,9 +147,9 @@ impl Pager {
 
     /// Starts the pager threads.
     pub fn start_threads(self: &Arc<Self>) {
-        for _ in 0..PAGER_THREADS {
+        for i in 0..PAGER_THREADS {
             let this = self.clone();
-            std::thread::spawn(move || {
+            let _ = std::thread::Builder::new().name(format!("pager-{}", i)).spawn(move || {
                 this.run_pager_thread();
             });
         }
@@ -217,6 +227,7 @@ impl Pager {
                         zx::PacketContents::Pager(contents)
                             if contents.command() == ZX_PAGER_VMO_READ =>
                         {
+                            trace_duration!(CATEGORY_STARNIX_PAGER, c"vmo_read");
                             let inode_num = packet.key().try_into().expect("Unexpected packet key");
                             self.receive_pager_packet(
                                 inode_num,
@@ -228,12 +239,14 @@ impl Pager {
                         zx::PacketContents::Pager(contents)
                             if contents.command() == ZX_PAGER_VMO_COMPLETE =>
                         {
+                            trace_duration!(CATEGORY_STARNIX_PAGER, c"vmo_complete");
                             // We don't care about this command, but we will receive them and we
                             // don't want to log them as unexpected.
                         }
                         zx::PacketContents::SignalOne(signals)
                             if signals.observed().contains(zx::Signals::VMO_ZERO_CHILDREN) =>
                         {
+                            trace_duration!(CATEGORY_STARNIX_PAGER, c"signal_zero_children");
                             let inode_num = packet.key().try_into().expect("Unexpected packet key");
                             let mut files = self.files_by_inode.lock();
                             let file = files.entry(inode_num);

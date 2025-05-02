@@ -53,6 +53,7 @@ DEFAULT_CATEGORIES: list[str] = [
     "sdmmc",
     "starnix",
     "starnix:binder",
+    "starnix:pager",
     "storage",
     "system_metrics",
     "view",
