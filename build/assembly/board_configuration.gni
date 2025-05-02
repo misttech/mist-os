@@ -85,13 +85,11 @@ import("//build/compiled_action.gni")
 #
 #  version (optional)
 #    [string] String representing the release version for this board config.
-#    TODO(https://fxbug.dev/397489730): Either this field or "version_file"
-#    must be set.
+#    Either this field or "version_file" must be set.
 #
 #  version_file (optional)
 #    [string] Path to a file containing the release version for this config.
-#    TODO(https://fxbug.dev/397489730): Either this field or "version" must
-#    be set.
+#    Either this field or "version" must be set.
 #
 #  Outputs
 #    A directory structure and manifest
@@ -221,6 +219,12 @@ template("board_configuration") {
                   get_label_info(invoker.devicetree, "name") + ".dtb",
               root_build_dir)
     }
+
+    # The "release_version" field in the final board_configuration.json file
+    # is set in the compiled_action below. But since this intermediate config
+    # is parsed using the same config schema as the final board configuration,
+    # this field must also be set in the intermediate file.
+    release_version = "intermediate_version"
   }
 
   generated_file(labels.base_info) {
@@ -275,6 +279,9 @@ template("board_configuration") {
       ]
     }
 
+    assert(
+        defined(invoker.version) || defined(invoker.version_file),
+        "board_configuration(\"target_name\") must define `version` or `version_file`")
     if (defined(invoker.version) && invoker.version != "") {
       args += [
         "--version",

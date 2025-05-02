@@ -48,11 +48,13 @@ def _fuchsia_board_input_bundle_impl(ctx):
 
     creation_args = ["--drivers", driver_list_file.path]
 
-    if ctx.attr.version and ctx.file.version_file:
-        fail("Only one of \"version\" or \"version_file\" can be set.")
-        # TODO(https://fxbug.dev/397489730):
-        # Make it required to have exactly one of these set
-        # once these changes have rolled into all downstream repositories.
+    # Ensure that at least one of "version" and "version_file" is set.
+    # Note: an empty string "" is acceptable: non-official builds may not
+    # have access to a version number. The config generator tool will convert
+    # the empty string to "unversioned".
+    if (ctx.attr.version != None and ctx.attr.version_file != None) or \
+       (ctx.attr.version == None and ctx.attr.version_file == None):
+        fail("Exactly one of \"version\" or \"version_file\" must be set.")
 
     if ctx.attr.version:
         creation_args.extend(["--version", ctx.attr.version])

@@ -51,5 +51,6 @@
     "tee_trusted_app_guids": [
         "67e55044-10b1-426f-9247-bb680e5fe0c8",
         "67e55044-10b1-426f-9247-bb680e5fe0c8"
-    ]
+    ],
+    "release_version": "fake_version_123"
 }

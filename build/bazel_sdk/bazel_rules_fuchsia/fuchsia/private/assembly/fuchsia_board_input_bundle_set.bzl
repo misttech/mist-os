@@ -25,6 +25,14 @@ def _fuchsia_board_input_bundle_set_impl(ctx):
         ]
         build_id_dirs += bib_info.build_id_dirs
 
+    # Ensure that at least one of "version" and "version_file" is set.
+    # Note: an empty string "" is acceptable: non-official builds may not
+    # have access to a version number. The config generator tool will convert
+    # the empty string to "unversioned".
+    if (ctx.attr.version != None and ctx.attr.version_file != None) or \
+       (ctx.attr.version == None and ctx.attr.version_file == None):
+        fail("Exactly one of \"version\" or \"version_file\" must be set.")
+
     if ctx.attr.version:
         creation_args.extend(["--version", ctx.attr.version])
     elif ctx.file.version_file:

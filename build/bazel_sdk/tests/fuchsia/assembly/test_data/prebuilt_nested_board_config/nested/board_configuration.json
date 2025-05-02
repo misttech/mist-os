@@ -7,5 +7,6 @@
     "kernel": {},
     "name": "x64",
     "platform": {},
-    "provided_features": []
+    "provided_features": [],
+    "release_version": "fake_version_123"
 }

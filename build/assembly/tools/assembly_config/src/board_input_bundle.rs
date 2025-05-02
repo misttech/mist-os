@@ -92,7 +92,7 @@ pub fn new(args: &BoardInputBundleArgs) -> Result<()> {
         packages,
         kernel_boot_args: kernel_boot_args.clone().into_iter().collect(),
         configuration,
-        release_version: Some(common::get_release_version(version, version_file)?),
+        release_version: common::get_release_version(version, version_file)?,
     };
     bundle.write_to_dir(output, depfile.as_ref())?;
 
