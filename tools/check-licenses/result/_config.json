@@ -170,7 +170,9 @@
           "zircon/third_party/uapp/mkfs-msdosfs": true,
           "zircon/third_party/ulib/lz4": true,
           "src/starnix/lib/third_party/rust_netlink": true,
-          "manifests/third_party": true
+          "manifests/third_party": true,
+          "manifests/third_party/chromium": true,
+          "manifests/third_party/pylibs": true
         }
       },
       {
@@ -179,6 +181,8 @@
           "build/prebuilt": true,
           "build/secondary/third_party": true,
           "manifests/third_party": true,
+          "manifests/third_party/chromium": true,
+          "manifests/third_party/pylibs": true,
           "src/connectivity/bluetooth/hci/vendor": true,
           "src/connectivity/openthread/third_party": true,
           "src/starnix/lib/third_party": true,
