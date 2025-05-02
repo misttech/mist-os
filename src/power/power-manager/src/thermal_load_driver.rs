@@ -125,7 +125,7 @@ impl ThermalLoadDriverBuilder<'_> {
         }
     }
 
-    pub fn build(self) -> Result<Rc<ThermalLoadDriver>, Error> {
+    pub async fn build(self) -> Result<Rc<ThermalLoadDriver>, Error> {
         // Optionally use the default inspect root node
         let inspect_root =
             self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
@@ -140,9 +140,9 @@ impl ThermalLoadDriverBuilder<'_> {
 
         // Spawn a polling task for each of the temperature input configs. The polling tasks are
         // collected into the node's `polling_tasks` field.
-        self.temperature_input_configs
-            .into_iter()
-            .for_each(|config| node.create_polling_task(config));
+        for config in self.temperature_input_configs {
+            node.create_polling_task(config).await?;
+        }
 
         Ok(node)
     }
@@ -178,13 +178,13 @@ impl ThermalLoadDriver {
     /// interval, then taking appropriate action to determine thermal load and/or initiate thermal
     /// shutdown. The new polling task is added to the `polling_tasks` vector to retain ownership
     /// (instead of detaching the Task).
-    fn create_polling_task(self: &Rc<Self>, config: TemperatureInputConfig) {
+    async fn create_polling_task(self: &Rc<Self>, config: TemperatureInputConfig) -> Result<()> {
+        // Query the TemperatureHandler to find out the driver's name. This sensor name is
+        // used to identify the source of thermal load changes in the system.
+        let sensor_name = self.query_sensor_name(&config.temperature_handler_node).await?;
+
         let this = self.clone();
         let polling_future = async move {
-            // Query the TemperatureHandler to find out the driver's name. This sensor name is
-            // used to identify the source of thermal load changes in the system.
-            let sensor_name = this.query_sensor_name(&config.temperature_handler_node).await?;
-
             // Each polling task gets its own Inspect node
             let inspect = TemperatureInputInspect::new(&this.inspect, &sensor_name, &config);
 
@@ -249,6 +249,7 @@ impl ThermalLoadDriver {
         .unwrap_or_else(|e: Error| error!("Failed to monitor sensor (err = {})", e));
 
         self.polling_tasks.borrow_mut().push(fasync::Task::local(polling_future));
+        Ok(())
     }
 
     /// Queries the provided TemperatureHandler node for its associated sensor name.
@@ -408,6 +409,7 @@ mod tests {
     use crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNode, MockNodeMaker};
     use crate::{msg_eq, msg_ok_return};
     use diagnostics_assertions::assert_data_tree;
+    use std::task::Poll::Ready;
 
     /// Tests that each node config file has proper configuration for ThermalLoadDriver entries. The
     /// test ensures that any TemperatureHandler nodes that are named inside the
@@ -583,7 +585,7 @@ mod tests {
     /// correctly.
     #[test]
     fn test_multiple_temperature_inputs() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
 
         // Create mock nodes
         let mut mock_maker = MockNodeMaker::new();
@@ -607,7 +609,7 @@ mod tests {
         // Create the ThermalLoadDriver node. The node has two temperature input sources that are
         // configured with differing onset/reboot temperatures, which adds a degree of testing for
         // the ThermalLoadDriver's ability to track thermal load for each source separately.
-        let node = ThermalLoadDriverBuilder {
+        let build_fut = ThermalLoadDriverBuilder {
             temperature_input_configs: vec![
                 TemperatureInputConfig {
                     temperature_handler_node: mock_temperature_handler_1.clone(),
@@ -631,8 +633,13 @@ mod tests {
             thermal_load_notify_nodes: vec![mock_thermal_load_receiver.clone()],
             inspect_root: None,
         }
-        .build()
-        .unwrap();
+        .build();
+
+        futures::pin_mut!(build_fut);
+        let node = match exec.run_until_stalled(&mut build_fut) {
+            Ready(n) => n.unwrap(),
+            _ => panic!("ThermalLoadDriver not built"),
+        };
 
         // Create the test runner
         let mut node_runner = NodeTestRunner::new(
@@ -666,7 +673,7 @@ mod tests {
     /// the ThermalLoadDriver node initiates a system reboot due to high temperature.
     #[test]
     fn test_trigger_shutdown() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
 
         // Create mock nodes
         let mut mock_maker = MockNodeMaker::new();
@@ -685,7 +692,7 @@ mod tests {
             msg_ok_return!(GetSensorName("fake_driver".to_string())),
         ));
 
-        let node = ThermalLoadDriverBuilder {
+        let build_fut = ThermalLoadDriverBuilder {
             temperature_input_configs: vec![TemperatureInputConfig {
                 temperature_handler_node: mock_temperature_handler.clone(),
                 onset_temperature: Celsius(0.0),
@@ -699,8 +706,13 @@ mod tests {
             thermal_load_notify_nodes: vec![mock_thermal_load_receiver],
             inspect_root: None,
         }
-        .build()
-        .unwrap();
+        .build();
+
+        futures::pin_mut!(build_fut);
+        let node = match exec.run_until_stalled(&mut build_fut) {
+            Ready(n) => n.unwrap(),
+            _ => panic!("ThermalLoadDriver not built"),
+        };
 
         // Create the test runner
         let mut node_runner = NodeTestRunner::new(exec, node, vec![mock_temperature_handler]);
@@ -715,7 +727,7 @@ mod tests {
     /// Tests that the expected Inspect properties are present.
     #[test]
     fn test_inspect_data() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let inspector = inspect::Inspector::default();
 
         // Create mock nodes
@@ -737,7 +749,7 @@ mod tests {
             msg_ok_return!(GetSensorName("fake_driver_2".to_string())),
         ));
 
-        let node = ThermalLoadDriverBuilder {
+        let build_fut = ThermalLoadDriverBuilder {
             temperature_input_configs: vec![
                 TemperatureInputConfig {
                     temperature_handler_node: mock_temperature_handler_1.clone(),
@@ -761,8 +773,13 @@ mod tests {
             thermal_load_notify_nodes: vec![mock_thermal_load_receiver.clone()],
             inspect_root: Some(inspector.root()),
         }
-        .build()
-        .unwrap();
+        .build();
+
+        futures::pin_mut!(build_fut);
+        let node = match exec.run_until_stalled(&mut build_fut) {
+            Ready(n) => n.unwrap(),
+            _ => panic!("ThermalLoadDriver not built"),
+        };
 
         // Create the test runner
         let mut node_runner = NodeTestRunner::new(
@@ -803,7 +820,7 @@ mod tests {
     /// Tests for correct platform metrics sent to the PlatformMetrics node.
     #[test]
     fn test_platform_metrics() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
 
         // Create mock nodes
         let mut mock_maker = MockNodeMaker::new();
@@ -819,7 +836,7 @@ mod tests {
             msg_ok_return!(GetSensorName("fake_driver".to_string())),
         ));
 
-        let node = ThermalLoadDriverBuilder {
+        let build_fut = ThermalLoadDriverBuilder {
             temperature_input_configs: vec![TemperatureInputConfig {
                 temperature_handler_node: mock_temperature_handler.clone(),
                 onset_temperature: Celsius(0.0),
@@ -833,8 +850,13 @@ mod tests {
             thermal_load_notify_nodes: vec![mock_thermal_load_receiver.clone()],
             inspect_root: None,
         }
-        .build()
-        .unwrap();
+        .build();
+
+        futures::pin_mut!(build_fut);
+        let node = match exec.run_until_stalled(&mut build_fut) {
+            Ready(n) => n.unwrap(),
+            _ => panic!("ThermalLoadDriver not built"),
+        };
 
         // Create the test runner
         let mut node_runner = NodeTestRunner::new(exec, node, vec![mock_temperature_handler]);
