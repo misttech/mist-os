@@ -935,15 +935,16 @@ where
         TableChange::Add(entry) => {
             if entry.subnet.prefix() == 0 {
                 // Only notify that we newly have a default route if this is the
-                // only default route on this device.
-                if table
-                    .inner
-                    .iter()
-                    .filter(|(table_entry, _)| {
-                        table_entry.subnet.prefix() == 0 && &table_entry.device == &entry.device
-                    })
-                    .count()
-                    == 1
+                // only default route on this device, and if this is the main table.
+                if table_id.is_main_route_table_id()
+                    && table
+                        .inner
+                        .iter()
+                        .filter(|(table_entry, _)| {
+                            table_entry.subnet.prefix() == 0 && &table_entry.device == &entry.device
+                        })
+                        .count()
+                        == 1
                 {
                     ctx.bindings_ctx().notify_interface_update(
                         &entry.device,
@@ -1043,7 +1044,9 @@ fn notify_removed_routes<I: Ip>(
     let mut already_notified_devices = HashSet::new();
 
     for EntryAndTableId { entry, table_id } in removed_routes {
-        if entry.subnet.prefix() == 0 {
+        // Only flip the `has_default_route` bit in the interface watcher if
+        // this is the main route table.
+        if entry.subnet.prefix() == 0 && table_id.is_main_route_table_id() {
             // Check if there are now no default routes on this device.
             let devices_with_default_routes = (&mut devices_with_default_routes)
                 .get_or_insert_with(|| {

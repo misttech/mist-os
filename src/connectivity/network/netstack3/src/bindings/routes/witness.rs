@@ -34,6 +34,11 @@ impl<I: Ip> TableId<I> {
     pub fn next(&self) -> Option<Self> {
         self.0.checked_add(2).map(|x| TableId(x, PhantomData))
     }
+
+    /// Returns whether this is the ID of the main route table.
+    pub(crate) fn is_main_route_table_id(&self) -> bool {
+        self == &main_table_id::<I>()
+    }
 }
 
 impl<I: Ip> From<TableId<I>> for u32 {
