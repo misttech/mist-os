@@ -211,10 +211,6 @@ impl ConnectDisconnectLogger {
         self.time_series_stats.log_wlan_connectivity_state(1 << wlan_connectivity_state_id);
     }
 
-    pub fn is_connected(&self) -> bool {
-        matches!(&*self.connection_state.lock(), ConnectionState::Connected(_))
-    }
-
     pub async fn handle_connect_attempt(
         &self,
         result: fidl_ieee80211::StatusCode,

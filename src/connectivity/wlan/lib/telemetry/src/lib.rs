@@ -205,7 +205,7 @@ pub fn serve_telemetry(
                 }
                 _ = telemetry_interval.next() => {
                     connect_disconnect.handle_periodic_telemetry().await;
-                    client_iface_counters_logger.handle_periodic_telemetry(connect_disconnect.is_connected()).await;
+                    client_iface_counters_logger.handle_periodic_telemetry().await;
                 }
             }
         }

@@ -158,7 +158,7 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
         }
     }
 
-    pub async fn handle_periodic_telemetry(&self, is_connected: bool) {
+    pub async fn handle_periodic_telemetry(&self) {
         let boot_now = fasync::BootInstant::now();
         let mono_now = fasync::MonotonicInstant::now();
         let boot_mono_drift = boot_now.into_nanos() - mono_now.into_nanos();
@@ -173,7 +173,6 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
                     match telemetry_proxy
                         .get_iface_stats()
                         .on_timeout(GET_IFACE_STATS_TIMEOUT, || {
-                            warn!("Timed out waiting for iface stats");
                             Ok(Err(zx::Status::TIMED_OUT.into_raw()))
                         })
                         .await
@@ -183,11 +182,7 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
                             self.log_iface_stats_cobalt(stats, suspended_during_last_period).await;
                         }
                         error => {
-                            // It's normal for this call to fail while the device is not connected,
-                            // so suppress the warning if that's the case.
-                            if is_connected {
-                                warn!("Failed to get interface stats: {:?}", error);
-                            }
+                            warn!("Failed to get interface stats: {:?}", error);
                         }
                     }
                 }
@@ -562,8 +557,7 @@ mod tests {
         // Transition to IfaceCreated state
         handle_iface_created(&mut test_helper, &logger);
 
-        let is_connected = true;
-        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
         let iface_stats = fidl_stats::IfaceStats {
             connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(1),
@@ -648,8 +642,7 @@ mod tests {
             Poll::Ready(())
         );
 
-        let is_connected = true;
-        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
         let iface_stats = fidl_stats::IfaceStats {
             driver_specific_counters: Some(vec![fidl_stats::UnnamedCounter { id: 1, count: 50 }]),
             connection_stats: Some(fidl_stats::ConnectionStats {
@@ -747,8 +740,7 @@ mod tests {
             Poll::Ready(())
         );
 
-        let is_connected = true;
-        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
         let iface_stats = fidl_stats::IfaceStats {
             driver_specific_gauges: Some(vec![fidl_stats::UnnamedGauge { id: 1, value: 50 }]),
             connection_stats: Some(fidl_stats::ConnectionStats {
@@ -813,8 +805,7 @@ mod tests {
         // Transition to IfaceCreated state
         handle_iface_created(&mut test_helper, &logger);
 
-        let is_connected = true;
-        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
         let iface_stats = fidl_stats::IfaceStats {
             connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(1),
@@ -839,7 +830,7 @@ mod tests {
         let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
         assert!(metrics.is_empty());
 
-        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
         let iface_stats = fidl_stats::IfaceStats {
             connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(1),
@@ -888,8 +879,7 @@ mod tests {
         // Transition to IfaceCreated state
         handle_iface_created(&mut test_helper, &logger);
 
-        let is_connected = true;
-        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
         let iface_stats = fidl_stats::IfaceStats {
             connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(1),
@@ -914,7 +904,7 @@ mod tests {
         let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
         assert!(metrics.is_empty());
 
-        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
         let iface_stats = fidl_stats::IfaceStats {
             connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(2),
@@ -941,7 +931,7 @@ mod tests {
         let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
         assert!(metrics.is_empty());
 
-        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
         let iface_stats = fidl_stats::IfaceStats {
             connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(2),
@@ -990,8 +980,7 @@ mod tests {
         // Transition to IfaceCreated state
         handle_iface_created(&mut test_helper, &logger);
 
-        let is_connected = true;
-        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
         let iface_stats = fidl_stats::IfaceStats {
             connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(1),
@@ -1017,7 +1006,7 @@ mod tests {
         assert!(metrics.is_empty());
 
         test_helper.exec.set_fake_boot_to_mono_offset(zx::BootDuration::from_millis(1));
-        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
         let iface_stats = fidl_stats::IfaceStats {
             connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(1),
@@ -1044,7 +1033,7 @@ mod tests {
         let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
         assert!(metrics.is_empty());
 
-        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
         let iface_stats = fidl_stats::IfaceStats {
             connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(1),
@@ -1228,8 +1217,7 @@ mod tests {
             Poll::Ready(())
         );
 
-        let is_connected = true;
-        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
         assert_eq!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
         let telemetry_svc_stream = test_helper.telemetry_svc_stream.as_mut().unwrap();
         let mut telemetry_svc_req_fut = pin!(telemetry_svc_stream.try_next());
