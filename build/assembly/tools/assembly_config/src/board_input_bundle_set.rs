@@ -23,7 +23,7 @@ pub fn new(args: &BoardInputBundleSetArgs) -> Result<()> {
     let set = BoardInputBundleSet {
         name,
         board_input_bundles,
-        release_version: common::get_release_version(&args.version, &args.version_file)?,
+        release_version: Some(common::get_release_version(&args.version, &args.version_file)?),
     };
     set.write_to_dir(&args.output, args.depfile.as_ref())?;
     Ok(())

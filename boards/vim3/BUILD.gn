@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/board_configuration.gni")
 import("//build/assembly/board_input_bundle.gni")
 import("//build/bazel/assembly/bazel_board_configuration.gni")
 import("//build/bazel/assembly/bazel_board_input_bundle.gni")

@@ -111,7 +111,11 @@ pub struct BoardInformation {
     pub tee_trusted_app_guids: Vec<uuid::Uuid>,
 
     /// Release version that this board config corresponds to.
-    pub release_version: String,
+    /// TODO(https://fxbug.dev/397489730): Make this a mandatory field
+    /// once these changes have rolled into all downstream repositories.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_version: Option<String>,
 }
 
 /// This struct defines board-provided data for the 'fuchsia.hwinfo.Board' fidl
@@ -185,7 +189,11 @@ pub struct BoardInputBundle {
     pub configuration: Option<BoardProvidedConfig>,
 
     /// Release version that this board config corresponds to.
-    pub release_version: String,
+    /// TODO: https://fxbug.dev/397489730 - Make this a mandatory field
+    /// once these changes have rolled into all downstream repositories.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_version: Option<String>,
 }
 
 /// This struct defines board-provided configuration for platform services and
@@ -445,7 +453,6 @@ mod test {
     fn test_basic_board_deserialize() {
         let json = serde_json::json!({
             "name": "sample board",
-            "release_version": "",
         });
 
         let parsed: BoardInformation = serde_json::from_value(json).unwrap();
@@ -456,8 +463,7 @@ mod test {
 
     #[test]
     fn test_board_default_serialization() {
-        let value: BoardInformation =
-            serde_json::from_str("{\"name\": \"foo\", \"release_version\": \"\"}").unwrap();
+        let value: BoardInformation = serde_json::from_str("{\"name\": \"foo\"}").unwrap();
         crate::common::tests::value_serialization_helper(value);
     }
 
@@ -510,8 +516,7 @@ mod test {
                 "development_support": {
                     "enable_debug_access_port_for_soc": "amlogic-t931g",
                 }
-            },
-            "release_version": "fake_version_123"
+            }
         });
         serde_json::to_writer(config_file, &json).unwrap();
         let resolved = BoardInformation::from_dir(&dir_path).unwrap();
@@ -546,7 +551,6 @@ mod test {
                 graphics: GraphicsConfig::default(),
                 sysmem_defaults: BoardSysmemConfig::default(),
             },
-            release_version: "fake_version_123".to_string(),
             ..Default::default()
         };
 

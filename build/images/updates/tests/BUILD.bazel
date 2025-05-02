@@ -15,7 +15,7 @@ load(
 fuchsia_board_configuration(
     name = "board_config",
     board_name = "fake_board",
-    version = "fake_version_123",
+    version = "fake_version",
 )
 
 fuchsia_product_configuration(

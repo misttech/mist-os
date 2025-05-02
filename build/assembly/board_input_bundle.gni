@@ -74,11 +74,13 @@ import("//build/python/python_action.gni")
 #
 #  version (optional)
 #    [string] String representing the release version for this board config.
-#    Either this field or "version_file" must be set.
+#    TODO(https://fxbug.dev/397489730): Either this field or "version_file"
+#    must be set.
 #
 #  version_file (optional)
 #    [string] Path to a file containing the release version for this config.
-#    Either this field or "version" must be set.
+#    TODO(https://fxbug.dev/397489730): Either this field or "version" must
+#    be set.
 #
 #  Outputs
 #    A directory structure and manifest
@@ -118,9 +120,6 @@ template("board_input_bundle") {
   creation_inputs = []
   creation_args = []
 
-  assert(
-      defined(invoker.version) || defined(invoker.version_file),
-      "board_input_bundle(\"target_name\") must define `version` or `version_file`")
   if (defined(invoker.version) && invoker.version != "") {
     creation_args += [
       "--version",

@@ -118,7 +118,6 @@ template("test_assembly_config") {
       contents = {
         name = "test board"
         provided_features = []
-        release_version = "fake_version_123"
       }
     }
 

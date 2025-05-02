@@ -35,12 +35,6 @@ def _fuchsia_board_configuration_impl(ctx):
     board_config["name"] = ctx.attr.board_name
     board_config["provided_features"] = ctx.attr.provided_features
 
-    # The "release_version" field in the final board_configuration.json file
-    # is set in the generate_config action below. But since this
-    # intermediate config is parsed using the same config schema as the final
-    # board config, this field must also be set in the intermediate file.
-    board_config["release_version"] = "intermediate_version"
-
     kernel = json.decode(ctx.attr.kernel)
     check_type(kernel, "dict")
     if kernel != {}:
@@ -89,17 +83,11 @@ def _fuchsia_board_configuration_impl(ctx):
     replace_labels_with_files(filesystems, ctx.attr.filesystems_labels)
     board_config["filesystems"] = filesystems
 
-    # Ensure that at least one of "version" and "version_file" is set.
-    # Note: an empty string "" is acceptable: non-official builds may not
-    # have access to a version number.
-    if (ctx.attr.version != "__unset" and ctx.attr.version_file != None) or \
-       (ctx.attr.version == "__unset" and ctx.attr.version_file == None):
-        fail("Exactly one of \"version\" or \"version_file\" must be set.")
-
-    # If version is "__unset", the target hasn't set it.
-    version = ctx.attr.version
-    if version == "__unset":
-        version = ""
+    if ctx.attr.version and ctx.attr.version_file:
+        fail("Only one of \"version\" or \"version_file\" can be set.")
+        # TODO(https://fxbug.dev/397489730):
+        # Make it required to have exactly one of these set
+        # once these changes have rolled into all downstream repositories.
 
     if ctx.attr.version:
         creation_args += ["--version", ctx.attr.version]
@@ -189,7 +177,6 @@ _fuchsia_board_configuration = rule(
         ),
         "version": attr.string(
             doc = "Release version of this board.",
-            default = "__unset",
         ),
         "version_file": attr.label(
             doc = "Path to a file containing the current release version.",
