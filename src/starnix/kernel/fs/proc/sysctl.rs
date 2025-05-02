@@ -47,6 +47,32 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
     });
+    dir.subdir(current_task, "crypto", 0o555, |dir| {
+        dir.node(
+            "fips_enabled",
+            fs.create_node(
+                current_task,
+                BytesFile::new_node(b"0\n".to_vec()),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+        );
+        dir.node(
+            "fips_name",
+            fs.create_node(
+                current_task,
+                BytesFile::new_node(b"Linux Kernel Cryptographic API\n".to_vec()),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+        );
+        dir.node(
+            "fips_version",
+            fs.create_node(
+                current_task,
+                BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_VERSION))),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+        );
+    });
     dir.subdir(current_task, "kernel", 0o555, |dir| {
         dir.node(
             "cap_last_cap",
