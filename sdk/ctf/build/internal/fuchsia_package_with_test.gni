@@ -82,6 +82,12 @@ template("fuchsia_package_with_test") {
       target = get_label_info(":$target_name", "label_with_toolchain")
       package_label = get_label_info(":$package_name", "label_with_toolchain")
       package_url = _package_url
+      _package_out_dir =
+          get_label_info(":${main_target_name}_package", "target_out_dir")
+      _package_name = get_label_info(":${main_target_name}_package", "name")
+      package_manifests = [ rebase_path(
+              "${_package_out_dir}/${_package_name}/package_manifest.json",
+              root_build_dir) ]
       component_label =
           get_label_info(invoker.test_component, "label_with_toolchain")
     }
