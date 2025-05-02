@@ -182,16 +182,14 @@ impl WorkThread {
         Self { thread_handle: Mutex::new(Some(thread_handle)), sender }
     }
 
-    pub fn join(&self) -> zx::sys::zx_status_t {
-        futures::executor::block_on(self.sender.clone().send(Request::Stop))
-            .expect("Failed to send");
+    pub fn join(&self) -> Result<(), anyhow::Error> {
+        self.sender.clone().unbounded_send(Request::Stop).unwrap();
         if let Err(err) =
             self.thread_handle.lock().take().unwrap().join().expect("Failed to join work thread")
         {
-            eprintln!("Work thread exited with error: {}", err);
-            return zx::Status::INTERNAL.into_raw();
+            return Err(anyhow!("Work thread exited with error: {}", err));
         }
-        zx::Status::OK.into_raw()
+        Ok(())
     }
 
     // Write address of active host into `addr_byte_buff`.

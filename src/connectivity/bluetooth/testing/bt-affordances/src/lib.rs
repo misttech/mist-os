@@ -18,7 +18,11 @@ static WORKER: LazyLock<WorkThread> = LazyLock::new(|| WorkThread::spawn());
 #[no_mangle]
 pub extern "C" fn stop_rust_affordances() -> zx_status_t {
     println!("Stopping Rust affordances");
-    WORKER.join()
+    if let Err(err) = WORKER.join() {
+        eprintln!("stop_rust_affordances encountered error: {}", err);
+        return zx::Status::INTERNAL.into_raw();
+    }
+    zx::Status::OK.into_raw()
 }
 
 /// Populates `addr_byte_buff` with public address of active host.

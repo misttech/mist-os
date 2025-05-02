@@ -15,7 +15,6 @@ rustc_library("affordances") {
     "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_rust",
-    "//sdk/rust/zx",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
