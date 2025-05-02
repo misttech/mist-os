@@ -4227,7 +4227,12 @@ impl BinderDriver {
                             thread_state.transactions.pop().expect("transaction stack underflow!");
                         // Command::Reply is sent to the receiver side. So the popped transaction
                         // must be a Sender role.
-                        assert!(matches!(transaction, TransactionRole::Sender));
+                        assert!(
+                            matches!(transaction, TransactionRole::Sender),
+                            "{:?}, {:?}",
+                            transaction,
+                            thread_state.transactions
+                        );
                     }
                     Command::TransactionComplete
                     | Command::OnewayTransaction(..)
