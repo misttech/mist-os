@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![recursion_limit = "256"]
+
 fn main() -> std::process::ExitCode {
     let binary = std::env::args().next().expect("missing first argument");
     let binary = std::path::Path::new(&binary)

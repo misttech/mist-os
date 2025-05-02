@@ -25,8 +25,8 @@ use crate::internal::device::config::{
     PendingIpDeviceConfigurationUpdate, UpdateIpConfigurationError,
 };
 use crate::internal::device::state::{
-    CommonAddressProperties, IpDeviceConfiguration, Ipv4AddrConfig, Ipv4AddressState,
-    Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6AddressState,
+    CommonAddressProperties, IpAddressData, IpAddressFlags, IpDeviceConfiguration, Ipv4AddrConfig,
+    Ipv6AddrConfig, Ipv6AddrManualConfig,
 };
 use crate::internal::device::{
     self, AddressRemovedReason, DelIpAddr, IpDeviceAddressContext as _, IpDeviceBindingsContext,
@@ -218,34 +218,27 @@ where
         trace!("set_ip_addr_properties: setting {:?} for addr={:?}", next_properties, address);
         let (core_ctx, bindings_ctx) = self.contexts();
         let address_id = core_ctx.get_address_id(device, address)?;
-        core_ctx.with_ip_address_state_mut(device, &address_id, |address_state| {
+        core_ctx.with_ip_address_data_mut(device, &address_id, |address_state| {
+            let IpAddressData { flags: _, config } = address_state;
+            let Some(config) = config else {
+                // Address is being removed, configuration has been
+                // taken out.
+                return Err(NotFoundError.into());
+            };
+
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
-            struct Wrap<'a, I: IpDeviceIpExt, II: Instant>(&'a mut I::AddressState<II>);
+            struct Wrap<'a, I: IpDeviceIpExt, Inst: Instant>(&'a mut I::AddressConfig<Inst>);
             let CommonAddressProperties { valid_until, preferred_lifetime } = I::map_ip_in(
-                Wrap(address_state),
-                |Wrap(Ipv4AddressState { config })| {
-                    match config {
-                        Some(Ipv4AddrConfig { config: _, properties }) => Ok(properties),
-                        // Address is being removed, configuration has been
-                        // taken out.
-                        None => Err(NotFoundError.into()),
-                    }
-                },
-                |Wrap(Ipv6AddressState { flags: _, config })| {
-                    match config {
-                        // Address is being removed, configuration has been
-                        // taken out.
-                        None => Err(NotFoundError.into()),
-                        Some(Ipv6AddrConfig::Slaac(_)) => {
-                            Err(SetIpAddressPropertiesError::NotManual)
-                        }
-                        Some(Ipv6AddrConfig::Manual(Ipv6AddrManualConfig {
-                            config: _,
-                            properties,
-                            temporary: _,
-                        })) => Ok(properties),
-                    }
+                Wrap(config),
+                |Wrap(Ipv4AddrConfig { config: _, properties })| Ok(properties),
+                |Wrap(config)| match config {
+                    Ipv6AddrConfig::Slaac(_) => Err(SetIpAddressPropertiesError::NotManual),
+                    Ipv6AddrConfig::Manual(Ipv6AddrManualConfig {
+                        config: _,
+                        properties,
+                        temporary: _,
+                    }) => Ok(properties),
                 },
             )?;
 
@@ -278,8 +271,10 @@ where
         self.core_ctx().with_address_ids(device, |addrs, core_ctx| {
             addrs
                 .filter_map(|addr| {
-                    let assigned = core_ctx.with_ip_address_state(device, &addr, |addr_state| {
-                        I::is_addr_assigned(addr_state)
+                    let assigned = core_ctx.with_ip_address_data(device, &addr, |addr_data| {
+                        let IpAddressData { flags: IpAddressFlags { assigned }, config: _ } =
+                            addr_data;
+                        *assigned
                     });
                     assigned.then(|| addr.addr_sub().to_witness())
                 })
@@ -310,7 +305,7 @@ where
             self.core_ctx().with_address_ids(device, |addrs, core_ctx| {
                 for addr in addrs {
                     inspector.record_display_child(addr.addr_sub(), |inspector| {
-                        core_ctx.with_ip_address_state(device, &addr, |addr_state| {
+                        core_ctx.with_ip_address_data(device, &addr, |addr_state| {
                             inspector.delegate_inspectable(addr_state)
                         })
                     });

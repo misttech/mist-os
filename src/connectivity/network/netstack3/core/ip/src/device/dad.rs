@@ -24,41 +24,18 @@ use packet_formats::utils::NonZeroDuration;
 use crate::internal::device::nud::DEFAULT_MAX_MULTICAST_SOLICIT;
 use crate::internal::device::{IpAddressState, IpDeviceIpExt, WeakIpAddressId};
 
-/// Whether DAD is enable by default for IPv4 Addresses.
-///
-/// In the context of IPv4 addresses, DAD refers to Address Conflict Detection
-/// (ACD) as specified in RFC 5227.
-///
-/// This value is set to false, which is out of compliance with RFC 5227. As per
-/// section 2.1:
-///   Before beginning to use an IPv4 address (whether received from manual
-///   configuration, DHCP, or some other means), a host implementing this
-///   specification MUST test to see if the address is already in use.
-///
-/// However, we believe that disabling DAD for IPv4 addresses by default is more
-/// inline with industry expectations. For example, Linux does not implement
-/// DAD for IPv4 addresses at all: applications that want to prevent duplicate
-/// IPv4 addresses must implement the ACD specification themselves (e.g.
-/// dhclient, a common DHCP client on Linux).
-pub const DEFAULT_DAD_ENABLED_IPV4: bool = false;
-
-/// Whether DAD is enabled by default for IPv6 Addresses.
-///
-/// True, as per RFC 4862, Section 5.4:
-///   Duplicate Address Detection MUST be performed on all unicast
-///   addresses prior to assigning them to an interface, regardless of
-///   whether they are obtained through stateless autoconfiguration,
-///   DHCPv6, or manual configuration.
-pub const DEFAULT_DAD_ENABLED_IPV6: bool = true;
-
 /// An IP Extension trait supporting Duplicate Address Detection.
 pub trait DadIpExt: Ip {
+    /// Whether or not DAD should be performed by default of a newly installed
+    /// address.
+    const DEFAULT_DAD_ENABLED: bool;
+
     /// Data that accompanies a sent DAD probe.
     type SentProbeData: Debug;
     /// Data that accompanies a received DAD probe.
     type ReceivedProbeData<'a>;
     /// State held for tentative addresses.
-    type TentativeState: Debug + Default;
+    type TentativeState: Debug + Default + Send + Sync;
     /// Metadata associated with the result of handling and incoming DAD probe.
     type IncomingProbeResultMeta;
 
@@ -72,6 +49,22 @@ pub trait DadIpExt: Ip {
 
 // TODO(https://fxbug.dev/42077260): Actually support DAD for IPv4.
 impl DadIpExt for Ipv4 {
+    /// In the context of IPv4 addresses, DAD refers to Address Conflict Detection
+    /// (ACD) as specified in RFC 5227.
+    ///
+    /// This value is set to false, which is out of compliance with RFC 5227. As per
+    /// section 2.1:
+    ///   Before beginning to use an IPv4 address (whether received from manual
+    ///   configuration, DHCP, or some other means), a host implementing this
+    ///   specification MUST test to see if the address is already in use.
+    ///
+    /// However, we believe that disabling DAD for IPv4 addresses by default is more
+    /// inline with industry expectations. For example, Linux does not implement
+    /// DAD for IPv4 addresses at all: applications that want to prevent duplicate
+    /// IPv4 addresses must implement the ACD specification themselves (e.g.
+    /// dhclient, a common DHCP client on Linux).
+    const DEFAULT_DAD_ENABLED: bool = false;
+
     type SentProbeData = ();
     type ReceivedProbeData<'a> = ();
     type TentativeState = ();
@@ -87,6 +80,13 @@ impl DadIpExt for Ipv4 {
 }
 
 impl DadIpExt for Ipv6 {
+    /// True, as per RFC 4862, Section 5.4:
+    ///   Duplicate Address Detection MUST be performed on all unicast
+    ///   addresses prior to assigning them to an interface, regardless of
+    ///   whether they are obtained through stateless autoconfiguration,
+    ///   DHCPv6, or manual configuration.
+    const DEFAULT_DAD_ENABLED: bool = true;
+
     type SentProbeData = Ipv6DadSentProbeData;
     type ReceivedProbeData<'a> = Option<NdpNonce<&'a [u8]>>;
     type TentativeState = Ipv6TentativeDadState;

@@ -125,7 +125,7 @@ pub mod ip {
         mod multicast_forwarding;
         mod raw;
 
-        pub(crate) use device::{CoreCtxWithIpDeviceConfiguration, IpAddrCtxSpec};
+        pub(crate) use device::CoreCtxWithIpDeviceConfiguration;
     }
 
     // Re-exported types.

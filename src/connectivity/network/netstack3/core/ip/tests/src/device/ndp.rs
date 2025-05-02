@@ -54,9 +54,9 @@ use netstack3_core::{BindingsTypes, Instant, TimerId};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::testutil::{calculate_slaac_addr_sub, with_assigned_ipv6_addr_subnets};
 use netstack3_ip::device::{
-    get_ipv6_hop_limit, IidGenerationConfiguration, InnerSlaacTimerId, IpDeviceBindingsContext,
-    IpDeviceConfigurationUpdate, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
-    Ipv6AddrConfig, Ipv6AddrSlaacConfig, Ipv6AddressFlags, Ipv6AddressState,
+    get_ipv6_hop_limit, IidGenerationConfiguration, InnerSlaacTimerId, IpAddressData,
+    IpAddressFlags, IpDeviceBindingsContext, IpDeviceConfigurationUpdate, IpDeviceStateContext,
+    Ipv4DeviceConfigurationUpdate, Ipv6AddrConfig, Ipv6AddrSlaacConfig,
     Ipv6DeviceConfigurationContext, Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler,
     Ipv6DeviceTimerId, Lifetime, OpaqueIid, OpaqueIidNonce, PreferredLifetime,
     SlaacBindingsContext, SlaacConfig, SlaacConfigurationUpdate, SlaacContext, SlaacTimerId,
@@ -69,7 +69,7 @@ use netstack3_ip::{self as ip, IpPacketDestination, SendIpPacketMeta};
 #[derive(Debug, PartialEq, Copy, Clone)]
 struct SlaacAddr<I> {
     addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-    flags: Ipv6AddressFlags,
+    flags: IpAddressFlags,
     config: Ipv6AddrConfig<I>,
 }
 
@@ -94,11 +94,11 @@ fn get_slaac_addrs(
                     if scope.map(|scope| scope != addr_sub.addr().scope()).unwrap_or(false) {
                         return None;
                     }
-                    ip::device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
+                    ip::device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_data(
                         core_ctx,
                         device_id,
                         &addr_id,
-                        |Ipv6AddressState { flags, config }| {
+                        |IpAddressData { flags, config }| {
                             Some(SlaacAddr { addr_sub, flags: *flags, config: config.unwrap() })
                         },
                     )
@@ -719,11 +719,11 @@ fn get_address_assigned(
         device,
         |mut addrs, core_ctx| {
             addrs.find_map(|addr_id| {
-                ip::device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
+                ip::device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_data(
                     core_ctx,
                     device,
                     &addr_id,
-                    |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config: _ }| {
+                    |IpAddressData { flags: IpAddressFlags { assigned }, config: _ }| {
                         (addr_id.addr_sub().addr() == addr).then_some(*assigned)
                     },
                 )
@@ -2230,7 +2230,7 @@ fn test_host_slaac_address_deprecate_while_tentative() {
     let expected_address_entry = SlaacAddr {
         addr_sub: expected_addr_sub,
         config: Ipv6AddrConfig::Slaac(expected_address_entry_config),
-        flags: Ipv6AddressFlags { assigned: false },
+        flags: IpAddressFlags { assigned: false },
     };
     assert_eq!(get_global_ipv6_addrs(&ctx, &device), [expected_address_entry]);
 
@@ -3360,7 +3360,7 @@ fn test_remove_stable_slaac_address() {
             },
             preferred_lifetime: PreferredLifetime::preferred_until(preferred_until),
         }),
-        flags: Ipv6AddressFlags { assigned: true },
+        flags: IpAddressFlags { assigned: true },
     };
     assert_eq!(get_global_ipv6_addrs(&ctx, &device), [expected_address_entry]);
     // Make sure deprecate and invalidation timers are set.

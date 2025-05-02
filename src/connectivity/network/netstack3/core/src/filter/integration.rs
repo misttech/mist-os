@@ -9,6 +9,7 @@ use net_types::SpecifiedAddr;
 use netstack3_base::{IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext};
 use netstack3_device::DeviceId;
 use netstack3_filter::{FilterContext, FilterImpl, FilterIpContext, NatContext, State};
+use netstack3_ip::device::WeakAddressId;
 use netstack3_ip::{FilterHandlerProvider, IpLayerIpExt, IpSasHandler, IpStateInner};
 
 use crate::context::prelude::*;
@@ -94,8 +95,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv4>>
     }
 }
 
-impl<I: IpLayerIpExt, BT: BindingsTypes> DelegatedOrderedLockAccess<State<I, I::Weak<BT>, BT>>
-    for StackState<BT>
+impl<I: IpLayerIpExt, BT: BindingsTypes>
+    DelegatedOrderedLockAccess<State<I, WeakAddressId<I, BT>, BT>> for StackState<BT>
 {
     type Inner = IpStateInner<I, DeviceId<BT>, BT>;
     fn delegate_ordered_lock_access(&self) -> &Self::Inner {
@@ -106,5 +107,5 @@ impl<I: IpLayerIpExt, BT: BindingsTypes> DelegatedOrderedLockAccess<State<I, I::
 impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
     for crate::lock_ordering::FilterState<I>
 {
-    type Data = State<I, I::Weak<BT>, BT>;
+    type Data = State<I, WeakAddressId<I, BT>, BT>;
 }

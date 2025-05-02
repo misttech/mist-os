@@ -18,7 +18,7 @@ use net_types::ip::{
 };
 use net_types::{map_ip_twice, MulticastAddr, SpecifiedAddr, Witness as _};
 use netstack3_base::{
-    AnyDevice, BroadcastIpExt, CounterContext, DeviceIdContext, ExistsError,
+    AnyDevice, BroadcastIpExt, CounterContext, DeviceIdContext, ExistsError, IpAddressId,
     IpDeviceAddressIdContext, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError, ReceivableFrameMeta,
     RecvIpFrameMeta, ReferenceNotifiersExt, RemoveResourceResultWithContext,
     ResourceCounterContext, SendFrameError, WeakDeviceIdentifier,
@@ -40,12 +40,11 @@ use netstack3_device::{
 };
 use netstack3_filter::ProofOfEgressCheck;
 use netstack3_ip::device::{
-    AddressId, AddressIdIter, AssignedAddressState as _, DadState, DualStackIpDeviceState,
+    AddressId, AddressIdIter, DadState, DualStackIpDeviceState, IpAddressData, IpAddressEntry,
     IpDeviceAddressContext, IpDeviceConfigurationContext, IpDeviceFlags, IpDeviceIpExt,
-    IpDeviceSendContext, IpDeviceStateContext, Ipv4AddressEntry, Ipv4AddressState,
-    Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState, Ipv6DeviceConfiguration,
-    Ipv6DeviceConfigurationContext, Ipv6DeviceContext, Ipv6NetworkLearnedParameters,
-    PrimaryAddressId, WeakAddressId,
+    IpDeviceSendContext, IpDeviceStateContext, Ipv4AddrConfig, Ipv4DeviceConfiguration,
+    Ipv6AddrConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
+    Ipv6NetworkLearnedParameters, PrimaryAddressId, WeakAddressId,
 };
 use netstack3_ip::nud::{
     ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
@@ -316,38 +315,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 }
 
 impl<BC: BindingsContext, L> IpDeviceAddressIdContext<Ipv4> for CoreCtx<'_, BC, L> {
-    type AddressId = AddressId<Ipv4AddressEntry<BC>>;
-    type WeakAddressId = WeakAddressId<Ipv4AddressEntry<BC>>;
-}
-
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv4DeviceAddressState>>
-    IpDeviceAddressContext<Ipv4, BC> for CoreCtx<'_, BC, L>
-{
-    fn with_ip_address_state<O, F: FnOnce(&Ipv4AddressState<BC::Instant>) -> O>(
-        &mut self,
-        _: &Self::DeviceId,
-        addr_id: &Self::AddressId,
-        cb: F,
-    ) -> O {
-        let mut locked = self.adopt(addr_id.deref());
-        let let_binding_needed_for_lifetimes =
-            cb(&locked
-                .read_lock_with::<crate::lock_ordering::Ipv4DeviceAddressState, _>(|c| c.right()));
-        let_binding_needed_for_lifetimes
-    }
-
-    fn with_ip_address_state_mut<O, F: FnOnce(&mut Ipv4AddressState<BC::Instant>) -> O>(
-        &mut self,
-        _: &Self::DeviceId,
-        addr_id: &Self::AddressId,
-        cb: F,
-    ) -> O {
-        let mut locked = self.adopt(addr_id.deref());
-        let let_binding_needed_for_lifetimes =
-            cb(&mut locked
-                .write_lock_with::<crate::lock_ordering::Ipv4DeviceAddressState, _>(|c| c.right()));
-        let_binding_needed_for_lifetimes
-    }
+    type AddressId = AddressId<Ipv4, BC>;
+    type WeakAddressId = WeakAddressId<Ipv4, BC>;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv4>>>
@@ -370,12 +339,15 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         &mut self,
         device_id: &Self::DeviceId,
         addr: AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>,
-        config: <Ipv4 as IpDeviceIpExt>::AddressConfig<BC::Instant>,
+        config: Ipv4AddrConfig<BC::Instant>,
     ) -> Result<Self::AddressId, ExistsError> {
         let mut state = ip_device_state(self, device_id);
         let addr_id = state
             .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
-            .add(Ipv4AddressEntry::new(addr, config));
+            // TODO(https://fxbug.dev/42077260): Once DAD is supported, start
+            // with Uninitialized state. For now, setting the state to Assigned
+            // skips DAD.
+            .add(IpAddressEntry::new(addr, DadState::Assigned, config));
         addr_id
     }
 
@@ -406,7 +378,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         let addr_id = state
             .read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
             .iter()
-            .find(|a| a.addr().addr() == *addr)
+            .find(|a| {
+                let a: Ipv4Addr = a.addr().get();
+                a == *addr
+            })
             .map(PrimaryAddressId::clone_strong)
             .ok_or(NotFoundError);
         addr_id
@@ -582,14 +557,18 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 }
 
 impl<BC: BindingsContext, L> IpDeviceAddressIdContext<Ipv6> for CoreCtx<'_, BC, L> {
-    type AddressId = AddressId<Ipv6AddressEntry<BC>>;
-    type WeakAddressId = WeakAddressId<Ipv6AddressEntry<BC>>;
+    type AddressId = AddressId<Ipv6, BC>;
+    type WeakAddressId = WeakAddressId<Ipv6, BC>;
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressState>>
-    IpDeviceAddressContext<Ipv6, BC> for CoreCtx<'_, BC, L>
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<
+        I: IpLayerIpExt,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::IpDeviceAddressData<I>>,
+    > IpDeviceAddressContext<I, BC> for CoreCtx<'_, BC, L>
 {
-    fn with_ip_address_state<O, F: FnOnce(&Ipv6AddressState<BC::Instant>) -> O>(
+    fn with_ip_address_data<O, F: FnOnce(&IpAddressData<I, BC::Instant>) -> O>(
         &mut self,
         _device_id: &Self::DeviceId,
         addr_id: &Self::AddressId,
@@ -597,11 +576,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressS
     ) -> O {
         let mut locked = self.adopt(addr_id.deref());
         let x = cb(&locked
-            .read_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| c.right()));
+            .read_lock_with::<crate::lock_ordering::IpDeviceAddressData<I>, _>(|c| c.right()));
         x
     }
 
-    fn with_ip_address_state_mut<O, F: FnOnce(&mut Ipv6AddressState<BC::Instant>) -> O>(
+    fn with_ip_address_data_mut<O, F: FnOnce(&mut IpAddressData<I, BC::Instant>) -> O>(
         &mut self,
         _device_id: &Self::DeviceId,
         addr_id: &Self::AddressId,
@@ -609,7 +588,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressS
     ) -> O {
         let mut locked = self.adopt(addr_id.deref());
         let x = cb(&mut locked
-            .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| c.right()));
+            .write_lock_with::<crate::lock_ordering::IpDeviceAddressData<I>, _>(|c| c.right()));
         x
     }
 }
@@ -634,12 +613,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         &mut self,
         device_id: &Self::DeviceId,
         addr: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-        config: <Ipv6 as IpDeviceIpExt>::AddressConfig<BC::Instant>,
+        config: Ipv6AddrConfig<BC::Instant>,
     ) -> Result<Self::AddressId, ExistsError> {
         let mut state = ip_device_state(self, device_id);
         let addr_id = state
             .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
-            .add(Ipv6AddressEntry::new(addr, DadState::Uninitialized, config));
+            .add(IpAddressEntry::new(addr, DadState::Uninitialized, config));
         addr_id
     }
 
@@ -670,7 +649,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         let addr_id = state
             .read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
             .iter()
-            .find_map(|a| (a.addr().addr() == *addr).then(|| PrimaryAddressId::clone_strong(a)))
+            .find_map(|a| {
+                let inner: Ipv6Addr = a.addr().get();
+                (inner == *addr).then(|| PrimaryAddressId::clone_strong(a))
+            })
             .ok_or(NotFoundError);
         addr_id
     }

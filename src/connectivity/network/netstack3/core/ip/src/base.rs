@@ -58,11 +58,9 @@ use crate::internal::counters::{IpCounters, IpCountersIpExt};
 use crate::internal::device::opaque_iid::IidSecret;
 use crate::internal::device::slaac::SlaacCounters;
 use crate::internal::device::state::{
-    IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv6AddressFlags, Ipv6AddressState,
+    IpAddressData, IpAddressFlags, IpDeviceStateBindingsTypes, IpDeviceStateIpExt, WeakAddressId,
 };
-use crate::internal::device::{
-    self, IpAddressIdExt, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceSendContext,
-};
+use crate::internal::device::{self, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceSendContext};
 use crate::internal::fragmentation::{FragmentableIpSerializer, FragmentationIpExt, IpFragmenter};
 use crate::internal::gmp::igmp::IgmpCounters;
 use crate::internal::gmp::mld::MldCounters;
@@ -693,10 +691,10 @@ impl AddressStatus<Ipv6PresentAddressStatus> {
             Err(NotFoundError) => return AddressStatus::Unassigned,
         };
 
-        let assigned = core_ctx.with_ip_address_state(
+        let assigned = core_ctx.with_ip_address_data(
             device,
             &addr_id,
-            |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config: _ }| *assigned,
+            |IpAddressData { flags: IpAddressFlags { assigned }, config: _ }| *assigned,
         );
 
         if assigned {
@@ -758,7 +756,6 @@ pub trait IpLayerIpExt:
     + FilterIpExt
     + FragmentationIpExt
     + IpDeviceIpExt
-    + IpAddressIdExt
     + IpCountersIpExt
     + ReassemblyIpExt
 {
@@ -1955,9 +1952,9 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
 }
 
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
-    OrderedLockAccess<filter::State<I, I::Weak<BT>, BT>> for IpStateInner<I, D, BT>
+    OrderedLockAccess<filter::State<I, WeakAddressId<I, BT>, BT>> for IpStateInner<I, D, BT>
 {
-    type Lock = RwLock<filter::State<I, I::Weak<BT>, BT>>;
+    type Lock = RwLock<filter::State<I, WeakAddressId<I, BT>, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.filter)
     }
@@ -2045,7 +2042,7 @@ pub struct IpStateInner<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateB
     counters: IpCounters<I>,
     raw_sockets: RwLock<RawIpSocketMap<I, D::Weak, BT>>,
     raw_socket_counters: RawIpSocketCounters<I>,
-    filter: RwLock<filter::State<I, I::Weak<BT>, BT>>,
+    filter: RwLock<filter::State<I, WeakAddressId<I, BT>, BT>>,
     // Make sure the primary IDs are dropped last. Also note that the following hash map also stores
     // the primary ID to the main table, and if the user (Bindings) attempts to remove the main
     // table without dropping `main_table_id` first, it will panic. This serves as an assertion
@@ -2085,7 +2082,7 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpSta
 
     /// Provides direct access to the filtering state.
     #[cfg(any(test, feature = "testutils"))]
-    pub fn filter(&self) -> &RwLock<filter::State<I, I::Weak<BT>, BT>> {
+    pub fn filter(&self) -> &RwLock<filter::State<I, WeakAddressId<I, BT>, BT>> {
         &self.filter
     }
 

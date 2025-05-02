@@ -8,9 +8,7 @@ use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use net_types::SpecifiedAddr;
 use netstack3_base::{IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext};
 
-use crate::internal::device::state::{
-    IpDeviceStateBindingsTypes, Ipv6AddressFlags, Ipv6AddressState,
-};
+use crate::internal::device::state::{IpAddressData, IpAddressFlags, IpDeviceStateBindingsTypes};
 use crate::internal::device::{IpDeviceAddressContext as _, IpDeviceIpExt, IpDeviceStateContext};
 use crate::internal::socket::ipv6_source_address_selection::{self, SasCandidate};
 
@@ -51,6 +49,8 @@ where
         device_id: &Self::DeviceId,
         _remote: Option<SpecifiedAddr<Ipv4Addr>>,
     ) -> Option<CC::AddressId> {
+        // TODO(https://fxbug.dev/42077260) Consider whether the address is
+        // assigned.
         self.with_address_ids(device_id, |mut addrs, _core_ctx| addrs.next())
     }
 }
@@ -71,10 +71,10 @@ where
                 device_id,
                 addrs,
                 |addr_id| {
-                    core_ctx.with_ip_address_state(
+                    core_ctx.with_ip_address_data(
                         device_id,
                         addr_id,
-                        |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config }| {
+                        |IpAddressData { flags: IpAddressFlags { assigned }, config }| {
                             // Assume an address is deprecated if config is
                             // not available. That means the address is
                             // going away, so we should not prefer it.

@@ -1309,6 +1309,7 @@ async fn inspect_devices(name: &str) {
                         "127.0.0.1/8": {
                             ValidUntil: "infinite",
                             PreferredLifetime: "infinite",
+                            Assigned: true,
                         }
                     },
                     Configuration: {
@@ -1530,6 +1531,7 @@ async fn inspect_devices(name: &str) {
                         "192.168.0.1/24": {
                             ValidUntil: "infinite",
                             PreferredLifetime: "infinite",
+                            Assigned: true,
                         }
                     },
                     Configuration: {

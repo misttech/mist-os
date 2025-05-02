@@ -29,7 +29,6 @@ use netstack3_device::{
     ArpConfigContext, ArpContext, ArpNudCtx, ArpSenderContext, ArpState,
     DeviceLayerEventDispatcher, DeviceLayerTimerId, DeviceSendFrameError, IpLinkDeviceState,
 };
-use netstack3_ip::device::AssignedAddressState;
 use netstack3_ip::icmp::{self, NdpCounters};
 use netstack3_ip::nud::{
     DelegateNudContext, NudConfigContext, NudContext, NudIcmpContext, NudSenderContext, NudState,
@@ -337,7 +336,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         let mut state = state.cast();
         let ipv4 = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
         // NB: This assignment is satisfying borrow checking on state.
-        let x = ipv4.iter().map(|addr| addr.addr().addr()).any(|a| a == addr);
+        let x = ipv4.iter().any(|a| {
+            let a: Ipv4Addr = a.addr().get();
+            a == addr
+        });
         x
     }
 
@@ -346,7 +348,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         let mut state = state.cast();
         let ipv4 = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
         // NB: This assignment is satisfying borrow checking on state.
-        let x = ipv4.iter().next().map(|addr| addr.addr().addr());
+        let x = ipv4.iter().next().map(|addr| addr.addr().get());
         x
     }
 

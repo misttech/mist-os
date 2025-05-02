@@ -17,6 +17,7 @@ pub(crate) mod state;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Display};
 use core::hash::Hash;
+use core::marker::PhantomData;
 use core::num::NonZeroU8;
 
 use derivative::Derivative;
@@ -28,11 +29,11 @@ use net_types::ip::{
 use net_types::{LinkLocalAddress as _, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness};
 use netstack3_base::{
     AnyDevice, AssignedAddrIpExt, CounterContext, DeferredResourceRemovalContext, DeviceIdContext,
-    EventContext, ExistsError, HandleableTimer, Inspectable, Instant, InstantBindingsTypes,
-    InstantContext, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Ipv4DeviceAddr,
-    Ipv6DeviceAddr, NotFoundError, RemoveResourceResultWithContext, RngContext, SendFrameError,
-    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler,
-    TxMetadataBindingsTypes, WeakDeviceIdentifier, WeakIpAddressId,
+    EventContext, ExistsError, HandleableTimer, Instant, InstantBindingsTypes, InstantContext,
+    IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Ipv4DeviceAddr, Ipv6DeviceAddr,
+    NotFoundError, RemoveResourceResultWithContext, RngContext, SendFrameError,
+    StrongDeviceIdentifier, TimerContext, TimerHandler, TxMetadataBindingsTypes,
+    WeakDeviceIdentifier, WeakIpAddressId,
 };
 use netstack3_filter::ProofOfEgressCheck;
 use packet::{BufferMut, Serializer};
@@ -58,11 +59,10 @@ use crate::internal::device::route_discovery::{
 use crate::internal::device::router_solicitation::{RsHandler, RsTimerId};
 use crate::internal::device::slaac::{SlaacHandler, SlaacTimerId};
 use crate::internal::device::state::{
-    IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateBindingsTypes,
-    IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressEntry, Ipv4AddressState,
-    Ipv4DeviceConfiguration, Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddrManualConfig,
-    Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration, Ipv6DeviceState,
-    Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, WeakAddressId,
+    IpAddressData, IpAddressFlags, IpDeviceConfiguration, IpDeviceFlags, IpDeviceState,
+    IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4DeviceConfiguration,
+    Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6DeviceConfiguration,
+    Ipv6DeviceState, Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, WeakAddressId,
 };
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
@@ -84,66 +84,84 @@ use crate::internal::local_delivery::{IpHeaderInfo, LocalDeliveryPacketInfo};
     Debug(bound = "")
 )]
 #[generic_over_ip(I, Ip)]
-pub struct IpDeviceTimerId<I: IpDeviceIpExt, D: WeakDeviceIdentifier, A: IpAddressIdSpec>(
-    I::Timer<D, A>,
+pub struct IpDeviceTimerId<
+    I: IpDeviceIpExt,
+    D: WeakDeviceIdentifier,
+    BT: IpDeviceStateBindingsTypes,
+>(I::Timer<D, BT>);
+
+// TODO(https://fxbug.dev/42077260): Remove the `PhantomData` once this holds
+// a `DadTimer`.
+/// A timer ID for IPv4 devices.
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = ""),
+    Debug(bound = ""),
+    Eq(bound = ""),
+    Hash(bound = ""),
+    PartialEq(bound = "")
+)]
+pub struct Ipv4DeviceTimerId<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>(
+    IgmpTimerId<D>,
+    PhantomData<BT>,
 );
 
-/// A timer ID for IPv4 devices.
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct Ipv4DeviceTimerId<D: WeakDeviceIdentifier>(IgmpTimerId<D>);
-
-impl<D: WeakDeviceIdentifier> Ipv4DeviceTimerId<D> {
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> Ipv4DeviceTimerId<D, BT> {
     /// Gets the device ID from this timer IFF the device hasn't been destroyed.
     fn device_id(&self) -> Option<D::Strong> {
-        let Self(this) = self;
+        let Self(this, _phantom) = self;
         this.device_id().upgrade()
     }
 
     /// Transforms this timer ID into the common [`IpDeviceTimerId`] version.
-    pub fn into_common<S: IpAddressIdSpec>(self) -> IpDeviceTimerId<Ipv4, D, S> {
+    pub fn into_common(self) -> IpDeviceTimerId<Ipv4, D, BT> {
         self.into()
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: IpAddressIdSpec> From<IpDeviceTimerId<Ipv4, D, A>>
-    for Ipv4DeviceTimerId<D>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<IpDeviceTimerId<Ipv4, D, BT>>
+    for Ipv4DeviceTimerId<D, BT>
 {
-    fn from(IpDeviceTimerId(inner): IpDeviceTimerId<Ipv4, D, A>) -> Self {
+    fn from(IpDeviceTimerId(inner): IpDeviceTimerId<Ipv4, D, BT>) -> Self {
         inner
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: IpAddressIdSpec> From<Ipv4DeviceTimerId<D>>
-    for IpDeviceTimerId<Ipv4, D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<Ipv4DeviceTimerId<D, BT>>
+    for IpDeviceTimerId<Ipv4, D, BT>
 {
-    fn from(value: Ipv4DeviceTimerId<D>) -> Self {
+    fn from(value: Ipv4DeviceTimerId<D, BT>) -> Self {
         Self(value)
     }
 }
 
-impl<D: WeakDeviceIdentifier> From<IgmpTimerId<D>> for Ipv4DeviceTimerId<D> {
-    fn from(id: IgmpTimerId<D>) -> Ipv4DeviceTimerId<D> {
-        Ipv4DeviceTimerId(id)
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<IgmpTimerId<D>>
+    for Ipv4DeviceTimerId<D, BT>
+{
+    fn from(id: IgmpTimerId<D>) -> Ipv4DeviceTimerId<D, BT> {
+        Ipv4DeviceTimerId(id, PhantomData)
     }
 }
 
-impl<D: WeakDeviceIdentifier, BC: TimerBindingsTypes, CC: TimerHandler<BC, IgmpTimerId<D>>>
-    HandleableTimer<CC, BC> for Ipv4DeviceTimerId<D>
+impl<
+        D: WeakDeviceIdentifier,
+        BC: IpDeviceStateBindingsTypes,
+        CC: TimerHandler<BC, IgmpTimerId<D>>,
+    > HandleableTimer<CC, BC> for Ipv4DeviceTimerId<D, BC>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
-        let Self(id) = self;
+        let Self(id, _phantom) = self;
         core_ctx.handle_timer(bindings_ctx, id, timer);
     }
 }
 
-impl<I, CC, BC, A> HandleableTimer<CC, BC> for IpDeviceTimerId<I, CC::WeakDeviceId, A>
+impl<I, CC, BC> HandleableTimer<CC, BC> for IpDeviceTimerId<I, CC::WeakDeviceId, BC>
 where
     I: IpDeviceIpExt,
     BC: IpDeviceBindingsContext<I, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<I, BC>,
-    A: IpAddressIdSpec,
     for<'a> CC::WithIpDeviceConfigurationInnerCtx<'a>:
-        TimerHandler<BC, I::Timer<CC::WeakDeviceId, A>>,
+        TimerHandler<BC, I::Timer<CC::WeakDeviceId, BC>>,
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
         let Self(id) = self;
@@ -157,33 +175,40 @@ where
 }
 
 /// A timer ID for IPv6 devices.
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = ""),
+    Debug(bound = ""),
+    Eq(bound = ""),
+    Hash(bound = ""),
+    PartialEq(bound = "")
+)]
 #[allow(missing_docs)]
-pub enum Ipv6DeviceTimerId<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> {
+pub enum Ipv6DeviceTimerId<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> {
     Mld(MldTimerId<D>),
-    Dad(DadTimerId<Ipv6, D, A>),
+    Dad(DadTimerId<Ipv6, D, WeakAddressId<Ipv6, BT>>),
     Rs(RsTimerId<D>),
     RouteDiscovery(Ipv6DiscoveredRouteTimerId<D>),
     Slaac(SlaacTimerId<D>),
 }
 
-impl<D: WeakDeviceIdentifier, A: IpAddressIdSpec> From<IpDeviceTimerId<Ipv6, D, A>>
-    for Ipv6DeviceTimerId<D, A::WeakV6>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<IpDeviceTimerId<Ipv6, D, BT>>
+    for Ipv6DeviceTimerId<D, BT>
 {
-    fn from(IpDeviceTimerId(inner): IpDeviceTimerId<Ipv6, D, A>) -> Self {
+    fn from(IpDeviceTimerId(inner): IpDeviceTimerId<Ipv6, D, BT>) -> Self {
         inner
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: IpAddressIdSpec> From<Ipv6DeviceTimerId<D, A::WeakV6>>
-    for IpDeviceTimerId<Ipv6, D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<Ipv6DeviceTimerId<D, BT>>
+    for IpDeviceTimerId<Ipv6, D, BT>
 {
-    fn from(value: Ipv6DeviceTimerId<D, A::WeakV6>) -> Self {
+    fn from(value: Ipv6DeviceTimerId<D, BT>) -> Self {
         Self(value)
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> Ipv6DeviceTimerId<D, A> {
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> Ipv6DeviceTimerId<D, BT> {
     /// Gets the device ID from this timer IFF the device hasn't been destroyed.
     fn device_id(&self) -> Option<D::Strong> {
         match self {
@@ -197,61 +222,60 @@ impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> Ipv6DeviceTimerId<D,
     }
 
     /// Transforms this timer ID into the common [`IpDeviceTimerId`] version.
-    pub fn into_common<S: IpAddressIdSpec<WeakV6 = A>>(self) -> IpDeviceTimerId<Ipv6, D, S> {
+    pub fn into_common(self) -> IpDeviceTimerId<Ipv6, D, BT> {
         self.into()
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<MldTimerId<D>>
-    for Ipv6DeviceTimerId<D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<MldTimerId<D>>
+    for Ipv6DeviceTimerId<D, BT>
 {
-    fn from(id: MldTimerId<D>) -> Ipv6DeviceTimerId<D, A> {
+    fn from(id: MldTimerId<D>) -> Ipv6DeviceTimerId<D, BT> {
         Ipv6DeviceTimerId::Mld(id)
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<DadTimerId<Ipv6, D, A>>
-    for Ipv6DeviceTimerId<D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>
+    From<DadTimerId<Ipv6, D, WeakAddressId<Ipv6, BT>>> for Ipv6DeviceTimerId<D, BT>
 {
-    fn from(id: DadTimerId<Ipv6, D, A>) -> Ipv6DeviceTimerId<D, A> {
+    fn from(id: DadTimerId<Ipv6, D, WeakAddressId<Ipv6, BT>>) -> Ipv6DeviceTimerId<D, BT> {
         Ipv6DeviceTimerId::Dad(id)
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<RsTimerId<D>>
-    for Ipv6DeviceTimerId<D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<RsTimerId<D>>
+    for Ipv6DeviceTimerId<D, BT>
 {
-    fn from(id: RsTimerId<D>) -> Ipv6DeviceTimerId<D, A> {
+    fn from(id: RsTimerId<D>) -> Ipv6DeviceTimerId<D, BT> {
         Ipv6DeviceTimerId::Rs(id)
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<Ipv6DiscoveredRouteTimerId<D>>
-    for Ipv6DeviceTimerId<D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<Ipv6DiscoveredRouteTimerId<D>>
+    for Ipv6DeviceTimerId<D, BT>
 {
-    fn from(id: Ipv6DiscoveredRouteTimerId<D>) -> Ipv6DeviceTimerId<D, A> {
+    fn from(id: Ipv6DiscoveredRouteTimerId<D>) -> Ipv6DeviceTimerId<D, BT> {
         Ipv6DeviceTimerId::RouteDiscovery(id)
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<SlaacTimerId<D>>
-    for Ipv6DeviceTimerId<D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<SlaacTimerId<D>>
+    for Ipv6DeviceTimerId<D, BT>
 {
-    fn from(id: SlaacTimerId<D>) -> Ipv6DeviceTimerId<D, A> {
+    fn from(id: SlaacTimerId<D>) -> Ipv6DeviceTimerId<D, BT> {
         Ipv6DeviceTimerId::Slaac(id)
     }
 }
 
 impl<
         D: WeakDeviceIdentifier,
-        A: WeakIpAddressId<Ipv6Addr>,
-        BC: TimerBindingsTypes,
+        BC: IpDeviceStateBindingsTypes,
         CC: TimerHandler<BC, RsTimerId<D>>
             + TimerHandler<BC, Ipv6DiscoveredRouteTimerId<D>>
             + TimerHandler<BC, MldTimerId<D>>
             + TimerHandler<BC, SlaacTimerId<D>>
-            + TimerHandler<BC, DadTimerId<Ipv6, D, A>>,
-    > HandleableTimer<CC, BC> for Ipv6DeviceTimerId<D, A>
+            + TimerHandler<BC, DadTimerId<Ipv6, D, WeakAddressId<Ipv6, BC>>>,
+    > HandleableTimer<CC, BC> for Ipv6DeviceTimerId<D, BC>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
         match self {
@@ -277,19 +301,15 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt + gmp::IpExt + D
         + Eq
         + PartialEq;
     /// High level IP device timer.
-    type Timer<D: WeakDeviceIdentifier, A: IpAddressIdSpec>: Into<IpDeviceTimerId<Self, D, A>>
-        + From<IpDeviceTimerId<Self, D, A>>
+    type Timer<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>: Into<IpDeviceTimerId<Self, D, BT>>
+        + From<IpDeviceTimerId<Self, D, BT>>
         + Clone
         + Eq
         + PartialEq
         + Debug
         + Hash;
-    /// Device address configuration.
-    type AddressConfig<I: Instant>: Default + Debug;
     /// Manual device address configuration (user-initiated).
     type ManualAddressConfig<I: Instant>: Default + Debug + Into<Self::AddressConfig<I>>;
-    /// Device address associated state.
-    type AddressState<I: Instant>: 'static + Inspectable;
     /// Device configuration update request.
     type ConfigurationUpdate: From<IpDeviceConfigurationUpdate>
         + AsRef<IpDeviceConfigurationUpdate>
@@ -298,59 +318,35 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt + gmp::IpExt + D
     /// Gets the common properties of an address from its configuration.
     fn get_common_props<I: Instant>(config: &Self::AddressConfig<I>) -> CommonAddressProperties<I>;
 
-    /// Returns whether the address is currently assigned based on state.
-    fn is_addr_assigned<I: Instant>(addr_state: &Self::AddressState<I>) -> bool;
-
     /// Extracts the device ID from a device timer.
-    fn timer_device_id<D: WeakDeviceIdentifier, A: IpAddressIdSpec>(
-        timer: &Self::Timer<D, A>,
+    fn timer_device_id<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>(
+        timer: &Self::Timer<D, BT>,
     ) -> Option<D::Strong>;
-
-    /// Extracts the address configuration from the state in preparation for
-    /// removal.
-    fn take_addr_config_for_removal<I: Instant>(
-        addr_state: &mut Self::AddressState<I>,
-    ) -> Option<Self::AddressConfig<I>>;
 }
 
 impl IpDeviceIpExt for Ipv4 {
     type State<BT: IpDeviceStateBindingsTypes> = Ipv4DeviceState<BT>;
     type Configuration = Ipv4DeviceConfiguration;
-    type Timer<D: WeakDeviceIdentifier, A: IpAddressIdSpec> = Ipv4DeviceTimerId<D>;
-    type AddressConfig<I: Instant> = Ipv4AddrConfig<I>;
+    type Timer<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> = Ipv4DeviceTimerId<D, BT>;
     type ManualAddressConfig<I: Instant> = Ipv4AddrConfig<I>;
-    type AddressState<I: Instant> = Ipv4AddressState<I>;
     type ConfigurationUpdate = Ipv4DeviceConfigurationUpdate;
 
     fn get_common_props<I: Instant>(config: &Self::AddressConfig<I>) -> CommonAddressProperties<I> {
         config.properties
     }
 
-    fn is_addr_assigned<I: Instant>(addr_state: &Ipv4AddressState<I>) -> bool {
-        let Ipv4AddressState { config: _ } = addr_state;
-        true
-    }
-
-    fn timer_device_id<D: WeakDeviceIdentifier, A: IpAddressIdSpec>(
-        timer: &Self::Timer<D, A>,
+    fn timer_device_id<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>(
+        timer: &Self::Timer<D, BT>,
     ) -> Option<D::Strong> {
         timer.device_id()
-    }
-
-    fn take_addr_config_for_removal<I: Instant>(
-        addr_state: &mut Self::AddressState<I>,
-    ) -> Option<Self::AddressConfig<I>> {
-        addr_state.config.take()
     }
 }
 
 impl IpDeviceIpExt for Ipv6 {
     type State<BT: IpDeviceStateBindingsTypes> = Ipv6DeviceState<BT>;
     type Configuration = Ipv6DeviceConfiguration;
-    type Timer<D: WeakDeviceIdentifier, A: IpAddressIdSpec> = Ipv6DeviceTimerId<D, A::WeakV6>;
-    type AddressConfig<I: Instant> = Ipv6AddrConfig<I>;
+    type Timer<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> = Ipv6DeviceTimerId<D, BT>;
     type ManualAddressConfig<I: Instant> = Ipv6AddrManualConfig<I>;
-    type AddressState<I: Instant> = Ipv6AddressState<I>;
     type ConfigurationUpdate = Ipv6DeviceConfigurationUpdate;
 
     fn get_common_props<I: Instant>(config: &Self::AddressConfig<I>) -> CommonAddressProperties<I> {
@@ -360,20 +356,10 @@ impl IpDeviceIpExt for Ipv6 {
         }
     }
 
-    fn is_addr_assigned<I: Instant>(addr_state: &Ipv6AddressState<I>) -> bool {
-        addr_state.flags.assigned
-    }
-
-    fn timer_device_id<D: WeakDeviceIdentifier, A: IpAddressIdSpec>(
-        timer: &Self::Timer<D, A>,
+    fn timer_device_id<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>(
+        timer: &Self::Timer<D, BT>,
     ) -> Option<D::Strong> {
         timer.device_id()
-    }
-
-    fn take_addr_config_for_removal<I: Instant>(
-        addr_state: &mut Self::AddressState<I>,
-    ) -> Option<Self::AddressConfig<I>> {
-        addr_state.config.take()
     }
 }
 /// IP address assignment states.
@@ -516,56 +502,22 @@ impl<
 {
 }
 
-/// A marker trait for a spec of address IDs.
-///
-/// This allows us to write types that are GenericOverIp that take the spec from
-/// some type.
-pub trait IpAddressIdSpec {
-    /// The weak V4 address ID.
-    type WeakV4: WeakIpAddressId<Ipv4Addr>;
-    /// The weak V6 address ID.
-    type WeakV6: WeakIpAddressId<Ipv6Addr>;
-}
-
-pub trait IpAddressIdExt: Ip {
-    type Weak<BT: IpDeviceStateBindingsTypes>: WeakIpAddressId<Self::Addr>;
-}
-
-impl IpAddressIdExt for Ipv4 {
-    type Weak<BT: IpDeviceStateBindingsTypes> = WeakAddressId<Ipv4AddressEntry<BT>>;
-}
-
-impl IpAddressIdExt for Ipv6 {
-    type Weak<BT: IpDeviceStateBindingsTypes> = WeakAddressId<Ipv6AddressEntry<BT>>;
-}
-
-/// Ties an [`IpAddressIdSpec`] to a core context implementation.
-pub trait IpAddressIdSpecContext:
-    IpDeviceAddressIdContext<Ipv4> + IpDeviceAddressIdContext<Ipv6>
-{
-    /// The address ID spec for this context.
-    type AddressIdSpec: IpAddressIdSpec<
-        WeakV4 = <Self as IpDeviceAddressIdContext<Ipv4>>::WeakAddressId,
-        WeakV6 = <Self as IpDeviceAddressIdContext<Ipv6>>::WeakAddressId,
-    >;
-}
-
 /// The core context providing access to device IP address state.
 pub trait IpDeviceAddressContext<I: IpDeviceIpExt, BT: InstantBindingsTypes>:
     IpDeviceAddressIdContext<I>
 {
-    /// Calls the callback with a reference to the address state `addr_id` on
+    /// Calls the callback with a reference to the address data `addr_id` on
     /// `device_id`.
-    fn with_ip_address_state<O, F: FnOnce(&I::AddressState<BT::Instant>) -> O>(
+    fn with_ip_address_data<O, F: FnOnce(&IpAddressData<I, BT::Instant>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         addr_id: &Self::AddressId,
         cb: F,
     ) -> O;
 
-    /// Calls the callback with a mutable reference to the address state
+    /// Calls the callback with a mutable reference to the address data
     /// `addr_id` on `device_id`.
-    fn with_ip_address_state_mut<O, F: FnOnce(&mut I::AddressState<BT::Instant>) -> O>(
+    fn with_ip_address_data_mut<O, F: FnOnce(&mut IpAddressData<I, BT::Instant>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         addr_id: &Self::AddressId,
@@ -1092,10 +1044,10 @@ impl<
             Err(NotFoundError) => return IpAddressState::Unavailable,
         };
 
-        let assigned = self.with_ip_address_state(
+        let assigned = self.with_ip_address_data(
             device_id,
             &addr_id,
-            |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config: _ }| *assigned,
+            |IpAddressData { flags: IpAddressFlags { assigned }, config: _ }| *assigned,
         );
 
         if assigned {
@@ -1296,10 +1248,10 @@ fn disable_ipv6_device_with_config<
         .with_address_ids(device_id, |addrs, core_ctx| {
             addrs
                 .map(|addr_id| {
-                    core_ctx.with_ip_address_state(
+                    core_ctx.with_ip_address_data(
                         device_id,
                         &addr_id,
-                        |Ipv6AddressState { flags: _, config }| (addr_id.clone(), *config),
+                        |IpAddressData { flags: _, config }| (addr_id.clone(), *config),
                     )
                 })
                 .collect::<Vec<_>>()
@@ -1732,9 +1684,7 @@ pub fn del_ip_addr_inner<
     // for deletion. If the configuration has already been taken, consider as if
     // the address is already removed.
     let addr_config = core_ctx
-        .with_ip_address_state_mut(device_id, &addr_id, |addr_state| {
-            I::take_addr_config_for_removal(addr_state)
-        })
+        .with_ip_address_data_mut(device_id, &addr_id, |addr_data| addr_data.config.take())
         .ok_or(NotFoundError)?;
 
     let addr_sub = addr_id.addr_sub();
@@ -1908,12 +1858,10 @@ pub(crate) mod testutil {
         core_ctx.with_address_ids(device_id, |addrs, core_ctx| {
             cb(Box::new(addrs.filter_map(|addr_id| {
                 core_ctx
-                    .with_ip_address_state(
+                    .with_ip_address_data(
                         device_id,
                         &addr_id,
-                        |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config: _ }| {
-                            *assigned
-                        },
+                        |IpAddressData { flags: IpAddressFlags { assigned }, config: _ }| *assigned,
                     )
                     .then(|| addr_id.addr_sub())
             })))

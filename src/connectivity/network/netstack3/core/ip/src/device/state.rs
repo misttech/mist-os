@@ -13,10 +13,8 @@ use core::time::Duration;
 
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
-use net_types::ip::{
-    AddrSubnet, GenericOverIp, Ip, IpAddress, IpMarked, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
-    Ipv6Addr,
-};
+use net_types::ip::{AddrSubnet, GenericOverIp, Ip, IpMarked, IpVersionMarker, Ipv4, Ipv6};
+use net_types::Witness as _;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
     AssignedAddrIpExt, BroadcastIpExt, CoreTimerContext, ExistsError, Inspectable,
@@ -28,13 +26,12 @@ use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
 
 use crate::internal::counters::{IpCounters, IpCountersIpExt};
-use crate::internal::device::dad::{DadState, DEFAULT_DAD_ENABLED_IPV4, DEFAULT_DAD_ENABLED_IPV6};
+use crate::internal::device::dad::{DadIpExt, DadState};
 use crate::internal::device::route_discovery::Ipv6RouteDiscoveryState;
 use crate::internal::device::router_solicitation::RsState;
 use crate::internal::device::slaac::{SlaacConfiguration, SlaacState};
 use crate::internal::device::{
-    IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceAddr, Ipv4DeviceTimerId,
-    Ipv6DeviceAddr, Ipv6DeviceTimerId, WeakIpAddressId,
+    IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceTimerId, Ipv6DeviceTimerId, WeakIpAddressId,
 };
 use crate::internal::gmp::igmp::{IgmpConfig, IgmpCounters, IgmpTimerId, IgmpTypeLayout};
 use crate::internal::gmp::mld::{MldConfig, MldCounters, MldTimerId, MldTypeLayout};
@@ -51,10 +48,11 @@ pub const RETRANS_TIMER_DEFAULT: NonZeroDuration = NonZeroDuration::from_secs(1)
 const DEFAULT_HOP_LIMIT: NonZeroU8 = NonZeroU8::new(64).unwrap();
 
 /// An `Ip` extension trait adding IP device state properties.
-pub trait IpDeviceStateIpExt: BroadcastIpExt + IpCountersIpExt {
-    /// Information stored about an IP address assigned to an interface.
-    type AssignedAddressState<BT: IpDeviceStateBindingsTypes>: AssignedAddressState<Address = Self::Addr>
-        + Debug;
+pub trait IpDeviceStateIpExt:
+    DadIpExt + BroadcastIpExt + IpCountersIpExt + AssignedAddrIpExt
+{
+    /// Configuration held for an IP address assigned to an interface.
+    type AddressConfig<I: Instant>: Default + Debug + Inspectable + PartialEq + Send + Sync;
     /// The GMP protocol-specific configuration.
     type GmpProtoConfig: Default;
     /// The GMP type layout used by IP-version specific state.
@@ -64,73 +62,34 @@ pub trait IpDeviceStateIpExt: BroadcastIpExt + IpCountersIpExt {
 }
 
 impl IpDeviceStateIpExt for Ipv4 {
-    type AssignedAddressState<BT: IpDeviceStateBindingsTypes> = Ipv4AddressEntry<BT>;
+    type AddressConfig<I: Instant> = Ipv4AddrConfig<I>;
     type GmpTimerId<D: WeakDeviceIdentifier> = IgmpTimerId<D>;
     type GmpProtoConfig = IgmpConfig;
     type GmpTypeLayout<BT: IpDeviceStateBindingsTypes> = IgmpTypeLayout;
 }
 
 impl IpDeviceStateIpExt for Ipv6 {
-    type AssignedAddressState<BT: IpDeviceStateBindingsTypes> = Ipv6AddressEntry<BT>;
+    type AddressConfig<I: Instant> = Ipv6AddrConfig<I>;
     type GmpTimerId<D: WeakDeviceIdentifier> = MldTimerId<D>;
     type GmpProtoConfig = MldConfig;
     type GmpTypeLayout<BT: IpDeviceStateBindingsTypes> = MldTypeLayout;
 }
 
-/// The state associated with an IP address assigned to an IP device.
-pub trait AssignedAddressState: Debug + Send + Sync + 'static {
-    /// The type of IP address that is assigned.
-    type Address: IpAddress<Version: AssignedAddrIpExt>;
-
-    /// Gets the address.
-    fn addr(&self) -> IpDeviceAddr<Self::Address>;
-
-    /// Gets the address subnet this ID represents.
-    fn addr_sub(
-        &self,
-    ) -> AddrSubnet<
-        Self::Address,
-        <<Self::Address as IpAddress>::Version as AssignedAddrIpExt>::AssignedWitness,
-    >;
-}
-
-impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState for Ipv4AddressEntry<BT> {
-    type Address = Ipv4Addr;
-
-    fn addr(&self) -> IpDeviceAddr<Ipv4Addr> {
-        IpDeviceAddr::new_from_witness(self.addr_sub().addr())
-    }
-
-    fn addr_sub(&self) -> AddrSubnet<Ipv4Addr, Ipv4DeviceAddr> {
-        *self.addr_sub()
-    }
-}
-
-impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState for Ipv6AddressEntry<BT> {
-    type Address = Ipv6Addr;
-
-    fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
-        IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub().addr())
-    }
-
-    fn addr_sub(&self) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
-        *self.addr_sub()
-    }
-}
-
 /// The primary reference to the state associated with an IP address assigned
 /// to an IP device.
-pub struct PrimaryAddressId<S>(PrimaryRc<S>);
+pub struct PrimaryAddressId<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>(
+    PrimaryRc<IpAddressEntry<I, BT>>,
+);
 
-impl<S: AssignedAddressState> Debug for PrimaryAddressId<S> {
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> Debug for PrimaryAddressId<I, BT> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
-        write!(f, "PrimaryAddressId({:?} => {})", rc.debug_id(), self.addr_sub())
+        write!(f, "PrimaryAddressId({:?} => {})", rc.debug_id(), rc.addr_sub)
     }
 }
 
-impl<S> Deref for PrimaryAddressId<S> {
-    type Target = S;
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> Deref for PrimaryAddressId<I, BT> {
+    type Target = IpAddressEntry<I, BT>;
 
     fn deref(&self) -> &Self::Target {
         let Self(inner) = self;
@@ -138,66 +97,55 @@ impl<S> Deref for PrimaryAddressId<S> {
     }
 }
 
-impl<S> PrimaryAddressId<S> {
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> PrimaryAddressId<I, BT> {
     /// Creates a new primary reference to the provided state.
-    fn new_with_strong_clone(addr: S) -> (Self, AddressId<S>) {
+    fn new_with_strong_clone(addr: IpAddressEntry<I, BT>) -> (Self, AddressId<I, BT>) {
         let primary = PrimaryRc::new(addr);
         let strong = PrimaryRc::clone_strong(&primary);
         (Self(primary), AddressId(strong))
     }
 
     /// Clones a strongly-held reference.
-    pub fn clone_strong(&self) -> AddressId<S> {
+    pub fn clone_strong(&self) -> AddressId<I, BT> {
         let Self(inner) = self;
         AddressId(PrimaryRc::clone_strong(inner))
     }
 
     /// Checks for equality with the provided strongly-held reference.
-    pub fn ptr_eq(&self, other: &AddressId<S>) -> bool {
+    pub fn ptr_eq(&self, other: &AddressId<I, BT>) -> bool {
         let Self(inner) = self;
         let AddressId(other) = other;
         PrimaryRc::ptr_eq(inner, other)
     }
 
     /// Consumes `self` and returns the inner [`PrimaryRc`].
-    pub fn into_inner(self) -> PrimaryRc<S> {
+    pub fn into_inner(self) -> PrimaryRc<IpAddressEntry<I, BT>> {
         self.0
     }
-}
 
-impl<S: AssignedAddressState> AssignedAddressState for PrimaryAddressId<S> {
-    type Address = S::Address;
-
-    fn addr(&self) -> IpDeviceAddr<S::Address> {
+    /// The underlying address for this ID.
+    pub fn addr(&self) -> I::AssignedWitness {
         let Self(inner) = self;
-        inner.addr()
-    }
-
-    fn addr_sub(
-        &self,
-    ) -> AddrSubnet<
-        S::Address,
-        <<S::Address as IpAddress>::Version as AssignedAddrIpExt>::AssignedWitness,
-    > {
-        let Self(inner) = self;
-        inner.addr_sub()
+        inner.addr_sub.addr()
     }
 }
 
 /// A strongly-held reference to an IP address assigned to a device.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Eq(bound = ""), Hash(bound = ""), PartialEq(bound = ""))]
-pub struct AddressId<S>(StrongRc<S>);
+pub struct AddressId<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>(
+    StrongRc<IpAddressEntry<I, BT>>,
+);
 
-impl<S: AssignedAddressState> Debug for AddressId<S> {
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> Debug for AddressId<I, BT> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
-        write!(f, "AddressId({:?} => {})", rc.debug_id(), self.addr_sub())
+        write!(f, "AddressId({:?} => {})", rc.debug_id(), self.addr_sub)
     }
 }
 
-impl<S> Deref for AddressId<S> {
-    type Target = S;
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> Deref for AddressId<I, BT> {
+    type Target = IpAddressEntry<I, BT>;
 
     fn deref(&self) -> &Self::Target {
         let Self(inner) = self;
@@ -205,62 +153,57 @@ impl<S> Deref for AddressId<S> {
     }
 }
 
-impl<A, S> IpAddressId<A> for AddressId<S>
-where
-    A: IpAddress<Version: AssignedAddrIpExt>,
-    S: AssignedAddressState<Address = A>,
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> IpAddressId<I::Addr>
+    for AddressId<I, BT>
 {
-    type Weak = WeakAddressId<S>;
+    type Weak = WeakAddressId<I, BT>;
 
     fn downgrade(&self) -> Self::Weak {
         let Self(inner) = self;
         WeakAddressId(StrongRc::downgrade(inner))
     }
 
-    fn addr(&self) -> IpDeviceAddr<A> {
+    fn addr(&self) -> IpDeviceAddr<I::Addr> {
         let Self(inner) = self;
-        inner.addr()
+        inner.addr_sub().addr().into()
     }
 
-    fn addr_sub(&self) -> AddrSubnet<A, <A::Version as AssignedAddrIpExt>::AssignedWitness> {
+    fn addr_sub(&self) -> AddrSubnet<I::Addr, I::AssignedWitness> {
         let Self(inner) = self;
-        inner.addr_sub()
+        *inner.addr_sub()
     }
 }
 
 /// A weakly-held reference to an IP address assigned to a device.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Eq(bound = ""), Hash(bound = ""), PartialEq(bound = ""))]
-pub struct WeakAddressId<S>(WeakRc<S>);
+pub struct WeakAddressId<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>(
+    WeakRc<IpAddressEntry<I, BT>>,
+);
 
-impl<S: AssignedAddressState> Debug for WeakAddressId<S> {
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> Debug for WeakAddressId<I, BT> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
         if let Some(id) = self.upgrade() {
-            write!(f, "WeakAddressId({:?} => {})", rc.debug_id(), id.addr_sub())
+            write!(f, "WeakAddressId({:?} => {})", rc.debug_id(), id.addr_sub)
         } else {
-            write!(
-                f,
-                "WeakAddressId({:?} => {})",
-                rc.debug_id(),
-                <S::Address as IpAddress>::Version::NAME
-            )
+            write!(f, "WeakAddressId({:?} => {})", rc.debug_id(), I::NAME)
         }
     }
 }
 
-impl<S: AssignedAddressState> InspectableValue for WeakAddressId<S> {
-    fn record<I: Inspector>(&self, name: &str, inspector: &mut I) {
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> InspectableValue
+    for WeakAddressId<I, BT>
+{
+    fn record<II: Inspector>(&self, name: &str, inspector: &mut II) {
         inspector.record_debug(name, self);
     }
 }
 
-impl<A, S> WeakIpAddressId<A> for WeakAddressId<S>
-where
-    A: IpAddress<Version: AssignedAddrIpExt>,
-    S: AssignedAddressState<Address = A>,
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> WeakIpAddressId<I::Addr>
+    for WeakAddressId<I, BT>
 {
-    type Strong = AddressId<S>;
+    type Strong = AddressId<I, BT>;
 
     fn upgrade(&self) -> Option<Self::Strong> {
         let Self(inner) = self;
@@ -421,7 +364,7 @@ impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext> IpDev
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(Debug))]
 pub struct IpDeviceAddresses<I: Ip + IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> {
-    addrs: Vec<PrimaryAddressId<I::AssignedAddressState<BT>>>,
+    addrs: Vec<PrimaryAddressId<I, BT>>,
 }
 
 // TODO(https://fxbug.dev/42165707): Once we figure out what invariants we want to
@@ -431,9 +374,7 @@ impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> IpDeviceAddresses<I,
     /// Iterates over the addresses assigned to this device.
     pub fn iter(
         &self,
-    ) -> impl ExactSizeIterator<Item = &PrimaryAddressId<I::AssignedAddressState<BT>>>
-           + ExactSizeIterator
-           + Clone {
+    ) -> impl ExactSizeIterator<Item = &PrimaryAddressId<I, BT>> + ExactSizeIterator + Clone {
         self.addrs.iter()
     }
 
@@ -443,11 +384,8 @@ impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> IpDeviceAddresses<I,
     }
 
     /// Adds an IP address to this interface.
-    pub fn add(
-        &mut self,
-        addr: I::AssignedAddressState<BT>,
-    ) -> Result<AddressId<I::AssignedAddressState<BT>>, ExistsError> {
-        if self.iter().any(|a| a.addr() == addr.addr()) {
+    pub fn add(&mut self, addr: IpAddressEntry<I, BT>) -> Result<AddressId<I, BT>, ExistsError> {
+        if self.iter().any(|a| a.addr() == addr.addr_sub.addr()) {
             return Err(ExistsError);
         }
         let (primary, strong) = PrimaryAddressId::new_with_strong_clone(addr);
@@ -456,15 +394,12 @@ impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> IpDeviceAddresses<I,
     }
 
     /// Removes the address.
-    pub fn remove(
-        &mut self,
-        addr: &I::Addr,
-    ) -> Result<PrimaryAddressId<I::AssignedAddressState<BT>>, NotFoundError> {
-        let (index, _entry): (_, &PrimaryAddressId<I::AssignedAddressState<BT>>) = self
+    pub fn remove(&mut self, addr: &I::Addr) -> Result<PrimaryAddressId<I, BT>, NotFoundError> {
+        let (index, _entry): (_, &PrimaryAddressId<I, BT>) = self
             .addrs
             .iter()
             .enumerate()
-            .find(|(_, entry)| &entry.addr().addr() == addr)
+            .find(|(_, entry)| entry.addr().get() == *addr)
             .ok_or(NotFoundError)?;
         Ok(self.addrs.remove(index))
     }
@@ -472,13 +407,13 @@ impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> IpDeviceAddresses<I,
 
 /// An iterator over address StrongIds. Created from `IpDeviceAddresses`.
 pub struct AddressIdIter<'a, I: Ip + IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>(
-    core::slice::Iter<'a, PrimaryAddressId<I::AssignedAddressState<BT>>>,
+    core::slice::Iter<'a, PrimaryAddressId<I, BT>>,
 );
 
 impl<'a, I: Ip + IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> Iterator
     for AddressIdIter<'a, I, BT>
 {
-    type Item = AddressId<I::AssignedAddressState<BT>>;
+    type Item = AddressId<I, BT>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let Self(inner) = self;
@@ -503,7 +438,7 @@ impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv4DeviceConfiguration>
 }
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv4DeviceState<BC> {
-    fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<Ipv4DeviceTimerId<D>, BC>>(
+    fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<Ipv4DeviceTimerId<D, BC>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
     ) -> Ipv4DeviceState<BC> {
@@ -729,11 +664,7 @@ pub struct Ipv6DeviceState<BT: IpDeviceStateBindingsTypes> {
 }
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv6DeviceState<BC> {
-    pub fn new<
-        D: WeakDeviceIdentifier,
-        A: WeakIpAddressId<Ipv6Addr>,
-        CC: CoreTimerContext<Ipv6DeviceTimerId<D, A>, BC>,
-    >(
+    pub fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<Ipv6DeviceTimerId<D, BC>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
     ) -> Self {
@@ -804,26 +735,22 @@ impl<BC: IpDeviceStateBindingsTypes + TimerContext> DualStackIpDeviceState<BC> {
     /// `metric` is the default metric used by routes through this device.
     pub fn new<
         D: WeakDeviceIdentifier,
-        A: IpAddressIdSpec,
-        CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D, A>, BC>
-            + CoreTimerContext<IpDeviceTimerId<Ipv4, D, A>, BC>,
+        CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D, BC>, BC>
+            + CoreTimerContext<IpDeviceTimerId<Ipv4, D, BC>, BC>,
     >(
         bindings_ctx: &mut BC,
         device_id: D,
         metric: RawMetric,
     ) -> Self {
-        Self {
-            ipv4: Ipv4DeviceState::new::<D, NestedIntoCoreTimerCtx<CC, IpDeviceTimerId<Ipv4, D, A>>>(
-                bindings_ctx,
-                device_id.clone(),
-            ),
-            ipv6: Ipv6DeviceState::new::<
-                D,
-                A::WeakV6,
-                NestedIntoCoreTimerCtx<CC, IpDeviceTimerId<Ipv6, D, A>>,
-            >(bindings_ctx, device_id),
-            metric,
-        }
+        let ipv4 = Ipv4DeviceState::new::<
+            D,
+            NestedIntoCoreTimerCtx<CC, IpDeviceTimerId<Ipv4, D, BC>>,
+        >(bindings_ctx, device_id.clone());
+        let ipv6 = Ipv6DeviceState::new::<
+            D,
+            NestedIntoCoreTimerCtx<CC, IpDeviceTimerId<Ipv6, D, BC>>,
+        >(bindings_ctx, device_id);
+        Self { ipv4, ipv6, metric }
     }
 }
 
@@ -1058,62 +985,11 @@ pub struct Ipv4AddrConfig<Instant> {
     pub properties: CommonAddressProperties<Instant>,
 }
 
-/// Data associated with an IPv4 address on an interface.
-#[derive(Derivative)]
-#[derivative(Debug)]
-pub struct Ipv4AddressEntry<BT: IpDeviceStateBindingsTypes> {
-    addr_sub: AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>,
-    state: RwLock<Ipv4AddressState<BT::Instant>>,
-}
-
-impl<BT: IpDeviceStateBindingsTypes> Ipv4AddressEntry<BT> {
-    /// Constructs a new `Ipv4AddressEntry`.
-    pub fn new(
-        addr_sub: AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>,
-        config: Ipv4AddrConfig<BT::Instant>,
-    ) -> Self {
-        Self { addr_sub, state: RwLock::new(Ipv4AddressState { config: Some(config) }) }
-    }
-
-    /// This entry's address and subnet.
-    pub fn addr_sub(&self) -> &AddrSubnet<Ipv4Addr, Ipv4DeviceAddr> {
-        &self.addr_sub
-    }
-}
-
-impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv4AddressState<BT::Instant>>
-    for Ipv4AddressEntry<BT>
-{
-    type Lock = RwLock<Ipv4AddressState<BT::Instant>>;
-    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
-        OrderedLockRef::new(&self.state)
-    }
-}
-
-/// The state associated with an IPv4 device address.
-#[derive(Debug)]
-pub struct Ipv4AddressState<Instant> {
-    pub(crate) config: Option<Ipv4AddrConfig<Instant>>,
-}
-
-impl<Inst: Instant> Inspectable for Ipv4AddressState<Inst> {
+impl<Inst: Instant> Inspectable for Ipv4AddrConfig<Inst> {
     fn record<I: Inspector>(&self, inspector: &mut I) {
-        let Self { config } = self;
-        if let Some(Ipv4AddrConfig { config, properties }) = config {
-            inspector.delegate_inspectable(config);
-            inspector.delegate_inspectable(properties);
-        }
-    }
-}
-
-impl<Instant> Ipv4AddressState<Instant> {
-    /// Return whether DAD should be performed for this address.
-    pub fn should_perform_dad(&self) -> bool {
-        self.config
-            .as_ref()
-            .map(|c| c.config.should_perform_dad)
-            .flatten()
-            .unwrap_or(DEFAULT_DAD_ENABLED_IPV4)
+        let Self { config, properties } = self;
+        inspector.delegate_inspectable(config);
+        inspector.delegate_inspectable(properties);
     }
 }
 
@@ -1164,6 +1040,49 @@ pub enum Ipv6AddrConfig<Instant> {
 impl<Instant> Default for Ipv6AddrConfig<Instant> {
     fn default() -> Self {
         Self::Manual(Default::default())
+    }
+}
+
+impl<Inst: Instant> Inspectable for Ipv6AddrConfig<Inst> {
+    fn record<I: Inspector>(&self, inspector: &mut I) {
+        match self {
+            // NB: Ignored fields are recorded after the match.
+            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig {
+                config,
+                properties: _,
+                temporary: _,
+            }) => {
+                inspector.delegate_inspectable(config);
+            }
+            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ }) => {
+                match inner {
+                    SlaacConfig::Stable {
+                        valid_until: _,
+                        creation_time,
+                        regen_counter,
+                        dad_counter,
+                    } => {
+                        inspector.record_inspectable_value("CreationTime", creation_time);
+                        inspector.record_uint("RegenCounter", *regen_counter);
+                        inspector.record_uint("DadCounter", *dad_counter);
+                    }
+                    SlaacConfig::Temporary(TemporarySlaacConfig {
+                        valid_until: _,
+                        desync_factor,
+                        creation_time,
+                        dad_counter,
+                    }) => {
+                        inspector.record_double("DesyncFactorSecs", desync_factor.as_secs_f64());
+                        inspector.record_uint("DadCounter", *dad_counter);
+                        inspector.record_inspectable_value("CreationTime", creation_time);
+                    }
+                }
+            }
+        };
+        inspector.record_bool("IsSlaac", self.is_slaac());
+        inspector.record_inspectable_value("ValidUntil", &self.valid_until());
+        inspector.record_inspectable_value("PreferredLifetime", &self.preferred_lifetime());
+        inspector.record_bool("Temporary", self.is_temporary());
     }
 }
 
@@ -1244,81 +1163,53 @@ impl<Instant: Copy + PartialEq> Ipv6AddrConfig<Instant> {
     }
 }
 
-/// Flags associated with an IPv6 device address.
+/// Flags associated with an IP device address.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct Ipv6AddressFlags {
+pub struct IpAddressFlags {
     /// True if the address is assigned.
     pub assigned: bool,
 }
 
-/// The state associated with an IPv6 device address.
+/// The state associated with an IP device address.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct Ipv6AddressState<Instant> {
+pub struct IpAddressData<I: IpDeviceStateIpExt, Inst: Instant> {
     /// The address' flags.
-    pub flags: Ipv6AddressFlags,
+    pub flags: IpAddressFlags,
     /// The address' configuration. `None` when the address is being removed.
-    pub config: Option<Ipv6AddrConfig<Instant>>,
+    pub config: Option<I::AddressConfig<Inst>>,
 }
 
-impl<Instant> Ipv6AddressState<Instant> {
+impl<I: IpDeviceStateIpExt, Inst: Instant> IpAddressData<I, Inst> {
     /// Return whether DAD should be performed for this address.
     pub fn should_perform_dad(&self) -> bool {
-        self.config
-            .as_ref()
-            .map(|c| match c {
+        let Some(config) = self.config.as_ref() else {
+            // When config is `None` the address is being removed. Insertion
+            // must be racing with removal; don't perform DAD.
+            return false;
+        };
+
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Wrap<'a, I: IpDeviceStateIpExt, Inst: Instant>(&'a I::AddressConfig<Inst>);
+        let should_perform_dad = I::map_ip_in(
+            Wrap(config),
+            |Wrap(Ipv4AddrConfig { config, properties: _ })| config.should_perform_dad,
+            |Wrap(config)| match config {
                 Ipv6AddrConfig::Slaac(_) => None,
                 Ipv6AddrConfig::Manual(c) => c.config.should_perform_dad,
-            })
-            .flatten()
-            .unwrap_or(DEFAULT_DAD_ENABLED_IPV6)
+            },
+        );
+
+        should_perform_dad.unwrap_or(I::DEFAULT_DAD_ENABLED)
     }
 }
 
-impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
-    fn record<I: Inspector>(&self, inspector: &mut I) {
-        let Self { flags: Ipv6AddressFlags { assigned }, config } = self;
+impl<I: IpDeviceStateIpExt, Inst: Instant> Inspectable for IpAddressData<I, Inst> {
+    fn record<II: Inspector>(&self, inspector: &mut II) {
+        let Self { flags: IpAddressFlags { assigned }, config } = self;
         inspector.record_bool("Assigned", *assigned);
-
         if let Some(config) = config {
-            match config {
-                // NB: Ignored fields are recorded after the match.
-                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig {
-                    config,
-                    properties: _,
-                    temporary: _,
-                }) => {
-                    inspector.delegate_inspectable(config);
-                }
-                Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ }) => {
-                    match inner {
-                        SlaacConfig::Stable {
-                            valid_until: _,
-                            creation_time,
-                            regen_counter,
-                            dad_counter,
-                        } => {
-                            inspector.record_inspectable_value("CreationTime", creation_time);
-                            inspector.record_uint("RegenCounter", *regen_counter);
-                            inspector.record_uint("DadCounter", *dad_counter);
-                        }
-                        SlaacConfig::Temporary(TemporarySlaacConfig {
-                            valid_until: _,
-                            desync_factor,
-                            creation_time,
-                            dad_counter,
-                        }) => {
-                            inspector
-                                .record_double("DesyncFactorSecs", desync_factor.as_secs_f64());
-                            inspector.record_uint("DadCounter", *dad_counter);
-                            inspector.record_inspectable_value("CreationTime", creation_time);
-                        }
-                    }
-                }
-            };
-            inspector.record_bool("IsSlaac", config.is_slaac());
-            inspector.record_inspectable_value("ValidUntil", &config.valid_until());
-            inspector.record_inspectable_value("PreferredLifetime", &config.preferred_lifetime());
-            inspector.record_bool("Temporary", config.is_temporary());
+            inspector.delegate_inspectable(config);
         }
     }
 }
@@ -1327,18 +1218,18 @@ impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
 // TODO(https://fxbug.dev/42173351): Should this be generalized for loopback?
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
-pub struct Ipv6AddressEntry<BT: IpDeviceStateBindingsTypes> {
-    addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-    dad_state: Mutex<DadState<Ipv6, BT>>,
-    state: RwLock<Ipv6AddressState<BT::Instant>>,
+pub struct IpAddressEntry<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> {
+    addr_sub: AddrSubnet<I::Addr, I::AssignedWitness>,
+    dad_state: Mutex<DadState<I, BT>>,
+    state: RwLock<IpAddressData<I, BT::Instant>>,
 }
 
-impl<BT: IpDeviceStateBindingsTypes> Ipv6AddressEntry<BT> {
-    /// Constructs a new `Ipv6AddressEntry`.
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> IpAddressEntry<I, BT> {
+    /// Constructs a new `IpAddressEntry`.
     pub fn new(
-        addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-        dad_state: DadState<Ipv6, BT>,
-        config: Ipv6AddrConfig<BT::Instant>,
+        addr_sub: AddrSubnet<I::Addr, I::AssignedWitness>,
+        dad_state: DadState<I, BT>,
+        config: I::AddressConfig<BT::Instant>,
     ) -> Self {
         let assigned = match dad_state {
             DadState::Assigned => true,
@@ -1348,32 +1239,32 @@ impl<BT: IpDeviceStateBindingsTypes> Ipv6AddressEntry<BT> {
         Self {
             addr_sub,
             dad_state: Mutex::new(dad_state),
-            state: RwLock::new(Ipv6AddressState {
+            state: RwLock::new(IpAddressData {
                 config: Some(config),
-                flags: Ipv6AddressFlags { assigned },
+                flags: IpAddressFlags { assigned },
             }),
         }
     }
 
     /// This entry's address and subnet.
-    pub fn addr_sub(&self) -> &AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
+    pub fn addr_sub(&self) -> &AddrSubnet<I::Addr, I::AssignedWitness> {
         &self.addr_sub
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<DadState<Ipv6, BT>>
-    for Ipv6AddressEntry<BT>
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> OrderedLockAccess<DadState<I, BT>>
+    for IpAddressEntry<I, BT>
 {
-    type Lock = Mutex<DadState<Ipv6, BT>>;
+    type Lock = Mutex<DadState<I, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.dad_state)
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv6AddressState<BT::Instant>>
-    for Ipv6AddressEntry<BT>
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>
+    OrderedLockAccess<IpAddressData<I, BT::Instant>> for IpAddressEntry<I, BT>
 {
-    type Lock = RwLock<Ipv6AddressState<BT::Instant>>;
+    type Lock = RwLock<IpAddressData<I, BT::Instant>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.state)
     }
@@ -1383,6 +1274,7 @@ impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv6AddressState<BT::Inst
 mod tests {
     use super::*;
 
+    use net_types::ip::{Ipv4Addr, Ipv6Addr};
     use netstack3_base::testutil::{FakeBindingsCtx, FakeInstant};
     use netstack3_base::InstantContext as _;
     use test_case::test_case;
@@ -1401,13 +1293,18 @@ mod tests {
             ..Default::default()
         };
 
-        let _: AddressId<_> = ipv4
-            .add(Ipv4AddressEntry::new(AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(), config))
+        let _: AddressId<_, _> = ipv4
+            .add(IpAddressEntry::new(
+                AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(),
+                DadState::Uninitialized,
+                config,
+            ))
             .unwrap();
         // Adding the same address with different prefix should fail.
         assert_eq!(
-            ipv4.add(Ipv4AddressEntry::new(
+            ipv4.add(IpAddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
+                DadState::Uninitialized,
                 config,
             ))
             .unwrap_err(),
@@ -1426,8 +1323,8 @@ mod tests {
 
         let mut bindings_ctx = FakeBindingsCtxImpl::default();
 
-        let _: AddressId<_> = ipv6
-            .add(Ipv6AddressEntry::new(
+        let _: AddressId<_, _> = ipv6
+            .add(IpAddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(),
                 DadState::Tentative {
                     dad_transmits_remaining: None,
@@ -1448,7 +1345,7 @@ mod tests {
         // Adding the same address with different prefix and configuration
         // should fail.
         assert_eq!(
-            ipv6.add(Ipv6AddressEntry::new(
+            ipv6.add(IpAddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
                 DadState::Assigned,
                 Ipv6AddrConfig::Manual(Ipv6AddrManualConfig {
@@ -1465,8 +1362,9 @@ mod tests {
     #[test_case(Some(false) => false; "disabled")]
     #[test_case(Some(true) => true; "enabled")]
     fn should_perform_dad_ipv4(setting: Option<bool>) -> bool {
-        let state = Ipv4AddressState {
-            config: Some(Ipv4AddrConfig::<()> {
+        let state = IpAddressData::<Ipv4, FakeInstant> {
+            flags: IpAddressFlags { assigned: false },
+            config: Some(Ipv4AddrConfig::<FakeInstant> {
                 config: CommonAddressConfig { should_perform_dad: setting },
                 ..Default::default()
             }),
@@ -1478,9 +1376,9 @@ mod tests {
     #[test_case(Some(false) => false; "disabled")]
     #[test_case(Some(true) => true; "enabled")]
     fn should_perform_dad_ipv6(setting: Option<bool>) -> bool {
-        let state = Ipv6AddressState {
-            flags: Ipv6AddressFlags { assigned: false },
-            config: Some(Ipv6AddrConfig::Manual(Ipv6AddrManualConfig::<()> {
+        let state = IpAddressData::<Ipv6, FakeInstant> {
+            flags: IpAddressFlags { assigned: false },
+            config: Some(Ipv6AddrConfig::Manual(Ipv6AddrManualConfig::<FakeInstant> {
                 config: CommonAddressConfig { should_perform_dad: setting },
                 ..Default::default()
             })),

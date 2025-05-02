@@ -15,7 +15,7 @@ use netstack3_base::{
     RemoveResourceResultWithContext, ResourceCounterContext, TimerContext,
 };
 use netstack3_ip::device::{
-    IpAddressIdSpecContext, IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceTimerId,
+    IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceTimerId,
     Ipv6DeviceConfigurationContext,
 };
 use netstack3_ip::gmp::{IgmpCounters, MldCounters};
@@ -103,7 +103,7 @@ where
                     weak_ref.clone(),
                     properties,
                 );
-                IpLinkDeviceStateInner::new::<_, _, C::CoreContext>(
+                IpLinkDeviceStateInner::new::<_, C::CoreContext>(
                     bindings_ctx,
                     weak_ref.into(),
                     link,
@@ -461,20 +461,11 @@ impl<O> DeviceApiBindingsContext for O where O: DeviceLayerTypes + ReferenceNoti
 /// layer to fulfill [`DeviceApi`].
 pub trait DeviceApiIpLayerCoreContext<D: Device, BC: DeviceLayerTypes>:
     DeviceIdAnyCompatContext<D>
-    + IpAddressIdSpecContext
     + CoreTimerContext<
-        IpDeviceTimerId<
-            Ipv6,
-            <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId,
-            Self::AddressIdSpec,
-        >,
+        IpDeviceTimerId<Ipv6, <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId, BC>,
         BC,
     > + CoreTimerContext<
-        IpDeviceTimerId<
-            Ipv4,
-            <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId,
-            Self::AddressIdSpec,
-        >,
+        IpDeviceTimerId<Ipv4, <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId, BC>,
         BC,
     >
 {
@@ -485,20 +476,11 @@ where
     D: Device,
     BC: DeviceLayerTypes,
     O: DeviceIdAnyCompatContext<D>
-        + IpAddressIdSpecContext
         + CoreTimerContext<
-            IpDeviceTimerId<
-                Ipv6,
-                <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId,
-                Self::AddressIdSpec,
-            >,
+            IpDeviceTimerId<Ipv6, <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId, BC>,
             BC,
         > + CoreTimerContext<
-            IpDeviceTimerId<
-                Ipv4,
-                <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId,
-                Self::AddressIdSpec,
-            >,
+            IpDeviceTimerId<Ipv4, <Self as DeviceIdContext<AnyDevice>>::WeakDeviceId, BC>,
             BC,
         >,
 {

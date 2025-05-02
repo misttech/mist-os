@@ -66,12 +66,11 @@ pub mod device {
         SLAAC_MIN_REGEN_ADVANCE,
     };
     pub use crate::internal::device::state::{
-        AddressId, AddressIdIter, AssignedAddressState, CommonAddressConfig,
-        CommonAddressProperties, DefaultHopLimit, DualStackIpDeviceState, IpDeviceAddresses,
+        AddressId, AddressIdIter, CommonAddressConfig, CommonAddressProperties, DefaultHopLimit,
+        DualStackIpDeviceState, IpAddressData, IpAddressEntry, IpAddressFlags, IpDeviceAddresses,
         IpDeviceConfiguration, IpDeviceFlags, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes,
-        IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressEntry, Ipv4AddressState,
-        Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6AddrSlaacConfig,
-        Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration,
+        IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4DeviceConfiguration, Ipv6AddrConfig,
+        Ipv6AddrManualConfig, Ipv6AddrSlaacConfig, Ipv6DeviceConfiguration,
         Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, PrimaryAddressId, SlaacConfig,
         TemporarySlaacConfig, WeakAddressId,
     };
@@ -80,12 +79,12 @@ pub mod device {
         del_ip_addr_inner, get_ipv4_addr_subnet, get_ipv6_hop_limit, is_ip_device_enabled,
         is_ip_multicast_forwarding_enabled, is_ip_unicast_forwarding_enabled, join_ip_multicast,
         join_ip_multicast_with_config, leave_ip_multicast, leave_ip_multicast_with_config,
-        receive_igmp_packet, AddressRemovedReason, DelIpAddr, IpAddressIdSpec,
-        IpAddressIdSpecContext, IpAddressState, IpDeviceAddressContext, IpDeviceBindingsContext,
-        IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt, IpDeviceSendContext,
-        IpDeviceStateContext, IpDeviceTimerId, Ipv4DeviceTimerId, Ipv6DeviceConfigurationContext,
-        Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId, Ipv6LinkLayerAddr,
-        WithIpDeviceConfigurationMutInner, WithIpv6DeviceConfigurationMutInner,
+        receive_igmp_packet, AddressRemovedReason, DelIpAddr, IpAddressState,
+        IpDeviceAddressContext, IpDeviceBindingsContext, IpDeviceConfigurationContext,
+        IpDeviceEvent, IpDeviceIpExt, IpDeviceSendContext, IpDeviceStateContext, IpDeviceTimerId,
+        Ipv4DeviceTimerId, Ipv6DeviceConfigurationContext, Ipv6DeviceContext, Ipv6DeviceHandler,
+        Ipv6DeviceTimerId, Ipv6LinkLayerAddr, WithIpDeviceConfigurationMutInner,
+        WithIpv6DeviceConfigurationMutInner,
     };
 
     /// IP device test utilities.
