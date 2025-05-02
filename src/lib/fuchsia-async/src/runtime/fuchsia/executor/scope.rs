@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::super::task::JoinHandle;
-use super::atomic_future::{AtomicFutureHandle, CancelAndDetachResult};
+use super::atomic_future::{AbortAndDetachResult, AtomicFutureHandle};
 use super::common::{Executor, TaskHandle};
 use crate::condition::{Condition, ConditionGuard, WakerEntry};
 use crate::EHandle;
@@ -982,7 +982,7 @@ mod state {
 
         pub fn abort_tasks_and_mark_finished(&mut self) {
             for task in self.all_tasks() {
-                if task.cancel() {
+                if task.abort() {
                     task.scope().executor().ready_tasks.push(task.clone());
                 }
                 // Don't bother dropping tasks that are finished; the entire
@@ -1227,38 +1227,38 @@ impl ScopeHandle {
         };
     }
 
-    /// Cancels the task.
+    /// Aborts the task.
     ///
     /// # Safety
     ///
     /// The caller must guarantee that `R` is the correct type.
-    pub(crate) unsafe fn cancel_task<R>(&self, task_id: usize) -> Option<R> {
+    pub(crate) unsafe fn abort_task<R>(&self, task_id: usize) -> Option<R> {
         let mut state = self.lock();
         if let Some(task) = state.results.detach(task_id) {
             drop(state);
             return task.take_result();
         }
         state.all_tasks().get(&task_id).and_then(|task| {
-            if task.cancel() {
+            if task.abort() {
                 self.inner.executor.ready_tasks.push(task.clone());
             }
             task.take_result()
         })
     }
 
-    /// Cancels and detaches the task.
-    pub(crate) fn cancel_and_detach(&self, task_id: usize) {
+    /// Aborts and detaches the task.
+    pub(crate) fn abort_and_detach(&self, task_id: usize) {
         let _tasks = {
             let mut state = ScopeWaker::from(self.lock());
             let maybe_task1 = state.results.detach(task_id);
             let mut maybe_task2 = None;
             if let Some(task) = state.all_tasks().get(&task_id) {
-                match task.cancel_and_detach() {
-                    CancelAndDetachResult::Done => maybe_task2 = state.take_task(task_id),
-                    CancelAndDetachResult::AddToRunQueue => {
+                match task.abort_and_detach() {
+                    AbortAndDetachResult::Done => maybe_task2 = state.take_task(task_id),
+                    AbortAndDetachResult::AddToRunQueue => {
                         self.inner.executor.ready_tasks.push(task.clone());
                     }
-                    CancelAndDetachResult::Pending => {}
+                    AbortAndDetachResult::Pending => {}
                 }
             }
             (maybe_task1, maybe_task2)
@@ -1279,14 +1279,14 @@ impl ScopeHandle {
         match task.take_result() {
             Some(result) => Poll::Ready(result),
             None => {
-                // The task has been cancelled so all we can do is forever return pending.
+                // The task has been aborted so all we can do is forever return pending.
                 Poll::Pending
             }
         }
     }
 
-    /// Polls for the task to be cancelled.
-    pub(crate) unsafe fn poll_cancelled<R>(
+    /// Polls for the task to be aborted.
+    pub(crate) unsafe fn poll_aborted<R>(
         &self,
         task_id: usize,
         cx: &mut Context<'_>,

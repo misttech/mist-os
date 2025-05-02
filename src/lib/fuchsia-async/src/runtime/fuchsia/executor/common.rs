@@ -572,7 +572,7 @@ impl Executor {
                 self.ready_tasks.push(task);
                 false
             }
-            AttemptPollResult::IFinished | AttemptPollResult::Cancelled => {
+            AttemptPollResult::IFinished | AttemptPollResult::Aborted => {
                 task.scope().task_did_finish(task.id());
                 true
             }

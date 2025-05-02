@@ -210,7 +210,7 @@ const DONE: usize = 1 << 61;
 const DETACHED: usize = 1 << 60;
 
 // The task has been cancelled.
-const CANCELLED: usize = 1 << 59;
+const ABORTED: usize = 1 << 59;
 
 // The result has been taken.
 const RESULT_TAKEN: usize = 1 << 58;
@@ -231,20 +231,20 @@ pub enum AttemptPollResult {
     /// The future was polled, did not complete, but it is woken whilst it is polled so it
     /// should be polled again.
     Yield,
-    /// The future was cancelled.
-    Cancelled,
+    /// The future was aborted.
+    Aborted,
 }
 
-/// The result of calling the `cancel_and_detach` function.
+/// The result of calling the `abort_and_detach` function.
 #[must_use]
-pub enum CancelAndDetachResult {
+pub enum AbortAndDetachResult {
     /// The future has finished; it can be dropped.
     Done,
 
-    /// The future needs to be added to a run queue to be cancelled.
+    /// The future needs to be added to a run queue to be aborted.
     AddToRunQueue,
 
-    /// The future is soon to be cancelled and nothing needs to be done.
+    /// The future is soon to be aborted and nothing needs to be done.
     Pending,
 }
 
@@ -320,13 +320,13 @@ impl<'a> AtomicFutureHandle<'a> {
             }
             if old & INACTIVE != 0 {
                 // We are now the (only) active worker, proceed to poll...
-                if old & CANCELLED != 0 {
-                    // The future was cancelled.
+                if old & ABORTED != 0 {
+                    // The future was aborted.
                     // SAFETY: We have exclusive access.
                     unsafe {
                         self.drop_future_unchecked();
                     }
-                    return AttemptPollResult::Cancelled;
+                    return AttemptPollResult::Aborted;
                 }
                 break;
             }
@@ -410,11 +410,10 @@ impl<'a> AtomicFutureHandle<'a> {
         }
     }
 
-    /// Cancels the task.  Returns true if the task needs to be added to a run queue.
+    /// Aborts the task.  Returns true if the task needs to be added to a run queue.
     #[must_use]
-    pub fn cancel(&self) -> bool {
-        self.meta().state.fetch_or(CANCELLED | READY, Relaxed) & (INACTIVE | READY | DONE)
-            == INACTIVE
+    pub fn abort(&self) -> bool {
+        self.meta().state.fetch_or(ABORTED | READY, Relaxed) & (INACTIVE | READY | DONE) == INACTIVE
     }
 
     /// Marks the task as detached.
@@ -433,12 +432,12 @@ impl<'a> AtomicFutureHandle<'a> {
         }
     }
 
-    /// Marks the task as cancelled and detached (for when the caller isn't interested in waiting
+    /// Marks the task as aborted and detached (for when the caller isn't interested in waiting
     /// for the cancellation to be finished).  Returns true if the task should be added to a run
     /// queue.
-    pub fn cancel_and_detach(&self) -> CancelAndDetachResult {
+    pub fn abort_and_detach(&self) -> AbortAndDetachResult {
         let meta = self.meta();
-        let old_state = meta.state.fetch_or(CANCELLED | DETACHED | READY, Relaxed);
+        let old_state = meta.state.fetch_or(ABORTED | DETACHED | READY, Relaxed);
         if old_state & DONE != 0 {
             // If the future is done, we should eagerly drop the result.  This needs to be acquire
             // ordering because another thread might have written the result.
@@ -448,11 +447,11 @@ impl<'a> AtomicFutureHandle<'a> {
                 meta.drop_result(Acquire);
             }
 
-            CancelAndDetachResult::Done
+            AbortAndDetachResult::Done
         } else if old_state & (INACTIVE | READY) == INACTIVE {
-            CancelAndDetachResult::AddToRunQueue
+            AbortAndDetachResult::AddToRunQueue
         } else {
-            CancelAndDetachResult::Pending
+            AbortAndDetachResult::Pending
         }
     }
 

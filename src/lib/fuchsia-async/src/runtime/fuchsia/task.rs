@@ -39,15 +39,15 @@ impl<T> JoinHandle<T> {
     /// future can be ignored in which case the task will still be cancelled.
     pub fn cancel(mut self) -> impl Future<Output = Option<T>> {
         // SAFETY: We spawned the task so the return type should be correct.
-        let result = unsafe { self.scope.cancel_task(self.task_id) };
+        let result = unsafe { self.scope.abort_task(self.task_id) };
         async move {
             match result {
                 Some(output) => Some(output),
                 None => {
-                    // If we are dropped from here, we'll end up calling `cancel_and_detach`.
+                    // If we are dropped from here, we'll end up calling `abort_and_detach`.
                     let result = std::future::poll_fn(|cx| {
                         // SAFETY: We spawned the task so the return type should be correct.
-                        unsafe { self.scope.poll_cancelled(self.task_id, cx) }
+                        unsafe { self.scope.poll_aborted(self.task_id, cx) }
                     })
                     .await;
                     self.task_id = 0;
@@ -78,7 +78,7 @@ impl<T: 'static> Future for JoinHandle<T> {
     }
 }
 
-/// This is the same as a JoinHandle, except that the future will be cancelled when the task is
+/// This is the same as a JoinHandle, except that the future will be aborted when the task is
 /// dropped.
 #[must_use]
 #[repr(transparent)]
@@ -197,7 +197,7 @@ impl<T: 'static> Future for Task<T> {
 impl<T> Drop for Task<T> {
     fn drop(&mut self) {
         if self.0.task_id != 0 {
-            self.0.scope.cancel_and_detach(self.0.task_id);
+            self.0.scope.abort_and_detach(self.0.task_id);
             self.0.task_id = 0;
         }
     }
