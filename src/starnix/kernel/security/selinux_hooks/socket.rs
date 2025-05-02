@@ -332,6 +332,17 @@ pub(in crate::security) fn check_socket_shutdown_access(
     )
 }
 
+/// Returns the Security Context with which the [`crate::vfs::Socket`]'s peer is labeled.
+pub(in crate::security) fn socket_getpeersec_stream(
+    security_server: &SecurityServer,
+    _current_task: &CurrentTask,
+    socket: &Socket,
+) -> Result<Vec<u8>, Errno> {
+    let peer_sid =
+        socket.security.state.peer_sid.lock().unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
+    Ok(security_server.sid_to_security_context(peer_sid).unwrap())
+}
+
 /// Checks if the Unix domain `sending_socket` is allowed to send a message to the
 /// `receiving_socket`.
 pub(in crate::security) fn unix_may_send(

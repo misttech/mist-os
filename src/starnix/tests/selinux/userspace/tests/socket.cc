@@ -14,6 +14,9 @@
 #include "src/starnix/tests/selinux/userspace/util.h"
 
 namespace {
+
+constexpr int kTestBacklog = 5;
+
 struct SocketTestCase {
   int domain;
   int type;
@@ -131,7 +134,6 @@ TEST(SocketTest, SockFileLabelIsCorrect) {
 }
 
 TEST(SocketTest, ListenAllowed) {
-  const int kBacklog = 5;
   LoadPolicy("socket_policy.pp");
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_listen_test_t:s0"), fit::ok());
   auto sockcreate =
@@ -145,11 +147,10 @@ TEST(SocketTest, ListenAllowed) {
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = INADDR_ANY;
   ASSERT_THAT(bind(sockfd.get(), (struct sockaddr*)&addr, sizeof(addr)), SyscallSucceeds());
-  EXPECT_THAT(listen(sockfd.get(), kBacklog), SyscallSucceeds());
+  EXPECT_THAT(listen(sockfd.get(), kTestBacklog), SyscallSucceeds());
 }
 
 TEST(SocketTest, ListenDenied) {
-  const int kBacklog = 5;
   LoadPolicy("socket_policy.pp");
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_listen_test_t:s0"), fit::ok());
   auto sockcreate =
@@ -163,7 +164,112 @@ TEST(SocketTest, ListenDenied) {
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = INADDR_ANY;
   ASSERT_THAT(bind(sockfd.get(), (struct sockaddr*)&addr, sizeof(addr)), SyscallSucceeds());
-  EXPECT_THAT(listen(sockfd.get(), kBacklog), SyscallFailsWithErrno(EACCES));
+  EXPECT_THAT(listen(sockfd.get(), kTestBacklog), SyscallFailsWithErrno(EACCES));
+}
+
+fit::result<int, std::string> GetPeerSec(int fd) {
+  char label_buf[256]{};
+  socklen_t label_len = sizeof(label_buf);
+  if (getsockopt(fd, SOL_SOCKET, SO_PEERSEC, label_buf, &label_len) == -1) {
+    return fit::error(errno);
+  }
+  return fit::ok(RemoveTrailingNul(std::string(label_buf, label_len)));
+}
+
+TEST(SocketPeerSecTest, UnixDomainStream) {
+  LoadPolicy("socket_policy.pp");
+
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_test_t:s0"), fit::ok());
+
+  fbl::unique_fd listen_fd;
+  {
+    auto sockcreate =
+        ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_test_peer_t:s0");
+
+    ASSERT_THAT((listen_fd = fbl::unique_fd(socket(AF_UNIX, SOCK_STREAM, 0))), SyscallSucceeds());
+    EXPECT_THAT(GetLabel(listen_fd.get()), IsOk("test_u:test_r:socket_test_peer_t:s0"));
+
+    // Before connecting, Unix stream sockets report the peer as the "unlabeled" context.
+    EXPECT_THAT(GetPeerSec(listen_fd.get()), IsOk("unlabeled_u:unlabeled_r:unlabeled_t:s0"));
+  }
+
+  fbl::unique_fd client_fd;
+  ASSERT_THAT((client_fd = fbl::unique_fd(socket(AF_UNIX, SOCK_STREAM, 0))), SyscallSucceeds());
+  EXPECT_THAT(GetLabel(client_fd.get()), IsOk("test_u:test_r:unix_stream_socket_test_t:s0"));
+  EXPECT_THAT(GetPeerSec(client_fd.get()), IsOk("unlabeled_u:unlabeled_r:unlabeled_t:s0"));
+
+  // Bind the `listen_fd` to an address and start listening on it.
+  constexpr char kListenPath[] = "/tmp/unix_domain_stream_test";
+  struct sockaddr_un sock_addr{.sun_family = AF_UNIX};
+  strncpy(sock_addr.sun_path, kListenPath, sizeof(sock_addr.sun_path) - 1);
+  ASSERT_THAT(bind(listen_fd.get(), (struct sockaddr*)&sock_addr, sizeof(sock_addr)),
+              SyscallSucceeds());
+  ASSERT_THAT(listen(listen_fd.get(), kTestBacklog), SyscallSucceeds());
+
+  // Connect the `client_fd` to the listener, which should immediately cause the peer label to
+  // reflect that of the listening socket.
+  ASSERT_THAT(connect(client_fd.get(), (struct sockaddr*)&sock_addr, sizeof(sock_addr)),
+              SyscallSucceeds());
+  EXPECT_THAT(GetPeerSec(client_fd.get()), IsOk("test_u:test_r:socket_test_peer_t:s0"));
+
+  // Accept the client connection on `listen_fd` and validate the peer label reported by the
+  // accepted socket.
+  fbl::unique_fd accepted_fd;
+  ASSERT_THAT((accepted_fd = fbl::unique_fd(accept(listen_fd.get(), nullptr, nullptr))),
+              SyscallSucceeds());
+  EXPECT_THAT(GetPeerSec(accepted_fd.get()), IsOk("test_u:test_r:unix_stream_socket_test_t:s0"));
+}
+
+TEST(SocketPeerSecTest, UnixDomainDatagram) {
+  LoadPolicy("socket_policy.pp");
+
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_test_t:s0"), fit::ok());
+
+  fbl::unique_fd fd;
+  ASSERT_THAT((fd = fbl::unique_fd(socket(AF_UNIX, SOCK_DGRAM, 0))), SyscallSucceeds());
+  EXPECT_THAT(GetLabel(fd.get()), IsOk("test_u:test_r:unix_dgram_socket_test_t:s0"));
+
+  // Unix datagram sockets do not support `SO_PEERSEC`.
+  EXPECT_EQ(GetPeerSec(fd.get()), fit::error(ENOPROTOOPT));
+}
+
+TEST(SocketPeerSecTest, SocketPairUnixStream) {
+  LoadPolicy("socket_policy.pp");
+
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_test_t:s0"), fit::ok());
+
+  int fds[2]{};
+  ASSERT_THAT(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), SyscallSucceeds());
+
+  fbl::unique_fd fd1(fds[0]);
+  fbl::unique_fd fd2(fds[1]);
+
+  EXPECT_THAT(GetLabel(fd1.get()), IsOk("test_u:test_r:unix_stream_socket_test_t:s0"));
+  EXPECT_THAT(GetLabel(fd2.get()), IsOk("test_u:test_r:unix_stream_socket_test_t:s0"));
+
+  // Unix-domain sockets created with `socketpair()` should report each other's labels immediately.
+  EXPECT_THAT(GetPeerSec(fd1.get()), IsOk("test_u:test_r:unix_stream_socket_test_t:s0"));
+  EXPECT_THAT(GetPeerSec(fd2.get()), IsOk("test_u:test_r:unix_stream_socket_test_t:s0"));
+}
+
+TEST(SocketPeerSecTest, SocketPairUnixDatagram) {
+  LoadPolicy("socket_policy.pp");
+
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_test_t:s0"), fit::ok());
+
+  int fds[2];
+  ASSERT_THAT(socketpair(AF_UNIX, SOCK_DGRAM, 0, fds), SyscallSucceeds());
+
+  fbl::unique_fd fd1(fds[0]);
+  fbl::unique_fd fd2(fds[1]);
+
+  EXPECT_THAT(GetLabel(fd1.get()), IsOk("test_u:test_r:unix_dgram_socket_test_t:s0"));
+  EXPECT_THAT(GetLabel(fd2.get()), IsOk("test_u:test_r:unix_dgram_socket_test_t:s0"));
+
+  // Unix-domain datagram sockets created with `socketpair()` are described as supporting
+  // `SO_PEERSEC` but actually seem to report not-supported.
+  EXPECT_EQ(GetPeerSec(fd1.get()), fit::error(ENOPROTOOPT));
+  EXPECT_EQ(GetPeerSec(fd2.get()), fit::error(ENOPROTOOPT));
 }
 
 }  // namespace

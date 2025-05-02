@@ -20,6 +20,9 @@
 
                 // TODO: https://fxbug.dev/361552580 - Fix "create" handling of unknown policy class Ids.
                 "SeLinuxFsCreate.InvalidComputeCreateClassId",
+
+                // TODO: https://fxbug.dev/364569703 - Implement correct SO_PEERSEC for socketpair() sockets.
+                "SocketPeerSecTest.SocketPairUnixStream",
             ],
         },
     ],
