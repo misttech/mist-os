@@ -691,7 +691,7 @@ impl TerminalMutableState<Base = Terminal> {
             }
 
             let mut maybe_erase_span = None;
-            if self.termios.has_local_flags(ICANON) {
+            if self.termios.has_local_flags(ICANON) && self.termios.has_local_flags(ECHOE) {
                 if self.termios.is_erase(first_byte) {
                     maybe_erase_span =
                         Some(compute_last_character_span(&queue.read_buffer[..], &self.termios));
@@ -710,9 +710,6 @@ impl TerminalMutableState<Base = Terminal> {
                 queue.read_buffer.extend_from_slice(&character_bytes);
             }
 
-            if self.termios.has_local_flags(ECHOE) {
-                track_stub!(TODO("https://fxbug.dev/322874345"), "terminal ECHOE");
-            }
             if self.termios.has_local_flags(ECHOPRT) {
                 track_stub!(TODO("https://fxbug.dev/322874329"), "terminal ECHOPRT");
             }
