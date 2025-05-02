@@ -10,6 +10,7 @@
 
 #include "fidl/fuchsia.bluetooth.sys/cpp/common_types.h"
 #include "lib/component/incoming/cpp/protocol.h"
+#include "src/connectivity/bluetooth/testing/pandora/bt-pandora-server/src/rust_affordances/ffi_c/bindings.h"
 
 using grpc::Status;
 using grpc::StatusCode;
@@ -17,20 +18,10 @@ using grpc::StatusCode;
 using namespace std::chrono_literals;
 
 HostService::HostService(async_dispatcher_t* dispatcher) {
-  // Connect to fuchsia.bluetooth.sys.HostWatcher
-  zx::result host_watcher_client_end = component::Connect<fuchsia_bluetooth_sys::HostWatcher>();
-  if (!host_watcher_client_end.is_ok()) {
-    FX_LOGS(ERROR) << "Error connecting to HostWatcher service: "
-                   << host_watcher_client_end.error_value();
-    return;
-  }
-  host_watcher_client_.Bind(std::move(*host_watcher_client_end), dispatcher);
-
   // Connect to fuchsia.bluetooth.sys.Access
   zx::result access_client_end = component::Connect<fuchsia_bluetooth_sys::Access>();
   if (!access_client_end.is_ok()) {
-    FX_LOGS(ERROR) << "Error connecting to Access service: "
-                   << host_watcher_client_end.error_value();
+    FX_LOGS(ERROR) << "Error connecting to Access service: " << access_client_end.error_value();
     return;
   }
   access_client_.Bind(std::move(*access_client_end), dispatcher);
@@ -38,8 +29,7 @@ HostService::HostService(async_dispatcher_t* dispatcher) {
   // Connect to fuchsia.bluetooth.sys.Pairing
   zx::result pairing_client_end = component::Connect<fuchsia_bluetooth_sys::Pairing>();
   if (!pairing_client_end.is_ok()) {
-    FX_LOGS(ERROR) << "Error connecting to Pairing service: "
-                   << host_watcher_client_end.error_value();
+    FX_LOGS(ERROR) << "Error connecting to Pairing service: " << pairing_client_end.error_value();
     return;
   }
   pairing_client_.Bind(std::move(*pairing_client_end));
@@ -80,32 +70,12 @@ Status HostService::Reset(grpc::ServerContext* context, const google::protobuf::
 Status HostService::ReadLocalAddress(grpc::ServerContext* context,
                                      const google::protobuf::Empty* request,
                                      pandora::ReadLocalAddressResponse* response) {
-  std::unique_lock<std::mutex> lock(m_host_watcher_);
-  if (!host_watching_) {
-    host_watching_ = true;
-    host_watcher_client_->Watch().Then(
-        [this](fidl::Result<fuchsia_bluetooth_sys::HostWatcher::Watch>& watch) {
-          if (watch.is_error()) {
-            fidl::Error err = watch.error_value();
-            FX_LOGS(ERROR) << "Host watcher error: " << err.error();
-            return;
-          }
-
-          std::unique_lock<std::mutex> lock(this->m_host_watcher_);
-          host_watching_ = false;
-          hosts_ = watch->hosts();
-          cv_host_watcher_.notify_one();
-        });
+  std::array<uint8_t, 6> host_addr;
+  if (read_local_address(host_addr.data()) != ZX_OK) {
+    return Status(StatusCode::INTERNAL, "Error in Rust affordances (check logs)");
   }
-
-  cv_host_watcher_.wait_for(lock, 100ms, [this] { return !host_watching_; });
-  if (hosts_.empty()) {
-    return Status(StatusCode::NOT_FOUND, "No hosts!");
-  }
-  std::array<uint8_t, 6> host_addr = hosts_.front().addresses()->front().bytes();
-  std::reverse(host_addr.begin(), host_addr.end());
+  std::ranges::reverse(host_addr);
   response->set_address(host_addr.data(), 6);
-
   return {/*OK*/};
 }
 

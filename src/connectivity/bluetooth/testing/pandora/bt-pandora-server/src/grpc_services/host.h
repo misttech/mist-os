@@ -81,12 +81,6 @@ class HostService : public pandora::Host::Service {
   // The synchronization primitives are utilized for configuring waiting/timeouts on FIDL callbacks
   // and enforcing mutual exclusivity when writing/reading the structures that cache the updated
   // state information that is received in these callbacks.
-  fidl::SharedClient<fuchsia_bluetooth_sys::HostWatcher> host_watcher_client_;
-  std::condition_variable cv_host_watcher_;
-  std::mutex m_host_watcher_;
-  std::vector<fuchsia_bluetooth_sys::HostInfo> hosts_;
-  bool host_watching_{false};
-
   fidl::SharedClient<fuchsia_bluetooth_sys::Access> access_client_;
   std::condition_variable cv_access_;
   std::mutex m_access_;

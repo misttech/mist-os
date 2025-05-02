@@ -1,0 +1,29 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_staticlib.gni")
+
+rustc_staticlib("affordances-c") {
+  name = "affordances_c"
+  version = "0.1.0"
+  edition = "2021"
+
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_rust",
+    "//sdk/rust/zx",
+    "//src/lib/async-utils",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-sync",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+  ]
+
+  public = [ "ffi_c/bindings.h" ]
+
+  sources = [ "src/lib.rs" ]
+}

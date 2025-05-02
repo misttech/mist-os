@@ -8,6 +8,8 @@
 
 #include <string>
 
+#include "rust_affordances/ffi_c/bindings.h"
+
 PandoraGrpcServer::PandoraGrpcServer(async_dispatcher_t* dispatcher)
     : host_service_(dispatcher), a2dp_service_(dispatcher) {}
 
@@ -36,9 +38,16 @@ zx_status_t PandoraGrpcServer::Run(uint16_t port, bool verbose) {
 
 void PandoraGrpcServer::Shutdown() {
   if (IsRunning()) {
-    FX_LOGS(INFO) << "shuting down Pandora gRPC server";
+    FX_LOGS(INFO) << "Shutting down Pandora server";
     server_->Shutdown();
     server_.reset(nullptr);
+
+    zx_status_t status = stop_rust_affordances();
+    if (status == ZX_ERR_BAD_STATE) {
+      FX_LOGS(ERROR) << "Tried to stop Rust affordances but they weren't running";
+    } else if (status != ZX_OK) {
+      FX_LOGS(ERROR) << "Encountered error stopping Rust affordances (check logs)";
+    }
   }
 }
 

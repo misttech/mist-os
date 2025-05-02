@@ -45,6 +45,7 @@ source_set("grpc_services") {
   public_deps = [
     "//sdk/fidl/fuchsia.bluetooth.a2dp:fuchsia.bluetooth.a2dp_cpp",
     "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_cpp",
+    "//src/connectivity/bluetooth/testing/pandora/bt-pandora-server/src/rust_affordances:affordances-c",
     "//third_party/protobuf:protobuf_full",
   ]
   configs += [ ":include_bindings" ]
