@@ -228,20 +228,6 @@ def get_nearest_following_flow_event(
     return next(iter(filtered_following_events), None)
 
 
-def get_nearest_following_event(
-    event: trace_model.Event,
-    following_event_category: str,
-    following_event_name: str,
-) -> trace_model.Event | None:
-    """Deprecated.  Use |get_nearest_following_flow_event| instead.
-
-    TODO(https://fxbug.dev/42073146): delete once there are no more callers.
-    """
-    return get_nearest_following_flow_event(
-        event, following_event_category, following_event_name
-    )
-
-
 # This method looks for a possible race between trace collection start in multiple processes.
 #
 # This problem usually occurs between Scenic, Magma and Display processes. The flow connection
