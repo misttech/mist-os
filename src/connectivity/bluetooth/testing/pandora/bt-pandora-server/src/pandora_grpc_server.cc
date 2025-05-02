@@ -8,7 +8,7 @@
 
 #include <string>
 
-#include "rust_affordances/ffi_c/bindings.h"
+#include "src/connectivity/bluetooth/testing/bt-affordances/ffi_c/bindings.h"
 
 PandoraGrpcServer::PandoraGrpcServer(async_dispatcher_t* dispatcher)
     : a2dp_service_(dispatcher), host_service_(dispatcher) {}

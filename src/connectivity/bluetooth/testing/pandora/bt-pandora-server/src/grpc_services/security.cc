@@ -6,7 +6,7 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-#include "src/connectivity/bluetooth/testing/pandora/bt-pandora-server/src/rust_affordances/ffi_c/bindings.h"
+#include "src/connectivity/bluetooth/testing/bt-affordances/ffi_c/bindings.h"
 
 using grpc::Status;
 using grpc::StatusCode;
