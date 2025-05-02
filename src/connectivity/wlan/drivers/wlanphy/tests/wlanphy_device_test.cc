@@ -132,6 +132,9 @@ class FakeWlanPhyImpl : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl
     completer.buffer(arena).ReplySuccess(builder.Build());
     test_completion_.Signal();
   }
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_wlan_phyimpl::WlanPhyImpl> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
 
   void WaitForCompletion() { test_completion_.Wait(); }
 

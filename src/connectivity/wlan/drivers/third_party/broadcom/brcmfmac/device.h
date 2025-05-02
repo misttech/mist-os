@@ -94,6 +94,9 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   void SetPowerSaveMode(SetPowerSaveModeRequestView request, fdf::Arena& arena,
                         SetPowerSaveModeCompleter::Sync& completer) override;
   void GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_wlan_phyimpl::WlanPhyImpl> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
 
   // NetworkDevice::Callbacks implementation
   void NetDevInit(wlan::drivers::components::NetworkDevice::Callbacks::InitTxn txn) override;
