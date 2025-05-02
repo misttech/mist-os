@@ -43,6 +43,16 @@ uint64_t get_peer_id(const char *address);
 /// Returns ZX_STATUS_INTERNAL on error (check logs).
 zx_status_t connect_peer(uint64_t peer_id);
 
+/// Remove all bonding information and disconnect peer with given identifier, if found.
+///
+/// Returns ZX_STATUS_INTERNAL on error (check logs).
+///
+/// # Safety
+///
+/// The caller must ensure that `address` points to a valid C string encoding a BD_ADDR as a string
+/// of bytes in little-endian order.
+zx_status_t forget_peer(uint64_t peer_id);
+
 /// Connect an L2CAP channel on a specific PSM to an already-connected peer. Calling this again will
 /// result in the channel being closed after the new channel is opened.
 ///

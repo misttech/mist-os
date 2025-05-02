@@ -11,7 +11,7 @@
 #include "rust_affordances/ffi_c/bindings.h"
 
 PandoraGrpcServer::PandoraGrpcServer(async_dispatcher_t* dispatcher)
-    : host_service_(dispatcher), a2dp_service_(dispatcher) {}
+    : a2dp_service_(dispatcher), host_service_(dispatcher) {}
 
 PandoraGrpcServer::~PandoraGrpcServer() { Shutdown(); }
 
@@ -28,9 +28,10 @@ zx_status_t PandoraGrpcServer::Run(uint16_t port, bool verbose) {
   grpc::ServerBuilder builder;
   const std::string address = "0.0.0.0:" + std::to_string(port);
   builder.AddListeningPort(address, grpc::InsecureServerCredentials());
+  builder.RegisterService(&a2dp_service_);
   builder.RegisterService(&host_service_);
   builder.RegisterService(&l2cap_service_);
-  builder.RegisterService(&a2dp_service_);
+  builder.RegisterService(&security_storage_service_);
 
   FX_LOGS(INFO) << "Server listening on " << address;
   server_ = builder.BuildAndStart();

@@ -39,11 +39,13 @@ source_set("grpc_services") {
     "src/grpc_services/a2dp.h",
     "src/grpc_services/host.h",
     "src/grpc_services/l2cap.h",
+    "src/grpc_services/security.h",
   ]
   sources = [
     "src/grpc_services/a2dp.cc",
     "src/grpc_services/host.cc",
     "src/grpc_services/l2cap.cc",
+    "src/grpc_services/security.cc",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.bluetooth.a2dp:fuchsia.bluetooth.a2dp_cpp",

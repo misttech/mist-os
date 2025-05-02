@@ -29,6 +29,7 @@ enum Request {
     ReadLocalAddress(oneshot::Sender<Result<[u8; 6], anyhow::Error>>),
     GetPeerId(CString, oneshot::Sender<Result<PeerId, anyhow::Error>>),
     Connect(PeerId, oneshot::Sender<Result<(), anyhow::Error>>),
+    Forget(PeerId, oneshot::Sender<Result<(), anyhow::Error>>),
     ConnectL2cap(PeerId, u16, oneshot::Sender<Result<(), anyhow::Error>>),
     SetDiscoverability(bool, oneshot::Sender<Result<(), anyhow::Error>>),
     Stop,
@@ -93,12 +94,22 @@ impl WorkThread {
                                 continue;
                             }
 
-                            match wait_for_peer(&address, &mut peer_cache, &mut peer_watcher_stream)
-                                .await
+                            match get_peer(
+                                &address,
+                                std::time::Duration::from_secs(1),
+                                &mut peer_cache,
+                                &mut peer_watcher_stream,
+                            )
+                            .await
                             {
-                                Ok(peer) => {
+                                Ok(Some(peer)) => {
                                     result_sender
                                         .send(Ok(peer.id.unwrap()))
+                                        .expect("Failed to send");
+                                }
+                                Ok(None) => {
+                                    result_sender
+                                        .send(Err(anyhow!("Peer not found")))
                                         .expect("Failed to send");
                                 }
                                 Err(err) => {
@@ -107,6 +118,11 @@ impl WorkThread {
                                         .expect("Failed to send");
                                 }
                             }
+                        }
+                        Request::Forget(peer_id, sender) => {
+                            sender
+                                .send(forget(&peer_id, &mut access_proxy).await)
+                                .expect("Failed to send");
                         }
                         Request::Connect(peer_id, result_sender) => {
                             result_sender
@@ -209,6 +225,13 @@ impl WorkThread {
         receiver.await.expect("Failed to receive")
     }
 
+    // Forget peer and delete all bonding information, if peer is found.
+    async fn forget_peer(&self, peer_id: PeerId) -> Result<(), anyhow::Error> {
+        let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
+        self.sender.clone().send(Request::Forget(peer_id, sender)).await.expect("Failed to send");
+        receiver.await.expect("Failed to receive")
+    }
+
     // Connect a basic L2CAP channel.
     async fn connect_l2cap_channel(&self, peer_id: PeerId, psm: u16) -> Result<(), anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
@@ -224,9 +247,7 @@ impl WorkThread {
     async fn set_discoverability(&self, discoverable: bool) -> Result<(), anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
         self.sender
-            .write()
-            .as_mut()
-            .unwrap()
+            .clone()
             .send(Request::SetDiscoverability(discoverable, sender))
             .await
             .expect("Failed to send");
@@ -253,14 +274,11 @@ async fn get_active_host<'a>(
 }
 
 async fn refresh_peer_cache(
+    timeout: std::time::Duration,
     peer_cache: &mut Vec<Peer>,
     peer_watcher_stream: &mut HangingGetStream<AccessProxy, (Vec<Peer>, Vec<PeerId>)>,
 ) -> Result<(), fidl::Error> {
-    match peer_watcher_stream
-        .next()
-        .on_timeout(std::time::Duration::from_millis(100), || None)
-        .await
-    {
+    match peer_watcher_stream.next().on_timeout(timeout, || None).await {
         Some(Ok((updated, removed))) => {
             removed.iter().for_each(|removed_id| {
                 let _ = peer_cache.extract_if(.., |peer| peer.id.unwrap() == *removed_id);
@@ -278,23 +296,26 @@ async fn refresh_peer_cache(
 }
 
 // `address` should encode a BD_ADDR as a string of bytes in little-endian order.
-async fn wait_for_peer<'a>(
+// Blocks until peer is discovered if `wait` is set. Otherwise, returns None if peer is not found.
+async fn get_peer<'a>(
     address: &CString,
+    timeout: std::time::Duration,
     peer_cache: &'a mut Vec<Peer>,
     peer_watcher_stream: &mut HangingGetStream<AccessProxy, (Vec<Peer>, Vec<PeerId>)>,
-) -> Result<&'a Peer, fidl::Error> {
-    loop {
-        // To satisfy borrow checker, must first check if peer exists before generating a reference
-        // to the peer in the conditional scope. See "Problem case #3" in "non-lexical lifetimes"
-        // rust-lang RFC.
-        let addr_matches =
-            |peer: &Peer| peer.address.unwrap().bytes.iter().eq(address.to_bytes().iter().rev());
-        if peer_cache.iter().any(addr_matches) {
-            return Ok(peer_cache.iter().find(|peer: &&Peer| addr_matches(peer)).unwrap());
-        }
-
-        refresh_peer_cache(peer_cache, peer_watcher_stream).await?;
+) -> Result<Option<&'a Peer>, fidl::Error> {
+    let addr_matches =
+        |peer: &Peer| peer.address.unwrap().bytes.iter().eq(address.to_bytes().iter().rev());
+    // To satisfy borrow checker, must first check if peer exists before generating a reference
+    // to the peer in the conditional scope. See "Problem case #3" in "non-lexical lifetimes"
+    // rust-lang RFC.
+    if peer_cache.iter().any(addr_matches) {
+        return Ok(Some(peer_cache.iter().find(|peer: &&Peer| addr_matches(peer)).unwrap()));
     }
+    refresh_peer_cache(timeout, peer_cache, peer_watcher_stream).await?;
+    if peer_cache.iter().any(addr_matches) {
+        return Ok(Some(peer_cache.iter().find(|peer: &&Peer| addr_matches(peer)).unwrap()));
+    }
+    return Ok(None);
 }
 
 async fn connect(peer_id: &PeerId, access_proxy: &mut AccessProxy) -> Result<(), anyhow::Error> {
@@ -307,6 +328,20 @@ async fn connect(peer_id: &PeerId, access_proxy: &mut AccessProxy) -> Result<(),
                 anyhow!("fuchsia.bluetooth.sys.Access/Connect error: {:?}", sapphire_err)
             })
         })
+}
+
+async fn forget(peer_id: &PeerId, access_proxy: &mut AccessProxy) -> Result<(), anyhow::Error> {
+    match access_proxy.forget(peer_id).await {
+        Err(fidl_error) => Err(anyhow!("fuchsia.bluetooth.sys.Access/Forget error: {fidl_error}")),
+        Ok(Err(fidl_fuchsia_bluetooth_sys::Error::PeerNotFound)) => {
+            println!("Asked to forget nonexistent peer.");
+            Ok(())
+        }
+        Ok(Err(sapphire_err)) => {
+            Err(anyhow!("fuchsia.bluetooth.sys.Access/Forget error: {sapphire_err:?}"))
+        }
+        Ok(Ok(_)) => Ok(()),
+    }
 }
 
 async fn connect_l2cap(
@@ -390,6 +425,20 @@ pub extern "C" fn connect_peer(peer_id: u64) -> zx_status_t {
 
     if let Err(err) = block_on(WORKER.connect_peer(peer_id)) {
         eprintln!("connect_peer encountered error: {}", err);
+        return zx::Status::INTERNAL.into_raw();
+    }
+    zx::Status::OK.into_raw()
+}
+
+/// Remove all bonding information and disconnect peer with given identifier, if found.
+///
+/// Returns ZX_STATUS_INTERNAL on error (check logs).
+#[no_mangle]
+pub extern "C" fn forget_peer(peer_id: u64) -> zx_status_t {
+    let peer_id = PeerId { value: peer_id };
+
+    if let Err(err) = block_on(WORKER.forget_peer(peer_id)) {
+        eprintln!("forget_peer encountered error: {:?}", err);
         return zx::Status::INTERNAL.into_raw();
     }
     zx::Status::OK.into_raw()
