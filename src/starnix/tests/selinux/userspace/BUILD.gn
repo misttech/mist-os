@@ -87,7 +87,6 @@ source_set("userspace_test_main") {
   deps = [
     "//sdk/lib/fit",
     "//src/lib/files",
-    "//src/starnix/tests/syscalls/cpp:test_utils",
     "//zircon/system/ulib/fbl",
   ]
   public_deps = [

@@ -26,8 +26,9 @@ TEST_P(SocketTest, SocketTakesProcessLabel) {
   LoadPolicy("socket_policy.pp");
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_test_no_trans_t:s0"), fit::ok());
 
-  fbl::unique_fd sockfd = fbl::unique_fd(socket(test_case.domain, test_case.type, 0));
-  ASSERT_TRUE(sockfd) << strerror(errno);
+  fbl::unique_fd sockfd;
+  ASSERT_THAT((sockfd = fbl::unique_fd(socket(test_case.domain, test_case.type, 0))),
+              SyscallSucceeds());
   EXPECT_EQ(GetLabel(sockfd.get()), "test_u:test_r:socket_test_no_trans_t:s0");
 }
 
@@ -84,9 +85,10 @@ TEST_P(SocketTransitionTest, SocketLabelingAccountsForTransitions) {
   const SocketTransitionTestCase& test_case = GetParam();
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_test_t:s0"), fit::ok());
 
-  fbl::unique_fd sockfd =
-      fbl::unique_fd(socket(test_case.domain, test_case.type, test_case.protocol));
-  ASSERT_TRUE(sockfd) << strerror(errno);
+  fbl::unique_fd sockfd;
+  ASSERT_THAT(
+      (sockfd = fbl::unique_fd(socket(test_case.domain, test_case.type, test_case.protocol))),
+      SyscallSucceeds());
   EXPECT_EQ(GetLabel(sockfd.get()), test_case.expected_label);
 }
 
@@ -114,8 +116,8 @@ TEST(SocketTest, SockFileLabelIsCorrect) {
   LoadPolicy("socket_policy.pp");
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_test_t:s0"), fit::ok());
 
-  fbl::unique_fd sockfd = fbl::unique_fd(socket(AF_UNIX, SOCK_STREAM, 0));
-  ASSERT_TRUE(sockfd) << strerror(errno);
+  fbl::unique_fd sockfd;
+  ASSERT_THAT((sockfd = fbl::unique_fd(socket(AF_UNIX, SOCK_STREAM, 0))), SyscallSucceeds());
 
   struct sockaddr_un sock_addr;
   const char* kSockPath = "/tmp/test_sock_file";
@@ -138,8 +140,8 @@ TEST(SocketTest, ListenAllowed) {
       ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_listen_yes_t:s0");
   auto enforce = ScopedEnforcement::SetEnforcing();
 
-  fbl::unique_fd sockfd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0));
-  ASSERT_TRUE(sockfd) << strerror(errno);
+  fbl::unique_fd sockfd;
+  ASSERT_THAT((sockfd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0))), SyscallSucceeds());
   sockaddr_in addr;
   std::memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
@@ -156,8 +158,8 @@ TEST(SocketTest, ListenDenied) {
       ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_listen_no_t:s0");
   auto enforce = ScopedEnforcement::SetEnforcing();
 
-  fbl::unique_fd sockfd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0));
-  ASSERT_TRUE(sockfd) << strerror(errno);
+  fbl::unique_fd sockfd;
+  ASSERT_THAT((sockfd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0))), SyscallSucceeds());
   sockaddr_in addr;
   std::memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
