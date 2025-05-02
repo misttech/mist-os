@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <projects>
+    <!-- NOTE: This file is parsed by a script to generate a BzlMod registry.
+         Each entry has an extra "module_version" tag that should match its
+         module version, and is required by the script.
+    -->
+    <project name="third_party/bazel_platforms"
+             gitsubmoduleof="fuchsia"
+             path="third_party/bazel_platforms"
+             remote="https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/platforms"
+             module_version="0.0.10"
+             revision="05ec3a3df23fde62471f8288e344cc021dd87bab"/>
+    <project name="third_party/bazel_rules_cc"
+             gitsubmoduleof="fuchsia"
+             path="third_party/bazel_rules_cc"
+             remote="https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_cc"
+             module_version="0.0.14"
+             revision="7348965146f61a24dfcc3cafeea73151a55e6c3c"/>
+    <project name="third_party/bazel_rules_go"
+             gitsubmoduleof="fuchsia"
+             path="third_party/bazel_rules_go"
+             remote="https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_go"
+             module_version="0.43"
+             revision="cb279cd9855fd82ebb92e3cd19b96fd6bf6f9346"/>
+    <project name="third_party/bazel_rules_license"
+             gitsubmoduleof="fuchsia"
+             path="third_party/bazel_rules_license"
+             remote="https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_license"
+             module_version="0.0.7"
+             revision="e160ce519a3ab82d407bc57a0f0b0510d61a3a59"/>
+    <project name="third_party/bazel_rules_python"
+             gitsubmoduleof="fuchsia"
+             path="third_party/bazel_rules_python"
+             remote="https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_python"
+             module_version="0.36.0"
+             revision="387c2f67f5e923e3e56192e2aead27ad98db6f8c"/>
+    <project name="third_party/bazel_rules_rust"
+             gitsubmoduleof="fuchsia"
+             path="third_party/bazel_rules_rust"
+             remote="https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_rust"
+             module_version="0.59.1"
+             revision="cc65202c6ecbbf4b423c4dd4180757a09442a86f"/>
+    <project name="third_party/bazel_rules_proto"
+             gitsubmoduleof="fuchsia"
+             path="third_party/bazel_rules_proto"
+             remote="https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_proto"
+             module_version="5.3.0-21.7"
+             revision="3f1ab99b718e3e7dd86ebdc49c580aa6a126b1cd"/>
+    <project name="third_party/bazel_skylib"
+             gitsubmoduleof="fuchsia"
+             path="third_party/bazel_skylib"
+             remote="https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/bazel-skylib"
+             module_version="1.7.1"
+             revision="27d429d8d036af3d010be837cc5924de1ca8d163"/>
+  </projects>
+</manifest>

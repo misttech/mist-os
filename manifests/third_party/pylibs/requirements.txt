@@ -1,0 +1,14 @@
+mypy==1.7.1 # github.com/python/mypy
+pylint==3.0.2 # github.com/pylint-dev/pylint
+autoflake==2.3.1 # github.com/PyCQA/autoflake
+
+# Transitive dependencies
+astroid # github.com/pylint-dev/astroid
+dill # github.com/uqfoundation/dill
+isort # github.com/PyCQA/isort
+mccabe # github.com/PyCQA/mccabe
+mypy_extensions # github.com/python/mypy_extensions
+platformdirs # github.com/platformdirs/platformdirs
+pyflakes # github.com/PyCQA/pyflakes
+tomlkit # github.com/sdispater/tomlkit
+typing_extensions # github.com/python/typing_extensions
