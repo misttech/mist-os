@@ -807,36 +807,34 @@ impl SocketOps for UnixSocket {
         optname: u32,
         _optlen: u32,
     ) -> Result<Vec<u8>, Errno> {
-        match level {
+        let opt_value = match level {
             SOL_SOCKET => match optname {
-                SO_PEERCRED => Ok(UcredPtr::into_bytes(
+                SO_PEERCRED => UcredPtr::into_bytes(
                     current_task,
                     self.peer_cred().unwrap_or(ucred { pid: 0, uid: uid_t::MAX, gid: gid_t::MAX }),
                 )
-                .map_err(|_| errno!(EINVAL))?),
-                SO_PEERSEC => match socket.socket_type {
-                    SocketType::Stream => security::socket_getpeersec_stream(current_task, socket),
-                    _ => error!(ENOPROTOOPT),
-                },
+                .map_err(|_| errno!(EINVAL))?,
+                SO_PEERSEC => "unconfined".as_bytes().to_vec(),
                 SO_ACCEPTCONN =>
                 {
                     #[allow(clippy::bool_to_int_with_if)]
-                    Ok(if self.is_listening(socket) { 1u32 } else { 0u32 }.to_ne_bytes().to_vec())
+                    if self.is_listening(socket) { 1u32 } else { 0u32 }.to_ne_bytes().to_vec()
                 }
-                SO_SNDBUF => Ok((self.get_send_capacity() as socklen_t).to_ne_bytes().to_vec()),
-                SO_RCVBUF => Ok((self.get_receive_capacity() as socklen_t).to_ne_bytes().to_vec()),
-                SO_LINGER => Ok(self.get_linger().as_bytes().to_vec()),
-                SO_PASSCRED => Ok((self.get_passcred() as u32).as_bytes().to_vec()),
-                SO_BROADCAST => Ok((self.get_broadcast() as u32).as_bytes().to_vec()),
-                SO_NO_CHECK => Ok((self.get_no_check() as u32).as_bytes().to_vec()),
-                SO_REUSEADDR => Ok((self.get_reuseaddr() as u32).as_bytes().to_vec()),
-                SO_REUSEPORT => Ok((self.get_reuseport() as u32).as_bytes().to_vec()),
-                SO_KEEPALIVE => Ok((self.get_keepalive() as u32).as_bytes().to_vec()),
-                SO_ERROR => Ok((0u32).as_bytes().to_vec()),
-                _ => error!(ENOPROTOOPT),
+                SO_SNDBUF => (self.get_send_capacity() as socklen_t).to_ne_bytes().to_vec(),
+                SO_RCVBUF => (self.get_receive_capacity() as socklen_t).to_ne_bytes().to_vec(),
+                SO_LINGER => self.get_linger().as_bytes().to_vec(),
+                SO_PASSCRED => (self.get_passcred() as u32).as_bytes().to_vec(),
+                SO_BROADCAST => (self.get_broadcast() as u32).as_bytes().to_vec(),
+                SO_NO_CHECK => (self.get_no_check() as u32).as_bytes().to_vec(),
+                SO_REUSEADDR => (self.get_reuseaddr() as u32).as_bytes().to_vec(),
+                SO_REUSEPORT => (self.get_reuseport() as u32).as_bytes().to_vec(),
+                SO_KEEPALIVE => (self.get_keepalive() as u32).as_bytes().to_vec(),
+                SO_ERROR => (0u32).as_bytes().to_vec(),
+                _ => return error!(ENOPROTOOPT),
             },
-            _ => error!(ENOPROTOOPT),
-        }
+            _ => return error!(ENOPROTOOPT),
+        };
+        Ok(opt_value)
     }
 
     fn ioctl(
