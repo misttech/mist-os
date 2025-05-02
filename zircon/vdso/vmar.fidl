@@ -793,7 +793,7 @@ closed protocol Vmar {
         region_index uint32;
         region_offset uint64;
         region_length usize64;
-    }) -> (resource struct {
+    }) -> (struct {
         mapped_addr Vaddr;
     }) error Status;
 
@@ -901,7 +901,7 @@ closed protocol Vmar {
         vmar_offset usize64;
         clock Handle:VMO;
         len usize64;
-    }) -> (resource struct {
+    }) -> (struct {
         mapped_addr Vaddr;
     }) error Status;
 };
