@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/packages/prebuilt_package.gni")
+import("//src/starnix/build/starnix_docker_container.gni")
 
 declare_args() {
   # The path to a locally built stardev.tar package.
@@ -16,27 +16,9 @@ group("stardev") {
 }
 
 if (stardev_path != "") {
-  compiled_action("stardev_far") {
-    tool = "//src/starnix/tools/convert_tarball_to_starnix_container:convert_tarball_to_starnix_container_bin"
-    tool_output_name = "convert_tarball_to_starnix_container"
-
-    sources = [ stardev_path ]
-    outputs = [ "$target_out_dir/stardev.far" ]
-
-    args = [
-      "--features",
-      "rootfs_rw",
-      "--input-format",
-      "docker-archive",
-      rebase_path(sources[0], root_build_dir),
-      rebase_path(outputs[0], root_build_dir),
-    ]
-  }
-
-  prebuilt_package("pkg") {
+  starnix_docker_container("pkg") {
+    input_path = stardev_path
     package_name = "stardev"
-    archive = "$target_out_dir/stardev.far"
-
-    deps = [ ":stardev_far" ]
+    features = [ "rootfs_rw" ]
   }
 }

@@ -5,4 +5,4 @@
 
 set -e
 
-ffx component run /core/starnix_runner/playground:stardev fuchsia-pkg://fuchsia.com/stardev#meta/container.cm
+ffx component run /core/starnix_runner/playground:stardev fuchsia-pkg://fuchsia.com/stardev#meta/stardev_container.cm
