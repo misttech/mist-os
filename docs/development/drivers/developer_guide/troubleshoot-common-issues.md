@@ -489,7 +489,7 @@ To fix the issue, search and remove `//src/devices/lib/driver` from the dependen
 To find the dependency, use the following command:
 
 ```posix-terminal
-fx gn route <out_directory> //path/to/driver //path/to/libdriver
+fx gn path <out_directory> //path/to/driver //path/to/libdriver
 ```
 
 ### \__fuchsia_driver_registration\_\_ symbol not available {:#fuchsia-driver-registration-symbol-not-available}
