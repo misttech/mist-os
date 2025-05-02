@@ -16,6 +16,7 @@ proto_library("bt-test-interfaces") {
   sources = [
     "//third_party/github.com/google/bt-test-interfaces/src/pandora/a2dp.proto",
     "//third_party/github.com/google/bt-test-interfaces/src/pandora/host.proto",
+    "//third_party/github.com/google/bt-test-interfaces/src/pandora/l2cap.proto",
     "//third_party/github.com/google/bt-test-interfaces/src/pandora/security.proto",
   ]
 
@@ -37,10 +38,12 @@ source_set("grpc_services") {
   public = [
     "src/grpc_services/a2dp.h",
     "src/grpc_services/host.h",
+    "src/grpc_services/l2cap.h",
   ]
   sources = [
     "src/grpc_services/a2dp.cc",
     "src/grpc_services/host.cc",
+    "src/grpc_services/l2cap.cc",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.bluetooth.a2dp:fuchsia.bluetooth.a2dp_cpp",

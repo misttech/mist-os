@@ -18,14 +18,6 @@ using grpc::StatusCode;
 using namespace std::chrono_literals;
 
 HostService::HostService(async_dispatcher_t* dispatcher) {
-  // Connect to fuchsia.bluetooth.sys.Access
-  zx::result access_client_end = component::Connect<fuchsia_bluetooth_sys::Access>();
-  if (!access_client_end.is_ok()) {
-    FX_LOGS(ERROR) << "Error connecting to Access service: " << access_client_end.error_value();
-    return;
-  }
-  access_client_.Bind(std::move(*access_client_end), dispatcher);
-
   // Connect to fuchsia.bluetooth.sys.Pairing
   zx::result pairing_client_end = component::Connect<fuchsia_bluetooth_sys::Pairing>();
   if (!pairing_client_end.is_ok()) {
@@ -81,29 +73,11 @@ Status HostService::ReadLocalAddress(grpc::ServerContext* context,
 
 Status HostService::Connect(grpc::ServerContext* context, const pandora::ConnectRequest* request,
                             pandora::ConnectResponse* response) {
-  auto peer_it = WaitForPeer(request->address());
-  if (!peer_it->connected() || !*peer_it->connected()) {
-    FX_LOGS(INFO) << "Peer not connected; sending connection request";
-    access_client_->Connect({*peer_it->id()})
-        .Then([this,
-               id = *peer_it->id()](fidl::Result<fuchsia_bluetooth_sys::Access::Connect>& connect) {
-          if (connect.is_error()) {
-            auto err = connect.error_value();
-            FX_LOGS(ERROR) << "Connect error: " << err.FormatDescription();
-          } else {
-            FX_LOGS(INFO) << "Connected peer: " << std::hex << id.value();
-          }
-          cv_access_.notify_one();
-        });
-
-    std::unique_lock<std::mutex> lock(m_access_);
-    cv_access_.wait(lock);
+  uint64_t peer_id = get_peer_id(request->address().c_str());
+  if (!peer_id || connect_peer(peer_id) != ZX_OK) {
+    return Status(StatusCode::INTERNAL, "Error in Rust affordances (check logs)");
   }
-
-  if (peer_it->id()) {
-    response->mutable_connection()->mutable_cookie()->set_value(
-        std::to_string(peer_it->id()->value()));
-  }
+  response->mutable_connection()->mutable_cookie()->set_value(std::to_string(peer_id));
   return {/*OK*/};
 }
 

@@ -29,6 +29,7 @@ zx_status_t PandoraGrpcServer::Run(uint16_t port, bool verbose) {
   const std::string address = "0.0.0.0:" + std::to_string(port);
   builder.AddListeningPort(address, grpc::InsecureServerCredentials());
   builder.RegisterService(&host_service_);
+  builder.RegisterService(&l2cap_service_);
   builder.RegisterService(&a2dp_service_);
 
   FX_LOGS(INFO) << "Server listening on " << address;

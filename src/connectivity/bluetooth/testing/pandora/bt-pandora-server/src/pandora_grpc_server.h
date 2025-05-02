@@ -7,6 +7,7 @@
 
 #include "grpc_services/a2dp.h"
 #include "grpc_services/host.h"
+#include "grpc_services/l2cap.h"
 
 #include <grpc++/grpc++.h>
 
@@ -31,6 +32,7 @@ class PandoraGrpcServer {
 
  private:
   HostService host_service_;
+  L2capService l2cap_service_;
   A2dpService a2dp_service_;
 
   std::unique_ptr<grpc::Server> server_;
