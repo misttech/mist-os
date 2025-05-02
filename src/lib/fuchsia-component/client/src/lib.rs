@@ -313,6 +313,11 @@ impl<S: ServiceMarker> Service<S> {
         Ok(Self::from_service_dir_proxy(open_service::<S>()?, marker))
     }
 
+    /// Returns a new [`Service`] from the process's incoming service namespace.
+    pub fn open_at(service_name: impl AsRef<str>, marker: S) -> Result<Self, Error> {
+        Ok(Self::from_service_dir_proxy(open_service_at(service_name)?, marker))
+    }
+
     /// Returns a new [`Service`] that is in the given directory.
     pub fn open_from_dir(svc_dir: impl AsRefDirectory, marker: S) -> Result<Self, Error> {
         let dir = open_directory_async(&svc_dir, S::SERVICE_NAME, fio::Rights::empty())?;
@@ -529,6 +534,13 @@ pub fn connect_to_service_instance_at_dir_svc<S: ServiceMarker>(
 /// Opens a FIDL service as a directory, which holds instances of the service.
 pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
     let service_path = format!("{}/{}", SVC_DIR, S::SERVICE_NAME);
+    fuchsia_fs::directory::open_in_namespace(&service_path, fio::Flags::empty())
+        .context("namespace open failed")
+}
+
+/// Opens a FIDL service with a custom name as a directory, which holds instances of the service.
+pub fn open_service_at(service_name: impl AsRef<str>) -> Result<fio::DirectoryProxy, Error> {
+    let service_path = format!("{SVC_DIR}/{}", service_name.as_ref());
     fuchsia_fs::directory::open_in_namespace(&service_path, fio::Flags::empty())
         .context("namespace open failed")
 }
