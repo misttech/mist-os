@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::util::cobalt_logger::log_cobalt_1dot1_batch;
+use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
 use fidl_fuchsia_wlan_stats as fidl_stats;
-use fuchsia_async::TimeoutExt;
+use fuchsia_async::{self as fasync, TimeoutExt};
 use futures::lock::Mutex;
 
 use log::{error, warn};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use windowed_stats::experimental::clock::Timed;
 use windowed_stats::experimental::series::interpolation::{Constant, LastSample};
@@ -16,6 +19,7 @@ use windowed_stats::experimental::series::statistic::{
 };
 use windowed_stats::experimental::series::{SamplingProfile, TimeMatrix};
 use windowed_stats::experimental::serve::{InspectSender, InspectedTimeMatrix};
+use wlan_legacy_metrics_registry as metrics;
 
 // Include a timeout on stats calls so that if the driver deadlocks, telemtry doesn't get stuck.
 const GET_IFACE_STATS_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
@@ -31,16 +35,20 @@ type GaugesTimeSeriesMap = HashMap<u16, Vec<InspectedTimeMatrix<i64>>>;
 
 pub struct ClientIfaceCountersLogger<S> {
     iface_state: Arc<Mutex<IfaceState>>,
+    cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     time_series_stats: IfaceCountersTimeSeries,
     driver_counters_time_matrix_client: S,
     driver_counters_time_series: Arc<Mutex<CountersTimeSeriesMap>>,
     driver_gauges_time_matrix_client: S,
     driver_gauges_time_series: Arc<Mutex<GaugesTimeSeriesMap>>,
+    prev_connection_stats: Arc<Mutex<Option<fidl_stats::ConnectionStats>>>,
+    boot_mono_drift: AtomicI64,
 }
 
 impl<S: InspectSender> ClientIfaceCountersLogger<S> {
     pub fn new(
+        cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
         monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
         time_matrix_client: &S,
         driver_counters_time_matrix_client: S,
@@ -48,12 +56,15 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
     ) -> Self {
         Self {
             iface_state: Arc::new(Mutex::new(IfaceState::NotAvailable)),
+            cobalt_proxy,
             monitor_svc_proxy,
             time_series_stats: IfaceCountersTimeSeries::new(time_matrix_client),
             driver_counters_time_matrix_client,
             driver_counters_time_series: Arc::new(Mutex::new(HashMap::new())),
             driver_gauges_time_matrix_client,
             driver_gauges_time_series: Arc::new(Mutex::new(HashMap::new())),
+            prev_connection_stats: Arc::new(Mutex::new(None)),
+            boot_mono_drift: AtomicI64::new(0),
         }
     }
 
@@ -148,6 +159,13 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
     }
 
     pub async fn handle_periodic_telemetry(&self, is_connected: bool) {
+        let boot_now = fasync::BootInstant::now();
+        let mono_now = fasync::MonotonicInstant::now();
+        let boot_mono_drift = boot_now.into_nanos() - mono_now.into_nanos();
+        let prev_boot_mono_drift = self.boot_mono_drift.swap(boot_mono_drift, Ordering::SeqCst);
+        // If the difference between boot time and monotonic time has increased, it means that
+        // there was a suspension since the last time `handle_periodic_telemetry` was called.
+        let suspended_during_last_period = boot_mono_drift > prev_boot_mono_drift;
         match &*self.iface_state.lock().await {
             IfaceState::NotAvailable => (),
             IfaceState::Created { telemetry_proxy, .. } => {
@@ -161,23 +179,8 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
                         .await
                     {
                         Ok(Ok(stats)) => {
-                            // Iface-level driver specific counters
-                            if let Some(counters) = &stats.driver_specific_counters {
-                                let time_series = Arc::clone(&self.driver_counters_time_series);
-                                log_driver_specific_counters(&counters[..], time_series).await;
-                            }
-                            // Iface-level driver specific gauges
-                            if let Some(gauges) = &stats.driver_specific_gauges {
-                                let time_series = Arc::clone(&self.driver_gauges_time_series);
-                                log_driver_specific_gauges(&gauges[..], time_series).await;
-                            }
-                            log_connection_stats(
-                                &stats,
-                                &self.time_series_stats,
-                                Arc::clone(&self.driver_counters_time_series),
-                                Arc::clone(&self.driver_gauges_time_series),
-                            )
-                            .await;
+                            self.log_iface_stats_inspect(&stats).await;
+                            self.log_iface_stats_cobalt(stats, suspended_during_last_period).await;
                         }
                         error => {
                             // It's normal for this call to fail while the device is not connected,
@@ -190,6 +193,54 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
                 }
             }
         }
+    }
+
+    async fn log_iface_stats_inspect(&self, stats: &fidl_stats::IfaceStats) {
+        // Iface-level driver specific counters
+        if let Some(counters) = &stats.driver_specific_counters {
+            let time_series = Arc::clone(&self.driver_counters_time_series);
+            log_driver_specific_counters(&counters[..], time_series).await;
+        }
+        // Iface-level driver specific gauges
+        if let Some(gauges) = &stats.driver_specific_gauges {
+            let time_series = Arc::clone(&self.driver_gauges_time_series);
+            log_driver_specific_gauges(&gauges[..], time_series).await;
+        }
+        log_connection_stats_inspect(
+            stats,
+            &self.time_series_stats,
+            Arc::clone(&self.driver_counters_time_series),
+            Arc::clone(&self.driver_gauges_time_series),
+        )
+        .await;
+    }
+
+    async fn log_iface_stats_cobalt(
+        &self,
+        stats: fidl_stats::IfaceStats,
+        suspended_during_last_period: bool,
+    ) {
+        let mut prev_connection_stats = self.prev_connection_stats.lock().await;
+        // Only log to Cobalt if there was no suspension in-between
+        if !suspended_during_last_period {
+            if let (Some(prev_connection_stats), Some(current_connection_stats)) =
+                (prev_connection_stats.as_ref(), stats.connection_stats.as_ref())
+            {
+                match (prev_connection_stats.connection_id, current_connection_stats.connection_id)
+                {
+                    (Some(prev_id), Some(current_id)) if prev_id == current_id => {
+                        diff_and_log_connection_stats_cobalt(
+                            &self.cobalt_proxy,
+                            prev_connection_stats,
+                            current_connection_stats,
+                        )
+                        .await;
+                    }
+                    _ => (),
+                }
+            }
+        }
+        *prev_connection_stats = stats.connection_stats;
     }
 }
 
@@ -229,7 +280,7 @@ fn create_time_series_for_gauge<S: InspectSender>(
     }
 }
 
-async fn log_connection_stats(
+async fn log_connection_stats_inspect(
     stats: &fidl_stats::IfaceStats,
     time_series_stats: &IfaceCountersTimeSeries,
     driver_counters_time_series: Arc<Mutex<CountersTimeSeriesMap>>,
@@ -240,8 +291,7 @@ async fn log_connection_stats(
         None => return,
     };
 
-    // `connection_id` field is not used yet, but we check it anyway to
-    // enforce that it must be there for us to log driver counters.
+    // Enforce that `connection_id` field is there for us to log driver counters.
     match &connection_stats.connection_id {
         Some(_connection_id) => (),
         _ => {
@@ -302,6 +352,86 @@ async fn log_driver_specific_gauges(
             }
         }
     }
+}
+
+async fn diff_and_log_connection_stats_cobalt(
+    cobalt_proxy: &fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    prev: &fidl_stats::ConnectionStats,
+    current: &fidl_stats::ConnectionStats,
+) {
+    diff_and_log_rx_cobalt(cobalt_proxy, prev, current).await;
+    diff_and_log_tx_cobalt(cobalt_proxy, prev, current).await;
+}
+
+async fn diff_and_log_rx_cobalt(
+    cobalt_proxy: &fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    prev: &fidl_stats::ConnectionStats,
+    current: &fidl_stats::ConnectionStats,
+) {
+    let mut metric_events = vec![];
+
+    let (current_rx_unicast_total, prev_rx_unicast_total) =
+        match (current.rx_unicast_total, prev.rx_unicast_total) {
+            (Some(current), Some(prev)) => (current, prev),
+            _ => return,
+        };
+    let (current_rx_unicast_drop, prev_rx_unicast_drop) =
+        match (current.rx_unicast_drop, prev.rx_unicast_drop) {
+            (Some(current), Some(prev)) => (current, prev),
+            _ => return,
+        };
+
+    let rx_total = current_rx_unicast_total - prev_rx_unicast_total;
+    let rx_drop = current_rx_unicast_drop - prev_rx_unicast_drop;
+    let rx_drop_rate = if rx_total > 0 { rx_drop as f64 / rx_total as f64 } else { 0f64 };
+
+    metric_events.push(MetricEvent {
+        metric_id: metrics::BAD_RX_RATE_METRIC_ID,
+        event_codes: vec![],
+        payload: MetricEventPayload::IntegerValue(float_to_ten_thousandth(rx_drop_rate)),
+    });
+    metric_events.push(MetricEvent {
+        metric_id: metrics::RX_UNICAST_PACKETS_METRIC_ID,
+        event_codes: vec![],
+        payload: MetricEventPayload::IntegerValue(rx_total as i64),
+    });
+
+    log_cobalt_1dot1_batch!(cobalt_proxy, &metric_events, "diff_and_log_rx_cobalt",);
+}
+
+async fn diff_and_log_tx_cobalt(
+    cobalt_proxy: &fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    prev: &fidl_stats::ConnectionStats,
+    current: &fidl_stats::ConnectionStats,
+) {
+    let mut metric_events = vec![];
+
+    let (current_tx_total, prev_tx_total) = match (current.tx_total, prev.tx_total) {
+        (Some(current), Some(prev)) => (current, prev),
+        _ => return,
+    };
+    let (current_tx_drop, prev_tx_drop) = match (current.tx_drop, prev.tx_drop) {
+        (Some(current), Some(prev)) => (current, prev),
+        _ => return,
+    };
+
+    let tx_total = current_tx_total - prev_tx_total;
+    let tx_drop = current_tx_drop - prev_tx_drop;
+    let tx_drop_rate = if tx_total > 0 { tx_drop as f64 / tx_total as f64 } else { 0f64 };
+
+    metric_events.push(MetricEvent {
+        metric_id: metrics::BAD_TX_RATE_METRIC_ID,
+        event_codes: vec![],
+        payload: MetricEventPayload::IntegerValue(float_to_ten_thousandth(tx_drop_rate)),
+    });
+
+    log_cobalt_1dot1_batch!(cobalt_proxy, &metric_events, "diff_and_log_tx_cobalt",);
+}
+
+// Convert float to an integer in "ten thousandth" unit
+// Example: 0.02f64 (i.e. 2%) -> 200 per ten thousand
+fn float_to_ten_thousandth(value: f64) -> i64 {
+    (value * 10000f64) as i64
 }
 
 #[derive(Debug, Clone)]
@@ -369,6 +499,7 @@ mod tests {
     use futures::TryStreamExt;
     use std::pin::pin;
     use std::task::Poll;
+    use test_case::test_case;
     use windowed_stats::experimental::testing::{MockTimeMatrixClient, TimeMatrixCall};
     use wlan_common::assert_variant;
 
@@ -380,6 +511,7 @@ mod tests {
         let driver_counters_mock_matrix_client = MockTimeMatrixClient::new();
         let driver_gauges_mock_matrix_client = MockTimeMatrixClient::new();
         let logger = ClientIfaceCountersLogger::new(
+            test_helper.cobalt_1dot1_proxy.clone(),
             test_helper.monitor_svc_proxy.clone(),
             &test_helper.mock_time_matrix_client,
             driver_counters_mock_matrix_client.clone(),
@@ -420,6 +552,7 @@ mod tests {
         let driver_counters_mock_matrix_client = MockTimeMatrixClient::new();
         let driver_gauges_mock_matrix_client = MockTimeMatrixClient::new();
         let logger = ClientIfaceCountersLogger::new(
+            test_helper.cobalt_1dot1_proxy.clone(),
             test_helper.monitor_svc_proxy.clone(),
             &test_helper.mock_time_matrix_client,
             driver_counters_mock_matrix_client.clone(),
@@ -473,6 +606,7 @@ mod tests {
         let driver_counters_mock_matrix_client = MockTimeMatrixClient::new();
         let driver_gauges_mock_matrix_client = MockTimeMatrixClient::new();
         let logger = ClientIfaceCountersLogger::new(
+            test_helper.cobalt_1dot1_proxy.clone(),
             test_helper.monitor_svc_proxy.clone(),
             &test_helper.mock_time_matrix_client,
             driver_counters_mock_matrix_client.clone(),
@@ -562,6 +696,7 @@ mod tests {
         let driver_counters_mock_matrix_client = MockTimeMatrixClient::new();
         let driver_gauges_mock_matrix_client = MockTimeMatrixClient::new();
         let logger = ClientIfaceCountersLogger::new(
+            test_helper.cobalt_1dot1_proxy.clone(),
             test_helper.monitor_svc_proxy.clone(),
             &test_helper.mock_time_matrix_client,
             driver_counters_mock_matrix_client.clone(),
@@ -663,11 +798,421 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_handle_periodic_telemetry_cobalt() {
+        let mut test_helper = setup_test();
+        let driver_counters_mock_matrix_client = MockTimeMatrixClient::new();
+        let driver_gauges_mock_matrix_client = MockTimeMatrixClient::new();
+        let logger = ClientIfaceCountersLogger::new(
+            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.monitor_svc_proxy.clone(),
+            &test_helper.mock_time_matrix_client,
+            driver_counters_mock_matrix_client.clone(),
+            driver_gauges_mock_matrix_client.clone(),
+        );
+
+        // Transition to IfaceCreated state
+        handle_iface_created(&mut test_helper, &logger);
+
+        let is_connected = true;
+        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let iface_stats = fidl_stats::IfaceStats {
+            connection_stats: Some(fidl_stats::ConnectionStats {
+                connection_id: Some(1),
+                rx_unicast_total: Some(100),
+                rx_unicast_drop: Some(5),
+                rx_multicast: Some(30),
+                tx_total: Some(50),
+                tx_drop: Some(2),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            test_helper.run_and_respond_iface_stats_req(&mut test_fut, Ok(&iface_stats)),
+            Poll::Ready(())
+        );
+
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_RX_RATE_METRIC_ID);
+        assert!(metrics.is_empty());
+        let metrics = test_helper.get_logged_metrics(metrics::RX_UNICAST_PACKETS_METRIC_ID);
+        assert!(metrics.is_empty());
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
+        assert!(metrics.is_empty());
+
+        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let iface_stats = fidl_stats::IfaceStats {
+            connection_stats: Some(fidl_stats::ConnectionStats {
+                connection_id: Some(1),
+                rx_unicast_total: Some(200),
+                rx_unicast_drop: Some(15),
+                rx_multicast: Some(30),
+                tx_total: Some(150),
+                tx_drop: Some(3),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            test_helper.run_and_respond_iface_stats_req(&mut test_fut, Ok(&iface_stats)),
+            Poll::Pending
+        );
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_RX_RATE_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(1000)); // 10%
+        let metrics = test_helper.get_logged_metrics(metrics::RX_UNICAST_PACKETS_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(100));
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(100)); // 1%
+    }
+
+    #[fuchsia::test]
+    fn test_handle_periodic_telemetry_cobalt_changed_connection_id() {
+        let mut test_helper = setup_test();
+        let driver_counters_mock_matrix_client = MockTimeMatrixClient::new();
+        let driver_gauges_mock_matrix_client = MockTimeMatrixClient::new();
+        let logger = ClientIfaceCountersLogger::new(
+            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.monitor_svc_proxy.clone(),
+            &test_helper.mock_time_matrix_client,
+            driver_counters_mock_matrix_client.clone(),
+            driver_gauges_mock_matrix_client.clone(),
+        );
+
+        // Transition to IfaceCreated state
+        handle_iface_created(&mut test_helper, &logger);
+
+        let is_connected = true;
+        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let iface_stats = fidl_stats::IfaceStats {
+            connection_stats: Some(fidl_stats::ConnectionStats {
+                connection_id: Some(1),
+                rx_unicast_total: Some(100),
+                rx_unicast_drop: Some(5),
+                rx_multicast: Some(30),
+                tx_total: Some(50),
+                tx_drop: Some(2),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            test_helper.run_and_respond_iface_stats_req(&mut test_fut, Ok(&iface_stats)),
+            Poll::Ready(())
+        );
+
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_RX_RATE_METRIC_ID);
+        assert!(metrics.is_empty());
+        let metrics = test_helper.get_logged_metrics(metrics::RX_UNICAST_PACKETS_METRIC_ID);
+        assert!(metrics.is_empty());
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
+        assert!(metrics.is_empty());
+
+        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let iface_stats = fidl_stats::IfaceStats {
+            connection_stats: Some(fidl_stats::ConnectionStats {
+                connection_id: Some(2),
+                rx_unicast_total: Some(200),
+                rx_unicast_drop: Some(15),
+                rx_multicast: Some(30),
+                tx_total: Some(150),
+                tx_drop: Some(3),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            test_helper.run_and_respond_iface_stats_req(&mut test_fut, Ok(&iface_stats)),
+            Poll::Ready(())
+        );
+
+        // No metric is logged because the ID indicates it's a different connection, meaning
+        // there is nothing to diff with
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_RX_RATE_METRIC_ID);
+        assert!(metrics.is_empty());
+        let metrics = test_helper.get_logged_metrics(metrics::RX_UNICAST_PACKETS_METRIC_ID);
+        assert!(metrics.is_empty());
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
+        assert!(metrics.is_empty());
+
+        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let iface_stats = fidl_stats::IfaceStats {
+            connection_stats: Some(fidl_stats::ConnectionStats {
+                connection_id: Some(2),
+                rx_unicast_total: Some(300),
+                rx_unicast_drop: Some(18),
+                rx_multicast: Some(30),
+                tx_total: Some(250),
+                tx_drop: Some(5),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            test_helper.run_and_respond_iface_stats_req(&mut test_fut, Ok(&iface_stats)),
+            Poll::Pending
+        );
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_RX_RATE_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(300)); // 3%
+        let metrics = test_helper.get_logged_metrics(metrics::RX_UNICAST_PACKETS_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(100));
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(200)); // 2%
+    }
+
+    #[fuchsia::test]
+    fn test_handle_periodic_telemetry_cobalt_suspension_in_between() {
+        let mut test_helper = setup_test();
+        let driver_counters_mock_matrix_client = MockTimeMatrixClient::new();
+        let driver_gauges_mock_matrix_client = MockTimeMatrixClient::new();
+        let logger = ClientIfaceCountersLogger::new(
+            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.monitor_svc_proxy.clone(),
+            &test_helper.mock_time_matrix_client,
+            driver_counters_mock_matrix_client.clone(),
+            driver_gauges_mock_matrix_client.clone(),
+        );
+
+        // Transition to IfaceCreated state
+        handle_iface_created(&mut test_helper, &logger);
+
+        let is_connected = true;
+        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let iface_stats = fidl_stats::IfaceStats {
+            connection_stats: Some(fidl_stats::ConnectionStats {
+                connection_id: Some(1),
+                rx_unicast_total: Some(100),
+                rx_unicast_drop: Some(5),
+                rx_multicast: Some(30),
+                tx_total: Some(50),
+                tx_drop: Some(2),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            test_helper.run_and_respond_iface_stats_req(&mut test_fut, Ok(&iface_stats)),
+            Poll::Ready(())
+        );
+
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_RX_RATE_METRIC_ID);
+        assert!(metrics.is_empty());
+        let metrics = test_helper.get_logged_metrics(metrics::RX_UNICAST_PACKETS_METRIC_ID);
+        assert!(metrics.is_empty());
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
+        assert!(metrics.is_empty());
+
+        test_helper.exec.set_fake_boot_to_mono_offset(zx::BootDuration::from_millis(1));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let iface_stats = fidl_stats::IfaceStats {
+            connection_stats: Some(fidl_stats::ConnectionStats {
+                connection_id: Some(1),
+                rx_unicast_total: Some(200),
+                rx_unicast_drop: Some(15),
+                rx_multicast: Some(30),
+                tx_total: Some(150),
+                tx_drop: Some(3),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            test_helper.run_and_respond_iface_stats_req(&mut test_fut, Ok(&iface_stats)),
+            Poll::Ready(())
+        );
+
+        // No metric is logged because the increase in boot-to-mono offset indicates that
+        // a suspension had happened in between
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_RX_RATE_METRIC_ID);
+        assert!(metrics.is_empty());
+        let metrics = test_helper.get_logged_metrics(metrics::RX_UNICAST_PACKETS_METRIC_ID);
+        assert!(metrics.is_empty());
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
+        assert!(metrics.is_empty());
+
+        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let iface_stats = fidl_stats::IfaceStats {
+            connection_stats: Some(fidl_stats::ConnectionStats {
+                connection_id: Some(1),
+                rx_unicast_total: Some(300),
+                rx_unicast_drop: Some(18),
+                rx_multicast: Some(30),
+                tx_total: Some(250),
+                tx_drop: Some(5),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            test_helper.run_and_respond_iface_stats_req(&mut test_fut, Ok(&iface_stats)),
+            Poll::Pending
+        );
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_RX_RATE_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(300)); // 3%
+        let metrics = test_helper.get_logged_metrics(metrics::RX_UNICAST_PACKETS_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(100));
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(200)); // 2%
+    }
+
+    #[fuchsia::test]
+    fn test_diff_and_log_rx_cobalt() {
+        let mut test_helper = setup_test();
+        let prev_stats = fidl_stats::ConnectionStats {
+            rx_unicast_total: Some(100),
+            rx_unicast_drop: Some(5),
+            ..Default::default()
+        };
+        let current_stats = fidl_stats::ConnectionStats {
+            rx_unicast_total: Some(300),
+            rx_unicast_drop: Some(7),
+            ..Default::default()
+        };
+        let cobalt_proxy = test_helper.cobalt_1dot1_proxy.clone();
+        let mut test_fut = pin!(diff_and_log_rx_cobalt(&cobalt_proxy, &prev_stats, &current_stats));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_RX_RATE_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(100)); // 1%
+        let metrics = test_helper.get_logged_metrics(metrics::RX_UNICAST_PACKETS_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(200));
+    }
+
+    #[test_case(
+        fidl_stats::ConnectionStats { ..Default::default() },
+        fidl_stats::ConnectionStats { ..Default::default() };
+        "both empty"
+    )]
+    #[test_case(
+        fidl_stats::ConnectionStats {
+            rx_unicast_total: Some(100),
+            rx_unicast_drop: Some(5),
+            ..Default::default()
+        },
+        fidl_stats::ConnectionStats { ..Default::default() };
+        "current empty"
+    )]
+    #[test_case(
+        fidl_stats::ConnectionStats { ..Default::default() },
+        fidl_stats::ConnectionStats {
+            rx_unicast_total: Some(300),
+            rx_unicast_drop: Some(7),
+            ..Default::default()
+        };
+        "prev empty"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_diff_and_log_rx_cobalt_empty(
+        prev_stats: fidl_stats::ConnectionStats,
+        current_stats: fidl_stats::ConnectionStats,
+    ) {
+        let mut test_helper = setup_test();
+        let cobalt_proxy = test_helper.cobalt_1dot1_proxy.clone();
+        let mut test_fut = pin!(diff_and_log_rx_cobalt(&cobalt_proxy, &prev_stats, &current_stats));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_RX_RATE_METRIC_ID);
+        assert!(metrics.is_empty())
+    }
+
+    #[fuchsia::test]
+    fn test_diff_and_log_tx_cobalt() {
+        let mut test_helper = setup_test();
+        let prev_stats = fidl_stats::ConnectionStats {
+            tx_total: Some(100),
+            tx_drop: Some(5),
+            ..Default::default()
+        };
+        let current_stats = fidl_stats::ConnectionStats {
+            tx_total: Some(300),
+            tx_drop: Some(7),
+            ..Default::default()
+        };
+        let cobalt_proxy = test_helper.cobalt_1dot1_proxy.clone();
+        let mut test_fut = pin!(diff_and_log_tx_cobalt(&cobalt_proxy, &prev_stats, &current_stats));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(100)); // 1%
+    }
+
+    #[test_case(
+        fidl_stats::ConnectionStats { ..Default::default() },
+        fidl_stats::ConnectionStats { ..Default::default() };
+        "both empty"
+    )]
+    #[test_case(
+        fidl_stats::ConnectionStats {
+            tx_total: Some(100),
+            tx_drop: Some(5),
+            ..Default::default()
+        },
+        fidl_stats::ConnectionStats { ..Default::default() };
+        "current empty"
+    )]
+    #[test_case(
+        fidl_stats::ConnectionStats { ..Default::default() },
+        fidl_stats::ConnectionStats {
+            tx_total: Some(300),
+            tx_drop: Some(7),
+            ..Default::default()
+        };
+        "prev empty"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_diff_and_log_tx_cobalt_empty(
+        prev_stats: fidl_stats::ConnectionStats,
+        current_stats: fidl_stats::ConnectionStats,
+    ) {
+        let mut test_helper = setup_test();
+        let cobalt_proxy = test_helper.cobalt_1dot1_proxy.clone();
+        let mut test_fut = pin!(diff_and_log_tx_cobalt(&cobalt_proxy, &prev_stats, &current_stats));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+        let metrics = test_helper.get_logged_metrics(metrics::BAD_TX_RATE_METRIC_ID);
+        assert!(metrics.is_empty())
+    }
+
+    #[fuchsia::test]
     fn test_handle_iface_destroyed() {
         let mut test_helper = setup_test();
         let driver_counters_mock_matrix_client = MockTimeMatrixClient::new();
         let driver_gauges_mock_matrix_client = MockTimeMatrixClient::new();
         let logger = ClientIfaceCountersLogger::new(
+            test_helper.cobalt_1dot1_proxy.clone(),
             test_helper.monitor_svc_proxy.clone(),
             &test_helper.mock_time_matrix_client,
             driver_counters_mock_matrix_client.clone(),

@@ -145,10 +145,11 @@ pub fn serve_telemetry(
     let power_logger =
         processors::power::PowerLogger::new(cobalt_1dot1_proxy.clone(), &inspect_node);
     let mut toggle_logger =
-        processors::toggle_events::ToggleLogger::new(cobalt_1dot1_proxy, &inspect_node);
+        processors::toggle_events::ToggleLogger::new(cobalt_1dot1_proxy.clone(), &inspect_node);
 
     let client_iface_counters_logger =
         processors::client_iface_counters::ClientIfaceCountersLogger::new(
+            cobalt_1dot1_proxy,
             monitor_svc_proxy,
             &time_matrix_client,
             driver_counters_time_series_client,
