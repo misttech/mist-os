@@ -1,0 +1,81 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+import("//build/python/python_mobly_test.gni")
+import("//build/testing/environments.gni")
+import("//build/testing/host_test_data.gni")
+
+import("//third_party/antlion/antlion_host_test.gni")
+import("//third_party/antlion/environments.gni")
+
+assert(is_host, "WLAN end-to-end tests only supported for host testing")
+
+antlion_host_test("wlan_canary_test") {
+  main_source = "WlanCanaryTest.py"
+  libraries = [
+    "//src/connectivity/wlan/tests/wlanix/wlanix_testing",
+    "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_python",
+    "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_python",
+  ]
+}
+
+antlion_host_test("wifi_chip_existence_test") {
+  main_source = "//src/connectivity/wlan/tests/wlanix/WifiChipExistenceTest.py"
+  libraries = [
+    "//src/connectivity/wlan/tests/wlanix/wlanix_testing",
+    "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_python",
+    "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_python",
+  ]
+}
+
+antlion_host_test("wifi_chip_correctness_and_consistency_test") {
+  main_source = "//src/connectivity/wlan/tests/wlanix/WifiChipCorrectnessAndConsistencyTest.py"
+  libraries = [
+    "//src/connectivity/wlan/tests/wlanix/wlanix_testing",
+    "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_python",
+    "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_python",
+  ]
+}
+
+antlion_host_test("iface_lifecycle_test") {
+  main_source = "//src/connectivity/wlan/tests/wlanix/IfaceLifecycleTest.py"
+  libraries = [
+    "//src/connectivity/wlan/tests/wlanix/wlanix_testing",
+    "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_python",
+    "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_python",
+  ]
+}
+
+antlion_host_test("iface_correctness_and_consistency_test") {
+  main_source = "//src/connectivity/wlan/tests/wlanix/IfaceCorrectnessAndConsistencyTest.py"
+  libraries = [
+    "//src/connectivity/wlan/tests/wlanix/wlanix_testing",
+    "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_python",
+    "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_python",
+  ]
+}
+
+antlion_host_test("connect_to_ap_test") {
+  main_source = "//src/connectivity/wlan/tests/wlanix/ConnectToApTest.py"
+  libraries = [
+    "//src/connectivity/wlan/tests/wlanix/wlanix_testing",
+    "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_python",
+    "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_python",
+  ]
+}
+
+group("tests_no_ap") {
+  testonly = true
+  public_deps = [
+    ":iface_correctness_and_consistency_test",
+    ":iface_lifecycle_test",
+    ":wifi_chip_correctness_and_consistency_test",
+    ":wifi_chip_existence_test",
+    ":wlan_canary_test",
+  ]
+}
+
+group("tests_with_ap") {
+  testonly = true
+  public_deps = [ ":connect_to_ap_test" ]
+}

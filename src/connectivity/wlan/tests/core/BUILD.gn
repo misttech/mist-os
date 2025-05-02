@@ -1,0 +1,27 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+import("//build/python/python_mobly_test.gni")
+import("//build/testing/environments.gni")
+import("//build/testing/host_test_data.gni")
+
+import("//third_party/antlion/antlion_host_test.gni")
+import("//third_party/antlion/environments.gni")
+
+assert(is_host, "WLAN end-to-end tests only supported for host testing")
+
+antlion_host_test("connect_to_ap_test") {
+  main_source = "ConnectToApTest.py"
+  libraries = [
+    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_host_test_data",
+    "//sdk/fidl/fuchsia.wlan.common.security:fuchsia.wlan.common.security_host_test_data",
+    "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_host_test_data",
+    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_host_test_data",
+    "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_host_test_data",
+  ]
+}
+
+group("tests_with_ap") {
+  testonly = true
+  public_deps = [ ":connect_to_ap_test" ]
+}
