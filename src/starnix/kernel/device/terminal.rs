@@ -24,7 +24,7 @@ use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     cc_t, error, tcflag_t, uapi, ECHO, ECHOCTL, ECHOE, ECHOK, ECHOKE, ECHONL, ECHOPRT, ICANON,
     ICRNL, IEXTEN, IGNCR, INLCR, ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST, TABDLY, VEOF,
-    VEOL, VEOL2, VERASE, VINTR, VQUIT, VSUSP, VWERASE, XTABS,
+    VEOL, VEOL2, VERASE, VINTR, VKILL, VQUIT, VSUSP, VWERASE, XTABS,
 };
 
 // CANON_MAX_BYTES is the number of bytes that fit into a single line of
@@ -691,13 +691,23 @@ impl TerminalMutableState<Base = Terminal> {
             }
 
             let mut maybe_erase_span = None;
-            if self.termios.has_local_flags(ICANON) && self.termios.has_local_flags(ECHOE) {
-                if self.termios.is_erase(first_byte) {
-                    maybe_erase_span =
-                        Some(compute_last_character_span(&queue.read_buffer[..], &self.termios));
-                } else if self.termios.is_werase(first_byte) {
-                    maybe_erase_span =
-                        Some(compute_last_word_span(&queue.read_buffer[..], &self.termios));
+            if self.termios.has_local_flags(ICANON) {
+                if self.termios.has_local_flags(ECHOE) {
+                    if self.termios.is_erase(first_byte) {
+                        maybe_erase_span = Some(compute_last_character_span(
+                            &queue.read_buffer[..],
+                            &self.termios,
+                        ));
+                    } else if self.termios.is_werase(first_byte) {
+                        maybe_erase_span =
+                            Some(compute_last_word_span(&queue.read_buffer[..], &self.termios));
+                    }
+                }
+                if self.termios.has_local_flags(ECHOK) {
+                    if self.termios.is_kill(first_byte) {
+                        maybe_erase_span =
+                            Some(compute_last_line_span(&queue.read_buffer[..], &self.termios));
+                    }
                 }
             }
 
@@ -712,9 +722,6 @@ impl TerminalMutableState<Base = Terminal> {
 
             if self.termios.has_local_flags(ECHOPRT) {
                 track_stub!(TODO("https://fxbug.dev/322874329"), "terminal ECHOPRT");
-            }
-            if self.termios.has_local_flags(ECHOK) {
-                track_stub!(TODO("https://fxbug.dev/322874293"), "terminal ECHOK");
             }
             if self.termios.has_local_flags(ECHOKE) {
                 track_stub!(TODO("https://fxbug.dev/322874191"), "terminal ECHOKE");
@@ -802,6 +809,7 @@ trait TermIOS {
     fn is_eof(&self, c: RawByte) -> bool;
     fn is_erase(&self, c: RawByte) -> bool;
     fn is_werase(&self, c: RawByte) -> bool;
+    fn is_kill(&self, c: RawByte) -> bool;
     fn is_terminating(&self, character_bytes: &[RawByte]) -> bool;
     fn signal(&self, c: RawByte) -> Option<Signal>;
 }
@@ -826,6 +834,9 @@ impl TermIOS for uapi::termios {
         c == self.c_cc[VWERASE as usize]
             && self.c_cc[VWERASE as usize] != DISABLED_CHAR
             && self.has_local_flags(IEXTEN)
+    }
+    fn is_kill(&self, c: RawByte) -> bool {
+        c == self.c_cc[VKILL as usize] && self.c_cc[VKILL as usize] != DISABLED_CHAR
     }
     fn is_terminating(&self, character_bytes: &[RawByte]) -> bool {
         // All terminating characters are 1 byte.
@@ -982,6 +993,31 @@ fn compute_last_word_span(buffer: &[RawByte], termios: &uapi::termios) -> Buffer
     }
 
     word_span
+}
+
+/// Returns size of the last line in `buffer`.
+///
+/// Depending on `termios`, this might consider ASCII or UTF8 encoding.
+fn compute_last_line_span(buffer: &[RawByte], termios: &uapi::termios) -> BufferSpan {
+    let mut line_span = BufferSpan::default();
+    let mut remaining = buffer.len();
+
+    loop {
+        let span = compute_last_character_span(&buffer[..remaining], termios);
+        if span.bytes == 0 {
+            break;
+        }
+        if span.bytes == 1 {
+            let c = buffer[remaining - 1];
+            if c == b'\n' {
+                break;
+            }
+        }
+        remaining -= span.bytes;
+        line_span += span;
+    }
+
+    line_span
 }
 
 /// Alias used to mark bytes in the queues that have not yet been processed and pushed into the

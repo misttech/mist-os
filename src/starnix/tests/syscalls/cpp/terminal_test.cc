@@ -315,6 +315,7 @@ TEST_F(Pty, EchoModes) {
     check_input("ab\x09" "cd\n", "ab\tcd\r\n", "ab\tcd\n");
     check_input("ab\x0E" "cd\n", "ab^Ncd\r\n", "ab\x0E" "cd\n");
     check_input("ab\x0F" "cd\n", "ab^Ocd\r\n", "ab\x0F" "cd\n");
+    check_input("ab\x15" "cd\n", "ab\b \b\b \bcd\r\n", "cd\n");
     check_input("ab\x1B" "cd\n", "ab^[cd\r\n", "ab\x1B" "cd\n");
     // clang-format on
   });
