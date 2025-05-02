@@ -39,10 +39,6 @@ def main():
         "--keep-location", help="Keep source location information."
     )
     parser.add_argument("--keep-documentation", help="Keep API documentation.")
-    parser.add_argument(
-        "--include-all",
-        help="Include libraries from all categories. By default only libraries in the 'partner' category are included.",
-    )
     parser.add_argument("--depfile", type=argparse.FileType("w"))
 
     args = parser.parse_args()
@@ -52,15 +48,7 @@ def main():
 
     # Extract the IR path for each library. This is the path for the in-tree version.
     ir_paths = [
-        fidl_library["ir"]
-        for fidl_library in json.load(args.sdk_fidl_json)
-        if (
-            fidl_library["category"] == "partner"
-            or args.include_all
-            # TODO(https://fxbug.dev/372986936): Remove `and` condition when "internal" is removed.
-            and fidl_library["category"]
-            in ("prebuilt", "host_tool", "compat_test")
-        )
+        fidl_library["ir"] for fidl_library in json.load(args.sdk_fidl_json)
     ]
 
     def patch_path(path: str, api_level: str) -> str:

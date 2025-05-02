@@ -85,8 +85,13 @@ def merge_irs(
         if experiments != ir.get("experiments"):
             if experiments is None:
                 experiments = ir["experiments"]
+            elif ir["name"] == "fuchsia.fdomain":
+                # fuchsia.fdomain is a unique snowflake
+                pass
             else:
-                raise Exception("Experiments mismatch")
+                raise Exception(
+                    f"Experiments mismatch. Expected {experiments} but {ir['name']} has {ir['experiments']}"
+                )
         # make sure available versions match
         if available != ir.get("available"):
             if available is None:
