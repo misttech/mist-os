@@ -2368,13 +2368,12 @@ From //build/bazel/remote_services.gni:16
 Controls whether the compiler emits full stack frames for function calls.
 This reduces performance but increases the ability to generate good
 stack traces, especially when we have bugs around unwind table generation.
-It does not apply for host targets (see below where it is unset).
-
-TODO(https://fxbug.dev/376749368) Enabling frame pointers breaks on RISCV release.
+It does not apply for host targets (see //build/config/BUILD.gn where it
+is unset).
 
 **Current value (from the default):** `true`
 
-From //build/config/enable_frame_pointers.gni:12
+From //build/config/enable_frame_pointers.gni:11
 
 ### enable_jobserver
 
@@ -3342,6 +3341,44 @@ directories, not the root_build_dir.
 **Current value (from the default):** `true`
 
 From //build/icu.gni:31
+
+### idk_buildable_api_levels
+
+The set of API levels for which this build will provide build-time
+support in the IDK/SDK. The default set is all `supported` and
+`in development` non-special API levels in //sdk/version_history.json.
+Other valid values are a list containing a subset of the default set. If
+empty, only targets for which the IDK contains artifacts built at "PLATFORM"
+will be built.
+
+This is useful for reducing the overall build time of any build that
+includes the IDK/SDK in exchange for reduced coverage of API level support.
+For example, `fx build //sdk:final_fuchsia_idk`.
+
+To override the set of CPU architectures, see `idk_buildable_cpus`.
+
+Do not use the `platform_version` member directly.
+
+**Current value (from the default):** `[16, 23, 25, 26, 27, "NEXT"]`
+
+From //build/config/fuchsia/platform_version.gni:43
+
+### idk_buildable_cpus
+
+The set of target CPU architectures for which the build will
+provide build-time support in the IDK/SDK. The default set is
+equivalent to `["arm64", "riscv64", "x64"]`. Other valid values are a list
+containing a subset of that list that includes the current `target_cpu.
+
+This is useful for reducing the overall build time of any build that
+includes the IDK/SDK in exchange for reduced coverage of target CPU
+architecture support. For example, `fx build //sdk:final_fuchsia_idk`.
+
+To override the set of API levels, see `idk_buildable_api_levels`.
+
+**Current value (from the default):** `["arm64", "riscv64", "x64"]`
+
+From //build/sdk/config.gni:67
 
 ### include_account_in_fvm
 
@@ -4612,43 +4649,6 @@ Controls whether we should output GSYM files for Fuchsia binaries.
 
 From //build/config/BUILDCONFIG.gn:34
 
-### override_idk_buildable_api_levels
-
-Overrides the set of API levels for which this build will provide build-time
-support in the IDK/SDK. The default (`false`) set is all `supported` and
-`in development` non-special API levels in //sdk/version_history.json.
-Other valid values are a list containing a subset of the default set. If
-empty, only targets for which the IDK contains artifacts built at "PLATFORM"
-will be built.
-
-This is useful for reducing the overall build time of any build that
-includes the IDK/SDK in exchange for reduced coverage of API level support.
-For example, `fx build //sdk:final_fuchsia_idk`.
-
-To override the set of target CPUs, see `override_idk_target_cpus`.
-
-**Current value (from the default):** `false`
-
-From //build/config/fuchsia/platform_version.gni:41
-
-### override_idk_target_cpus
-
-Overrides the set of target CPU architectures for which the build will
-provide build-time support in the IDK/SDK. The default (`false`) set is
-equivalent to `["arm64", "riscv64", "x64"]`. Other valid values are a list
-containing a subset of that list that includes the current `target_cpu.
-
-This is useful for reducing the overall build time of any build that
-includes the IDK/SDK in exchange for reduced coverage of target CPU
-architecture support. For example, `fx build //sdk:final_fuchsia_idk`.
-
-To override the set of API levels, see
-`override_idk_buildable_api_levels`.
-
-**Current value (from the default):** `false`
-
-From //build/sdk/config.gni:60
-
 ### override_target_api_level
 
 Deprecated name for the variable above that is still used by obsolete bots.
@@ -5456,7 +5456,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"27.99991231.0.1"`
+**Current value (from the default):** `"28.99991231.0.1"`
 
 From //sdk/config.gni:7
 
@@ -5469,7 +5469,7 @@ Can be true for any API level, including "PLATFORM", and CPU architecture.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:14
+From //build/sdk/config.gni:22
 
 ### sdk_max_simultaneous_sub_builds
 
@@ -5492,7 +5492,7 @@ But also these bad things:
 
 **Current value (from the default):** `5`
 
-From //build/sdk/config.gni:32
+From //build/sdk/config.gni:40
 
 ### sdk_sub_build_max_load_average
 
@@ -5502,7 +5502,7 @@ itself. If left blank, the subbuild script will make a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:44
+From //build/sdk/config.gni:52
 
 ### sdk_sub_build_parallelism
 
@@ -5514,7 +5514,7 @@ will make a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:39
+From //build/sdk/config.gni:47
 
 ### sdk_sub_build_verbose
 
@@ -5522,7 +5522,7 @@ Set to `true` to enable verbose logging during IDK subbuilds.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:47
+From //build/sdk/config.gni:55
 
 ### select_variant
 
@@ -6585,7 +6585,7 @@ If false, any unacknowledged SDK change will cause a build failure.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:8
+From //build/sdk/config.gni:16
 
 ### wayland_bridge_protocol_logging
 
@@ -9469,17 +9469,11 @@ From //third_party/pigweed/src/third_party/mbedtls/mbedtls.gni:25
 
 ### pw_third_party_nanopb_AGGRESSIVE_NANOPB_PB2_REGEN
 
-Regenerates `$dir_pw_third_party_nanopb/generator/proto/nanopb_pb2.py`
-whenever the `generate_nanopb_proto` action is run. If this is set to false,
-the file will only be regenerated if `protoc` is newer than the generated
-`nanopb_pb2.py`.
-
-Aggressive regeneration is NOT safe if this build will run in parallel with
-other build systems that try to read `nanopb_pb2.py`.
+Deprecated, does nothing.
 
 **Current value (from the default):** `true`
 
-From //third_party/pigweed/src/third_party/nanopb/nanopb.gni:36
+From //third_party/pigweed/src/third_party/nanopb/nanopb.gni:30
 
 ### pw_third_party_nanopb_CONFIG
 
