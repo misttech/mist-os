@@ -91,10 +91,8 @@ impl Interface {
             usb::interface_close(self.interface);
         }
     }
-}
 
-impl Open<Interface> for Interface {
-    fn open<F>(matcher: &mut F) -> Result<Interface>
+    fn open_interface<F>(matcher: &mut F, timeout: u32) -> Result<Self>
     where
         F: FnMut(&InterfaceInfo) -> bool,
     {
@@ -118,13 +116,22 @@ impl Open<Interface> for Interface {
         // as a void pointer which is re-intepreted by the above trampoline.  The foreign function
         // call requires an unsafe block.
         let device_ptr = unsafe {
-            usb::interface_open(Some(trampoline::<F>), matcher as *mut F as *mut c_void, 200)
+            usb::interface_open(Some(trampoline::<F>), matcher as *mut F as *mut c_void, timeout)
         };
         if !device_ptr.is_null() {
             return Ok(Interface { interface: device_ptr as *mut usb::UsbInterface });
         } else {
             return Err(Error::NoDeviceMatched);
         }
+    }
+}
+
+impl Open<Interface> for Interface {
+    fn open<F>(matcher: &mut F) -> Result<Interface>
+    where
+        F: FnMut(&InterfaceInfo) -> bool,
+    {
+        Self::open_interface(matcher, 200)
     }
 }
 
@@ -210,47 +217,119 @@ impl AsyncInterface {
         Self::open_interface(matcher, false).is_ok()
     }
 
+    /// Opens the interface with the matcher.
+    ///
+    /// If `drain_input_queue` is true, the device's input queue will be
+    /// drained before returning.
     fn open_interface<F>(matcher: &mut F, drain_input_queue: bool) -> Result<Self>
     where
         F: FnMut(&InterfaceInfo) -> bool,
     {
-        let mut serial = None;
+        // Mutex to hold the serial number of the opened device.
+        let serial: Mutex<Option<String>> = Mutex::new(None);
+        // Mutex to hold the matcher.
+        let m_doom = Mutex::new(&mut *matcher);
+        // Callback function to be passed to the C library.
         let mut cb = |info: &InterfaceInfo| -> bool {
-            if matcher(info) {
-                let null_pos = match info.serial_number.iter().position(|&c| c == 0) {
-                    Some(p) => p,
-                    None => {
-                        return false;
+            match m_doom.lock() {
+                Ok(mut matcher) => {
+                    if matcher(info) {
+                        let null_pos = match info.serial_number.iter().position(|&c| c == 0) {
+                            Some(p) => p,
+                            None => {
+                                return false;
+                            }
+                        };
+                        // Since the interface has a serial number, go ahead and
+                        // update the serial number we are tracking. The
+                        // `Interface` struct does not expose the serial serial
+                        // number or the InterfaceInfo after it has been opened
+                        // so this is our chance to record it.
+                        match serial.lock() {
+                            Ok(mut ser) => {
+                                ser.replace(
+                                    (*String::from_utf8_lossy(&info.serial_number[..null_pos]))
+                                        .to_string(),
+                                );
+                                return true;
+                            }
+                            Err(_) => return false,
+                        }
+                    } else {
+                        false
                     }
-                };
-                serial.replace(
-                    (*String::from_utf8_lossy(&info.serial_number[..null_pos])).to_string(),
-                );
-                return true;
-            }
-            false
-        };
-        Interface::open(&mut cb).and_then(|mut iface| match serial {
-            Some(s) => {
-                tracing::debug!("AsyncInterface open_interface() for serial {}.", s);
-                if drain_input_queue {
-                    tracing::debug!(
-                        "AsyncInterface open_interface() for serial {}. About to clear buffer",
-                        s
-                    );
-                    // Clears out anything that was in the usb buffer waiting.
-                    let mut buffer = Vec::new();
-                    let _read_res = iface.read_to_end(&mut buffer);
                 }
-
-                let mut write_guard = IFACE_REGISTRY
-                    .write()
-                    .expect("could not acquire write lock on interface registry");
-                (*write_guard).insert(s.clone(), Mutex::new(iface));
-                Ok(AsyncInterface { serial: s, write_task: None, read_task: None })
+                Err(_) => false,
             }
-            None => Err(Error::SerialNumberMissing),
-        })
+        };
+
+        // Callback function to be passed to the C library when draining the
+        // input queue.
+        let mut drain_cb = |info: &InterfaceInfo| -> bool {
+            match m_doom.lock() {
+                // First make sure we match.
+                Ok(mut matcher) => {
+                    if matcher(info) {
+                        // Since we match we need to check that the interface
+                        // actually has a serial number.
+                        match info.serial_number.iter().position(|&c| c == 0) {
+                            Some(_) => true,
+                            None => false,
+                        }
+                    } else {
+                        false
+                    }
+                }
+                Err(_) => false,
+            }
+        };
+        // If `drain_input_queue` is true, drain the input queue before opening the interface.
+        if drain_input_queue {
+            // Open the interface with the drain callback.
+            // Set the timeout to 200 ms so that we dont block forever on the
+            // `read_to_end` call below. If the timeout is 0 we will block
+            // waiting on the device to return forever and if there is nothing
+            // to drain from the queue we'll just be waiting forever.
+            let mut iface = Interface::open_interface(&mut drain_cb, 200)?;
+            // Clears out anything that was in the usb buffer waiting.
+            tracing::debug!("AsyncInterface about to drain input queue");
+            let mut buffer = Vec::new();
+            let _read_res = iface.read_to_end(&mut buffer);
+            drop(iface);
+            // Set timeout to 0 to help reduce spamming the target with
+            // read requests.
+            Self::add_interface_to_registry(&serial, &mut cb, 0)
+        } else {
+            // Open interface with standard callback
+            // Set timeout to 0 to help reduce spamming the target with
+            // read requests.
+            Self::add_interface_to_registry(&serial, &mut cb, 0)
+        }
+    }
+
+    fn add_interface_to_registry<F>(
+        serial: &Mutex<Option<String>>,
+        cb: &mut F,
+        timeout: u32,
+    ) -> Result<Self>
+    where
+        F: Fn(&InterfaceInfo) -> bool,
+    {
+        let iface = Interface::open_interface(cb, timeout)?;
+        match serial.lock() {
+            Ok(guard) => match *guard {
+                Some(ref s) => {
+                    tracing::debug!("AsyncInterface open_interface() for serial {}.", s);
+                    let mut write_guard = IFACE_REGISTRY
+                        .write()
+                        .expect("could not acquire write lock on interface registry");
+                    (*write_guard).insert(s.clone(), Mutex::new(iface));
+                    Ok(AsyncInterface { serial: s.to_owned(), write_task: None, read_task: None })
+                }
+                None => Err(Error::SerialNumberMissing),
+            },
+            Err(_e) => Err(Error::SerialNumberMissing),
+        }
     }
 }
 
