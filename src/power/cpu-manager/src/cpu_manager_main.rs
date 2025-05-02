@@ -630,9 +630,21 @@ impl CpuManagerMain {
 
         let mut inner = self.mutable_inner.borrow_mut();
 
-        // Return early if no update is required. We're assuming that opps have not changed.
-        if inner.current_thermal_state == Some(index) {
-            return Ok(());
+        if let Some(current_index) = inner.current_thermal_state {
+            // Return early if no update is required. We're assuming that opps have not changed.
+            if current_index == index {
+                return Ok(());
+            }
+            // A positive index indicates a throttled state. So the first condition describes
+            // the transition from unthrottled to throttled, while the second describes the
+            // transition from throttled to unthrottled. (There is some redundant logic in the
+            // conditions to improve clarity.)
+            if current_index == 0 && index > 0 {
+                log::info!("Starting CPU throttling")
+            }
+            if current_index > 0 && index == 0 {
+                log::info!("Ending CPU throttling");
+            }
         }
 
         let opp_indices = &inner.thermal_states[index].cluster_opps;
