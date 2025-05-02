@@ -157,7 +157,11 @@ Status HostService::Inquiry(::grpc::ServerContext* context,
 Status HostService::SetDiscoverabilityMode(::grpc::ServerContext* context,
                                            const ::pandora::SetDiscoverabilityModeRequest* request,
                                            ::google::protobuf::Empty* response) {
-  return Status(StatusCode::UNIMPLEMENTED, "");
+  if (set_discoverability(request->mode() != ::pandora::DiscoverabilityMode::NOT_DISCOVERABLE) !=
+      ZX_OK) {
+    return Status(StatusCode::INTERNAL, "Error in Rust affordances (check logs)");
+  }
+  return {/*OK*/};
 }
 
 Status HostService::SetConnectabilityMode(::grpc::ServerContext* context,

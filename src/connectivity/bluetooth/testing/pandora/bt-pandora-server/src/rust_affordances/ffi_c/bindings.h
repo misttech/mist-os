@@ -49,6 +49,11 @@ zx_status_t connect_peer(uint64_t peer_id);
 /// Returns ZX_STATUS_INTERNAL on error (check logs).
 zx_status_t connect_l2cap_channel(uint64_t peer_id, uint16_t psm);
 
+/// Start or revoke discoverability.
+///
+/// Returns ZX_STATUS_INTERNAL on error (check logs).
+zx_status_t set_discoverability(bool discoverable);
+
 }  // extern "C"
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_TESTING_PANDORA_BT_PANDORA_SERVER_SRC_RUST_AFFORDANCES_FFI_C_BINDINGS_H_

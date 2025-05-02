@@ -10,6 +10,7 @@ use fidl_fuchsia_bluetooth_bredr::{
 };
 use fidl_fuchsia_bluetooth_sys::{
     AccessMarker, AccessProxy, HostInfo, HostWatcherMarker, HostWatcherProxy, Peer,
+    ProcedureTokenProxy,
 };
 use fuchsia_async::{LocalExecutor, TimeoutExt};
 use fuchsia_bluetooth::types::Channel;
@@ -29,6 +30,7 @@ enum Request {
     GetPeerId(CString, oneshot::Sender<Result<PeerId, anyhow::Error>>),
     Connect(PeerId, oneshot::Sender<Result<(), anyhow::Error>>),
     ConnectL2cap(PeerId, u16, oneshot::Sender<Result<(), anyhow::Error>>),
+    SetDiscoverability(bool, oneshot::Sender<Result<(), anyhow::Error>>),
     Stop,
 }
 
@@ -56,6 +58,7 @@ impl WorkThread {
                 let mut peer_cache: Vec<Peer> = Vec::new();
                 #[allow(clippy::collection_is_never_read)]
                 let mut _l2cap_channel: Option<Channel> = None;
+                let mut discoverability_session: Option<ProcedureTokenProxy> = None;
 
                 while let Some(request) = receiver.next().await {
                     match request {
@@ -121,6 +124,36 @@ impl WorkThread {
                                 }
                             }
                         }
+                        Request::SetDiscoverability(discoverable, sender) => {
+                            if !discoverable {
+                                if discoverability_session.take().is_none() {
+                                    eprintln!(
+                                        "Asked to revoke nonexistent discoverability session."
+                                    );
+                                }
+                                sender.send(Ok(())).expect("Failed to send");
+                                continue;
+                            }
+                            if discoverability_session.is_some() {
+                                continue;
+                            }
+                            let (token, discoverability_session_server) =
+                                fidl::endpoints::create_proxy();
+                            if let Err(err) = access_proxy
+                                .make_discoverable(discoverability_session_server)
+                                .await?
+                            {
+                                sender
+                                    .send(Err(anyhow!(
+                                        "fuchsia.bluetooth.sys.Access/MakeDiscoverable error: {:?}",
+                                        err
+                                    )))
+                                    .expect("Failed to send");
+                                continue;
+                            }
+                            discoverability_session = Some(token);
+                            sender.send(Ok(())).expect("Failed to send");
+                        }
                         Request::Stop => {
                             break;
                         }
@@ -182,6 +215,19 @@ impl WorkThread {
         self.sender
             .clone()
             .send(Request::ConnectL2cap(peer_id, psm, sender))
+            .await
+            .expect("Failed to send");
+        receiver.await.expect("Failed to receive")
+    }
+
+    // Set discoverability state.
+    async fn set_discoverability(&self, discoverable: bool) -> Result<(), anyhow::Error> {
+        let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
+        self.sender
+            .write()
+            .as_mut()
+            .unwrap()
+            .send(Request::SetDiscoverability(discoverable, sender))
             .await
             .expect("Failed to send");
         receiver.await.expect("Failed to receive")
@@ -359,6 +405,18 @@ pub extern "C" fn connect_l2cap_channel(peer_id: u64, psm: u16) -> zx_status_t {
 
     if let Err(err) = block_on(WORKER.connect_l2cap_channel(peer_id, psm)) {
         eprintln!("connect_l2cap_channel encountered error: {:?}", err);
+        return zx::Status::INTERNAL.into_raw();
+    }
+    zx::Status::OK.into_raw()
+}
+
+/// Start or revoke discoverability.
+///
+/// Returns ZX_STATUS_INTERNAL on error (check logs).
+#[no_mangle]
+pub extern "C" fn set_discoverability(discoverable: bool) -> zx_status_t {
+    if let Err(err) = block_on(WORKER.set_discoverability(discoverable)) {
+        eprintln!("set_discoverability encountered error: {:?}", err);
         return zx::Status::INTERNAL.into_raw();
     }
     zx::Status::OK.into_raw()
