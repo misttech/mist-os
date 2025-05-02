@@ -236,9 +236,9 @@ impl SecurityServer {
         Ok(())
     }
 
-    /// Returns the active policy in binary form.
-    pub fn get_binary_policy(&self) -> Vec<u8> {
-        self.state.lock().active_policy.as_ref().map_or(Vec::new(), |p| p.binary.clone())
+    /// Returns the active policy in binary form, or `None` if no policy has yet been loaded.
+    pub fn get_binary_policy(&self) -> Option<Vec<u8>> {
+        self.state.lock().active_policy.as_ref().map(|p| p.binary.clone())
     }
 
     /// Returns true if a policy has been loaded.
@@ -697,7 +697,7 @@ mod tests {
     #[test]
     fn loaded_policy_can_be_retrieved() {
         let security_server = security_server_with_tests_policy();
-        assert_eq!(TESTS_BINARY_POLICY, security_server.get_binary_policy().as_slice());
+        assert_eq!(TESTS_BINARY_POLICY, security_server.get_binary_policy().unwrap().as_slice());
     }
 
     #[test]

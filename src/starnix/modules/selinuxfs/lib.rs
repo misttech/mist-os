@@ -310,7 +310,7 @@ impl PolicyFile {
 
 impl BytesFileOps for PolicyFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(self.security_server.get_binary_policy().into())
+        self.security_server.get_binary_policy().map(Into::into).ok_or_else(|| errno!(EINVAL))
     }
 }
 
