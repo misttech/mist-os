@@ -61,7 +61,7 @@ declare -a subshell_trace=()
 # Propagate tracing option from `fx -x rbe ...` to the wrapper script.
 # This is less invasive than re-exporting SHELLOPTS.
 if [[ -o xtrace ]]; then
-  subshell_trace=( "$SHELL" -x )
+  subshell_trace=( /bin/bash -x )
 fi
 
 readonly -a reproxy_wrap_cmd=( "${subshell_trace[@]}" "$reproxy_wrap" )

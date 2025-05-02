@@ -133,7 +133,7 @@ readonly _upload_script=build/rbe/upload_reproxy_logs.sh
 
 trace_prefix=()
 if [[ -o xtrace ]]; then
-  trace_prefix=("$SHELL" -x)
+  trace_prefix=(/bin/bash -x)
 fi
 
 case "$action" in

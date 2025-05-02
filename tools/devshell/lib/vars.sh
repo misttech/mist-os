@@ -96,7 +96,7 @@ RBE_WRAPPER=( "$FUCHSIA_DIR"/build/rbe/fuchsia-reproxy-wrap.sh )
 # Propagate tracing option from `fx -x build` to the wrapper script.
 # This is less invasive than re-exporting SHELLOPTS.
 if [[ -o xtrace ]]; then
-  RBE_WRAPPER=( "$SHELL" -x "${RBE_WRAPPER[@]}" )
+  RBE_WRAPPER=(/bin/bash -x "${RBE_WRAPPER[@]}" )
 fi
 
 # fx-command-stdout-to-array runs a command and stores its standard output
