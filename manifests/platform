@@ -2,7 +2,6 @@
 <manifest>
   <imports>
     <localimport file="third_party/all"/>
-    <localimport file="prebuilts"/>
   </imports>
   <projects>
     <project name="fuchsia"
@@ -11,12 +10,6 @@
              gerrithost="https://fuchsia-review.googlesource.com"
              gitmodules="true"
              githooks="integration/git-hooks"/>
-    <project name="third_party/luci-go"
-             gitsubmoduleof="fuchsia"
-             path="third_party/luci-go"
-             revision="fd977bf9e01d199a529f28af6dc10fe0fa35d9e7"
-             remote="https://fuchsia.googlesource.com/third_party/luci-go"
-             gerrithost="https://fuchsia-review.googlesource.com"/>
   </projects>
   <hooks>
     <hook name="install-environment"
