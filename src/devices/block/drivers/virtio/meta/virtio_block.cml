@@ -13,7 +13,16 @@
         bind: "meta/bind/virtio_block_bind.bindbc",
         colocate: "false",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.block.volume.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.pci.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.block.volume.Service",
+            from: "self",
+        },
     ],
 }

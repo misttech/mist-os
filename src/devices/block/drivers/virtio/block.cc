@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "block.h"
+#include "src/devices/block/drivers/virtio/block.h"
 
+#include <fidl/fuchsia.hardware.block.volume/cpp/fidl.h>
 #include <fuchsia/hardware/block/c/banjo.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <inttypes.h>
@@ -18,6 +19,7 @@
 #include <sys/param.h>
 #include <zircon/compiler.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -27,59 +29,202 @@
 #include <fbl/algorithm.h>
 
 #include "src/devices/block/lib/common/include/common.h"
+#include "src/storage/lib/block_server/block_server.h"
 
 #define LOCAL_TRACE 0
 
-// 1MB max transfer (unless further restricted by ring size).
-#define MAX_SCATTER 257
-
 namespace virtio {
 
-// Cache some page size calculations that are used frequently.
-static const uint32_t kPageSize = zx_system_get_page_size();
-static const uint32_t kPageMask = kPageSize - 1;
-static const uint32_t kMaxMaxXfer = (MAX_SCATTER - 1) * kPageSize;
+namespace {
 
-void BlockDevice::txn_complete(block_txn_t* txn, zx_status_t status) {
-  if (txn->pmt != ZX_HANDLE_INVALID) {
-    zx_pmt_unpin(txn->pmt);
-    txn->pmt = ZX_HANDLE_INVALID;
+// Cache some page size calculations that are used frequently.
+const uint32_t kPageSize = zx_system_get_page_size();
+const uint32_t kPageMask = kPageSize - 1;
+const uint32_t kMaxMaxXfer = (MAX_SCATTER - 1) * kPageSize;
+
+// See 5.2.2 in the virtio spec
+const uint16_t kVirtioBlkRequestQueueIndex = 0;
+
+uint32_t VirtioRequestType(const block_txn_t& txn) {
+  switch (txn.op.command.opcode) {
+    case BLOCK_OPCODE_READ:
+      return VIRTIO_BLK_T_IN;
+    case BLOCK_OPCODE_WRITE:
+      return VIRTIO_BLK_T_OUT;
+    case BLOCK_OPCODE_TRIM:
+      return VIRTIO_BLK_T_DISCARD;
+    case BLOCK_OPCODE_FLUSH:
+      return VIRTIO_BLK_T_FLUSH;
+    default:
+      // Maintain legacy behaviour of defaulting to a read.  Opcodes are untrusted.
+      return VIRTIO_BLK_T_IN;
+  }
+}
+
+uint32_t VirtioRequestType(const block_server::Request& request) {
+  switch (request.operation.tag) {
+    case block_server::Operation::Tag::Read:
+      return VIRTIO_BLK_T_IN;
+    case block_server::Operation::Tag::Write:
+      return VIRTIO_BLK_T_OUT;
+    case block_server::Operation::Tag::Trim:
+      return VIRTIO_BLK_T_DISCARD;
+    case block_server::Operation::Tag::Flush:
+      return VIRTIO_BLK_T_FLUSH;
+    case block_server::Operation::Tag::CloseVmo:
+      __UNREACHABLE;
+  }
+}
+
+}  // namespace
+
+void BlockDevice::CompleteTxn(block_txn_t* transaction, zx_status_t status) {
+  FDF_LOGL(TRACE, logger(), "Complete txn %p %s", transaction, zx_status_get_string(status));
+  if (transaction->pmt != ZX_HANDLE_INVALID) {
+    zx_pmt_unpin(transaction->pmt);
+    transaction->pmt = ZX_HANDLE_INVALID;
   }
   {
     std::lock_guard<std::mutex> lock(watchdog_lock_);
-    blk_req_start_timestamps_[txn->req_index] = zx::time::infinite();
+    blk_req_start_timestamps_[transaction->req_index] = zx::time::infinite();
   }
-  txn->completion_cb(txn->cookie, status, &txn->op);
+  // Save the request ID before we release the transaction's resources, because for block server
+  // requests, the req_index is used to reserve a slot in our pool for txn, so once we free that,
+  // txn could be reused.
+  std::optional<uint64_t> request_id = transaction->request;
+  {
+    std::lock_guard<std::mutex> lock(txn_lock_);
+    // NB: req_index might be invalid (>= kBlkReqCount) if transaction comes from Banjo but never
+    // even made it as far as allocating a req_index.  That's tolerated by FreeBlkReqLocked.
+    FreeBlkReqLocked(transaction->req_index);
+    if (transaction->discard_req_index) {
+      FreeBlkReqLocked(*transaction->discard_req_index);
+    }
+    list_delete(&transaction->node);
+  }
+  txn_cond_.notify_all();
+  if (transaction->completion_cb) {
+    transaction->completion_cb(transaction->cookie, status, &transaction->op);
+  } else {
+    ZX_DEBUG_ASSERT(request_id);
+    std::lock_guard lock(block_server_lock_);
+    if (block_server_) {
+      block_server_->SendReply(*request_id, zx::make_result(status));
+    }
+  }
+}
+
+uint32_t BlockDevice::GetMaxTransferSize() const {
+  const uint32_t max_transfer_size = static_cast<uint32_t>(kPageSize * (kRingSize - 2));
+  // Limit max transfer to our worst case scatter list size.
+  return std::min(max_transfer_size, kMaxMaxXfer);
+}
+
+flag_t BlockDevice::GetFlags() const {
+  flag_t flags = 0;
+  if (supports_discard_) {
+    flags |= FLAG_TRIM_SUPPORT;
+  }
+  return flags;
 }
 
 void BlockDevice::BlockImplQuery(block_info_t* info, size_t* bopsz) {
   memset(info, 0, sizeof(*info));
   info->block_size = GetBlockSize();
   info->block_count = GetBlockCount();
-  info->max_transfer_size = static_cast<uint32_t>(kPageSize * (kRingSize - 2));
-  if (supports_discard_) {
-    info->flags |= FLAG_TRIM_SUPPORT;
-  }
-
-  // Limit max transfer to our worst case scatter list size.
-  if (info->max_transfer_size > kMaxMaxXfer) {
-    info->max_transfer_size = kMaxMaxXfer;
-  }
+  info->max_transfer_size = GetMaxTransferSize();
+  info->flags = GetFlags();
   *bopsz = sizeof(block_txn_t);
 }
 
 void BlockDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback completion_cb,
                                  void* cookie) {
   block_txn_t* txn = static_cast<block_txn_t*>((void*)bop);
-  txn->pmt = ZX_HANDLE_INVALID;
   txn->completion_cb = completion_cb;
   txn->cookie = cookie;
+  switch (txn->op.command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
+    case BLOCK_OPCODE_TRIM:
+      if (zx_status_t status = block::CheckIoRange(txn->op.rw, config_.capacity, logger());
+          status != ZX_OK) {
+        completion_cb(cookie, status, bop);
+        return;
+      }
+      if (txn->op.command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) {
+        completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, bop);
+        return;
+      }
+      FDF_LOG(TRACE, "txn %p, opcode %#x\n", txn, txn->op.command.opcode);
+      break;
+    case BLOCK_OPCODE_FLUSH:
+      FDF_LOG(TRACE, "txn %p, opcode FLUSH\n", txn);
+      break;
+    default:
+      completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, bop);
+      return;
+  }
   SignalWorker(txn);
+}
+
+void BlockDevice::StartThread(block_server::Thread thread) {
+  if (auto server_dispatcher = fdf::SynchronizedDispatcher::Create(
+          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "Virtio Block Server",
+          [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
+      server_dispatcher.is_ok()) {
+    async::PostTask(server_dispatcher->async_dispatcher(),
+                    [thread = std::move(thread)]() mutable { thread.Run(); });
+
+    // The dispatcher is destroyed in the shutdown handler.
+    server_dispatcher->release();
+  }
+}
+
+void BlockDevice::OnNewSession(block_server::Session session) {
+  if (auto server_dispatcher = fdf::SynchronizedDispatcher::Create(
+          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "Block Server Session",
+          [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
+      server_dispatcher.is_ok()) {
+    async::PostTask(server_dispatcher->async_dispatcher(),
+                    [session = std::move(session)]() mutable { session.Run(); });
+
+    // The dispatcher is destroyed in the shutdown handler.
+    server_dispatcher->release();
+  }
+}
+
+void BlockDevice::OnRequests(std::span<block_server::Request> requests) {
+  for (auto& request : requests) {
+    FDF_LOGL(TRACE, logger(), "Received request %lu", request.request_id);
+    if (zx_status_t status = block_server::CheckIoRange(request, config_.capacity);
+        status != ZX_OK) {
+      FDF_LOGL(WARNING, logger(), "Invalid request range.");
+      std::lock_guard lock(block_server_lock_);
+      if (block_server_) {
+        block_server_->SendReply(request.request_id, zx::make_result(status));
+      }
+      continue;
+    }
+    zx::result status = SubmitBlockServerRequest(request);
+    if (status.is_error()) {
+      FDF_LOGL(WARNING, logger(), "Failed to submit request: %s", status.status_string());
+      std::lock_guard lock(block_server_lock_);
+      if (block_server_) {
+        block_server_->SendReply(request.request_id, status.take_error());
+      }
+    }
+  }
+}
+
+void BlockDevice::ServeRequests(fidl::ServerEnd<fuchsia_hardware_block_volume::Volume> server_end) {
+  std::lock_guard lock(block_server_lock_);
+  if (block_server_) {
+    block_server_->Serve(std::move(server_end));
+  }
 }
 
 BlockDevice::BlockDevice(zx::bti bti, std::unique_ptr<Backend> backend, fdf::Logger& logger)
     : virtio::Device(std::move(bti), std::move(backend)), logger_(logger) {
-  sync_completion_reset(&txn_signal_);
   sync_completion_reset(&worker_signal_);
   for (auto& time : blk_req_start_timestamps_) {
     time = zx::time::infinite();
@@ -123,7 +268,7 @@ zx_status_t BlockDevice::Init() {
   }
 
   // Allocate the main vring.
-  auto err = vring_.Init(0, kRingSize);
+  auto err = vring_.Init(kVirtioBlkRequestQueueIndex, kRingSize);
   if (err < 0) {
     FDF_LOG(ERROR, "failed to allocate vring");
     return err;
@@ -155,6 +300,18 @@ zx_status_t BlockDevice::Init() {
   StartIrqThread();
   DriverStatusOk();
 
+  {
+    std::lock_guard lock(block_server_lock_);
+    block_server_.emplace(
+        block_server::PartitionInfo{
+            .device_flags = GetFlags(),
+            .block_count = GetBlockCount(),
+            .block_size = GetBlockSize(),
+            .max_transfer_size = GetMaxTransferSize(),
+        },
+        this);
+  }
+
   auto worker_thread_entry = [](void* ctx) {
     auto bd = static_cast<BlockDevice*>(ctx);
     bd->WorkerThread();
@@ -182,62 +339,65 @@ zx_status_t BlockDevice::Init() {
 void BlockDevice::Release() {
   watchdog_shutdown_.store(true);
   sync_completion_signal(&watchdog_signal_);
+  thrd_join(watchdog_thread_, nullptr);
+
+  {
+    std::lock_guard lock(block_server_lock_);
+    block_server_.reset();
+  }
   worker_shutdown_.store(true);
   sync_completion_signal(&worker_signal_);
-  sync_completion_signal(&txn_signal_);
-
-  thrd_join(watchdog_thread_, nullptr);
+  txn_cond_.notify_all();
   thrd_join(worker_thread_, nullptr);
   virtio::Device::Release();
+}
+
+struct vring_desc* BlockDevice::FreeDescChainLocked(uint16_t index) {
+  struct vring_desc* desc = vring_.DescFromIndex(index);
+  auto head_desc = desc;  // Save the first element.
+  {
+    for (;;) {
+      std::optional<uint16_t> next;
+      if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
+        virtio_dump_desc(desc);
+      }
+      if (desc->flags & VRING_DESC_F_NEXT) {
+        next = desc->next;
+      }
+
+      vring_.FreeDesc(index);
+
+      if (!next) {
+        // End of chain
+        break;
+      }
+      index = *next;
+      desc = vring_.DescFromIndex(index);
+    }
+  }
+  return head_desc;
 }
 
 void BlockDevice::IrqRingUpdate() {
   // Parse our descriptor chain and add back to the free queue.
   auto free_chain = [this](vring_used_elem* used_elem) {
-    uint32_t i = static_cast<uint16_t>(used_elem->id);
-    struct vring_desc* desc = vring_.DescFromIndex(static_cast<uint16_t>(i));
-    auto head_desc = desc;  // Save the first element.
-    {
-      std::lock_guard<std::mutex> lock(ring_lock_);
-      for (;;) {
-        int next;
-        if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
-          virtio_dump_desc(desc);
-        }
-        if (desc->flags & VRING_DESC_F_NEXT) {
-          next = desc->next;
-        } else {
-          // End of chain.
-          next = -1;
-        }
-
-        vring_.FreeDesc(static_cast<uint16_t>(i));
-
-        if (next < 0)
-          break;
-        i = next;
-        desc = vring_.DescFromIndex(static_cast<uint16_t>(i));
-      }
-    }
-
     std::optional<uint8_t> status;
     block_txn_t* txn = nullptr;
     {
       std::lock_guard<std::mutex> lock(txn_lock_);
+      struct vring_desc* head_desc;
+      {
+        std::lock_guard<std::mutex> lock2(ring_lock_);
+        head_desc = FreeDescChainLocked(static_cast<uint16_t>(used_elem->id));
+      }
 
       // Search our pending txn list to see if this completes it.
       list_for_every_entry (&pending_txn_list_, txn, block_txn_t, node) {
         if (txn->desc == head_desc) {
           FDF_LOG(TRACE, "completes txn %p", txn);
           status = blk_res_[txn->req_index];
-
-          free_blk_req(txn->req_index);
-          if (txn->discard_req_index) {
-            free_blk_req(*txn->discard_req_index);
-          }
-          list_delete(&txn->node);
-
-          sync_completion_signal(&txn_signal_);
+          // NB: We can't free the transaction's resources until we complete it, because the
+          // req_index is used to allocate requests out of the pool.
           break;
         }
       }
@@ -254,7 +414,7 @@ void BlockDevice::IrqRingUpdate() {
         case VIRTIO_BLK_S_UNSUPP:
           zx_status = ZX_ERR_NOT_SUPPORTED;
       }
-      txn_complete(txn, zx_status);
+      CompleteTxn(txn, zx_status);
     }
   };
 
@@ -264,32 +424,19 @@ void BlockDevice::IrqRingUpdate() {
 
 void BlockDevice::IrqConfigChange() {}
 
-zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes, zx_paddr_t* pages,
-                                  size_t pagecount, uint16_t* idx) {
-  size_t req_index;
-  std::optional<size_t> discard_req_index;
-  {
-    std::lock_guard<std::mutex> lock(txn_lock_);
-    req_index = alloc_blk_req();
-    if (req_index >= kBlkReqCount) {
-      FDF_LOG(TRACE, "too many block requests queued (%zu)!", req_index);
-      return ZX_ERR_NO_RESOURCES;
-    }
-    if (type == VIRTIO_BLK_T_DISCARD) {
-      // A second descriptor needs to be allocated for discard requests.
-      discard_req_index = alloc_blk_req();
-      if (*discard_req_index >= kBlkReqCount) {
-        FDF_LOG(TRACE, "too many block requests queued (%zu)!", *discard_req_index);
-        free_blk_req(req_index);
-        return ZX_ERR_NO_RESOURCES;
-      }
-    }
-  }
+void BlockDevice::QueueTxn(block_txn_t* txn, RequestContext context) {
+  ZX_DEBUG_ASSERT(txn);
 
-  auto req = &blk_req_[req_index];
+  uint32_t type = VirtioRequestType(*txn);
+  txn->req_index = context.req_index();
+  txn->discard_req_index = context.discard_req_index();
+  txn->desc = context.desc();
+  txn->pmt = context.pmt();
+
+  auto req = &blk_req_[txn->req_index];
   req->type = type;
   req->ioprio = 0;
-  if (type == VIRTIO_BLK_T_FLUSH) {
+  if (req->type == VIRTIO_BLK_T_FLUSH) {
     req->sector = 0;
   } else {
     req->sector = txn->op.rw.offset_dev;
@@ -302,57 +449,34 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
     // respect the max_discard_seg configuration of the device.
     static_assert(sizeof(virtio_blk_discard_write_zeroes_t) <= sizeof(virtio_blk_req_t));
     virtio_blk_discard_write_zeroes_t* req =
-        reinterpret_cast<virtio_blk_discard_write_zeroes_t*>(&blk_req_[req_index]);
-    req->sector = txn->op.rw.offset_dev;
-    req->num_sectors = txn->op.rw.length;
+        reinterpret_cast<virtio_blk_discard_write_zeroes_t*>(&blk_req_[*txn->discard_req_index]);
+    req->sector = txn->op.trim.offset_dev;
+    req->num_sectors = txn->op.trim.length;
+    req->flags = 0;
     FDF_LOG(TRACE, "blk_dwz_req sector %" PRIu64 " num_sectors %" PRIu32, req->sector,
             req->num_sectors);
   }
-  // Save the request indexes so we can free them when we complete the transfer.
-  txn->req_index = req_index;
-  txn->discard_req_index = discard_req_index;
+  FDF_LOG(TRACE, "page count %lu", context.num_pages());
 
-  FDF_LOG(TRACE, "page count %lu", pagecount);
-
-  // Put together a transfer.
-  uint16_t i;
-  vring_desc* desc;
-  uint16_t num_descriptors =
-      (type == VIRTIO_BLK_T_DISCARD ? 3u : 2u) + static_cast<uint16_t>(pagecount);
-  {
-    std::lock_guard<std::mutex> lock(ring_lock_);
-    desc = vring_.AllocDescChain(num_descriptors, &i);
-  }
-  if (!desc) {
-    FDF_LOG(TRACE, "failed to allocate descriptor chain of length %zu", 2u + pagecount);
-    std::lock_guard<std::mutex> lock(txn_lock_);
-    free_blk_req(req_index);
-    if (discard_req_index) {
-      free_blk_req(*discard_req_index);
-    }
-    return ZX_ERR_NO_RESOURCES;
-  }
-
-  FDF_LOG(TRACE, "after alloc chain desc %p, i %u", desc, i);
-
-  // Point the txn at this head descriptor.
-  txn->desc = desc;
-
-  // Set up the descriptor pointing to the head.
-  desc->addr = blk_req_buf_->phys() + req_index * sizeof(virtio_blk_req_t);
+  // Set up the head descriptor.
+  struct vring_desc* desc = context.desc();
+  desc->addr = blk_req_buf_->phys() + txn->req_index * sizeof(virtio_blk_req_t);
   desc->len = sizeof(virtio_blk_req_t);
   desc->flags = VRING_DESC_F_NEXT;
   if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
-    virtio_dump_desc(desc);
+    virtio_dump_desc(txn->desc);
   }
 
-  for (size_t n = 0; n < pagecount; n++) {
+  size_t bytes = type == VIRTIO_BLK_T_IN || type == VIRTIO_BLK_T_OUT
+                     ? txn->op.rw.length * config_.blk_size
+                     : 0;
+  for (size_t n = 0; n < context.num_pages(); n++) {
     desc = vring_.DescFromIndex(desc->next);
-    desc->addr = pages[n];  // |pages| are all page-aligned addresses.
+    desc->addr = context.pages()[n];  // |pages| are all page-aligned addresses.
     desc->len = static_cast<uint32_t>((bytes > kPageSize) ? kPageSize : bytes);
     if (n == 0) {
       // First entry may not be page aligned.
-      size_t page0_offset = txn->op.rw.offset_vmo & kPageMask;
+      size_t page0_offset = (txn->op.rw.offset_vmo * config_.blk_size) & kPageMask;
 
       // Adjust starting address.
       desc->addr += page0_offset;
@@ -373,14 +497,11 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
 
     bytes -= desc->len;
   }
-  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
-    virtio_dump_desc(desc);
-  }
   assert(bytes == 0);
 
   if (type == VIRTIO_BLK_T_DISCARD) {
     desc = vring_.DescFromIndex(desc->next);
-    desc->addr = blk_req_buf_->phys() + *discard_req_index * sizeof(virtio_blk_req_t);
+    desc->addr = blk_req_buf_->phys() + *context.discard_req_index() * sizeof(virtio_blk_req_t);
     desc->len = sizeof(virtio_blk_discard_write_zeroes_t);
     desc->flags = VRING_DESC_F_NEXT;
     if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
@@ -390,7 +511,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
 
   // Set up the descriptor pointing to the response.
   desc = vring_.DescFromIndex(desc->next);
-  desc->addr = blk_res_pa_ + req_index;
+  desc->addr = blk_res_pa_ + context.req_index();
   desc->len = 1;
   desc->flags = VRING_DESC_F_WRITE;
   if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
@@ -399,65 +520,162 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
 
   {
     std::lock_guard<std::mutex> lock(watchdog_lock_);
-    blk_req_start_timestamps_[req_index] = zx::clock::get_monotonic();
+    blk_req_start_timestamps_[context.req_index()] = zx::clock::get_monotonic();
   }
 
-  *idx = i;
-  return ZX_OK;
+  std::lock_guard<std::mutex> lock(txn_lock_);
+  list_add_tail(&pending_txn_list_, &txn->node);
+  vring_.SubmitChain(context.desc_index());
+  vring_.Kick();
+  FDF_LOG(TRACE, "Submitted txn %p (desc %u)", txn, context.desc_index());
+  context.Release();
 }
 
-namespace {
-// Out parameter |pages| are all page-aligned addresses.
-static zx_status_t pin_pages(zx_handle_t bti, block_txn_t* txn, size_t bytes, zx_paddr_t* pages,
-                             size_t* num_pages) {
-  uint64_t suboffset = txn->op.rw.offset_vmo & kPageMask;
-  uint64_t aligned_offset = txn->op.rw.offset_vmo & ~kPageMask;
-  size_t pin_size = ZX_ROUNDUP(suboffset + bytes, kPageSize);
+zx::result<zx_handle_t> BlockDevice::PinPages(zx_handle_t bti, zx_handle_t vmo,
+                                              uint64_t vmo_offset_blocks, uint32_t num_blocks,
+                                              std::array<zx_paddr_t, MAX_SCATTER>* pages,
+                                              size_t* num_pages) const {
+  uint64_t suboffset = (vmo_offset_blocks * config_.blk_size) & kPageMask;
+  uint64_t aligned_offset = (vmo_offset_blocks * config_.blk_size) & ~kPageMask;
+  size_t pin_size =
+      ZX_ROUNDUP(suboffset + (static_cast<uint64_t>(num_blocks * config_.blk_size)), kPageSize);
   *num_pages = pin_size / kPageSize;
-  if (*num_pages > MAX_SCATTER) {
+  if (*num_pages > pages->size()) {
     FDF_LOG(ERROR, "transaction too large");
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  zx_handle_t vmo = txn->op.rw.vmo;
+  zx_handle_t pmt;
   zx_status_t status = zx_bti_pin(bti, ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, vmo, aligned_offset,
-                                  pin_size, pages, *num_pages, &txn->pmt);
+                                  pin_size, pages->data(), *num_pages, &pmt);
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "could not pin pages: %s", zx_status_get_string(status));
-    return ZX_ERR_INTERNAL;
+    return zx::error(status);
   }
 
-  return ZX_OK;
+  return zx::ok(pmt);
 }
-}  // namespace
+
+zx::result<> BlockDevice::SubmitBlockServerRequest(const block_server::Request& request) {
+  uint32_t type = VirtioRequestType(request);
+  std::array<zx_paddr_t, MAX_SCATTER> pages;
+  zx::result<RequestContext> context = AllocateRequestContext(
+      type, request.vmo->get(), request.operation.read.vmo_offset / config_.blk_size,
+      request.operation.read.block_count, &pages);
+  if (context.is_error()) {
+    return context.take_error();
+  }
+  block_txn_t* txn = &block_server_request_pool_[context->req_index()];
+
+  txn->request = request.request_id;
+  txn->completion_cb = nullptr;  // Not used for block_server requests
+
+  switch (request.operation.tag) {
+    case block_server::Operation::Tag::Read:
+      txn->op.rw.command.opcode = BLOCK_OPCODE_READ;
+      txn->op.rw.vmo = request.vmo->get();
+      txn->op.rw.length = request.operation.read.block_count;
+      txn->op.rw.offset_dev = request.operation.read.device_block_offset;
+      txn->op.rw.offset_vmo = request.operation.read.vmo_offset / config_.blk_size;
+      break;
+    case block_server::Operation::Tag::Write:
+      txn->op.rw.command.opcode = BLOCK_OPCODE_WRITE;
+      if (request.operation.write.options.is_force_access()) {
+        txn->op.rw.command.flags |= BLOCK_IO_FLAG_FORCE_ACCESS;
+      }
+      txn->op.rw.vmo = request.vmo->get();
+      txn->op.rw.length = request.operation.write.block_count;
+      txn->op.rw.offset_dev = request.operation.write.device_block_offset;
+      txn->op.rw.offset_vmo = request.operation.write.vmo_offset / config_.blk_size;
+      break;
+    case block_server::Operation::Tag::Trim:
+      txn->op.trim.command.opcode = BLOCK_OPCODE_TRIM;
+      txn->op.trim.length = request.operation.trim.block_count;
+      txn->op.trim.offset_dev = request.operation.trim.device_block_offset;
+      break;
+    case block_server::Operation::Tag::Flush:
+      txn->op.command.opcode = BLOCK_OPCODE_FLUSH;
+      break;
+    case block_server::Operation::Tag::CloseVmo:
+      // The rust block server will never send CloseVmo to its C interface.
+      __UNREACHABLE;
+  }
+
+  // A flush operation should complete after any in-flight transactions, so wait for all pending
+  // txns to complete before submitting a flush txn. This is necessary because a virtio block device
+  // may service requests in any order.
+  if (type == VIRTIO_BLK_T_FLUSH) {
+    FlushPendingTxns();
+    if (worker_shutdown_.load()) {
+      std::lock_guard lock1(txn_lock_);
+      std::lock_guard lock2(ring_lock_);
+      FreeRequestContext(*context);
+      return zx::error(ZX_ERR_IO_NOT_PRESENT);
+    }
+  }
+
+  QueueTxn(txn, std::move(*context));
+
+  // A flush operation should complete before any subsequent transactions. So, we wait for all
+  // pending transactions (including the flush) to complete before continuing.
+  if (type == VIRTIO_BLK_T_FLUSH) {
+    FlushPendingTxns();
+  }
+
+  return zx::ok();
+}
+
+BlockDevice::RequestContext::RequestContext(BlockDevice::RequestContext&& other) {
+  *this = std::move(other);
+}
+
+BlockDevice::RequestContext& BlockDevice::RequestContext::operator=(RequestContext&& other) {
+  if (this != &other) {
+    released_ = other.released_;
+    req_index_ = other.req_index_;
+    discard_req_index_ = other.discard_req_index_;
+    desc_index_ = other.desc_index_;
+    desc_ = other.desc_;
+    pages_ = other.pages_;
+    num_pages_ = other.num_pages_;
+    pmt_ = other.pmt_;
+    other.Release();
+  }
+  return *this;
+}
+
+BlockDevice::RequestContext::~RequestContext() {
+  // RAII-style cleanup isn't a good option, because the destructor would need to take locks (see
+  // BlockDevice::FreeRequestContext), which could cause difficult-to-spot deadlocks.
+  ZX_ASSERT_MSG(released_, "Did you forget to call Release/FreeRequestContext?");
+}
+
+void BlockDevice::FreeRequestContext(BlockDevice::RequestContext& context) {
+  if (context.pmt() != ZX_HANDLE_INVALID) {
+    zx_pmt_unpin(context.pmt());
+  }
+  if (context.desc() != nullptr) {
+    FreeDescChainLocked(context.desc_index());
+  }
+  if (context.req_index() < kBlkReqCount) {
+    FreeBlkReqLocked(context.req_index());
+    if (context.discard_req_index()) {
+      FreeBlkReqLocked(*context.discard_req_index());
+    }
+  }
+  context.Release();
+  txn_cond_.notify_all();
+}
+
+void BlockDevice::RequestContext::Release() {
+  ZX_ASSERT_MSG(!released_, "Release called twice");
+  released_ = true;
+}
 
 void BlockDevice::SignalWorker(block_txn_t* txn) {
-  switch (txn->op.command.opcode) {
-    case BLOCK_OPCODE_READ:
-    case BLOCK_OPCODE_WRITE:
-    case BLOCK_OPCODE_TRIM:
-      if (zx_status_t status = block::CheckIoRange(txn->op.rw, config_.capacity, logger());
-          status != ZX_OK) {
-        txn_complete(txn, status);
-        return;
-      }
-      if (txn->op.command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) {
-        txn_complete(txn, ZX_ERR_NOT_SUPPORTED);
-        return;
-      }
-      FDF_LOG(TRACE, "txn %p, opcode %#x\n", txn, txn->op.command.opcode);
-      break;
-    case BLOCK_OPCODE_FLUSH:
-      FDF_LOG(TRACE, "txn %p, opcode FLUSH\n", txn);
-      break;
-    default:
-      txn_complete(txn, ZX_ERR_NOT_SUPPORTED);
-      return;
-  }
-
   std::lock_guard lock(lock_);
   if (worker_shutdown_.load()) {
-    txn_complete(txn, ZX_ERR_IO_NOT_PRESENT);
+    CompleteTxn(txn, ZX_ERR_IO_NOT_PRESENT);
     return;
   }
   list_add_tail(&worker_txn_list_, &txn->node);
@@ -484,103 +702,122 @@ void BlockDevice::WorkerThread() {
     }
 
     FDF_LOG(TRACE, "WorkerThread handling txn %p", txn);
-
-    uint32_t type;
-    bool do_flush = false;
-    size_t bytes;
-    zx_paddr_t pages[MAX_SCATTER];
-    size_t num_pages;
-    zx_status_t status = ZX_OK;
-
-    if (txn->op.command.opcode == BLOCK_OPCODE_FLUSH) {
-      type = VIRTIO_BLK_T_FLUSH;
-      bytes = 0;
-      num_pages = 0;
-      do_flush = true;
-    } else if (txn->op.command.opcode == BLOCK_OPCODE_TRIM) {
-      type = VIRTIO_BLK_T_DISCARD;
-      bytes = 0;
-      num_pages = 0;
-    } else {
-      if (txn->op.command.opcode == BLOCK_OPCODE_WRITE) {
-        type = VIRTIO_BLK_T_OUT;
-      } else {
-        type = VIRTIO_BLK_T_IN;
+    if (zx::result result = SubmitBanjoRequest(txn); result.is_error()) {
+      if (txn->completion_cb) {
+        txn->completion_cb(txn->cookie, result.status_value(), &txn->op);
       }
-      bytes = static_cast<size_t>(txn->op.rw.length) * config_.blk_size;
-      txn->op.rw.offset_vmo *= config_.blk_size;
-      status = pin_pages(bti_.get(), txn, bytes, pages, &num_pages);
-    }
-
-    if (status != ZX_OK) {
-      txn_complete(txn, status);
-      continue;
-    }
-
-    // A flush operation should complete after any inflight transactions, so wait for all
-    // pending txns to complete before submitting a flush txn. This is necessary because
-    // a virtio block device may service requests in any order.
-    if (do_flush) {
-      FlushPendingTxns();
-      if (worker_shutdown_.load()) {
-        return;
-      }
-    }
-
-    bool cannot_fail = false;
-    for (;;) {
-      uint16_t idx;
-      status = QueueTxn(txn, type, bytes, pages, num_pages, &idx);
-      if (status == ZX_OK) {
-        std::lock_guard<std::mutex> lock(txn_lock_);
-        list_add_tail(&pending_txn_list_, &txn->node);
-        vring_.SubmitChain(idx);
-        vring_.Kick();
-        FDF_LOG(TRACE, "WorkerThread submitted txn %p", txn);
-        break;
-      }
-
-      if (cannot_fail) {
-        FDF_LOG(ERROR, "failed to queue txn to hw: %s", zx_status_get_string(status));
-        {
-          std::lock_guard<std::mutex> lock(txn_lock_);
-          free_blk_req(txn->req_index);
-          if (txn->discard_req_index) {
-            free_blk_req(*txn->discard_req_index);
-          }
-        }
-        txn_complete(txn, status);
-        break;
-      }
-
-      {
-        std::lock_guard<std::mutex> lock(txn_lock_);
-        if (list_is_empty(&pending_txn_list_)) {
-          // We hold the txn lock and the list is empty, if we fail this time around
-          // there's no point in trying again.
-          cannot_fail = true;
-          continue;
-        }
-
-        // Reset the txn signal then wait for one of the pending txns to complete
-        // outside the lock. This should mean that resources have been freed for the next
-        // iteration. We cannot deadlock due to the reset because pending_txn_list_ is not
-        // empty.
-        sync_completion_reset(&txn_signal_);
-      }
-
-      sync_completion_wait(&txn_signal_, ZX_TIME_INFINITE);
-      if (worker_shutdown_.load()) {
-        return;
-      }
-    }
-
-    // A flush operation should complete before any subsequent transactions. So, we wait for all
-    // pending transactions (including the flush) to complete before continuing.
-    if (do_flush) {
-      FlushPendingTxns();
     }
   }
+}
+
+zx::result<> BlockDevice::SubmitBanjoRequest(block_txn_t* transaction) {
+  uint32_t type = VirtioRequestType(*transaction);
+  std::array<zx_paddr_t, MAX_SCATTER> pages;
+  zx::result<RequestContext> context =
+      AllocateRequestContext(type, transaction->op.rw.vmo, transaction->op.rw.offset_vmo,
+                             transaction->op.rw.length, &pages);
+  if (context.is_error()) {
+    FDF_LOG(ERROR, "failed to queue txn to hw: %s", context.status_string());
+    return context.take_error();
+  }
+
+  // A flush operation should complete after any in-flight transactions, so wait for all pending
+  // txns to complete before submitting a flush txn. This is necessary because a virtio block
+  // device may service requests in any order.
+  if (type == VIRTIO_BLK_T_FLUSH) {
+    FlushPendingTxns();
+    if (worker_shutdown_.load()) {
+      std::lock_guard lock1(txn_lock_);
+      std::lock_guard lock2(ring_lock_);
+      FreeRequestContext(*context);
+      return zx::error(ZX_ERR_IO_NOT_PRESENT);
+    }
+  }
+
+  QueueTxn(transaction, std::move(*context));
+
+  // A flush operation should complete before any subsequent transactions. So, we wait for all
+  // pending transactions (including the flush) to complete before continuing.
+  if (type == VIRTIO_BLK_T_FLUSH) {
+    FlushPendingTxns();
+  }
+
+  return zx::ok();
+}
+
+// Thread safety: Disable thread safety analysis because TA doesn't understand std::unique_lock,
+// which is required by std::condition_variable.
+zx::result<BlockDevice::RequestContext> BlockDevice::AllocateRequestContext(
+    uint32_t type, zx_handle_t vmo, uint64_t vmo_offset_blocks, uint32_t num_blocks,
+    std::array<zx_paddr_t, MAX_SCATTER>* pages) TA_NO_THREAD_SAFETY_ANALYSIS {
+  for (;;) {
+    std::unique_lock lock(txn_lock_);
+    if (worker_shutdown_.load()) {
+      return zx::error(ZX_ERR_IO_NOT_PRESENT);
+    }
+    zx::result<std::optional<RequestContext>> result;
+    {
+      std::unique_lock lock2(ring_lock_);
+      result = TryAllocateRequestContextLocked(type, vmo, vmo_offset_blocks, num_blocks, pages);
+    }
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "failed to allocate virtio resources: %s", result.status_string());
+      return result.take_error();
+    }
+    if (result.value().has_value()) {
+      return zx::ok(std::move(*result).value());
+    }
+
+    // No resources; try again.
+    txn_cond_.wait(lock);
+  }
+}
+
+zx::result<std::optional<BlockDevice::RequestContext>> BlockDevice::TryAllocateRequestContextLocked(
+    uint32_t type, zx_handle_t vmo, uint64_t vmo_offset_blocks, uint32_t num_blocks,
+    std::array<zx_paddr_t, MAX_SCATTER>* pages) {
+  RequestContext out;
+  // Thread safety: TryAllocateRequestContextLocked requires the necessary locks.
+  auto cleanup = fit::defer([&]() TA_NO_THREAD_SAFETY_ANALYSIS { FreeRequestContext(out); });
+  std::optional<size_t> idx = AllocateBlkReqLocked();
+  if (!idx) {
+    FDF_LOG(TRACE, "too many block requests queued!");
+    return zx::ok(std::nullopt);
+  }
+  out.set_req_index(*idx);
+
+  if (type == VIRTIO_BLK_T_DISCARD) {
+    // A second descriptor needs to be allocated for discard requests.
+    idx = AllocateBlkReqLocked();
+    if (!idx) {
+      FDF_LOG(TRACE, "too many block requests queued!");
+      return zx::ok(std::nullopt);
+    }
+    out.set_discard_req_index(*idx);
+  }
+
+  if (type == VIRTIO_BLK_T_IN || type == VIRTIO_BLK_T_OUT) {
+    size_t num_pages;
+    zx::result result = PinPages(bti_.get(), vmo, vmo_offset_blocks, num_blocks, pages, &num_pages);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    out.set_pages(pages->data(), num_pages);
+    out.set_pmt(result.value());
+  }
+
+  uint16_t num_descriptors =
+      (type == VIRTIO_BLK_T_DISCARD ? 3u : 2u) + static_cast<uint16_t>(out.num_pages());
+  uint16_t desc_index;
+  struct vring_desc* desc = nullptr;
+  desc = vring_.AllocDescChain(num_descriptors, &desc_index);
+  if (!desc) {
+    FDF_LOG(TRACE, "failed to allocate descriptor chain of length %zu", 2u + out.num_pages());
+    return zx::ok(std::nullopt);
+  }
+  out.set_desc(desc, desc_index);
+  cleanup.cancel();
+  return zx::ok(std::move(out));
 }
 
 void BlockDevice::WatchdogThread() {
@@ -608,19 +845,9 @@ void BlockDevice::WatchdogThread() {
 }
 
 void BlockDevice::FlushPendingTxns() {
-  for (;;) {
-    {
-      std::lock_guard<std::mutex> lock(txn_lock_);
-      if (list_is_empty(&pending_txn_list_)) {
-        return;
-      }
-      sync_completion_reset(&txn_signal_);
-    }
-    sync_completion_wait(&txn_signal_, ZX_TIME_INFINITE);
-    if (worker_shutdown_.load()) {
-      return;
-    }
-  }
+  std::unique_lock lock(txn_lock_);
+  txn_cond_.wait(lock,
+                 [&]() { return worker_shutdown_.load() || list_is_empty(&pending_txn_list_); });
 }
 
 void BlockDevice::CleanupPendingTxns() {
@@ -634,17 +861,17 @@ void BlockDevice::CleanupPendingTxns() {
     std::lock_guard lock(lock_);
     list_for_every_entry_safe (&worker_txn_list_, txn, temp_entry, block_txn_t, node) {
       list_delete(&txn->node);
-      txn_complete(txn, ZX_ERR_IO_NOT_PRESENT);
+      CompleteTxn(txn, ZX_ERR_IO_NOT_PRESENT);
     }
   }
   std::lock_guard<std::mutex> lock(txn_lock_);
   list_for_every_entry_safe (&pending_txn_list_, txn, temp_entry, block_txn_t, node) {
-    free_blk_req(txn->req_index);
+    FreeBlkReqLocked(txn->req_index);
     if (txn->discard_req_index) {
-      free_blk_req(*txn->discard_req_index);
+      FreeBlkReqLocked(*txn->discard_req_index);
     }
     list_delete(&txn->node);
-    txn_complete(txn, ZX_ERR_IO_NOT_PRESENT);
+    CompleteTxn(txn, ZX_ERR_IO_NOT_PRESENT);
   }
 }
 
@@ -697,6 +924,19 @@ zx::result<> BlockDriver::Start() {
     FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
     return zx::error(result.status());
   }
+
+  if (zx::result result = outgoing()->AddService<fuchsia_hardware_block_volume::Service>(
+          fuchsia_hardware_block_volume::Service::InstanceHandler({
+              .volume =
+                  [this](fidl::ServerEnd<fuchsia_hardware_block_volume::Volume> server_end) {
+                    block_device_->ServeRequests(std::move(server_end));
+                  },
+          }));
+      result.is_error()) {
+    FDF_LOGL(ERROR, logger(), "Failed to add volume service instance: %s", result.status_string());
+    return result.take_error();
+  }
+
   return zx::ok();
 }
 

@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/predicates/status.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 
 namespace {
 
@@ -200,6 +201,8 @@ class TestBlockDriver : public virtio::BlockDriver {
   TestBlockDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
       : BlockDriver(std::move(start_args), std::move(dispatcher)) {}
 
+  virtio::BlockDevice& block_device() const { return virtio::BlockDriver::block_device(); }
+
  protected:
   zx::result<std::unique_ptr<virtio::BlockDevice>> CreateBlockDevice() override {
     zx::bti bti(ZX_HANDLE_INVALID);
@@ -260,16 +263,13 @@ class BlockDriverTest : public ::testing::Test {
     sync_completion_signal(&operation->event_);
   }
 
-  bool Wait() {
+  zx_status_t Wait() {
     zx_status_t status = sync_completion_wait(&event_, ZX_SEC(5));
     sync_completion_reset(&event_);
-    return status == ZX_OK;
+    return status;
   }
 
   zx_status_t OperationStatus() { return operation_status_; }
-
- protected:
-  std::unique_ptr<virtio::BlockDevice> device_;
 
  private:
   fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
@@ -284,13 +284,13 @@ TEST_F(BlockDriverTest, QueueOne) {
   virtio::block_txn_t txn = TestReadCommand(0);
   driver_test().driver()->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn),
                                          &BlockDriverTest::CompletionCb, this);
-  ASSERT_TRUE(Wait());
+  ASSERT_OK(Wait());
   ASSERT_EQ(ZX_ERR_OUT_OF_RANGE, OperationStatus());
 
   txn = TestReadCommand(kCapacity * 10);
   driver_test().driver()->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn),
                                          &BlockDriverTest::CompletionCb, this);
-  ASSERT_TRUE(Wait());
+  ASSERT_OK(Wait());
   ASSERT_EQ(ZX_ERR_OUT_OF_RANGE, OperationStatus());
 }
 
@@ -315,7 +315,7 @@ TEST_F(BlockDriverTest, ReadOk) {
   txn.op.rw.vmo = vmo.get();
   driver_test().driver()->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn),
                                          &BlockDriverTest::CompletionCb, this);
-  ASSERT_TRUE(Wait());
+  ASSERT_OK(Wait());
   ASSERT_EQ(ZX_OK, OperationStatus());
 }
 
@@ -328,7 +328,7 @@ TEST_F(BlockDriverTest, ReadError) {
   txn.op.rw.vmo = vmo.get();
   driver_test().driver()->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn),
                                          &BlockDriverTest::CompletionCb, this);
-  ASSERT_TRUE(Wait());
+  ASSERT_OK(Wait());
   ASSERT_EQ(ZX_ERR_IO, OperationStatus());
 }
 
@@ -338,8 +338,70 @@ TEST_F(BlockDriverTest, Trim) {
   virtio::block_txn_t txn = TestTrimCommand();
   driver_test().driver()->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn),
                                          &BlockDriverTest::CompletionCb, this);
-  ASSERT_TRUE(Wait());
+  ASSERT_OK(Wait());
   ASSERT_OK(OperationStatus());
+}
+
+TEST_F(BlockDriverTest, BlockServer) {
+  StartDriver();
+
+  auto [volume_client, volume_server] =
+      fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
+  driver_test().driver()->block_device().ServeRequests(std::move(volume_server));
+  zx::result client = block_client::RemoteBlockDevice::Create(std::move(volume_client));
+  ASSERT_OK(client);
+
+  fuchsia_hardware_block::wire::BlockInfo info;
+  ASSERT_OK(client->BlockGetInfo(&info));
+  const size_t kLen = info.max_transfer_size + kBlkSize;
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(kLen, 0, &vmo));
+
+  storage::Vmoid owned_vmoid;
+  EXPECT_OK(client->BlockAttachVmo(vmo, &owned_vmoid));
+
+  // It doesn't matter if we leak the ID.
+  vmoid_t vmoid = owned_vmoid.TakeId();
+
+  block_fifo_request_t requests[] = {
+      {.command =
+           {
+               .opcode = BLOCK_OPCODE_WRITE,
+           },
+       .vmoid = vmoid,
+       .length = 3,
+       .vmo_offset = 0,
+       .dev_offset = 0},
+      {.command =
+           {
+               .opcode = BLOCK_OPCODE_READ,
+           },
+       .vmoid = vmoid,
+       .length = 3,
+       .vmo_offset = 10,
+       .dev_offset = 100},
+      {.command =
+           {
+               .opcode = BLOCK_OPCODE_TRIM,
+           },
+       .vmoid = 0,
+       .length = 3,
+       .vmo_offset = 0,
+       .dev_offset = 3},
+  };
+
+  EXPECT_OK(client->FifoTransaction(requests, 3));
+
+  block_fifo_request_t big_request = {.command =
+                                          {
+                                              .opcode = BLOCK_OPCODE_WRITE,
+                                          },
+                                      .vmoid = vmoid,
+                                      .length = static_cast<uint32_t>(kLen / kBlkSize),
+                                      .vmo_offset = 0,
+                                      .dev_offset = 0};
+
+  EXPECT_OK(client->FifoTransaction(&big_request, 1));
 }
 
 FUCHSIA_DRIVER_EXPORT(TestBlockDriver);

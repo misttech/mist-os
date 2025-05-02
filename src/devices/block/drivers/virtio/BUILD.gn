@@ -51,6 +51,7 @@ source_set("block_lib") {
   sources = [ "block.cc" ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/block/lib/common",
@@ -58,6 +59,7 @@ source_set("block_lib") {
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/listnode",
+    "//src/storage/lib/block_server:block_server_cc",
   ]
 }
 
@@ -130,6 +132,7 @@ test("virtio-block-test-bin") {
     "//src/devices/testing/fake-bti",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
+    "//src/storage/lib/block_client/cpp",
   ]
 }
 
