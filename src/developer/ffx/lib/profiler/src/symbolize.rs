@@ -3,11 +3,14 @@
 // found in the LICENSE file.
 
 use crate::parse::{
-    BacktraceDetails, ModuleWithMmapDetails, Pid, SymbolizeError, Tid, UnsymbolizedSamples,
+    BacktraceDetails, ModuleWithMmapDetails, Pid, ProfilingRecordHandler, SymbolizeError, Tid,
+    UnsymbolizedSamples,
 };
 use ffx_symbolize::{ResolvedLocation, Symbolizer};
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 /// A resolved address.
 #[derive(Clone, PartialEq)]
 pub struct ResolvedAddress {
@@ -29,13 +32,7 @@ impl std::fmt::Debug for ResolvedAddress {
 /// Symbolized record hash map. key: pid, value: all of the records belong to this pid.
 #[derive(Clone, Debug, Default)]
 pub struct SymbolizedRecords {
-    records: HashMap<Pid, Vec<SymbolizedRecord>>,
-}
-
-impl SymbolizedRecords {
-    pub fn add_pid(&mut self, pid: Pid) {
-        self.records.insert(pid, Vec::new());
-    }
+    pub records: HashMap<Pid, Vec<SymbolizedRecord>>,
 }
 
 /// Symbolized bt list for a single tid.
@@ -79,38 +76,47 @@ impl UnsymbolizedSamples {
         pprof_conversion: bool,
         context: &ffx_config::EnvironmentContext,
     ) -> Result<SymbolizedRecords, SymbolizeError> {
-        let mut res = SymbolizedRecords::default();
-        for (pid, handler) in self.handlers {
-            res.add_pid(pid);
-            let mut symbolizer = Symbolizer::with_context(context)?;
-            // We use a hashmap to store the seen backtrace, to avoid symbolize the same backtrace multiple times.
-            let mut seen_bt: HashMap<BacktraceDetails, ResolvedAddress> = HashMap::new();
-            for ModuleWithMmapDetails { module, mmaps } in handler.get_module_with_mmap_records() {
-                let module_id =
-                    symbolizer.add_module(&module.name, hex::decode(&module.build_id)?.as_ref());
-                for mmap_record in mmaps {
-                    symbolizer.add_mapping(module_id, mmap_record.clone())?;
-                }
-            }
+        let context_arc = Arc::new(context.clone());
+        let res: HashMap<Pid, Vec<SymbolizedRecord>> = self.handlers.par_iter().map(|(pid, handler):(&Pid, &ProfilingRecordHandler)| -> Result<(Pid, Vec<SymbolizedRecord>), SymbolizeError> {
+            let context_clone_for_thread = Arc::clone(&context_arc);
+            let mut res_per_pid = vec![];
+                    let mut symbolizer = Symbolizer::with_context(&*context_clone_for_thread)?;
+                    // We use a hashmap to store the seen backtrace, to avoid symbolize the same backtrace multiple times.
+                    let mut seen_bt: HashMap<BacktraceDetails, ResolvedAddress> = HashMap::new();
+                    for ModuleWithMmapDetails { module, mmaps } in
+                        handler.get_module_with_mmap_records()
+                    {
+                        let module_id = symbolizer
+                            .add_module(&module.name, hex::decode(&module.build_id)?.as_ref());
 
-            for (tid, backtraces) in handler.get_backtrace_records() {
-                let mut symbolized_record = SymbolizedRecord { tid: *tid, backtraces: Vec::new() };
-                for backtrace in backtraces {
-                    let resolved_addr = seen_bt.entry(*backtrace).or_insert_with_key(|bt_key| {
-                        let resolved_locations =
-                            symbolizer.resolve_addr(bt_key.0).unwrap_or_else(|_| Vec::new());
-                        ResolvedAddress { addr: bt_key.0, locations: resolved_locations }
-                    });
-                    symbolized_record.add_backtrace(resolved_addr.clone());
-                }
-                if let Some(records) = res.records.get_mut(&pid) {
-                    records.push(symbolized_record);
-                }
-            }
-        }
+                        for mmap_record in mmaps {
+                            symbolizer.add_mapping(module_id, mmap_record.clone())?;
+                        }
+                    }
+                    for (tid, backtraces) in handler.get_backtrace_records() {
+                        let mut symbolized_record =
+                            SymbolizedRecord { tid: *tid, backtraces: Vec::new() };
+                        for backtrace in backtraces {
+                            let resolved_addr =
+                                seen_bt.entry(*backtrace).or_insert_with_key(|bt_key| {
+                                    let resolved_locations = symbolizer
+                                        .resolve_addr(bt_key.0)
+                                        .unwrap_or_else(|_| Vec::new());
+                                    ResolvedAddress {
+                                        addr: bt_key.0,
+                                        locations: resolved_locations,
+                                    }
+                                }).to_owned();
+                            symbolized_record.add_backtrace(resolved_addr);
+                        }
+                        res_per_pid.push(symbolized_record);
+                    }
+                    Ok((*pid, res_per_pid))
+        })
+        .collect::<Result<HashMap<Pid, Vec<SymbolizedRecord>>, SymbolizeError>>()?;
         if !pprof_conversion {
             std::fs::write(output, format!("{res:#?}\n"))?;
         }
-        Ok(res)
+        Ok(SymbolizedRecords { records: res })
     }
 }

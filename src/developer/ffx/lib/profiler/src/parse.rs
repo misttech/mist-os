@@ -4,8 +4,6 @@
 
 use ffx_symbolize::{MappingDetails, MappingFlags};
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::str::FromStr;
 use thiserror::Error;
@@ -160,13 +158,11 @@ pub struct UnsymbolizedSamples {
 
 impl UnsymbolizedSamples {
     pub fn new(path: &PathBuf) -> Result<Self, SymbolizeError> {
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
+        let reader = std::fs::read_to_string(path)?;
         let mut profiling_map: HashMap<Pid, ProfilingRecordHandler> = HashMap::new();
         let mut state = ParseStateMachine::NotStarted;
         let mut current_profiling_record_handler = ProfilingRecordHandler::default();
-        for line_result in reader.lines() {
-            let line = line_result?;
+        for line in reader.lines() {
             if line.starts_with("{{{reset") {
                 state = ParseStateMachine::Start;
             }
