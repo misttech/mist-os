@@ -9,7 +9,7 @@ use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
 use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use fidl::endpoints::{ControlHandle as _, Responder as _};
-pub use fidl_test_driverservice_common::*;
+pub use fidl_test_driverservice__common::*;
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
 

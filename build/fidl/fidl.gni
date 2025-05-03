@@ -480,135 +480,39 @@ template("fidl") {
       # rust bindings are to be defined.
       import("//build/rust/fidl_rust.gni")
 
-      # Define the common portion of the rust bindings.
-      fidl_rust("${target_name}_rust_common") {
-        forward_variables_from(invoker,
-                               [
-                                 "applicable_licenses",
-                                 "testonly",
-                                 "visibility",
-                                 "public_deps",
-                                 "disable_rustdoc",
-                               ])
-        forward_variables_from(common_parameters, "*")
-        if (!is_host && enable_rust_drivers) {
-          forward_variables_from(invoker, [ "contains_drivers" ])
-        }
-        deps = []
-        common = true
-        if (is_host) {
-          deps = [ "//sdk/categories:marker-${marker_category}" ]
-        }
-        fidl_gen_dir += "/rust"
-      }
-
-      common_crate_name =
-          "fidl_" + string_replace(common_parameters.library_name, ".", "_") +
-          "_common"
-
       # Define the standard FIDL Rust bindings.
       fidl_rust("${target_name}_rust") {
         forward_variables_from(invoker,
                                [
                                  "applicable_licenses",
+                                 "disable_rustdoc",
+                                 "enable_fdomain",
+                                 "public_deps",
                                  "testonly",
                                  "visibility",
-                                 "public_deps",
-                                 "disable_rustdoc",
                                ])
         forward_variables_from(common_parameters, "*")
         if (!is_host && enable_rust_drivers) {
           forward_variables_from(invoker, [ "contains_drivers" ])
         }
-        deps = [ ":${invoker.target_name}_rust_common" ]
-        use_common = common_crate_name
-        deps += [ "//sdk/categories:marker-${marker_category}" ]
+        deps = [ "//sdk/categories:marker-${marker_category}" ]
         fidl_gen_dir += "/rust"
       }
 
+      # TODO: update users to the new target names
+      group("${target_name}_fidl_flex") {
+        forward_variables_from(invoker, [ "testonly" ])
+        public_deps = [ ":${_fidl_target_name}_rust_flex" ]
+      }
       if (enable_fdomain) {
-        # Define the FDomain Rust bindings.
-        fidl_rust("${target_name}_fdomain") {
-          forward_variables_from(invoker,
-                                 [
-                                   "applicable_licenses",
-                                   "testonly",
-                                   "visibility",
-                                   "public_deps",
-                                   "disable_rustdoc",
-                                 ])
-
-          fdomain = true
-
-          forward_variables_from(common_parameters, "*")
-          deps = [
-            ":${invoker.target_name}_rust_common",
-            "//sdk/categories:marker-${marker_category}",
-          ]
-          use_common = common_crate_name
-          fidl_gen_dir += "/rust"
+        group("${target_name}_fdomain") {
+          forward_variables_from(invoker, [ "testonly" ])
+          public_deps = [ ":${_fidl_target_name}_rust_fdomain" ]
         }
-      }
-
-      _lib_name = string_replace(common_parameters.library_name, ".", "_")
-
-      generated_file("${target_name}_fdomain_flex_src") {
-        contents = "pub use fdomain_${_lib_name}::*;"
-        outputs = [ "${target_gen_dir}/${_lib_name}_fdomain_flex.rs" ]
-      }
-
-      generated_file("${target_name}_fidl_flex_src") {
-        contents = "pub use fidl_${_lib_name}::*;"
-        outputs = [ "${target_gen_dir}/${_lib_name}_fidl_flex.rs" ]
-      }
-
-      _fdomain_flex_src =
-          get_label_info(":${target_name}_fdomain_flex_src", "target_gen_dir") +
-          "/${_lib_name}_fdomain_flex.rs"
-      _fidl_flex_src =
-          get_label_info(":${target_name}_fidl_flex_src", "target_gen_dir") +
-          "/${_lib_name}_fidl_flex.rs"
-
-      rustc_library("${target_name}_fdomain_flex") {
-        name = "flex_${_lib_name}"
-        sources = [ _fdomain_flex_src ]
-        source_root = _fdomain_flex_src
-        edition = "2024"
-        disable_rustdoc = true
-
-        forward_variables_from(invoker,
-                               [
-                                 "applicable_licenses",
-                                 "testonly",
-                                 "visibility",
-                               ])
-
-        deps = [
-          ":${invoker.target_name}_fdomain",
-          ":${target_name}_src",
-        ]
-        configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-      }
-
-      rustc_library("${target_name}_fidl_flex") {
-        name = "flex_${_lib_name}"
-        sources = [ _fidl_flex_src ]
-        source_root = _fidl_flex_src
-        edition = "2024"
-        disable_rustdoc = true
-
-        forward_variables_from(invoker,
-                               [
-                                 "applicable_licenses",
-                                 "testonly",
-                                 "visibility",
-                               ])
-
-        deps = [
-          ":${invoker.target_name}_rust",
-          ":${target_name}_src",
-        ]
-        configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+        group("${target_name}_fdomain_flex") {
+          forward_variables_from(invoker, [ "testonly" ])
+          public_deps = [ ":${_fidl_target_name}_rust_fdomain_flex" ]
+        }
       }
     }
 

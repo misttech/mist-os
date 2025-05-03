@@ -581,7 +581,8 @@ type compiler struct {
 	dialect           string
 	// Raw structs (including ExternalStructs), needed for
 	// flattening parameters and in computeUseFidlStructCopy.
-	structs map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
+	structs  map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
+	isCommon bool
 }
 
 func (c *compiler) inExternalLibrary(eci fidlgen.EncodedCompoundIdentifier) bool {
@@ -667,6 +668,9 @@ func (c *compiler) compileDeclIdentifier(val fidlgen.EncodedCompoundIdentifier) 
 	name = changeIfReserved(fidlgen.Identifier(name))
 	if c.inExternalLibrary(val) {
 		crate := c.compileLibraryName(ci.Library)
+		if c.isCommon {
+			crate += "__common"
+		}
 		c.externCrates[crate] = struct{}{}
 		return fmt.Sprintf("%s::%s", crate, name)
 	}
@@ -1912,7 +1916,7 @@ func (dc *derivesCompiler) derivesForType(t Type) derives {
 	}
 }
 
-func Compile(r fidlgen.Root, includeDrivers bool, fdomain bool) Root {
+func Compile(r fidlgen.Root, includeDrivers bool, fdomain bool, isCommon bool) Root {
 	r = r.ForBindings("rust")
 	transports := []string{"Channel"}
 	if includeDrivers {
@@ -1946,6 +1950,7 @@ func Compile(r fidlgen.Root, includeDrivers bool, fdomain bool) Root {
 		handleSubtypes:    handleSubtypes,
 		externCrates:      map[string]struct{}{},
 		structs:           map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct{},
+		isCommon:          isCommon,
 	}
 	for _, s := range r.Structs {
 		c.structs[s.Name] = s
