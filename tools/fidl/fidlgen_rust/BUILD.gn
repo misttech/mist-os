@@ -41,7 +41,7 @@ if (is_host) {
           },
           {
             golden = "goldens/${info.name}_common.rs.golden"
-            candidate = "${info.fidl_gen_dir}/${info.target_name}/rust/fidl_${_library_underscore}_common.rs"
+            candidate = "${info.fidl_gen_dir}/${info.target_name}/rust/fidl_${_library_underscore}__common.rs"
           },
         ]
       }

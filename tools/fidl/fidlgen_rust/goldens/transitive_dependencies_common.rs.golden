@@ -12,7 +12,7 @@ use zx_status;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Baz {
-    pub g: fidl_test_middle::Bar,
+    pub g: fidl_test_middle__common::Bar,
 }
 
 impl fidl::Persistable for Baz {}
@@ -52,7 +52,9 @@ mod internal {
             encoder.debug_check_bounds::<Baz>(offset);
             // Delegate to tuple encoding.
             fidl::encoding::Encode::<Baz, D>::encode(
-                (<fidl_test_middle::Bar as fidl::encoding::ValueTypeMarker>::borrow(&self.g),),
+                (<fidl_test_middle__common::Bar as fidl::encoding::ValueTypeMarker>::borrow(
+                    &self.g,
+                ),),
                 encoder,
                 offset,
                 _depth,
@@ -61,7 +63,7 @@ mod internal {
     }
     unsafe impl<
             D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<fidl_test_middle::Bar, D>,
+            T0: fidl::encoding::Encode<fidl_test_middle__common::Bar, D>,
         > fidl::encoding::Encode<Baz, D> for (T0,)
     {
         #[inline]
@@ -83,7 +85,7 @@ mod internal {
     impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Baz {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { g: fidl::new_empty!(fidl_test_middle::Bar, D) }
+            Self { g: fidl::new_empty!(fidl_test_middle__common::Bar, D) }
         }
 
         #[inline]
@@ -95,7 +97,14 @@ mod internal {
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(fidl_test_middle::Bar, D, &mut self.g, decoder, offset + 0, _depth)?;
+            fidl::decode!(
+                fidl_test_middle__common::Bar,
+                D,
+                &mut self.g,
+                decoder,
+                offset + 0,
+                _depth
+            )?;
             Ok(())
         }
     }

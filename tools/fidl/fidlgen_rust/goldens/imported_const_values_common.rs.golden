@@ -10,13 +10,16 @@ use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
 
-pub const BITS_MEMBER: fidl_test_dependent::MyBits = fidl_test_dependent::MyBits::MEMBER;
+pub const BITS_MEMBER: fidl_test_dependent__common::MyBits =
+    fidl_test_dependent__common::MyBits::MEMBER;
 
-pub const BITS_MEMBER_PRIMITIVE: u8 = fidl_test_dependent::MyBits::MEMBER.bits() as u8;
+pub const BITS_MEMBER_PRIMITIVE: u8 = fidl_test_dependent__common::MyBits::MEMBER.bits() as u8;
 
-pub const ENUM_MEMBER: fidl_test_dependent::MyEnum = fidl_test_dependent::MyEnum::Member;
+pub const ENUM_MEMBER: fidl_test_dependent__common::MyEnum =
+    fidl_test_dependent__common::MyEnum::Member;
 
-pub const ENUM_MEMBER_PRIMITIVE: u8 = fidl_test_dependent::MyEnum::Member.into_primitive() as u8;
+pub const ENUM_MEMBER_PRIMITIVE: u8 =
+    fidl_test_dependent__common::MyEnum::Member.into_primitive() as u8;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MyStruct;

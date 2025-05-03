@@ -10,7 +10,7 @@ use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
 
-pub type ReferenceMe = fidl_test_someotherlibrary::ReferenceMe;
+pub type ReferenceMe = fidl_test_someotherlibrary__common::ReferenceMe;
 
 pub type U32 = u32;
 
