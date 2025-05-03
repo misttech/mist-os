@@ -12,6 +12,7 @@ use bitflags::bitflags;
 use ffx_config::EnvironmentContext;
 use std::os::raw::{c_char, c_void};
 use std::ptr::NonNull;
+use std::sync::Mutex;
 
 /// A symbolizer for program counters.
 #[derive(Debug)]
@@ -25,6 +26,8 @@ pub struct Symbolizer {
     // symbols.
     _global_init: global_init::GlobalInitHandle,
 }
+
+static SYMBOLIZER_LOCK: Mutex<()> = Mutex::new(());
 
 impl Symbolizer {
     /// Create a new symbolizer instance.
@@ -41,9 +44,12 @@ impl Symbolizer {
 
         let _global_init = global_init::GlobalInitHandle::new();
 
+        let _guard = SYMBOLIZER_LOCK.lock().unwrap();
+
         // SAFETY: basic FFI call without invariants.
         let inner = NonNull::new(unsafe { symbolizer_sys::symbolizer_new() })
             .expect("symbolizer pointer must have been allocated");
+
         Ok(Self { next_id: 0, inner, _global_init })
     }
 
