@@ -19,7 +19,11 @@ rustc_library("profiler") {
 
   test_deps = [ "//third_party/rust_crates:tempfile" ]
 
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/lib.rs",
+    "src/parse.rs",
+    "src/symbolize.rs",
+  ]
 }
 
 group("tests") {
