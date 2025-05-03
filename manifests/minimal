@@ -11,11 +11,11 @@
   because that one has a `githooks` entry pointing into //integration, but we
   want to be able to check out fuchsia without integration.
   -->
-  <imports>
+  <projects>
     <project name="fuchsia"
              path="."
              remote="https://fuchsia.googlesource.com/fuchsia"
              gerrithost="https://fuchsia-review.googlesource.com"
              historydepth="2"/>
-  </imports>
+  </projects>
 </manifest>
