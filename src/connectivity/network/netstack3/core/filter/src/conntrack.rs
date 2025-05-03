@@ -341,7 +341,8 @@ impl<I: IpExt, E: Default, BC: FilterBindingsContext> Table<I, E, BC> {
         packet: PacketMetadata<I>,
     ) -> Result<Option<(Connection<I, E, BC>, ConnectionDirection)>, GetConnectionError<I, E, BC>>
     {
-        let mut connection = match self.inner.lock().table.get(&packet.tuple()) {
+        let tuple = packet.tuple();
+        let mut connection = match self.inner.lock().table.get(&tuple) {
             Some(connection) => Connection::Shared(connection.clone()),
             None => match ConnectionExclusive::from_deconstructed_packet(bindings_ctx, &packet) {
                 None => return Ok(None),
@@ -350,7 +351,7 @@ impl<I: IpExt, E: Default, BC: FilterBindingsContext> Table<I, E, BC> {
         };
 
         let direction = connection
-            .direction(&packet.tuple())
+            .direction(&tuple)
             .expect("tuple must match connection as we just looked up connection by tuple");
 
         match connection.update(bindings_ctx, &packet, direction) {
@@ -1127,9 +1128,37 @@ impl<I: IpExt> PacketMetadata<I> {
         Self::IcmpError(Tuple::new(src_addr, dst_addr, src_port, dst_port, protocol))
     }
 
-    pub(crate) fn tuple(&self) -> &Tuple<I> {
+    pub(crate) fn tuple(&self) -> Tuple<I> {
         match self {
-            PacketMetadata::Full { tuple, .. } | PacketMetadata::IcmpError(tuple) => &tuple,
+            PacketMetadata::Full { tuple, .. } => tuple.clone(),
+            // We need to invert the tuple for ICMP errors because they aren't
+            // necessarily ones that exist in the map due to being post-NAT.
+            //
+            // For example, if we have a connection A -> R -> B with Masquerade
+            // NAT on R rewriting packets from A, we'll end up with the
+            // following tuples for a connection originating at A:
+            //
+            // Original {
+            //   src_ip: A
+            //   dst_ip: B
+            // }
+            //
+            // Reply {
+            //   src_ip: B
+            //   dst_ip: R
+            // }
+            //
+            // However, if there's an ICMP error packet from B in response to A,
+            // the tuple of the original packet in the ICMP error's payload will
+            // look like R -> B. In the opposite direction, the ICMP error from
+            // A in response to B will have an inner payload with a tuple that
+            // looks like B -> A.
+            //
+            // If we invert the error tuple, then we get the correct connection
+            // from the map, and the direction also corresponds to the direction
+            // of the outer packet, which is what we need for NAT to work
+            // correctly.
+            PacketMetadata::IcmpError(tuple) => tuple.clone().invert(),
         }
     }
 }
@@ -1269,7 +1298,7 @@ mod tests {
             },
         );
 
-        assert_eq!(*packet.tuple(), expected);
+        assert_eq!(packet.tuple(), expected);
     }
 
     #[ip_test(I)]
@@ -1282,8 +1311,8 @@ mod tests {
             TransportProtocol::Udp,
             TransportPacketData::Generic { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
         );
-        let original_tuple = packet.tuple().clone();
-        let reply_tuple = packet.tuple().clone().invert();
+        let original_tuple = packet.tuple();
+        let reply_tuple = packet.tuple().invert();
 
         let connection =
             ConnectionExclusive::<_, (), _>::from_deconstructed_packet(&bindings_ctx, &packet)
@@ -1501,7 +1530,7 @@ mod tests {
             .get_connection_for_packet_and_update(&bindings_ctx, packet.clone())
             .expect("packet should be valid")
             .is_none());
-        assert!(!table.contains_tuple(packet.tuple()));
+        assert!(!table.contains_tuple(&packet.tuple()));
     }
 
     #[ip_test(I)]
