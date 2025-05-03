@@ -970,6 +970,18 @@ pub fn check_socket_shutdown_access(
     })
 }
 
+/// Returns the Security Context with which the [`crate::vfs::Socket`]'s peer is labeled.
+/// Corresponds to the `socket_getpeersec_stream()` LSM hook.
+pub fn socket_getpeersec_stream(
+    current_task: &CurrentTask,
+    socket: &Socket,
+) -> Result<Vec<u8>, Errno> {
+    track_hook_duration!(c"security.hooks.socket_getpeersec_stream");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::socket_getpeersec_stream(&security_server, current_task, socket)
+    })
+}
+
 /// Checks if the Unix domain `sending_socket` is allowed to send a message to the
 /// `receiving_socket`.
 /// Corresponds to the `unix_may_send()` LSM hook.
