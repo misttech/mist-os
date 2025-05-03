@@ -94,6 +94,8 @@ python_host_test("fuchsia_controller_e2e_test") {
   main_source = "e2e.py"
   libraries = [
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_python",
+    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.othertest_python",
+    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test_python",
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
   ]

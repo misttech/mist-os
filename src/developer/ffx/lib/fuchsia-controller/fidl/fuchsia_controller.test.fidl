@@ -97,6 +97,10 @@ open protocol Testing {
     strict ReturnOtherComposedProtocol() -> (resource struct {
         client_thing client_end:OtherComposedProtocol;
     });
+
+    strict ReturnSocketOrError() -> (resource struct {
+        reader_thing zx.Handle:SOCKET;
+    }) error zx.Status;
 };
 
 @discoverable

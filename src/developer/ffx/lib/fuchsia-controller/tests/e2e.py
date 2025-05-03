@@ -1,6 +1,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+import asyncio
 import os
 import os.path
 import platform
@@ -8,9 +9,12 @@ import sys
 import typing
 import unittest
 
+import fidl_fuchsia_controller_test as fc_test
 import fidl_fuchsia_developer_ffx as ffx_fidl
 from fidl_codec import encode_fidl_message, method_ordinal
-from fuchsia_controller_py import Channel, Context, IsolateDir
+from fuchsia_controller_py import Channel, Context, IsolateDir, Socket, ZxStatus
+
+from fidl import DomainError
 
 SDK_ROOT = "./sdk/exported/core"
 # For Linux this handles the gamut of options.
@@ -29,6 +33,41 @@ def _locate_ffx_binary(sdk_manifest: str) -> str:
         PLATFORM_TYPE[platform.machine()],
         "ffx",
     )
+
+
+class TestSocketServer(fc_test.TestingServer):
+    def __init__(self, ch: Channel):
+        client, server = Socket.create()
+        self.client = client
+        self.server = server
+        super().__init__(ch)
+
+    def return_socket_or_error(
+        self,
+    ) -> fc_test.TestingReturnSocketOrErrorResponse:
+        if self.server.as_int() == 0:
+            return DomainError(ZxStatus.ZX_ERR_NOT_SUPPORTED)
+        return fc_test.TestingReturnSocketOrErrorResponse(
+            reader_thing=self.server.take()
+        )
+
+    def return_union(self):
+        res = fc_test.TestingReturnUnionResponse(x=10)
+        return res
+
+    def return_union_with_table(self):
+        x = fc_test.NoopUnion(union_str="foobar")
+        res = fc_test.TestingReturnUnionWithTableResponse(x=x)
+        return res
+
+    def return_other_composed_protocol(self):
+        return DomainError("not implemented")
+
+    def return_possible_error(self):
+        return DomainError("not implemented")
+
+    def return_possible_error2(self):
+        return DomainError("not implemented")
 
 
 FFX_PATH = _locate_ffx_binary(SDK_ROOT)
@@ -121,3 +160,21 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
         list_buf, list_hdls = list_server.read()
         self.assertEqual(len(list_hdls), 0)
         self.assertEqual(list_buf, bytearray([5, 6, 7]))
+
+    async def test_sending_socket_as_result(self):
+        t_server, t_client = Channel.create()
+        server = TestSocketServer(t_server)
+        client = fc_test.TestingClient(t_client)
+        server_task = asyncio.get_running_loop().create_task(server.serve())
+        res = await client.return_union()
+        self.assertEqual(res.x, 10)
+        res = await client.return_union_with_table()
+        self.assertEqual(res.x.union_str, "foobar")
+        res = await client.return_socket_or_error()
+        # TODO(b/415379365): Given this is intended to be a socket, it should return
+        # the appropriate type here.
+        self.assertNotEqual(res.response.reader_thing, 0)
+        res = await client.return_socket_or_error()
+        self.assertEqual(res.err, ZxStatus.ZX_ERR_NOT_SUPPORTED)
+        server_task.cancel()
+        server.close()
