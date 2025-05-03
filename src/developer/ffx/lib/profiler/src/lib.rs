@@ -3,4 +3,4 @@
 // found in the LICENSE file.
 
 mod parse;
-mod symbolize;
+pub mod symbolize;

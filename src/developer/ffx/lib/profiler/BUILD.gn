@@ -13,7 +13,10 @@ rustc_library("profiler") {
   with_unit_tests = true
 
   deps = [
+    "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/symbolize:symbolize",
+    "//src/lib/diagnostics/log/rust_cpp_bridge",
+    "//third_party/rust_crates:hex",
     "//third_party/rust_crates:thiserror",
   ]
 

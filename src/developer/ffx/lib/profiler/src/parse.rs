@@ -10,31 +10,42 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use thiserror::Error;
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub struct Pid(u64);
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub struct Tid(u64);
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ModuleDetails(String);
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ModuleWithMmapDetails {
-    module: ModuleDetails,
-    mmaps: Vec<MappingDetails>,
+pub struct ModuleDetails {
+    pub name: String,
+    pub build_id: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct BacktraceDetails(u64);
+pub struct ModuleWithMmapDetails {
+    pub module: ModuleDetails,
+    pub mmaps: Vec<MappingDetails>,
+}
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct BacktraceDetails(pub u64);
+
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ProfilingRecordHandler {
     module_with_mmap_records: Vec<ModuleWithMmapDetails>,
     backtrace_records: HashMap<Tid, Vec<BacktraceDetails>>,
 }
 
 impl ProfilingRecordHandler {
+    pub fn get_module_with_mmap_records(&self) -> &Vec<ModuleWithMmapDetails> {
+        &self.module_with_mmap_records
+    }
+
+    pub fn get_backtrace_records(&self) -> &HashMap<Tid, Vec<BacktraceDetails>> {
+        &self.backtrace_records
+    }
+
     pub fn parse_markup_line(
         &mut self,
         line: &str,
@@ -77,20 +88,20 @@ fn parse_mmap_record(record: &str) -> Result<MappingDetails, SymbolizeError> {
         start_addr: u64::from_str_radix(&parts[1][2..], 16).map_err(|e| {
             SymbolizeError::ParseError {
                 record_type: "mmap".to_string(),
-                reason: format!("Failed to parse start address: {}", e).to_string(),
+                reason: format!("Failed to parse start address: {}", e),
             }
         })?,
         size: u64::from_str_radix(&parts[2][2..], 16).map_err(|e| SymbolizeError::ParseError {
             record_type: "mmap".to_string(),
-            reason: format!("Failed to parse size: {}", e).to_string(),
+            reason: format!("Failed to parse size: {}", e),
         })?,
         vaddr: u64::from_str_radix(&parts[6][2..], 16).map_err(|e| SymbolizeError::ParseError {
             record_type: "mmap".to_string(),
-            reason: format!("Failed to parse vaddr: {}", e).to_string(),
+            reason: format!("Failed to parse vaddr: {}", e),
         })?,
         flags: MappingFlags::from_str(parts[5]).map_err(|e| SymbolizeError::ParseError {
             record_type: "mmap".to_string(),
-            reason: format!("Failed to parse flags: {}", e).to_string(),
+            reason: format!("Failed to parse flags: {}", e),
         })?,
     })
 }
@@ -114,7 +125,7 @@ fn parse_module_record(record: &str) -> Result<ModuleDetails, SymbolizeError> {
             reason: "Failed to get the build id due to it doesn't exist".to_string(),
         })?
         .to_string();
-    Ok(ModuleDetails(build_id))
+    Ok(ModuleDetails { name: parts[2].to_string(), build_id })
 }
 
 fn parse_backtrace_record(record: &str) -> Result<BacktraceDetails, SymbolizeError> {
@@ -123,7 +134,7 @@ fn parse_backtrace_record(record: &str) -> Result<BacktraceDetails, SymbolizeErr
     Ok(BacktraceDetails(u64::from_str_radix(&parts[2][2..], 16).map_err(|e| {
         SymbolizeError::ParseError {
             record_type: "backtrace".to_string(),
-            reason: format!("Failed to get address: {}", e).to_string(),
+            reason: format!("Failed to get address: {}", e),
         }
     })?))
 }
@@ -144,7 +155,7 @@ enum ParseStateMachine {
 
 #[derive(PartialEq, Debug)]
 pub struct UnsymbolizedSamples {
-    handlers: HashMap<Pid, ProfilingRecordHandler>,
+    pub handlers: HashMap<Pid, ProfilingRecordHandler>,
 }
 
 impl UnsymbolizedSamples {
@@ -172,21 +183,18 @@ impl UnsymbolizedSamples {
                         current_profiling_record_handler.parse_markup_line(&line, None)?;
                         state = ParseStateMachine::SetModuleOrMmap;
                     } else {
-                        // first time see pid
-                        let pid = Pid(u64::from_str_radix(&line, 16)?);
+                        // first time see an unique pid
+                        let pid = Pid(line.parse::<u64>()?);
                         if profiling_map.contains_key(&pid) {
                             return Err(SymbolizeError::PidAlreadyExist(pid));
                         }
-                        profiling_map.insert(pid.clone(), current_profiling_record_handler.clone());
+                        profiling_map.insert(pid, current_profiling_record_handler.clone());
                         state = ParseStateMachine::SetPid { pid }
                     }
                 }
                 ParseStateMachine::SetPid { pid } => {
-                    if Pid(u64::from_str_radix(&line, 16)?) != pid.clone() {
-                        state = ParseStateMachine::SetPidTid {
-                            pid,
-                            tid: Tid(u64::from_str_radix(&line, 16)?),
-                        }
+                    if Pid(line.parse::<u64>()?) != pid {
+                        state = ParseStateMachine::SetPidTid { pid, tid: Tid(line.parse::<u64>()?) }
                     } else {
                         return Err(SymbolizeError::NoTid);
                     }
@@ -195,20 +203,20 @@ impl UnsymbolizedSamples {
                     if !line.starts_with("{{{") {
                         return Err(SymbolizeError::NoBackTrace);
                     }
-                    if let Some(profiling_record_handler) = profiling_map.get_mut(&pid.clone()) {
-                        profiling_record_handler.parse_markup_line(&line, Some(tid.clone()))?;
+                    if let Some(profiling_record_handler) = profiling_map.get_mut(&pid) {
+                        profiling_record_handler.parse_markup_line(&line, Some(tid))?;
                         state = ParseStateMachine::SetBacktrace { pid, tid }
                     } else {
                         return Err(SymbolizeError::NoPid);
                     }
                 }
-                ParseStateMachine::SetBacktrace { ref pid, ref tid } => {
+                ParseStateMachine::SetBacktrace { pid, tid } => {
                     if line.starts_with("{{{") {
-                        if let Some(profiling_record_handler) = profiling_map.get_mut(pid) {
-                            profiling_record_handler.parse_markup_line(&line, Some(tid.clone()))?;
+                        if let Some(profiling_record_handler) = profiling_map.get_mut(&pid) {
+                            profiling_record_handler.parse_markup_line(&line, Some(tid))?;
                         }
                     } else {
-                        state = ParseStateMachine::SetPid { pid: pid.clone() }
+                        state = ParseStateMachine::SetPid { pid }
                     }
                 }
             }
@@ -219,13 +227,16 @@ impl UnsymbolizedSamples {
 
 #[derive(Error, Debug)]
 pub enum SymbolizeError {
-    #[error("TID is not set for the current backtrace")]
+    #[error("TID is not set for the current backtrace.")]
     TidNotExist,
+
+    #[error("Failed to load ffx environment context.")]
+    NoFfxEnvironmentContext,
 
     #[error("The current pid {:?} already been processed. Please verify the record.", .0)]
     PidAlreadyExist(Pid),
 
-    #[error("Failed to parse the {} record due to {}", record_type, reason)]
+    #[error("Failed to parse the {} record due to {}.", record_type, reason)]
     ParseError { record_type: String, reason: String },
 
     #[error("Failed to open the profiler file due to {}", .0)]
@@ -248,6 +259,18 @@ pub enum SymbolizeError {
 
     #[error("No module record associate with the mmap record: {}.", .0)]
     NoModuleRecord(String),
+
+    #[error("Failed to create symbolizer due to {}", .0)]
+    SymbolizerError(#[from] ffx_symbolize::CreateSymbolizerError),
+
+    #[error("Failed to add mapping due to {}", .0)]
+    AddMappingError(#[from] ffx_symbolize::AddMappingError),
+
+    #[error("Failed to resolve address due to {}", .0)]
+    ResolveAddressError(#[from] ffx_symbolize::ResolveError),
+
+    #[error("Failed to convert string to u64 due to {}", .0)]
+    HexConvertError(#[from] hex::FromHexError),
 }
 
 #[cfg(test)]
@@ -293,7 +316,10 @@ mod tests {
         let mut expected_handlers = HashMap::new();
         let first_handler = ProfilingRecordHandler {
             module_with_mmap_records: vec![ModuleWithMmapDetails {
-                module: ModuleDetails(String::from("333e89f0c175000cee9b7e201fedcd6f9b4ba8ae")),
+                module: ModuleDetails {
+                    name: "libtrace-engine.so".to_string(),
+                    build_id: "333e89f0c175000cee9b7e201fedcd6f9b4ba8ae".to_string(),
+                },
                 mmaps: vec![
                     MappingDetails {
                         start_addr: 0xc936396000,
@@ -324,7 +350,10 @@ mod tests {
         let second_handler = ProfilingRecordHandler {
             module_with_mmap_records: vec![
                 ModuleWithMmapDetails {
-                    module: ModuleDetails(String::from("867c18818584f5823f35472b70fc8714b2518ba0")),
+                    module: ModuleDetails {
+                        name: "<VMO#4165=/boot/bin/sh>".to_string(),
+                        build_id: "867c18818584f5823f35472b70fc8714b2518ba0".to_string(),
+                    },
                     mmaps: vec![MappingDetails {
                         start_addr: 0x30db523d000,
                         size: 0x10000,
@@ -333,7 +362,10 @@ mod tests {
                     }],
                 },
                 ModuleWithMmapDetails {
-                    module: ModuleDetails(String::from("3e1c4eb82f79af6a4fd142db11f83979772f9867")),
+                    module: ModuleDetails {
+                        name: "libfdio.so".to_string(),
+                        build_id: "3e1c4eb82f79af6a4fd142db11f83979772f9867".to_string(),
+                    },
                     mmaps: vec![MappingDetails {
                         start_addr: 0x3bfd82b3000,
                         size: 0x62000,

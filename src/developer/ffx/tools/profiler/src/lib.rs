@@ -281,11 +281,20 @@ async fn run_session(
     } else {
         std::path::PathBuf::from(&opts.output)
     };
-    symbolize(&unsymbolized_path, &symbolized_path).await?;
     if !opts.pprof_conversion {
-        return Ok(());
+        if let Ok(_symbolized_record) =
+            ffx_profiler::symbolize::symbolize(&unsymbolized_path, &symbolized_path, false)
+        {
+            return Ok(());
+        } else {
+            anyhow::bail!("Failed to symbolize profile");
+        }
+    } else {
+        // TODO(https://fxbug.dev/401034854): We need to remove `ffx debug symbolize` by
+        // implementing symbolized text to pprof.
+        symbolize(&unsymbolized_path, &symbolized_path).await?;
+        pprof_conversion(&symbolized_path, PathBuf::from(&opts.output))
     }
-    pprof_conversion(&symbolized_path, PathBuf::from(&opts.output))
 }
 
 pub async fn profiler(
@@ -371,11 +380,18 @@ pub async fn profiler(
             } else {
                 opts.output.clone()
             };
-            symbolize(&opts.input, &symbolized_path).await?;
-
             if !opts.pprof_conversion {
-                return Ok(());
+                if let Ok(_symbolized_record) =
+                    ffx_profiler::symbolize::symbolize(&opts.input, &symbolized_path, false)
+                {
+                    return Ok(());
+                } else {
+                    anyhow::bail!("Failed to symbolize profile");
+                }
             }
+            // TODO(https://fxbug.dev/401034854): We need to remove `ffx debug symbolize` by
+            // implementing symbolized text to pprof.
+            symbolize(&opts.input, &symbolized_path).await?;
             return pprof_conversion(&symbolized_path, opts.output);
         }
     };

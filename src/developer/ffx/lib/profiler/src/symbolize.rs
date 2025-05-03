@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::parse::{Pid, Tid};
-use ffx_symbolize::ResolvedLocation;
+use crate::parse::{
+    BacktraceDetails, ModuleWithMmapDetails, Pid, SymbolizeError, Tid, UnsymbolizedSamples,
+};
+use ffx_symbolize::{ResolvedLocation, Symbolizer};
 use std::collections::HashMap;
-
+use std::path::PathBuf;
 /// A resolved address.
 #[derive(Clone, PartialEq)]
 pub struct ResolvedAddress {
@@ -25,28 +27,90 @@ impl std::fmt::Debug for ResolvedAddress {
 }
 
 /// Symbolized record hash map. key: pid, value: all of the records belong to this pid.
-#[derive(PartialEq, Clone, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct SymbolizedRecords {
     records: HashMap<Pid, Vec<SymbolizedRecord>>,
 }
 
 impl SymbolizedRecords {
-    #[allow(dead_code)]
-    fn add_pid(&mut self, pid: Pid) {
+    pub fn add_pid(&mut self, pid: Pid) {
         self.records.insert(pid, Vec::new());
     }
 }
 
 /// Symbolized bt list for a single tid.
-#[derive(PartialEq, Clone, Debug)]
-struct SymbolizedRecord {
-    tid: Tid,
+#[derive(Clone, Debug)]
+pub struct SymbolizedRecord {
+    pub tid: Tid,
     backtraces: Vec<ResolvedAddress>,
 }
 
 impl SymbolizedRecord {
-    #[allow(dead_code)]
     fn add_backtrace(&mut self, backtrace: ResolvedAddress) {
         self.backtraces.push(backtrace);
+    }
+}
+
+pub fn symbolize(
+    input: &PathBuf,
+    output: &PathBuf,
+    pprof_conversion: bool,
+) -> Result<SymbolizedRecords, SymbolizeError> {
+    let context =
+        ffx_config::global_env_context().ok_or(SymbolizeError::NoFfxEnvironmentContext)?;
+    symbolize_with_context(input, output, pprof_conversion, &context)
+}
+
+pub fn symbolize_with_context(
+    input: &PathBuf,
+    output: &PathBuf,
+    pprof_conversion: bool,
+    context: &ffx_config::EnvironmentContext,
+) -> Result<SymbolizedRecords, SymbolizeError> {
+    logging_rust_cpp_bridge::init_with_log_severity(logging_rust_cpp_bridge::FUCHSIA_LOG_FATAL);
+    let unsymbolized_samples = UnsymbolizedSamples::new(input)?;
+    unsymbolized_samples.process_unsymbolized_samples(output, pprof_conversion, &context)
+}
+
+impl UnsymbolizedSamples {
+    pub fn process_unsymbolized_samples(
+        self,
+        output: &PathBuf,
+        pprof_conversion: bool,
+        context: &ffx_config::EnvironmentContext,
+    ) -> Result<SymbolizedRecords, SymbolizeError> {
+        let mut res = SymbolizedRecords::default();
+        for (pid, handler) in self.handlers {
+            res.add_pid(pid);
+            let mut symbolizer = Symbolizer::with_context(context)?;
+            // We use a hashmap to store the seen backtrace, to avoid symbolize the same backtrace multiple times.
+            let mut seen_bt: HashMap<BacktraceDetails, ResolvedAddress> = HashMap::new();
+            for ModuleWithMmapDetails { module, mmaps } in handler.get_module_with_mmap_records() {
+                let module_id =
+                    symbolizer.add_module(&module.name, hex::decode(&module.build_id)?.as_ref());
+                for mmap_record in mmaps {
+                    symbolizer.add_mapping(module_id, mmap_record.clone())?;
+                }
+            }
+
+            for (tid, backtraces) in handler.get_backtrace_records() {
+                let mut symbolized_record = SymbolizedRecord { tid: *tid, backtraces: Vec::new() };
+                for backtrace in backtraces {
+                    let resolved_addr = seen_bt.entry(*backtrace).or_insert_with_key(|bt_key| {
+                        let resolved_locations =
+                            symbolizer.resolve_addr(bt_key.0).unwrap_or_else(|_| Vec::new());
+                        ResolvedAddress { addr: bt_key.0, locations: resolved_locations }
+                    });
+                    symbolized_record.add_backtrace(resolved_addr.clone());
+                }
+                if let Some(records) = res.records.get_mut(&pid) {
+                    records.push(symbolized_record);
+                }
+            }
+        }
+        if !pprof_conversion {
+            std::fs::write(output, format!("{res:#?}\n"))?;
+        }
+        Ok(res)
     }
 }
