@@ -18,6 +18,7 @@ mod processors;
 pub(crate) mod util;
 pub use crate::processors::connect_disconnect::DisconnectInfo;
 pub use crate::processors::power::{IfacePowerLevel, UnclearPowerDemand};
+pub use crate::processors::scan::ScanResult;
 pub use crate::processors::toggle_events::ClientConnectionsToggleEvent;
 pub use util::sender::TelemetrySender;
 #[cfg(test)]
@@ -42,6 +43,10 @@ pub enum TelemetryEvent {
     },
     ClientIfaceDestroyed {
         iface_id: u16,
+    },
+    ScanStart,
+    ScanResult {
+        result: ScanResult,
     },
     IfacePowerLevelChanged {
         iface_power_level: IfacePowerLevel,
@@ -144,6 +149,7 @@ pub fn serve_telemetry(
     );
     let power_logger =
         processors::power::PowerLogger::new(cobalt_1dot1_proxy.clone(), &inspect_node);
+    let mut scan_logger = processors::scan::ScanLogger::new(cobalt_1dot1_proxy.clone());
     let mut toggle_logger =
         processors::toggle_events::ToggleLogger::new(cobalt_1dot1_proxy.clone(), &inspect_node);
 
@@ -188,6 +194,12 @@ pub fn serve_telemetry(
                         ClientIfaceDestroyed { iface_id } => {
                             client_iface_counters_logger.handle_iface_destroyed(iface_id).await;
                             power_logger.handle_iface_destroyed(iface_id).await;
+                        }
+                        ScanStart => {
+                            scan_logger.handle_scan_start().await;
+                        }
+                        ScanResult { result } => {
+                            scan_logger.handle_scan_result(result).await;
                         }
                         IfacePowerLevelChanged { iface_power_level, iface_id } => {
                             power_logger.log_iface_power_event(iface_power_level, iface_id).await;
