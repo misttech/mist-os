@@ -1478,6 +1478,7 @@ if (current_toolchain == default_toolchain) {
 
         "//src/developer/ffx/lib/e2e_emu:isolated_emulator_data",
         "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
+        "//src/developer/ffx/lib/profiler/tests:ffx_profiler_lib_e2e_test_emulator_data",
         "//src/developer/ffx/lib/symbolize/tests:ffx_symbolize_lib_e2e_test_emulator_data",
         "//src/developer/ffx/plugins/component/create/tests/structured_config:verify_ffx_component_create_parent_overrides_emulator_data",
         "//src/developer/ffx/plugins/component/run/tests/structured_config:verify_ffx_component_run_parent_overrides_emulator_data",

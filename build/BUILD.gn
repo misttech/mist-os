@@ -156,6 +156,7 @@ group("non_hermetic_deps") {
   visibility += [
     "//build/images/*",
     "//src/bringup/lib/mexec/tests/*",
+    "//src/developer/ffx/lib/profiler/tests:*",
     "//src/developer/ffx/lib/symbolize/tests:*",
     "//src/lib/elfldltl/test/*",
     "//src/security/lib/scrutiny/collector/*",
