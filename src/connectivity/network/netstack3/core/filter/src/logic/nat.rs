@@ -24,11 +24,13 @@ use rand::Rng as _;
 use crate::actions::MarkAction;
 use crate::conntrack::{
     CompatibleWith, Connection, ConnectionDirection, ConnectionExclusive, Table, TransportProtocol,
+    Tuple,
 };
 use crate::context::{FilterBindingsContext, FilterBindingsTypes, NatContext};
 use crate::logic::{IngressVerdict, Interfaces, RoutineResult, Verdict};
 use crate::packets::{
-    FilterIpExt, IpPacket, MaybeTransportPacketMut as _, TransportPacketMut as _,
+    FilterIpExt, IcmpErrorMut, IpPacket, MaybeIcmpErrorMut as _, MaybeTransportPacketMut as _,
+    TransportPacketMut as _,
 };
 use crate::state::{FilterMarkMetadata, Hook};
 
@@ -1094,6 +1096,175 @@ fn rewrite_reply_tuple_port<I: IpExt, BC: FilterBindingsContext, A: PartialEq>(
     Verdict::Drop
 }
 
+fn rewrite_packet_for_dst_nat<I, P>(
+    packet: &mut P,
+    new_dst_addr: I::Addr,
+    new_dst_port: u16,
+) -> Verdict
+where
+    I: FilterIpExt,
+    P: IpPacket<I>,
+{
+    packet.set_dst_addr(new_dst_addr);
+    let Some(proto) = packet.protocol() else {
+        return Verdict::Accept(());
+    };
+    let mut transport = packet.transport_packet_mut();
+    let Some(mut transport) = transport.transport_packet_mut() else {
+        return Verdict::Accept(());
+    };
+    let Some(new_dst_port) = NonZeroU16::new(new_dst_port) else {
+        // TODO(https://fxbug.dev/341128580): allow rewriting port to zero if
+        // allowed by the transport-layer protocol.
+        error!("cannot rewrite dst port to unspecified; dropping {proto} packet");
+        return Verdict::Drop;
+    };
+    transport.set_dst_port(new_dst_port);
+
+    Verdict::Accept(())
+}
+
+fn rewrite_packet_for_src_nat<I, P>(
+    packet: &mut P,
+    new_src_addr: I::Addr,
+    new_src_port: u16,
+) -> Verdict
+where
+    I: FilterIpExt,
+    P: IpPacket<I>,
+{
+    packet.set_src_addr(new_src_addr);
+    let Some(proto) = packet.protocol() else {
+        return Verdict::Accept(());
+    };
+    let mut transport = packet.transport_packet_mut();
+    let Some(mut transport) = transport.transport_packet_mut() else {
+        return Verdict::Accept(());
+    };
+    let Some(new_src_port) = NonZeroU16::new(new_src_port) else {
+        // TODO(https://fxbug.dev/341128580): allow rewriting port to zero if
+        // allowed by the transport-layer protocol.
+        error!("cannot rewrite src port to unspecified; dropping {proto} packet");
+        return Verdict::Drop;
+    };
+    transport.set_src_port(new_src_port);
+
+    Verdict::Accept(())
+}
+
+fn rewrite_icmp_error_payload<I, E>(icmp_error: &mut E, nat: NatType, tuple: &Tuple<I>) -> Verdict
+where
+    I: FilterIpExt,
+    E: IcmpErrorMut<I>,
+{
+    // What follows is a justification for how ICMP error NAT decides what
+    // addresses and ports to use.  We will only consider the address rewriting,
+    // because ports necessarily must be rewritten in the same way.
+    //
+    // When rewriting the IP payload of ICMP errors, we know the following:
+    //
+    // 1. The payload was sent in the opposite direction from the error.
+    // 2. The source of the payload is the same as the destination of the error.
+    //
+    // Imagine the following scenario:
+    //
+    // A --- R --- B
+    //
+    // Where SNAT is configured on R for packets originating at A. When packets
+    // are sent in the original direction, their source will be rewritten from A
+    // to R. The conntrack tuples will look like:
+    //
+    // Original: {
+    //   src: A,
+    //   dst: B,
+    // }
+    //
+    // Reply: {
+    //   src: B,
+    //   dst: R,
+    // }
+    //
+    // If B sends an error in response to a packet from A (meaning the reply
+    // direction), it will look like:
+    //
+    //   B -> R | R -> B
+    //
+    // When performing SNAT, we need to perform the same rewrite for the
+    // destination of the outer packet as well as the source of the inner
+    // packet.
+    //
+    // In the opposite direction (original), if A sends an error in response to
+    // a packet from B, it will look like:
+    //
+    //   A -> B | B -> A
+    //
+    // When performing SNAT, we need to perform the same rewrite to the source
+    // of the outer packet and the destination of the inner packet.
+    //
+    // Conversely, let's look at DNAT. Imagine the case above was such that
+    // R has DNAT configured to map traffic originally headed for R to B. The
+    // tuples would look as follows:
+    //
+    // Original: {
+    //   src: A,
+    //   dst: R,
+    // }
+    //
+    // Reply: {
+    //   src: B,
+    //   dst: A,
+    // }
+    //
+    // An error response from B to A (reply) will look like:
+    //
+    // B -> A | A -> B
+    //
+    // An error response from A to B (original) will look like:
+    //
+    // A -> R | R -> A
+    //
+    // Note that we still need to rewrite the inner source the same as the outer
+    // destination and the inner destination the same as the outer source. This
+    // means we can use the same source and destination address and port for
+    // rewriting the inner packet as well as the outer packet, but just need to
+    // invert whether we're rewriting the source or destination information.
+    let should_recalculate_checksum = match icmp_error.inner_packet() {
+        Some(mut inner_packet) => {
+            let verdict = match nat {
+                NatType::Destination => rewrite_packet_for_src_nat(
+                    &mut inner_packet,
+                    tuple.src_addr,
+                    tuple.src_port_or_id,
+                ),
+                NatType::Source => rewrite_packet_for_dst_nat(
+                    &mut inner_packet,
+                    tuple.dst_addr,
+                    tuple.dst_port_or_id,
+                ),
+            };
+
+            match verdict {
+                Verdict::Accept(_) => true,
+                Verdict::Drop => return Verdict::Drop,
+            }
+        }
+        None => false,
+    };
+
+    if should_recalculate_checksum {
+        // If updating the checksum fails, the packet will be left with the
+        // original checksum, which will be incorrect. At the time of writing,
+        // the only way for this to happen is if the length of an ICMPv6 is
+        // larger than a u32, which is not possible for NS3 (nor most networks)
+        // to handle.
+        if !icmp_error.recalculate_checksum() {
+            return Verdict::Drop;
+        }
+    }
+
+    Verdict::Accept(())
+}
+
 /// Perform NAT on a packet, using its connection in the conntrack table as a
 /// guide.
 fn rewrite_packet<I, P, A, BT>(
@@ -1118,47 +1289,20 @@ where
         ConnectionDirection::Original => conn.reply_tuple(),
         ConnectionDirection::Reply => conn.original_tuple(),
     };
-    match nat {
-        NatType::Destination => {
-            let (new_dst_addr, new_dst_port) = (tuple.src_addr, tuple.src_port_or_id);
 
-            packet.set_dst_addr(new_dst_addr);
-            let Some(proto) = packet.protocol() else {
-                return Verdict::Accept(());
-            };
-            let mut transport = packet.transport_packet_mut();
-            let Some(mut transport) = transport.transport_packet_mut() else {
-                return Verdict::Accept(());
-            };
-            let Some(new_dst_port) = NonZeroU16::new(new_dst_port) else {
-                // TODO(https://fxbug.dev/341128580): allow rewriting port to zero if allowed by
-                // the transport-layer protocol.
-                error!("cannot rewrite dst port to unspecified; dropping {proto} packet");
-                return Verdict::Drop;
-            };
-            transport.set_dst_port(new_dst_port);
-        }
-        NatType::Source => {
-            let (new_src_addr, new_src_port) = (tuple.dst_addr, tuple.dst_port_or_id);
-
-            packet.set_src_addr(new_src_addr);
-            let Some(proto) = packet.protocol() else {
-                return Verdict::Accept(());
-            };
-            let mut transport = packet.transport_packet_mut();
-            let Some(mut transport) = transport.transport_packet_mut() else {
-                return Verdict::Accept(());
-            };
-            let Some(new_src_port) = NonZeroU16::new(new_src_port) else {
-                // TODO(https://fxbug.dev/341128580): allow rewriting port to zero if allowed by
-                // the transport-layer protocol.
-                error!("cannot rewrite src port to unspecified; dropping {proto} packet");
-                return Verdict::Drop;
-            };
-            transport.set_src_port(new_src_port);
+    if let Some(mut icmp_error) = packet.icmp_error_mut().icmp_error_mut() {
+        match rewrite_icmp_error_payload(&mut icmp_error, nat, tuple) {
+            Verdict::Accept(_) => (),
+            Verdict::Drop => return Verdict::Drop,
         }
     }
-    Verdict::Accept(())
+
+    match nat {
+        NatType::Destination => {
+            rewrite_packet_for_dst_nat(packet, tuple.src_addr, tuple.src_port_or_id)
+        }
+        NatType::Source => rewrite_packet_for_src_nat(packet, tuple.dst_addr, tuple.dst_port_or_id),
+    }
 }
 
 #[cfg(test)]
@@ -1171,7 +1315,10 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_types::ip::{AddrSubnet, Ipv4};
     use netstack3_base::IntoCoreTimerCtx;
-    use test_case::test_case;
+    use packet::{InnerPacketBuilder, Serializer};
+    use packet_formats::ip::{IpPacketBuilder, IpProto};
+    use packet_formats::udp::UdpPacketBuilder;
+    use test_case::{test_case, test_matrix};
 
     use super::*;
     use crate::conntrack::Tuple;
@@ -1180,7 +1327,10 @@ mod tests {
     };
     use crate::matchers::testutil::{ethernet_interface, FakeDeviceId};
     use crate::matchers::PacketMatcher;
-    use crate::packets::testutil::internal::{ArbitraryValue, FakeIpPacket, FakeUdpPacket};
+    use crate::packets::testutil::internal::{
+        ArbitraryValue, FakeIpPacket, FakeUdpPacket, IcmpErrorMessage, Icmpv4DestUnreachableError,
+        Icmpv6DestUnreachableError,
+    };
     use crate::state::{Action, Routine, Rule, TransparentProxy};
     use crate::testutil::TestIpExt;
 
@@ -2328,5 +2478,752 @@ mod tests {
             Verdict::Accept(NatConfigurationResult::AdoptExisting(Connection::Shared(conn))) => conn
         );
         assert!(Arc::ptr_eq(&existing, &conn));
+    }
+
+    trait IcmpErrorTestIpExt: TestIpExt {
+        const NETSTACK: Self::Addr = Self::DST_IP;
+        const ULTIMATE_SRC: Self::Addr = Self::SRC_IP;
+        const ULTIMATE_DST: Self::Addr = Self::DST_IP_3;
+        const ROUTER_SRC: Self::Addr = Self::SRC_IP_2;
+        const ROUTER_DST: Self::Addr = Self::DST_IP_2;
+    }
+
+    impl<I> IcmpErrorTestIpExt for I where I: TestIpExt {}
+
+    enum IcmpErrorSource {
+        IntermediateRouter,
+        EndHost,
+    }
+
+    // The next two test cases (redirect_icmp_error_in_reply_direction and
+    // redirect_icmp_error_in_original_direction) require some explanation. The
+    // tests are based on the `redirect` test above, but are validating that
+    // ICMP error NAT works properly.
+    //
+    // The imaginary network used in these tests is set up as follows:
+    //
+    // D --- US --- SR --- S
+    //
+    // Where:
+    //
+    // - US: That's us :-)
+    // - D:  The ultimate destination
+    // - S:  The ultimate source
+    // - SR: A router between us and the source
+    //
+    // The IPs that matter are:
+    //
+    // - D: ULTIMATE_DST
+    // - US: NETSTACK
+    // - S: ULTIMATE_SRC
+    // - SR: ROUTER_SRC
+    //
+    // There is DNAT configured such that packets coming from S to D are
+    // rewritten to instead go to US. Packets going from US -> S will have their
+    // source rewritten to replace US with the address of D.
+    //
+    // Each test checks that an ICMP error traveling in either the original or
+    // reply direction are rewritten appropriately.
+
+    #[test_case(Icmpv4DestUnreachableError)]
+    #[test_case(Icmpv6DestUnreachableError)]
+    fn redirect_icmp_error_in_reply_direction<I: IcmpErrorTestIpExt, IE: IcmpErrorMessage<I>>(
+        _icmp_error: IE,
+    ) {
+        let mut bindings_ctx = FakeBindingsCtx::<I>::new();
+        let conntrack = Table::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+        let mut core_ctx = FakeNatCtx::new([(
+            ethernet_interface(),
+            AddrSubnet::new(I::NETSTACK, I::SUBNET.prefix()).unwrap(),
+        )]);
+
+        // Create a packet and get the corresponding connection from conntrack.
+        let mut packet = []
+            .into_serializer()
+            .encapsulate(UdpPacketBuilder::new(
+                I::ULTIMATE_SRC,
+                I::ULTIMATE_DST,
+                Some(NonZeroU16::new(11111).unwrap()),
+                NonZeroU16::new(22222).unwrap(),
+            ))
+            .encapsulate(I::PacketBuilder::new(
+                I::ULTIMATE_SRC,
+                I::ULTIMATE_DST,
+                u8::MAX,
+                IpProto::Udp.into(),
+            ));
+        let packet_pre_nat = packet.clone();
+        let (mut conn, _) = conntrack
+            .get_connection_for_packet_and_update(&bindings_ctx, packet.conntrack_packet().unwrap())
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
+        let original_tuple = conn.original_tuple().clone();
+
+        let nat_routines = Hook {
+            routines: vec![Routine {
+                rules: vec![Rule::new(
+                    PacketMatcher::default(),
+                    Action::Redirect { dst_port: Some(LOCAL_PORT..=LOCAL_PORT) },
+                )],
+            }],
+        };
+        let verdict = perform_nat::<IngressHook, _, _, _, _>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
+            &conntrack,
+            &mut conn,
+            ConnectionDirection::Original,
+            &nat_routines,
+            &mut packet,
+            <IngressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
+        );
+        assert_eq!(verdict, Verdict::Accept(()).into());
+
+        // The packet's destination should be rewritten and DNAT should be
+        // configured for the packet; the reply tuple's source should be
+        // rewritten to match the new destination.
+        let (redirect_addr, cached_addr) = IngressHook::redirect_addr(
+            &mut core_ctx,
+            &packet,
+            <IngressHook as NatHookExt<I>>::interfaces(&ethernet_interface()).ingress,
+        )
+        .expect("get redirect addr for NAT hook");
+
+        // Since this is in the INGRESS hook, redirect_addr should be the
+        // address of the receiving interface.
+        assert_eq!(redirect_addr, I::NETSTACK);
+
+        // The destination address and port were updated.
+        let expected = []
+            .into_serializer()
+            .encapsulate(UdpPacketBuilder::new(
+                I::ULTIMATE_SRC,
+                redirect_addr,
+                packet.inner().outer().src_port(),
+                LOCAL_PORT,
+            ))
+            .encapsulate(I::PacketBuilder::new(
+                I::ULTIMATE_SRC,
+                redirect_addr,
+                u8::MAX,
+                IpProto::Udp.into(),
+            ));
+        assert_eq!(packet, expected);
+        assert_eq!(
+            conn.external_data().destination.get().expect("DNAT should be configured"),
+            &ShouldNat::Yes(cached_addr)
+        );
+        assert_eq!(conn.external_data().source.get(), None, "SNAT should not be configured");
+        assert_eq!(conn.original_tuple(), &original_tuple);
+
+        let reply_tuple = Tuple {
+            src_addr: redirect_addr,
+            src_port_or_id: LOCAL_PORT.get(),
+            ..original_tuple.invert()
+        };
+        assert_eq!(conn.reply_tuple(), &reply_tuple);
+
+        let mut error_packet = IE::make_serializer(
+            redirect_addr,
+            I::ULTIMATE_SRC,
+            packet.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
+        )
+        .encapsulate(I::PacketBuilder::new(
+            redirect_addr,
+            I::ULTIMATE_SRC,
+            u8::MAX,
+            IE::proto(),
+        ));
+
+        let verdict = perform_nat::<EgressHook, _, _, _, _>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
+            &conntrack,
+            &mut conn,
+            ConnectionDirection::Reply,
+            &nat_routines,
+            &mut error_packet,
+            <EgressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
+        );
+        assert_eq!(verdict, Verdict::Accept(()).into());
+
+        let error_packet_expected = IE::make_serializer(
+            // We expect this address to be rewritten since `redirect_addr`
+            // shouldn't end up in the packet destined to the other host.
+            I::ULTIMATE_DST,
+            I::ULTIMATE_SRC,
+            packet_pre_nat.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
+        )
+        .encapsulate(I::PacketBuilder::new(
+            I::ULTIMATE_DST,
+            I::ULTIMATE_SRC,
+            u8::MAX,
+            IE::proto(),
+        ));
+
+        assert_eq!(error_packet, error_packet_expected);
+    }
+
+    #[test_matrix(
+        [
+            Icmpv4DestUnreachableError,
+            Icmpv6DestUnreachableError,
+        ],
+        [
+            IcmpErrorSource::IntermediateRouter,
+            IcmpErrorSource::EndHost,
+        ]
+    )]
+    fn redirect_icmp_error_in_original_direction<I: IcmpErrorTestIpExt, IE: IcmpErrorMessage<I>>(
+        _icmp_error: IE,
+        icmp_error_source: IcmpErrorSource,
+    ) {
+        let mut bindings_ctx = FakeBindingsCtx::<I>::new();
+        let conntrack = Table::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+        let mut core_ctx = FakeNatCtx::new([(
+            ethernet_interface(),
+            AddrSubnet::new(I::NETSTACK, I::SUBNET.prefix()).unwrap(),
+        )]);
+
+        // Create a packet and get the corresponding connection from conntrack.
+        let mut packet = []
+            .into_serializer()
+            .encapsulate(UdpPacketBuilder::new(
+                I::ULTIMATE_SRC,
+                I::ULTIMATE_DST,
+                Some(NonZeroU16::new(11111).unwrap()),
+                NonZeroU16::new(22222).unwrap(),
+            ))
+            .encapsulate(I::PacketBuilder::new(
+                I::ULTIMATE_SRC,
+                I::ULTIMATE_DST,
+                u8::MAX,
+                IpProto::Udp.into(),
+            ));
+        let (mut conn, direction) = conntrack
+            .get_connection_for_packet_and_update(&bindings_ctx, packet.conntrack_packet().unwrap())
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
+        let original_tuple = conn.original_tuple().clone();
+
+        // Perform NAT at the first hook where we'd encounter this packet (either
+        // INGRESS, if it's an incoming packet, or LOCAL_EGRESS, if it's an outgoing
+        // packet).
+        let nat_routines = Hook {
+            routines: vec![Routine {
+                rules: vec![Rule::new(
+                    PacketMatcher::default(),
+                    Action::Redirect { dst_port: Some(LOCAL_PORT..=LOCAL_PORT) },
+                )],
+            }],
+        };
+        let verdict = perform_nat::<IngressHook, _, _, _, _>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
+            &conntrack,
+            &mut conn,
+            direction,
+            &nat_routines,
+            &mut packet,
+            <IngressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
+        );
+        assert_eq!(verdict, Verdict::Accept(()).into());
+
+        // The packet's destination should be rewritten, and DNAT should be configured
+        // for the packet; the reply tuple's source should be rewritten to match the new
+        // destination.
+        let (redirect_addr, cached_addr) = IngressHook::redirect_addr(
+            &mut core_ctx,
+            &packet,
+            <IngressHook as NatHookExt<I>>::interfaces(&ethernet_interface()).ingress,
+        )
+        .expect("get redirect addr for NAT hook");
+
+        // Since this is in the INGRESS hook, redirect_addr should be the
+        // address of the receiving interface.
+        assert_eq!(redirect_addr, I::NETSTACK);
+
+        // The destination address and port were updated.
+        let expected = []
+            .into_serializer()
+            .encapsulate(UdpPacketBuilder::new(
+                I::ULTIMATE_SRC,
+                redirect_addr,
+                packet.inner().outer().src_port(),
+                LOCAL_PORT,
+            ))
+            .encapsulate(I::PacketBuilder::new(
+                I::ULTIMATE_SRC,
+                redirect_addr,
+                u8::MAX,
+                IpProto::Udp.into(),
+            ));
+        assert_eq!(packet, expected);
+        assert_eq!(
+            conn.external_data().destination.get().expect("DNAT should be configured"),
+            &ShouldNat::Yes(cached_addr)
+        );
+        assert_eq!(conn.external_data().source.get(), None, "SNAT should not be configured");
+        assert_eq!(conn.original_tuple(), &original_tuple);
+        let reply_tuple = Tuple {
+            src_addr: redirect_addr,
+            src_port_or_id: LOCAL_PORT.get(),
+            ..original_tuple.invert()
+        };
+        assert_eq!(conn.reply_tuple(), &reply_tuple);
+
+        let mut reply_packet = []
+            .into_serializer()
+            .encapsulate(UdpPacketBuilder::new(
+                reply_tuple.src_addr,
+                reply_tuple.dst_addr,
+                Some(NonZeroU16::new(reply_tuple.src_port_or_id).unwrap()),
+                NonZeroU16::new(reply_tuple.dst_port_or_id).unwrap(),
+            ))
+            .encapsulate(I::PacketBuilder::new(
+                reply_tuple.src_addr,
+                reply_tuple.dst_addr,
+                u8::MAX,
+                IpProto::Udp.into(),
+            ));
+        let reply_packet_pre_nat = reply_packet.clone();
+
+        let verdict = perform_nat::<EgressHook, _, _, _, _>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
+            &conntrack,
+            &mut conn,
+            ConnectionDirection::Reply,
+            &nat_routines,
+            &mut reply_packet,
+            <EgressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
+        );
+        assert_eq!(verdict, Verdict::Accept(()).into());
+
+        let reply_packet_expected = []
+            .into_serializer()
+            .encapsulate(UdpPacketBuilder::new(
+                I::ULTIMATE_DST,
+                I::ULTIMATE_SRC,
+                Some(NonZeroU16::new(22222).unwrap()),
+                NonZeroU16::new(11111).unwrap(),
+            ))
+            .encapsulate(I::PacketBuilder::new(
+                I::ULTIMATE_DST,
+                I::ULTIMATE_SRC,
+                u8::MAX,
+                IpProto::Udp.into(),
+            ));
+        assert_eq!(reply_packet, reply_packet_expected);
+
+        // The packet sent from D -> S was invalid and triggered an ICMP error
+        // either from either S or SR.
+        let error_src_addr = match icmp_error_source {
+            IcmpErrorSource::IntermediateRouter => I::ROUTER_SRC,
+            IcmpErrorSource::EndHost => I::ULTIMATE_SRC,
+        };
+
+        let mut error_packet = IE::make_serializer(
+            error_src_addr,
+            I::ULTIMATE_DST,
+            reply_packet.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
+        )
+        .encapsulate(I::PacketBuilder::new(
+            error_src_addr,
+            I::ULTIMATE_DST,
+            u8::MAX,
+            IE::proto(),
+        ));
+
+        let verdict = perform_nat::<IngressHook, _, _, _, _>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
+            &conntrack,
+            &mut conn,
+            direction,
+            &nat_routines,
+            &mut error_packet,
+            <IngressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
+        );
+        assert_eq!(verdict, Verdict::Accept(()).into());
+
+        let error_packet_expected = IE::make_serializer(
+            // Unlike in the reply case, we shouldn't expect this address to be
+            // rewritten since it's not one configured for NAT.
+            error_src_addr,
+            redirect_addr,
+            reply_packet_pre_nat.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
+        )
+        .encapsulate(I::PacketBuilder::new(
+            error_src_addr,
+            redirect_addr,
+            u8::MAX,
+            IE::proto(),
+        ));
+
+        assert_eq!(error_packet, error_packet_expected);
+    }
+
+    // This is an explanation of masquerade_icmp_error_in_reply_direction and
+    // masquerade_icmp_error_in_original_direction. There is more background
+    // information in the equivalent comment of the redirect ICMP error tests.
+    //
+    // The imaginary network used in these tests is set up as follows:
+    //
+    // S --- SR --- US --- DR --- D
+    //
+    // Where:
+    //
+    // - US: That's us :-)
+    // - D:  The ultimate destination
+    // - S:  The ultimate source
+    // - DR: A router between us and the destination
+    // - SR: A router between us and the source
+    //
+    // The IPs that matter are:
+    //
+    // - D: ULTIMATE_DST
+    // - DR: ROUTER_DST
+    // - S: ULTIMAKE_SOURCE
+    // - SR: ROUTER_SRC
+    // - US: ULTIMATE_SRC
+    //
+    // The network is configured such that any packets traveling from S through
+    // US are rewritten to have the address of US as their source address.
+
+    #[test_matrix(
+        [
+            Icmpv4DestUnreachableError,
+            Icmpv6DestUnreachableError,
+        ],
+        [
+            IcmpErrorSource::IntermediateRouter,
+            IcmpErrorSource::EndHost,
+        ]
+    )]
+    fn masquerade_icmp_error_in_reply_direction<I: TestIpExt, IE: IcmpErrorMessage<I>>(
+        _icmp_error: IE,
+        icmp_error_source: IcmpErrorSource,
+    ) {
+        let mut bindings_ctx = FakeBindingsCtx::<I>::new();
+        let conntrack = Table::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+        let assigned_addr = AddrSubnet::new(I::NETSTACK, I::SUBNET.prefix()).unwrap();
+        let mut core_ctx = FakeNatCtx::new([(ethernet_interface(), assigned_addr)]);
+
+        // Create a packet and get the corresponding connection from conntrack.
+        let mut packet = []
+            .into_serializer()
+            .encapsulate(UdpPacketBuilder::new(
+                I::ULTIMATE_SRC,
+                I::ULTIMATE_DST,
+                Some(NonZeroU16::new(11111).unwrap()),
+                NonZeroU16::new(22222).unwrap(),
+            ))
+            .encapsulate(I::PacketBuilder::new(
+                I::ULTIMATE_SRC,
+                I::ULTIMATE_DST,
+                u8::MAX,
+                IpProto::Udp.into(),
+            ));
+        let packet_pre_nat = packet.clone();
+        let (mut conn, direction) = conntrack
+            .get_connection_for_packet_and_update(&bindings_ctx, packet.conntrack_packet().unwrap())
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
+        let original_tuple = conn.original_tuple().clone();
+
+        // Perform Masquerade NAT at EGRESS.
+        let nat_routines = Hook {
+            routines: vec![Routine {
+                rules: vec![Rule::new(
+                    PacketMatcher::default(),
+                    Action::Masquerade { src_port: Some(LOCAL_PORT..=LOCAL_PORT) },
+                )],
+            }],
+        };
+        let verdict = perform_nat::<EgressHook, _, _, _, _>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
+            &conntrack,
+            &mut conn,
+            direction,
+            &nat_routines,
+            &mut packet,
+            Interfaces { ingress: None, egress: Some(&ethernet_interface()) },
+        );
+        assert_eq!(verdict, Verdict::Accept(()).into());
+
+        // The packet's source address should be rewritten, and SNAT should be
+        // configured for the packet; the reply tuple's destination should be rewritten
+        // to match the new source.
+        let expected = []
+            .into_serializer()
+            .encapsulate(UdpPacketBuilder::new(
+                I::NETSTACK,
+                I::ULTIMATE_DST,
+                Some(LOCAL_PORT),
+                packet.inner().outer().dst_port().unwrap(),
+            ))
+            .encapsulate(I::PacketBuilder::new(
+                I::NETSTACK,
+                I::ULTIMATE_DST,
+                u8::MAX,
+                IpProto::Udp.into(),
+            ));
+        assert_eq!(packet, expected);
+        assert_matches!(
+            conn.external_data().source.get().expect("SNAT should be configured"),
+            &ShouldNat::Yes(Some(_))
+        );
+        assert_eq!(conn.external_data().destination.get(), None, "DNAT should not be configured");
+        assert_eq!(conn.original_tuple(), &original_tuple);
+        let reply_tuple = Tuple {
+            dst_addr: I::NETSTACK,
+            dst_port_or_id: LOCAL_PORT.get(),
+            ..original_tuple.invert()
+        };
+        assert_eq!(conn.reply_tuple(), &reply_tuple);
+
+        // The packet sent from S -> D was invalid and triggered an ICMP error
+        // either from D or DR.
+        let error_src_addr = match icmp_error_source {
+            IcmpErrorSource::IntermediateRouter => I::ROUTER_DST,
+            IcmpErrorSource::EndHost => I::ULTIMATE_DST,
+        };
+
+        let mut error_packet = IE::make_serializer(
+            error_src_addr,
+            I::NETSTACK,
+            packet.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
+        )
+        .encapsulate(I::PacketBuilder::new(
+            error_src_addr,
+            I::NETSTACK,
+            u8::MAX,
+            IE::proto(),
+        ));
+
+        let verdict = perform_nat::<IngressHook, _, _, _, _>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
+            &conntrack,
+            &mut conn,
+            ConnectionDirection::Reply,
+            &nat_routines,
+            &mut error_packet,
+            Interfaces { ingress: Some(&ethernet_interface()), egress: None },
+        );
+        assert_eq!(verdict, Verdict::Accept(()).into());
+
+        let error_packet_expected = IE::make_serializer(
+            // We expect this address to be rewritten since `redirect_addr`
+            // shouldn't end up in the packet destined to the other host.
+            error_src_addr,
+            I::ULTIMATE_SRC,
+            packet_pre_nat.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
+        )
+        .encapsulate(I::PacketBuilder::new(
+            error_src_addr,
+            I::ULTIMATE_SRC,
+            u8::MAX,
+            IE::proto(),
+        ));
+
+        assert_eq!(error_packet, error_packet_expected);
+    }
+
+    #[test_matrix(
+        [
+            Icmpv4DestUnreachableError,
+            Icmpv6DestUnreachableError,
+        ],
+        [
+            IcmpErrorSource::IntermediateRouter,
+            IcmpErrorSource::EndHost,
+        ]
+    )]
+    fn masquerade_icmp_error_in_original_direction<I: TestIpExt, IE: IcmpErrorMessage<I>>(
+        _icmp_error: IE,
+        icmp_error_source: IcmpErrorSource,
+    ) {
+        let mut bindings_ctx = FakeBindingsCtx::<I>::new();
+        let conntrack = Table::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+        let assigned_addr = AddrSubnet::new(I::NETSTACK, I::SUBNET.prefix()).unwrap();
+        let mut core_ctx = FakeNatCtx::new([(ethernet_interface(), assigned_addr)]);
+
+        // Create a packet and get the corresponding connection from conntrack.
+        let mut packet = []
+            .into_serializer()
+            .encapsulate(UdpPacketBuilder::new(
+                I::ULTIMATE_SRC,
+                I::ULTIMATE_DST,
+                Some(NonZeroU16::new(11111).unwrap()),
+                NonZeroU16::new(22222).unwrap(),
+            ))
+            .encapsulate(I::PacketBuilder::new(
+                I::ULTIMATE_SRC,
+                I::ULTIMATE_DST,
+                u8::MAX,
+                IpProto::Udp.into(),
+            ));
+        let (mut conn, direction) = conntrack
+            .get_connection_for_packet_and_update(&bindings_ctx, packet.conntrack_packet().unwrap())
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
+        let original_tuple = conn.original_tuple().clone();
+
+        // Perform Masquerade NAT at EGRESS.
+        let nat_routines = Hook {
+            routines: vec![Routine {
+                rules: vec![Rule::new(
+                    PacketMatcher::default(),
+                    Action::Masquerade { src_port: Some(LOCAL_PORT..=LOCAL_PORT) },
+                )],
+            }],
+        };
+        let verdict = perform_nat::<EgressHook, _, _, _, _>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
+            &conntrack,
+            &mut conn,
+            direction,
+            &nat_routines,
+            &mut packet,
+            Interfaces { ingress: None, egress: Some(&ethernet_interface()) },
+        );
+        assert_eq!(verdict, Verdict::Accept(()).into());
+
+        // The packet's source address should be rewritten, and SNAT should be
+        // configured for the packet; the reply tuple's destination should be rewritten
+        // to match the new source.
+        let expected = []
+            .into_serializer()
+            .encapsulate(UdpPacketBuilder::new(
+                I::NETSTACK,
+                I::ULTIMATE_DST,
+                Some(LOCAL_PORT),
+                packet.inner().outer().dst_port().unwrap(),
+            ))
+            .encapsulate(I::PacketBuilder::new(
+                I::NETSTACK,
+                I::ULTIMATE_DST,
+                u8::MAX,
+                IpProto::Udp.into(),
+            ));
+        assert_eq!(packet, expected);
+        assert_matches!(
+            conn.external_data().source.get().expect("SNAT should be configured"),
+            &ShouldNat::Yes(Some(_))
+        );
+        assert_eq!(conn.external_data().destination.get(), None, "DNAT should not be configured");
+        assert_eq!(conn.original_tuple(), &original_tuple);
+        let reply_tuple = Tuple {
+            dst_addr: I::NETSTACK,
+            dst_port_or_id: LOCAL_PORT.get(),
+            ..original_tuple.invert()
+        };
+        assert_eq!(conn.reply_tuple(), &reply_tuple);
+
+        // When a reply to the original packet arrives at INGRESS, it should
+        // have reverse SNAT applied, i.e. its destination should be rewritten
+        // to match the original source of the connection.
+        let mut reply_packet = []
+            .into_serializer()
+            .encapsulate(UdpPacketBuilder::new(
+                reply_tuple.src_addr,
+                reply_tuple.dst_addr,
+                Some(NonZeroU16::new(reply_tuple.src_port_or_id).unwrap()),
+                NonZeroU16::new(reply_tuple.dst_port_or_id).unwrap(),
+            ))
+            .encapsulate(I::PacketBuilder::new(
+                reply_tuple.src_addr,
+                reply_tuple.dst_addr,
+                u8::MAX,
+                IpProto::Udp.into(),
+            ));
+        let reply_packet_pre_nat = reply_packet.clone();
+
+        let verdict = perform_nat::<IngressHook, _, _, _, _>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
+            &conntrack,
+            &mut conn,
+            ConnectionDirection::Reply,
+            &nat_routines,
+            &mut reply_packet,
+            Interfaces { ingress: Some(&ethernet_interface()), egress: None },
+        );
+        assert_eq!(verdict, Verdict::Accept(()).into());
+
+        let reply_packet_expected = []
+            .into_serializer()
+            .encapsulate(UdpPacketBuilder::new(
+                I::ULTIMATE_DST,
+                I::ULTIMATE_SRC,
+                Some(NonZeroU16::new(22222).unwrap()),
+                NonZeroU16::new(11111).unwrap(),
+            ))
+            .encapsulate(I::PacketBuilder::new(
+                I::ULTIMATE_DST,
+                I::ULTIMATE_SRC,
+                u8::MAX,
+                IpProto::Udp.into(),
+            ));
+        assert_eq!(reply_packet, reply_packet_expected);
+
+        let error_src_addr = match icmp_error_source {
+            IcmpErrorSource::IntermediateRouter => I::ROUTER_SRC,
+            IcmpErrorSource::EndHost => I::ULTIMATE_SRC,
+        };
+
+        let mut error_packet = IE::make_serializer(
+            error_src_addr,
+            I::ULTIMATE_DST,
+            reply_packet.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
+        )
+        .encapsulate(I::PacketBuilder::new(
+            error_src_addr,
+            I::ULTIMATE_DST,
+            u8::MAX,
+            IE::proto(),
+        ));
+
+        let verdict = perform_nat::<EgressHook, _, _, _, _>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
+            &conntrack,
+            &mut conn,
+            direction,
+            &nat_routines,
+            &mut error_packet,
+            Interfaces { ingress: None, egress: Some(&ethernet_interface()) },
+        );
+        assert_eq!(verdict, Verdict::Accept(()).into());
+
+        let error_packet_expected = IE::make_serializer(
+            // We expect this address to be rewritten since `redirect_addr`
+            // shouldn't end up in the packet destined to the other host.
+            I::NETSTACK,
+            I::ULTIMATE_DST,
+            reply_packet_pre_nat.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
+        )
+        .encapsulate(I::PacketBuilder::new(
+            I::NETSTACK,
+            I::ULTIMATE_DST,
+            u8::MAX,
+            IE::proto(),
+        ));
+
+        assert_eq!(error_packet, error_packet_expected);
     }
 }

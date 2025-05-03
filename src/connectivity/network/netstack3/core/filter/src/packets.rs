@@ -3094,7 +3094,9 @@ pub mod testutil {
         }
 
         pub(crate) trait IcmpErrorMessage<I: FilterIpExt> {
-            type Serializer: TransportPacketSerializer<I, Buffer: packet::ReusableBuffer> + Debug;
+            type Serializer: TransportPacketSerializer<I, Buffer: packet::ReusableBuffer>
+                + Debug
+                + PartialEq;
 
             fn proto() -> I::Proto {
                 I::map_ip((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6)

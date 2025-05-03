@@ -1733,8 +1733,7 @@ pub enum TruncateDirection {
 /// occur. The size limit may be small enough that the encapsulating headers
 /// alone exceed the size limit.  There may also be a minimum body length
 /// constraint which is larger than the size limit.
-#[derive(Copy, Clone, Debug)]
-#[cfg_attr(test, derive(Eq, PartialEq))]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct TruncatingSerializer<B> {
     buffer: B,
     direction: TruncateDirection,

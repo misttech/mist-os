@@ -1496,7 +1496,7 @@ pub(crate) struct TestRouterNet<'a, I: RouterTestIpExt> {
     pub router: netemul::TestRealm<'a>,
     pub _router_client_net: netemul::TestNetwork<'a>,
     router_client_interface: netemul::TestInterface<'a>,
-    pub _router_server_net: netemul::TestNetwork<'a>,
+    pub router_server_net: netemul::TestNetwork<'a>,
     pub router_server_interface: netemul::TestInterface<'a>,
 
     // Client resources. We keep the handle to the interface around so that it is
@@ -1633,7 +1633,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
             router_client_interface,
             _router_client_net: client_net,
             router_server_interface,
-            _router_server_net: server_net,
+            router_server_net: server_net,
             client,
             _client_interface: client_interface,
             server,
