@@ -7859,7 +7859,7 @@ From //third_party/pigweed/src/third_party/fuchsia/fuchsia.gni:20
 
 If compiling tests with googletest, this variable is set to the path to the
 googletest installation. When set, a pw_source_set for the googletest
-library is created at "$dir_pw_third_party/googletest". Incompatible
+library is created at "$pw_external_googletest". Incompatible
 with pw_third_party_googletest_ALIAS definition.
 
 **Current value (from the default):** `""`
@@ -7870,7 +7870,7 @@ From //third_party/pigweed/src/third_party/googletest/googletest.gni:20
 
 If compiling backends with mbedtls, this variable is set to the path to the
 mbedtls source code. When set, a pw_source_set for the mbedtls library is
-created at "$dir_pw_third_party/mbedtls".
+created at "$pw_external_mbedtls".
 
 **Current value (from the default):** `""`
 
@@ -7880,7 +7880,7 @@ From //third_party/pigweed/src/third_party/mbedtls/mbedtls.gni:21
 
 If compiling protos for nanopb, this variable is set to the path to the
 nanopb installation. When set, a pw_source_set for the nanopb library is
-created at "$dir_pw_third_party/nanopb".
+created at "$pw_external_nanopb".
 
 **Current value (from the default):** `""`
 
