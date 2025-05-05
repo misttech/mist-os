@@ -412,8 +412,7 @@ struct UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse {
 
     int32_t some_field = {};
 };
-
-}  // namespace wire
+  }  // namespace wire
 }  // namespace test_unknowninteractions
 
 template<>

@@ -59,7 +59,6 @@ namespace internal {
       .array = WireNaturalConversionTraits<::test_encapsulatedstructs::wire::ArrayInt16Int8, ::test_encapsulatedstructs::ArrayInt16Int8>::ToWire(arena, std::move(src.array())),
   };
 }
-
 #ifdef __Fuchsia__
 
 ::test_encapsulatedstructs::NonInlineStructTestStruct WireNaturalConversionTraits<::test_encapsulatedstructs::wire::NonInlineStructTestStruct, ::test_encapsulatedstructs::NonInlineStructTestStruct>::ToNatural(::test_encapsulatedstructs::wire::NonInlineStructTestStruct src) {

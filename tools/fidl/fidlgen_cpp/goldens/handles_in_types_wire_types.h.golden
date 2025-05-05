@@ -436,6 +436,7 @@ struct internal::WireCodingTraits<::test_handlesintypes::wire::ObjType, ::fidl::
 };
 
 #ifdef __Fuchsia__
+
 template <>
 struct IsResource<::test_handlesintypes::wire::HandlesInTypes> : public std::true_type {};
 

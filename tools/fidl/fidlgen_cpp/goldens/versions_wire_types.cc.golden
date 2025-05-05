@@ -39,6 +39,7 @@ template struct ::fidl::internal::WireCodingTraits<::test_versions::wire::Enum, 
 template struct ::fidl::internal::WireCodingTraits<::test_versions::wire::Enum, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
 #ifdef __Fuchsia__
+
 void ::test_versions::wire::Struct::_CloseHandles() {
 }
 

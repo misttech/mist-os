@@ -11,9 +11,7 @@ struct {{ .Name }};
 
 {{- define "Struct:WireTypesHeader" }}
 {{ EnsureNamespace . }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 {{ .Docs }}
 struct {{ .Name }} {
 {{- range .AnonymousChildren }}
@@ -35,18 +33,16 @@ struct {{ .Name }} {
   {{- end }}
 };
 
-{{- if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Struct:WireTypesSource" }}
 {{ EnsureNamespace "" }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 {{ if .IsResourceType }}
-  {{- IfdefFuchsia -}}
     void {{ . }}::_CloseHandles() {
       {{- range .Members }}
-        {{- CloseHandles . false }}
+        {{ CloseHandles . false }}
       {{- end }}
     }
 {{- end }}
@@ -95,15 +91,13 @@ static_assert(offsetof({{ $struct }}, {{ .Name }}) == {{ .OffsetV2 }});
 {{- end }}
 static_assert(sizeof({{ . }}) == ::fidl::TypeTraits<{{ . }}>::kPrimarySize);
 
-{{ if .IsResourceType }}
-  {{- EndifFuchsia -}}
-{{ end }}
+  {{- EndifFuchsiaIf .IsResourceType -}}
 
 {{- end }}
 
 {{- define "Struct:Traits:WireTypesHeader" }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 {{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
 template <>
 struct IsResource<{{ . }}> : public std::true_type {};
 {{- end }}
@@ -143,7 +137,5 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-{{- if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}

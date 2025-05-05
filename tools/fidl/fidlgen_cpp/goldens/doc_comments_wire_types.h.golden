@@ -55,7 +55,6 @@ struct Struct {
   /// struct member comment #3
   int32_t field = {};
 };
-
 }  // namespace wire
 }  // namespace test_doccomments
 

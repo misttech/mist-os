@@ -64,7 +64,6 @@ template <>
 struct WireTypeForNaturalType<::test_arrays::TableSmallArray> {
   using type = ::test_arrays::wire::TableSmallArray;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_arrays::wire::TableLargeArray, ::test_arrays::TableLargeArray> {
   static ::test_arrays::TableLargeArray ToNatural(::test_arrays::wire::TableLargeArray src);

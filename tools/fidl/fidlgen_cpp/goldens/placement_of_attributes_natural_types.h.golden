@@ -239,7 +239,6 @@ struct IsStruct<::test_placementofattributes::ExampleProtocolMethodRequest> : pu
 template <>
 struct internal::NaturalCodingTraits<::test_placementofattributes::ExampleProtocolMethodRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_placementofattributes::ExampleProtocolMethodRequest, 1> {};
-
 template <>
 struct IsFidlType<::test_placementofattributes::ExampleStruct> : public std::true_type {};
 

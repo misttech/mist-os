@@ -980,7 +980,6 @@ struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest> : p
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest, 1> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> : public std::true_type {};
 
@@ -999,7 +998,6 @@ struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> : 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse, 4> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest> : public std::true_type {};
 
@@ -1018,7 +1016,6 @@ struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest> : pub
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest, 1> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> : public std::true_type {};
 
@@ -1037,7 +1034,6 @@ struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> : pu
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse, 4> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest> : public std::true_type {};
 
@@ -1056,7 +1052,6 @@ struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest> :
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest, 1> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse> : public std::true_type {};
 
@@ -1075,7 +1070,6 @@ struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse> 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse, 4> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest> : public std::true_type {};
 
@@ -1094,7 +1088,6 @@ struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest> : p
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest, 1> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> : public std::true_type {};
 
@@ -1113,7 +1106,6 @@ struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> : 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse, 4> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest> : public std::true_type {};
 
@@ -1132,7 +1124,6 @@ struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest, 1> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse> : public std::true_type {};
 
@@ -1151,7 +1142,6 @@ struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRespons
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse, 4> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary> : public std::true_type {};
 
@@ -1170,7 +1160,6 @@ struct IsStruct<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary> : 
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary, 1> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::OnlyAppearsInImportingLibrary> : public std::true_type {};
 
@@ -1208,7 +1197,6 @@ struct IsUnion<::test_bindingsdenylist::OnlyLlcpp> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::OnlyLlcpp, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_bindingsdenylist::OnlyLlcpp> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult> : public std::true_type {};
 
@@ -1227,7 +1215,6 @@ struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult> : pub
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> : public std::true_type {};
 
@@ -1246,7 +1233,6 @@ struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> : publi
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult> : public std::true_type {};
 
@@ -1265,7 +1251,6 @@ struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult> : p
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult> : public std::true_type {};
 
@@ -1284,7 +1269,6 @@ struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult> : pub
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult> {};
-
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult> : public std::true_type {};
 

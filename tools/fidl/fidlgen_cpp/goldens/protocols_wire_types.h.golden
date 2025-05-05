@@ -868,8 +868,8 @@ struct ::fidl::internal::WireCodingTraits<::test_protocols::wire::WithErrorSynta
   static void Decode(
       internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
 #ifdef __Fuchsia__
+
 template <>
 struct IsResource<::test_protocols::wire::WithErrorSyntaxHandleInResultResponse> : public std::true_type {};
 
@@ -1034,8 +1034,8 @@ struct ::fidl::internal::WireCodingTraits<::test_protocols::wire::ChannelProtoco
   static void Decode(
       internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
 #ifdef __Fuchsia__
+
 template <>
 struct IsResource<::test_protocols::wire::ChannelProtocolTakeHandleRequest> : public std::true_type {};
 
@@ -1174,8 +1174,8 @@ struct ::fidl::internal::WireCodingTraits<::test_protocols::wire::SyscallProtoco
   static void Decode(
       internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
 #ifdef __Fuchsia__
+
 template <>
 struct IsResource<::test_protocols::wire::HandleRightsProtocolNoResponseMethodRequest> : public std::true_type {};
 
@@ -1757,8 +1757,8 @@ struct ::fidl::internal::WireCodingTraits<::test_protocols::wire::WithErrorSynta
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public ::fidl::internal::WireCodingTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
-
 #ifdef __Fuchsia__
+
 template <>
 struct IsResource<::test_protocols::wire::WithErrorSyntaxHandleInResultResult> : public std::true_type {};
 

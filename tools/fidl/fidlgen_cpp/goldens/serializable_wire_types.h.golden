@@ -37,7 +37,6 @@ struct SerializableStruct {
 
   uint8_t __reserved = {};
 };
-
 }  // namespace wire
 }  // namespace test_serializable
 

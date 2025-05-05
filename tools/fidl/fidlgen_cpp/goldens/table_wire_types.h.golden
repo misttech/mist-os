@@ -43,7 +43,7 @@ class ExtensionTable;
 
 class SixtyFourOrdinalTable;
 
-}  // namespace wire
+  }  // namespace wire
 }  // namespace test_table
 
 template<>

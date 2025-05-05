@@ -27,7 +27,6 @@ namespace internal {
       .member = WireNaturalConversionTraits<uint32_t, uint32_t>::ToWire(arena, std::move(src.member())),
   };
 }
-
 ::test_placementofattributes::ExampleTable WireNaturalConversionTraits<::test_placementofattributes::wire::ExampleTable, ::test_placementofattributes::ExampleTable>::ToNatural(::test_placementofattributes::wire::ExampleTable src) {
   ::test_placementofattributes::ExampleTable dst;
   if (src.has_member()) {

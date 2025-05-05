@@ -58,7 +58,6 @@ class Handles;
 class FdfHandles;
 
 #ifdef __Fuchsia__
-
 using AliasedPlainHandle = ::zx::handle;
 
 using AliasedSubtypeHandle = ::zx::vmo;

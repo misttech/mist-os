@@ -276,6 +276,7 @@ struct internal::WireCodingTraits<::test_versions::wire::Enum, ::fidl::internal:
 };
 
 #ifdef __Fuchsia__
+
 template <>
 struct IsResource<::test_versions::wire::Struct> : public std::true_type {};
 

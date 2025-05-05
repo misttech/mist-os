@@ -55,7 +55,6 @@ namespace internal {
       .bits_member = WireNaturalConversionTraits<::test_anonymous::wire::BitsMember, ::test_anonymous::BitsMember>::ToWire(arena, std::move(src.bits_member())),
   };
 }
-
 ::test_anonymous::FunctionApplication WireNaturalConversionTraits<::test_anonymous::wire::FunctionApplication, ::test_anonymous::FunctionApplication>::ToNatural(::test_anonymous::wire::FunctionApplication src) {
   ::test_anonymous::FunctionApplication dst;
   if (src.has_func()) {

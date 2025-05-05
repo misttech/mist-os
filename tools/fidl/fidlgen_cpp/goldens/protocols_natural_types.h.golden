@@ -2123,7 +2123,6 @@ struct IsStruct<::test_protocols::WithAndWithoutRequestResponseNoRequestWithResp
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse, 16> {};
-
 template <>
 struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest> : public std::true_type {};
 
@@ -2142,7 +2141,6 @@ struct IsStruct<::test_protocols::WithAndWithoutRequestResponseWithRequestNoResp
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest, 16> {};
-
 template <>
 struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest> : public std::true_type {};
 
@@ -2161,7 +2159,6 @@ struct IsStruct<::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyR
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest, 16> {};
-
 template <>
 struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest> : public std::true_type {};
 
@@ -2180,7 +2177,6 @@ struct IsStruct<::test_protocols::WithAndWithoutRequestResponseWithRequestWithRe
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest, 16> {};
-
 template <>
 struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse> : public std::true_type {};
 
@@ -2199,7 +2195,6 @@ struct IsStruct<::test_protocols::WithAndWithoutRequestResponseWithRequestWithRe
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse, 16> {};
-
 template <>
 struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest> : public std::true_type {};
 
@@ -2218,7 +2213,6 @@ struct IsStruct<::test_protocols::WithAndWithoutRequestResponseOnWithResponseReq
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest, 16> {};
-
 template <>
 struct IsFidlType<::test_protocols::WithErrorSyntaxResponseAsStructResponse> : public std::true_type {};
 
@@ -2237,7 +2231,6 @@ struct IsStruct<::test_protocols::WithErrorSyntaxResponseAsStructResponse> : pub
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructResponse, 24> {};
-
 template <>
 struct IsFidlType<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse> : public std::true_type {};
 
@@ -2256,7 +2249,6 @@ struct IsStruct<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse> : pub
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse> {};
-
 template <>
 struct IsFidlType<::test_protocols::WithErrorSyntaxErrorAsEnumResponse> : public std::true_type {};
 
@@ -2275,7 +2267,6 @@ struct IsStruct<::test_protocols::WithErrorSyntaxErrorAsEnumResponse> : public s
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResponse> {};
-
 #ifdef __Fuchsia__
 
 template <>
@@ -2319,7 +2310,6 @@ struct IsStruct<::test_protocols::ChannelProtocolMethodARequest> : public std::t
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::ChannelProtocolMethodARequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMethodARequest, 16> {};
-
 template <>
 struct IsFidlType<::test_protocols::ChannelProtocolEventARequest> : public std::true_type {};
 
@@ -2338,7 +2328,6 @@ struct IsStruct<::test_protocols::ChannelProtocolEventARequest> : public std::tr
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::ChannelProtocolEventARequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolEventARequest, 16> {};
-
 template <>
 struct IsFidlType<::test_protocols::ChannelProtocolMethodBRequest> : public std::true_type {};
 
@@ -2357,7 +2346,6 @@ struct IsStruct<::test_protocols::ChannelProtocolMethodBRequest> : public std::t
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::ChannelProtocolMethodBRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMethodBRequest, 16> {};
-
 template <>
 struct IsFidlType<::test_protocols::ChannelProtocolMethodBResponse> : public std::true_type {};
 
@@ -2376,7 +2364,6 @@ struct IsStruct<::test_protocols::ChannelProtocolMethodBResponse> : public std::
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::ChannelProtocolMethodBResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMethodBResponse, 8> {};
-
 #ifdef __Fuchsia__
 
 template <>
@@ -2462,7 +2449,6 @@ struct IsStruct<::test_protocols::SyscallProtocolMethodCRequest> : public std::t
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::SyscallProtocolMethodCRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::SyscallProtocolMethodCRequest, 16> {};
-
 #ifdef __Fuchsia__
 
 template <>
@@ -2716,7 +2702,6 @@ struct IsStruct<::test_protocols::ManyParametersFifteenRequest> : public std::tr
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::ManyParametersFifteenRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ManyParametersFifteenRequest, 15> {};
-
 template <>
 struct IsFidlType<::test_protocols::MethodWithUnionUnionMethodRequest> : public std::true_type {};
 
@@ -2735,7 +2720,6 @@ struct IsStruct<::test_protocols::MethodWithUnionUnionMethodRequest> : public st
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::MethodWithUnionUnionMethodRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::MethodWithUnionUnionMethodRequest, 16> {};
-
 template <>
 struct IsFidlType<::test_protocols::MethodWithUnionUnionMethodResponse> : public std::true_type {};
 
@@ -2773,7 +2757,6 @@ struct IsUnion<::test_protocols::WithErrorSyntaxResponseAsStructResult> : public
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructResult> {};
-
 template <>
 struct IsFidlType<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult> : public std::true_type {};
 
@@ -2792,7 +2775,6 @@ struct IsUnion<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult> : public
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult> {};
-
 template <>
 struct IsFidlType<::test_protocols::WithErrorSyntaxErrorAsEnumResult> : public std::true_type {};
 
@@ -2811,7 +2793,6 @@ struct IsUnion<::test_protocols::WithErrorSyntaxErrorAsEnumResult> : public std:
 template <>
 struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResult> {};
-
 #ifdef __Fuchsia__
 
 template <>

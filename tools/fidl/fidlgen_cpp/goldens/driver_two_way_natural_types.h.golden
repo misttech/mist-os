@@ -159,7 +159,6 @@ struct IsStruct<::test_drivertwoway::TwoWayAddRequest> : public std::true_type {
 template <>
 struct internal::NaturalCodingTraits<::test_drivertwoway::TwoWayAddRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_drivertwoway::TwoWayAddRequest, 4> {};
-
 template <>
 struct IsFidlType<::test_drivertwoway::TwoWayAddResponse> : public std::true_type {};
 

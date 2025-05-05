@@ -96,7 +96,6 @@ namespace internal {
       .__reserved = WireNaturalConversionTraits<uint8_t, uint8_t>::ToWire(arena, std::move(src.__reserved())),
   };
 }
-
 #ifdef __Fuchsia__
 
 ::test_protocols::WithErrorSyntaxHandleInResultResponse WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultResponse, ::test_protocols::WithErrorSyntaxHandleInResultResponse>::ToNatural(::test_protocols::wire::WithErrorSyntaxHandleInResultResponse src) {
@@ -157,7 +156,6 @@ namespace internal {
       .result = WireNaturalConversionTraits<int64_t, int64_t>::ToWire(arena, std::move(src.result())),
   };
 }
-
 #ifdef __Fuchsia__
 
 ::test_protocols::ChannelProtocolTakeHandleRequest WireNaturalConversionTraits<::test_protocols::wire::ChannelProtocolTakeHandleRequest, ::test_protocols::ChannelProtocolTakeHandleRequest>::ToNatural(::test_protocols::wire::ChannelProtocolTakeHandleRequest src) {
@@ -201,7 +199,6 @@ namespace internal {
       .b = WireNaturalConversionTraits<int64_t, int64_t>::ToWire(arena, std::move(src.b())),
   };
 }
-
 #ifdef __Fuchsia__
 
 ::test_protocols::HandleRightsProtocolNoResponseMethodRequest WireNaturalConversionTraits<::test_protocols::wire::HandleRightsProtocolNoResponseMethodRequest, ::test_protocols::HandleRightsProtocolNoResponseMethodRequest>::ToNatural(::test_protocols::wire::HandleRightsProtocolNoResponseMethodRequest src) {

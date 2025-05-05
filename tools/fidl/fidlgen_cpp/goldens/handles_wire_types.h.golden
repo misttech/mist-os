@@ -66,7 +66,6 @@ struct Handles;
 struct FdfHandles;
 
 #ifdef __Fuchsia__
-
 using AliasedPlainHandle = ::zx::handle;
 
 using AliasedSubtypeHandle = ::zx::vmo;
@@ -164,6 +163,7 @@ struct FdfHandles {
 namespace fidl {
 
 #ifdef __Fuchsia__
+
 template <>
 struct IsResource<::test_handles::wire::Handles> : public std::true_type {};
 

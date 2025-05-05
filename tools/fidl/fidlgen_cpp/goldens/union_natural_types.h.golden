@@ -1703,7 +1703,6 @@ struct IsStruct<::test_union::Pizza> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::Pizza, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_union::Pizza, 16> {};
-
 template <>
 struct IsFidlType<::test_union::Pasta> : public std::true_type {};
 
@@ -1722,7 +1721,6 @@ struct IsStruct<::test_union::Pasta> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::Pasta, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_union::Pasta, 16> {};
-
 template <>
 struct IsFidlType<::test_union::NullableUnionStruct> : public std::true_type {};
 
@@ -1741,7 +1739,6 @@ struct IsStruct<::test_union::NullableUnionStruct> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::NullableUnionStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_union::NullableUnionStruct, 16> {};
-
 template <>
 struct IsFidlType<::test_union::Empty> : public std::true_type {};
 
@@ -1760,7 +1757,6 @@ struct IsStruct<::test_union::Empty> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::Empty, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_union::Empty> {};
-
 template <>
 struct IsFidlType<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
 
@@ -1779,7 +1775,6 @@ struct IsStruct<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllo
 template <>
 struct internal::NaturalCodingTraits<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, 16> {};
-
 template <>
 struct IsFidlType<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
 
@@ -1798,7 +1793,6 @@ struct IsStruct<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAl
 template <>
 struct internal::NaturalCodingTraits<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, 16> {};
-
 template <>
 struct IsFidlType<::test_union::StructWithNullableUnion> : public std::true_type {};
 
@@ -1817,7 +1811,6 @@ struct IsStruct<::test_union::StructWithNullableUnion> : public std::true_type {
 template <>
 struct internal::NaturalCodingTraits<::test_union::StructWithNullableUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_union::StructWithNullableUnion, 16> {};
-
 template <>
 struct IsFidlType<::test_union::UnionSandwich> : public std::true_type {};
 
@@ -1855,7 +1848,6 @@ struct IsUnion<::test_union::PizzaOrPasta> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::PizzaOrPasta, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::PizzaOrPasta> {};
-
 template <>
 struct IsFidlType<::test_union::ExplicitPizzaOrPasta> : public std::true_type {};
 
@@ -1874,7 +1866,6 @@ struct IsUnion<::test_union::ExplicitPizzaOrPasta> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::ExplicitPizzaOrPasta, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitPizzaOrPasta> {};
-
 template <>
 struct IsFidlType<::test_union::FlexiblePizzaOrPasta> : public std::true_type {};
 
@@ -1893,7 +1884,6 @@ struct IsUnion<::test_union::FlexiblePizzaOrPasta> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::FlexiblePizzaOrPasta, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::FlexiblePizzaOrPasta> {};
-
 template <>
 struct IsFidlType<::test_union::StrictPizzaOrPasta> : public std::true_type {};
 
@@ -1912,7 +1902,6 @@ struct IsUnion<::test_union::StrictPizzaOrPasta> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::StrictPizzaOrPasta, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictPizzaOrPasta> {};
-
 template <>
 struct IsFidlType<::test_union::Union> : public std::true_type {};
 
@@ -1931,7 +1920,6 @@ struct IsUnion<::test_union::Union> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::Union, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::Union> {};
-
 template <>
 struct IsFidlType<::test_union::FlexibleUnion> : public std::true_type {};
 
@@ -1950,7 +1938,6 @@ struct IsUnion<::test_union::FlexibleUnion> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::FlexibleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::FlexibleUnion> {};
-
 template <>
 struct IsFidlType<::test_union::StrictUnion> : public std::true_type {};
 
@@ -1969,7 +1956,6 @@ struct IsUnion<::test_union::StrictUnion> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::StrictUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictUnion> {};
-
 template <>
 struct IsFidlType<::test_union::FieldCollision> : public std::true_type {};
 
@@ -1988,7 +1974,6 @@ struct IsUnion<::test_union::FieldCollision> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::FieldCollision, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::FieldCollision> {};
-
 template <>
 struct IsFidlType<::test_union::ExplicitUnion> : public std::true_type {};
 
@@ -2007,7 +1992,6 @@ struct IsUnion<::test_union::ExplicitUnion> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::ExplicitUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitUnion> {};
-
 template <>
 struct IsFidlType<::test_union::ReverseOrdinalUnion> : public std::true_type {};
 
@@ -2026,7 +2010,6 @@ struct IsUnion<::test_union::ReverseOrdinalUnion> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::ReverseOrdinalUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ReverseOrdinalUnion> {};
-
 template <>
 struct IsFidlType<::test_union::FlexibleFoo> : public std::true_type {};
 
@@ -2045,7 +2028,6 @@ struct IsUnion<::test_union::FlexibleFoo> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::FlexibleFoo, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::FlexibleFoo> {};
-
 template <>
 struct IsFidlType<::test_union::StrictFoo> : public std::true_type {};
 
@@ -2064,7 +2046,6 @@ struct IsUnion<::test_union::StrictFoo> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::StrictFoo, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictFoo> {};
-
 template <>
 struct IsFidlType<::test_union::ExplicitFoo> : public std::true_type {};
 
@@ -2083,7 +2064,6 @@ struct IsUnion<::test_union::ExplicitFoo> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::ExplicitFoo, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitFoo> {};
-
 template <>
 struct IsFidlType<::test_union::ExplicitStrictFoo> : public std::true_type {};
 
@@ -2102,7 +2082,6 @@ struct IsUnion<::test_union::ExplicitStrictFoo> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::ExplicitStrictFoo, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitStrictFoo> {};
-
 template <>
 struct IsFidlType<::test_union::OlderSimpleUnion> : public std::true_type {};
 
@@ -2121,7 +2100,6 @@ struct IsUnion<::test_union::OlderSimpleUnion> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::OlderSimpleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::OlderSimpleUnion> {};
-
 template <>
 struct IsFidlType<::test_union::NewerSimpleUnion> : public std::true_type {};
 
@@ -2140,7 +2118,6 @@ struct IsUnion<::test_union::NewerSimpleUnion> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::NewerSimpleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::NewerSimpleUnion> {};
-
 template <>
 struct IsFidlType<::test_union::StrictSimpleUnion> : public std::true_type {};
 
@@ -2159,7 +2136,6 @@ struct IsUnion<::test_union::StrictSimpleUnion> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::StrictSimpleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictSimpleUnion> {};
-
 template <>
 struct IsFidlType<::test_union::UnionContainingEmptyStruct> : public std::true_type {};
 
@@ -2178,7 +2154,6 @@ struct IsUnion<::test_union::UnionContainingEmptyStruct> : public std::true_type
 template <>
 struct internal::NaturalCodingTraits<::test_union::UnionContainingEmptyStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::UnionContainingEmptyStruct> {};
-
 template <>
 struct IsFidlType<::test_union::StrictBoundedUnion> : public std::true_type {};
 
@@ -2197,7 +2172,6 @@ struct IsUnion<::test_union::StrictBoundedUnion> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::StrictBoundedUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictBoundedUnion> {};
-
 template <>
 struct IsFidlType<::test_union::ExplicitFlexibleUnion> : public std::true_type {};
 
@@ -2216,7 +2190,6 @@ struct IsUnion<::test_union::ExplicitFlexibleUnion> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::ExplicitFlexibleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitFlexibleUnion> {};
-
 template <>
 struct IsFidlType<::test_union::UnionWithAttributes> : public std::true_type {};
 
@@ -2235,7 +2208,6 @@ struct IsUnion<::test_union::UnionWithAttributes> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_union::UnionWithAttributes, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::UnionWithAttributes> {};
-
 template <>
 struct IsFidlType<::test_union::EmptyFlexibleUnion> : public std::true_type {};
 

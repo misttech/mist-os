@@ -52,7 +52,6 @@ struct ExampleProtocolMethodRequest {
 struct ExampleStruct {
   uint32_t member = {};
 };
-
 }  // namespace wire
 }  // namespace test_placementofattributes
 

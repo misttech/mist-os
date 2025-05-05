@@ -33,7 +33,6 @@ using VecOfStrings = ::std::vector<::std::string>;
 using VecOfStringsAtMost5 = ::std::vector<::std::string>;
 
 #ifdef __Fuchsia__
-
 using Channel = ::zx::channel;
 
 using AliasOfChannel = ::zx::channel;

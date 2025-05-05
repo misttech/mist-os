@@ -6130,7 +6130,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayErrResponse> : public std::true_type {};
 
@@ -6149,7 +6148,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 
@@ -6168,7 +6166,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResponse> : public std::true_type {};
 
@@ -6187,7 +6184,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse> : public std::true_type {};
 
@@ -6206,7 +6202,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResponse> : public std::true_type {};
 
@@ -6225,7 +6220,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse> : public std::true_type {};
 
@@ -6244,7 +6238,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest> : public std::true_type {};
 
@@ -6263,7 +6256,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest> : public std::true_type {};
 
@@ -6282,7 +6274,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 
@@ -6301,7 +6292,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse> : public std::true_type {};
 
@@ -6320,7 +6310,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 
@@ -6339,7 +6328,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest> : public std::true_type {};
 
@@ -6358,7 +6346,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> : public std::true_type {};
 
@@ -6377,7 +6364,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 
@@ -6396,7 +6382,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse> : public std::true_type {};
 
@@ -6415,7 +6400,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 
@@ -6434,7 +6418,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest> : public std::true_type {};
 
@@ -6453,7 +6436,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 
@@ -6472,7 +6454,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse> : public std::true_type {};
 
@@ -6491,7 +6472,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 
@@ -6510,7 +6490,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse> : public std::true_type {};
 
@@ -6529,7 +6508,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse> : public std::true_type {};
 
@@ -6548,7 +6526,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse> : public std::true_type {};
 
@@ -6567,7 +6544,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse> : public std::true_type {};
 
@@ -6586,7 +6562,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 
@@ -6605,7 +6580,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse> : public std::true_type {};
 
@@ -6624,7 +6598,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 
@@ -6643,7 +6616,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 
@@ -6662,7 +6634,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse, 4> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse> : public std::true_type {};
 
@@ -6681,7 +6652,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 
@@ -6719,7 +6689,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 
@@ -6738,7 +6707,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResponse> : public std::true_type {};
 
@@ -6757,7 +6725,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse> : public std::true_type {};
 
@@ -6776,7 +6743,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest> : public std::true_type {};
 
@@ -6795,7 +6761,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest> : public std::true_type {};
 
@@ -6814,7 +6779,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> : public std::true_type {};
 
@@ -6833,7 +6797,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 
@@ -6852,7 +6815,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest> : public std::true_type {};
 
@@ -6871,7 +6833,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest> : public std::true_type {};
 
@@ -6890,7 +6851,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> : public std::true_type {};
 
@@ -6909,7 +6869,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 
@@ -6928,7 +6887,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest> : public std::true_type {};
 
@@ -6947,7 +6905,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> : public std::true_type {};
 
@@ -6966,7 +6923,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 
@@ -6985,7 +6941,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse> : public std::true_type {};
 
@@ -7004,7 +6959,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse> : public std::true_type {};
 
@@ -7023,7 +6977,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> : public std::true_type {};
 
@@ -7042,7 +6995,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 
@@ -7061,7 +7013,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse> : public std::true_type {};
 
@@ -7080,7 +7031,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 
@@ -7118,7 +7068,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayErrResult> : public std::true_type {};
 
@@ -7137,7 +7086,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 
@@ -7156,7 +7104,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 
@@ -7175,7 +7122,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 
@@ -7194,7 +7140,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 
@@ -7213,7 +7158,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult> : public std::true_type {};
 
@@ -7232,7 +7176,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult> : public std::true_type {};
 
@@ -7251,7 +7194,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse> : public std::true_type {};
 
@@ -7270,7 +7212,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult> : public std::true_type {};
 
@@ -7289,7 +7230,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult> : public std::true_type {};
 
@@ -7308,7 +7248,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult> : public std::true_type {};
 
@@ -7327,7 +7266,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult> : public std::true_type {};
 
@@ -7346,7 +7284,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse> : public std::true_type {};
 
@@ -7365,7 +7302,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult> : public std::true_type {};
 
@@ -7384,7 +7320,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult> : public std::true_type {};
 
@@ -7403,7 +7338,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest> : public std::true_type {};
 
@@ -7422,7 +7356,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest> : public std::true_type {};
 
@@ -7441,7 +7374,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 
@@ -7460,7 +7392,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayErrResult> : public std::true_type {};
 
@@ -7479,7 +7410,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 
@@ -7498,7 +7428,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 
@@ -7517,7 +7446,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 
@@ -7536,7 +7464,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 
@@ -7555,7 +7482,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest> : public std::true_type {};
 
@@ -7574,7 +7500,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest> : public std::true_type {};
 
@@ -7593,7 +7518,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 
@@ -7612,7 +7536,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayErrResult> : public std::true_type {};
 
@@ -7631,7 +7554,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 
@@ -7650,7 +7572,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 
@@ -7669,7 +7590,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 
@@ -7688,7 +7608,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 
@@ -7707,7 +7626,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest> : public std::true_type {};
 
@@ -7726,7 +7644,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 
@@ -7745,7 +7662,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayErrResult> : public std::true_type {};
 
@@ -7764,7 +7680,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 
@@ -7783,7 +7698,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 
@@ -7802,7 +7716,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 
@@ -7821,7 +7734,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 
@@ -7840,7 +7752,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult> : public std::true_type {};
 
@@ -7859,7 +7770,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult> : public std::true_type {};
 
@@ -7878,7 +7788,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse> : public std::true_type {};
 
@@ -7897,7 +7806,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult> : public std::true_type {};
 
@@ -7916,7 +7824,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult> : public std::true_type {};
 
@@ -7935,7 +7842,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult> : public std::true_type {};
 
@@ -7954,7 +7860,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult> : public std::true_type {};
 
@@ -7973,7 +7878,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse> : public std::true_type {};
 
@@ -7992,7 +7896,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult> : public std::true_type {};
 
@@ -8011,7 +7914,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult> : public std::true_type {};
 
@@ -8030,7 +7932,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 
@@ -8049,7 +7950,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult> : public std::true_type {};
 
@@ -8068,7 +7968,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 
@@ -8087,7 +7986,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 
@@ -8106,7 +8004,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 
@@ -8125,7 +8022,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 
@@ -8144,7 +8040,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 
@@ -8163,7 +8058,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult> : public std::true_type {};
 
@@ -8182,7 +8076,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 
@@ -8201,7 +8094,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 
@@ -8220,7 +8112,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 
@@ -8239,7 +8130,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult> {};
-
   template <>
   struct IsFidlType<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 

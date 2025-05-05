@@ -299,7 +299,6 @@ struct IsStruct<::test_emptystruct::Empty> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::Empty, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_emptystruct::Empty> {};
-
 template <>
 struct IsFidlType<::test_emptystruct::EmptyProtocolSendRequest> : public std::true_type {};
 
@@ -318,7 +317,6 @@ struct IsStruct<::test_emptystruct::EmptyProtocolSendRequest> : public std::true
 template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::EmptyProtocolSendRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolSendRequest, 1> {};
-
 template <>
 struct IsFidlType<::test_emptystruct::EmptyProtocolReceiveRequest> : public std::true_type {};
 
@@ -337,7 +335,6 @@ struct IsStruct<::test_emptystruct::EmptyProtocolReceiveRequest> : public std::t
 template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::EmptyProtocolReceiveRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolReceiveRequest, 1> {};
-
 template <>
 struct IsFidlType<::test_emptystruct::EmptyProtocolSendAndReceiveRequest> : public std::true_type {};
 
@@ -356,7 +353,6 @@ struct IsStruct<::test_emptystruct::EmptyProtocolSendAndReceiveRequest> : public
 template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::EmptyProtocolSendAndReceiveRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolSendAndReceiveRequest, 1> {};
-
 template <>
 struct IsFidlType<::test_emptystruct::EmptyProtocolSendAndReceiveResponse> : public std::true_type {};
 

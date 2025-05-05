@@ -248,6 +248,7 @@ struct HandlesInProtocolSendHandlesRequest {
 namespace fidl {
 
 #ifdef __Fuchsia__
+
 template <>
 struct IsResource<::test_driverhandle::wire::ClientEndWrapper> : public std::true_type {};
 

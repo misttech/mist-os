@@ -27,7 +27,6 @@ namespace internal {
       .a = WireNaturalConversionTraits<::fidl::Array<uint32_t, 100>, ::std::array<uint32_t, 100>>::ToWire(arena, std::move(src.a())),
   };
 }
-
 ::test_arrays::TableSmallArray WireNaturalConversionTraits<::test_arrays::wire::TableSmallArray, ::test_arrays::TableSmallArray>::ToNatural(::test_arrays::wire::TableSmallArray src) {
   ::test_arrays::TableSmallArray dst;
   if (src.has_a()) {

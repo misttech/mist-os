@@ -167,7 +167,6 @@ struct IsStruct<::test_struct::Simple> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_struct::Simple, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_struct::Simple, 2> {};
-
 template <>
 struct IsFidlType<::test_struct::BasicStruct> : public std::true_type {};
 

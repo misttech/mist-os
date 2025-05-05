@@ -315,7 +315,6 @@ struct IsUnion<::test_doccomments::StrictUnion> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_doccomments::StrictUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_doccomments::StrictUnion> {};
-
 template <>
 struct IsFidlType<::test_doccomments::FlexibleUnion> : public std::true_type {};
 

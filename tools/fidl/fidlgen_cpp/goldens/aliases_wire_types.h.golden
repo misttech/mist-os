@@ -42,7 +42,6 @@ using VecOfStrings = ::fidl::VectorView<::fidl::StringView>;
 using VecOfStringsAtMost5 = ::fidl::VectorView<::fidl::StringView>;
 
 #ifdef __Fuchsia__
-
 using Channel = ::zx::channel;
 
 using AliasOfChannel = ::zx::channel;
@@ -89,6 +88,7 @@ struct internal::WireCodingTraits<::test_aliases::wire::ObjType, ::fidl::interna
 };
 
 #ifdef __Fuchsia__
+
 template <>
 struct IsResource<::test_aliases::wire::ExampleOfUseOfAliases> : public std::true_type {};
 

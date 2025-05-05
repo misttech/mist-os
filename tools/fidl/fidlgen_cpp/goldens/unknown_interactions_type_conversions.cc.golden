@@ -288,7 +288,6 @@ namespace internal {
       .some_field = WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field())),
   };
 }
-
 ::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableResponse src) {
   ::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse dst;
   if (src.has_some_field()) {

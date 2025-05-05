@@ -68,7 +68,9 @@ static_assert(offsetof(::test_typesinprotocols::wire::Struct, __reserved) == 0);
 static_assert(sizeof(::test_typesinprotocols::wire::Struct) == ::fidl::TypeTraits<::test_typesinprotocols::wire::Struct>::kPrimarySize);
 
 #ifdef __Fuchsia__
-void ::test_typesinprotocols::wire::ResourceStruct::_CloseHandles() {
+
+    void ::test_typesinprotocols::wire::ResourceStruct::_CloseHandles() {
+
     }
 
 template <bool IsRecursive>
@@ -561,46 +563,74 @@ static_assert(offsetof(::test_typesinprotocols::wire::ArrayVectorNested, vector_
 static_assert(sizeof(::test_typesinprotocols::wire::ArrayVectorNested) == ::fidl::TypeTraits<::test_typesinprotocols::wire::ArrayVectorNested>::kPrimarySize);
 
 #ifdef __Fuchsia__
-void ::test_typesinprotocols::wire::Resource::_CloseHandles() {handle.reset();vmo.reset();client_end.reset();server_end.reset();struct_._CloseHandles();table._CloseHandles();union_._CloseHandles();opt_handle.reset();opt_vmo.reset();opt_client_end.reset();opt_server_end.reset();if (opt_struct != nullptr) { opt_struct->_CloseHandles(); }if (opt_union.has_value()) { opt_union->_CloseHandles(); }for (auto& e_1 : array_handle) {
+
+    void ::test_typesinprotocols::wire::Resource::_CloseHandles() {
+        handle.reset();
+        vmo.reset();
+        client_end.reset();
+        server_end.reset();
+        struct_._CloseHandles();
+        table._CloseHandles();
+        union_._CloseHandles();
+        opt_handle.reset();
+        opt_vmo.reset();
+        opt_client_end.reset();
+        opt_server_end.reset();
+        if (opt_struct != nullptr) { opt_struct->_CloseHandles(); }
+        if (opt_union.has_value()) { opt_union->_CloseHandles(); }
+        for (auto& e_1 : array_handle) {
 e_1.reset();
 }
-for (auto& e_1 : array_vmo) {
+
+        for (auto& e_1 : array_vmo) {
 e_1.reset();
 }
-for (auto& e_1 : array_client_end) {
+
+        for (auto& e_1 : array_client_end) {
 e_1.reset();
 }
-for (auto& e_1 : array_server_end) {
+
+        for (auto& e_1 : array_server_end) {
 e_1.reset();
 }
-for (auto& e_1 : array_struct) {
+
+        for (auto& e_1 : array_struct) {
 e_1._CloseHandles();
 }
-for (auto& e_1 : array_table) {
+
+        for (auto& e_1 : array_table) {
 e_1._CloseHandles();
 }
-for (auto& e_1 : array_union) {
+
+        for (auto& e_1 : array_union) {
 e_1._CloseHandles();
 }
-for (auto& e_1 : vector_handle) {
+
+        for (auto& e_1 : vector_handle) {
 e_1.reset();
 }
-for (auto& e_1 : vector_vmo) {
+
+        for (auto& e_1 : vector_vmo) {
 e_1.reset();
 }
-for (auto& e_1 : vector_client_end) {
+
+        for (auto& e_1 : vector_client_end) {
 e_1.reset();
 }
-for (auto& e_1 : vector_server_end) {
+
+        for (auto& e_1 : vector_server_end) {
 e_1.reset();
 }
-for (auto& e_1 : vector_struct) {
+
+        for (auto& e_1 : vector_struct) {
 e_1._CloseHandles();
 }
-for (auto& e_1 : vector_table) {
+
+        for (auto& e_1 : vector_table) {
 e_1._CloseHandles();
 }
-for (auto& e_1 : vector_union) {
+
+        for (auto& e_1 : vector_union) {
 e_1._CloseHandles();
 }
 

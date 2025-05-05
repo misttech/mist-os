@@ -558,7 +558,6 @@ struct IsStruct<::test_anonymous::OverrideTest> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::OverrideTest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::OverrideTest, 40> {};
-
 template <>
 struct IsFidlType<::test_anonymous::TableData> : public std::true_type {};
 
@@ -577,7 +576,6 @@ struct IsStruct<::test_anonymous::TableData> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::TableData, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::TableData, 1> {};
-
 template <>
 struct IsFidlType<::test_anonymous::SomeProtocolSomeMethodRequest> : public std::true_type {};
 
@@ -596,7 +594,6 @@ struct IsStruct<::test_anonymous::SomeProtocolSomeMethodRequest> : public std::t
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::SomeProtocolSomeMethodRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::SomeProtocolSomeMethodRequest, 32> {};
-
 template <>
 struct IsFidlType<::test_anonymous::SomeProtocolSomeMethodResponse> : public std::true_type {};
 
@@ -633,7 +630,6 @@ struct IsTable<::test_anonymous::FunctionApplication> : public std::true_type {}
 
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::FunctionApplication, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_anonymous::FunctionApplication> {};
-
 template <>
 struct IsFidlType<::test_anonymous::TableMember> : public std::true_type {};
 
@@ -670,7 +666,6 @@ struct IsUnion<::test_anonymous::Expression> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::Expression, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_anonymous::Expression> {};
-
 template <>
 struct IsFidlType<::test_anonymous::UnionMember> : public std::true_type {};
 
@@ -689,7 +684,6 @@ struct IsUnion<::test_anonymous::UnionMember> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::UnionMember, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_anonymous::UnionMember> {};
-
 template <>
 struct IsFidlType<::test_anonymous::SomeProtocolSomeMethodResult> : public std::true_type {};
 

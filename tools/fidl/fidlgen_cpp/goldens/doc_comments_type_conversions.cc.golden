@@ -18,7 +18,6 @@ namespace internal {
       .field = WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.field())),
   };
 }
-
 ::test_doccomments::Table WireNaturalConversionTraits<::test_doccomments::wire::Table, ::test_doccomments::Table>::ToNatural(::test_doccomments::wire::Table src) {
   ::test_doccomments::Table dst;
   if (src.has_Field()) {

@@ -224,8 +224,8 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
   static void Decode(
       internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
 #ifdef __Fuchsia__
+
 template <>
 struct IsResource<::test_nullable::wire::StructWithNullableHandle> : public std::true_type {};
 
@@ -326,8 +326,8 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::SimpleProtocolA
   static void Decode(
       internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
 #ifdef __Fuchsia__
+
 template <>
 struct IsResource<::test_nullable::wire::StructWithNullableProtocol> : public std::true_type {};
 

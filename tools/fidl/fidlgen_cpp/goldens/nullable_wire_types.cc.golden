@@ -60,6 +60,7 @@ static_assert(offsetof(::test_nullable::wire::StructWithNullableVector, val) == 
 static_assert(sizeof(::test_nullable::wire::StructWithNullableVector) == ::fidl::TypeTraits<::test_nullable::wire::StructWithNullableVector>::kPrimarySize);
 
 #ifdef __Fuchsia__
+
 void ::test_nullable::wire::StructWithNullableHandle::_CloseHandles() {
   val.reset();
 }
@@ -149,6 +150,7 @@ static_assert(offsetof(::test_nullable::wire::SimpleProtocolAddResponse, sum) ==
 static_assert(sizeof(::test_nullable::wire::SimpleProtocolAddResponse) == ::fidl::TypeTraits<::test_nullable::wire::SimpleProtocolAddResponse>::kPrimarySize);
 
 #ifdef __Fuchsia__
+
 void ::test_nullable::wire::StructWithNullableProtocol::_CloseHandles() {
   val.reset();
 }

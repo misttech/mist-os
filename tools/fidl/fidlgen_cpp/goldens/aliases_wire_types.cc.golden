@@ -39,6 +39,7 @@ template struct ::fidl::internal::WireCodingTraits<::test_aliases::wire::ObjType
 template struct ::fidl::internal::WireCodingTraits<::test_aliases::wire::ObjType, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
 #ifdef __Fuchsia__
+
 void ::test_aliases::wire::ExampleOfUseOfAliases::_CloseHandles() {
   field_of_channel.reset();
   field_of_client_end.reset();

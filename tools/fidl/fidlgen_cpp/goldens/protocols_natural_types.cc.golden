@@ -424,7 +424,6 @@ uint8_t& ::test_protocols::WithErrorSyntaxErrorAsEnumResponse::__reserved() {
   storage_.__reserved = std::move(value);
   return *this;
 }
-
 #ifdef __Fuchsia__
 
 ::test_protocols::WithErrorSyntaxHandleInResultResponse::WithErrorSyntaxHandleInResultResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
@@ -657,7 +656,6 @@ int64_t& ::test_protocols::ChannelProtocolMethodBResponse::result() {
   storage_.result = std::move(value);
   return *this;
 }
-
 #ifdef __Fuchsia__
 
 ::test_protocols::ChannelProtocolTakeHandleRequest::ChannelProtocolTakeHandleRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
@@ -780,7 +778,6 @@ int64_t& ::test_protocols::SyscallProtocolMethodCRequest::b() {
   storage_.b = std::move(value);
   return *this;
 }
-
 #ifdef __Fuchsia__
 
 ::test_protocols::HandleRightsProtocolNoResponseMethodRequest::HandleRightsProtocolNoResponseMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
@@ -1725,7 +1722,6 @@ const ::fidl::internal::UnionMemberView<2, ::test_protocols::WithErrorSyntaxErro
   storage_->emplace<2>(std::move(value));
   return *this;
 }
-
 #ifdef __Fuchsia__
 
 ::test_protocols::WithErrorSyntaxHandleInResultResult::WithErrorSyntaxHandleInResultResult(WithErrorSyntaxHandleInResultResult&& other) noexcept : WithErrorSyntaxHandleInResultResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {

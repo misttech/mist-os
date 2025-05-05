@@ -86,7 +86,6 @@ test_nullable::StructWithNullableVector::val() const {
   storage_.val = std::move(value);
   return *this;
 }
-
 #ifdef __Fuchsia__
 
 ::test_nullable::StructWithNullableHandle::StructWithNullableHandle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
@@ -207,7 +206,6 @@ int32_t& ::test_nullable::SimpleProtocolAddResponse::sum() {
   storage_.sum = std::move(value);
   return *this;
 }
-
 #ifdef __Fuchsia__
 
 ::test_nullable::StructWithNullableProtocol::StructWithNullableProtocol(Storage_ storage) noexcept : storage_(std::move(storage)) {}

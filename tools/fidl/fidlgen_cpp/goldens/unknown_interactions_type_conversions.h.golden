@@ -499,7 +499,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResponse> {
   static ::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResponse src);
@@ -514,7 +513,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResponse> {
   static ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResponse src);
@@ -529,7 +527,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse> {
   static ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse src);
@@ -544,7 +541,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest> {
   static ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest src);
@@ -559,7 +555,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest> {
   static ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest src);
@@ -574,7 +569,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> {
   static ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse src);
@@ -589,7 +583,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse> {
   static ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse src);
@@ -604,7 +597,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest> {
   static ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest src);
@@ -619,7 +611,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest> {
   static ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest src);
@@ -634,7 +625,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> {
   static ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse src);
@@ -649,7 +639,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse> {
   static ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse src);
@@ -664,7 +653,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest> {
   static ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest ToNatural(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest src);
@@ -679,7 +667,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse, ::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> {
   static ::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse src);
@@ -694,7 +681,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse, ::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse> {
   static ::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse src);
@@ -709,7 +695,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse, ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse> {
   static ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse src);
@@ -724,7 +709,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse, ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse> {
   static ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse src);
@@ -739,7 +723,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse, ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> {
   static ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse src);
@@ -754,7 +737,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse> {
   static ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse src);
@@ -769,7 +751,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse, ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse> {
   static ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse src);
@@ -784,7 +765,6 @@ template <>
 struct WireTypeForNaturalType<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse> {
     using type = ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse> {
   static ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse ToNatural(::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse src);

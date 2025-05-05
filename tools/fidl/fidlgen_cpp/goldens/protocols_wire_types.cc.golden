@@ -287,6 +287,7 @@ static_assert(offsetof(::test_protocols::wire::WithErrorSyntaxErrorAsEnumRespons
 static_assert(sizeof(::test_protocols::wire::WithErrorSyntaxErrorAsEnumResponse) == ::fidl::TypeTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResponse>::kPrimarySize);
 
 #ifdef __Fuchsia__
+
 void ::test_protocols::wire::WithErrorSyntaxHandleInResultResponse::_CloseHandles() {
   h.reset();
 }
@@ -436,6 +437,7 @@ static_assert(offsetof(::test_protocols::wire::ChannelProtocolMethodBResponse, r
 static_assert(sizeof(::test_protocols::wire::ChannelProtocolMethodBResponse) == ::fidl::TypeTraits<::test_protocols::wire::ChannelProtocolMethodBResponse>::kPrimarySize);
 
 #ifdef __Fuchsia__
+
 void ::test_protocols::wire::ChannelProtocolTakeHandleRequest::_CloseHandles() {
   h.reset();
 }
@@ -559,6 +561,7 @@ static_assert(offsetof(::test_protocols::wire::SyscallProtocolMethodCRequest, b)
 static_assert(sizeof(::test_protocols::wire::SyscallProtocolMethodCRequest) == ::fidl::TypeTraits<::test_protocols::wire::SyscallProtocolMethodCRequest>::kPrimarySize);
 
 #ifdef __Fuchsia__
+
 void ::test_protocols::wire::HandleRightsProtocolNoResponseMethodRequest::_CloseHandles() {
   h.reset();
 }

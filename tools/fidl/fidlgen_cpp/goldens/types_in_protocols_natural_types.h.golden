@@ -2215,7 +2215,6 @@ struct IsStruct<::test_typesinprotocols::Struct> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::Struct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_typesinprotocols::Struct> {};
-
 #ifdef __Fuchsia__
 
 template <>
@@ -2259,7 +2258,6 @@ struct IsStruct<::test_typesinprotocols::Basic> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::Basic, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::Basic, 80> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::Compound> : public std::true_type {};
 
@@ -2278,7 +2276,6 @@ struct IsStruct<::test_typesinprotocols::Compound> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::Compound, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::Compound, 72> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::ArrayBasic> : public std::true_type {};
 
@@ -2297,7 +2294,6 @@ struct IsStruct<::test_typesinprotocols::ArrayBasic> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::ArrayBasic, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ArrayBasic, 384> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::ArrayCompound> : public std::true_type {};
 
@@ -2316,7 +2312,6 @@ struct IsStruct<::test_typesinprotocols::ArrayCompound> : public std::true_type 
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::ArrayCompound, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ArrayCompound, 328> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::VectorBasic> : public std::true_type {};
 
@@ -2335,7 +2330,6 @@ struct IsStruct<::test_typesinprotocols::VectorBasic> : public std::true_type {}
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::VectorBasic, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::VectorBasic, 192> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::VectorCompound> : public std::true_type {};
 
@@ -2354,7 +2348,6 @@ struct IsStruct<::test_typesinprotocols::VectorCompound> : public std::true_type
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::VectorCompound, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::VectorCompound, 112> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::VectorOptional> : public std::true_type {};
 
@@ -2373,7 +2366,6 @@ struct IsStruct<::test_typesinprotocols::VectorOptional> : public std::true_type
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::VectorOptional, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::VectorOptional, 64> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::ArrayVectorNested> : public std::true_type {};
 
@@ -2392,7 +2384,6 @@ struct IsStruct<::test_typesinprotocols::ArrayVectorNested> : public std::true_t
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::ArrayVectorNested, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_typesinprotocols::ArrayVectorNested, 144> {};
-
 #ifdef __Fuchsia__
 
 template <>
@@ -2435,7 +2426,6 @@ struct IsTable<::test_typesinprotocols::Table> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::Table, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_typesinprotocols::Table> {};
-
 #ifdef __Fuchsia__
 
 template <>
@@ -2478,7 +2468,6 @@ struct IsUnion<::test_typesinprotocols::Union> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::Union, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::Union> {};
-
 #ifdef __Fuchsia__
 
 template <>
@@ -2522,7 +2511,6 @@ struct IsUnion<::test_typesinprotocols::ProtocolErrorBasicResult> : public std::
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorBasicResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorBasicResult> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::ProtocolErrorCompoundResult> : public std::true_type {};
 
@@ -2541,7 +2529,6 @@ struct IsUnion<::test_typesinprotocols::ProtocolErrorCompoundResult> : public st
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorCompoundResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorCompoundResult> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::ProtocolErrorArrayBasicResult> : public std::true_type {};
 
@@ -2560,7 +2547,6 @@ struct IsUnion<::test_typesinprotocols::ProtocolErrorArrayBasicResult> : public 
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorArrayBasicResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorArrayBasicResult> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::ProtocolErrorArrayCompoundResult> : public std::true_type {};
 
@@ -2579,7 +2565,6 @@ struct IsUnion<::test_typesinprotocols::ProtocolErrorArrayCompoundResult> : publ
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorArrayCompoundResult> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::ProtocolErrorVectorBasicResult> : public std::true_type {};
 
@@ -2598,7 +2583,6 @@ struct IsUnion<::test_typesinprotocols::ProtocolErrorVectorBasicResult> : public
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorVectorBasicResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorVectorBasicResult> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::ProtocolErrorVectorCompoundResult> : public std::true_type {};
 
@@ -2617,7 +2601,6 @@ struct IsUnion<::test_typesinprotocols::ProtocolErrorVectorCompoundResult> : pub
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorVectorCompoundResult> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::ProtocolErrorVectorOptionalResult> : public std::true_type {};
 
@@ -2636,7 +2619,6 @@ struct IsUnion<::test_typesinprotocols::ProtocolErrorVectorOptionalResult> : pub
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorVectorOptionalResult> {};
-
 template <>
 struct IsFidlType<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult> : public std::true_type {};
 
@@ -2655,7 +2637,6 @@ struct IsUnion<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult> : 
 template <>
 struct internal::NaturalCodingTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult> {};
-
 #ifdef __Fuchsia__
 
 template <>

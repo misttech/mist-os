@@ -68,7 +68,6 @@
       storage_.__reserved = std::move(value);
       return *this;
     }
-
 #ifdef __Fuchsia__
 
   ::test_typesinprotocols::ResourceStruct::ResourceStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
@@ -1351,7 +1350,6 @@
       storage_.vector_vector_uint8 = std::move(value);
       return *this;
     }
-
 #ifdef __Fuchsia__
 
   ::test_typesinprotocols::Resource::Resource(Storage_ storage) noexcept : storage_(std::move(storage)) {}
@@ -1795,7 +1793,6 @@
 bool test_typesinprotocols::Table::IsEmpty() const {
     return true;
 }
-
 #ifdef __Fuchsia__
 
 ::test_typesinprotocols::ResourceTable::ResourceTable(::test_typesinprotocols::ResourceTable::Storage_ storage) noexcept : storage_(std::move(storage)) {}
@@ -1892,7 +1889,6 @@ std::optional<::test_typesinprotocols::Union::Tag> test_typesinprotocols::Union:
     storage_->emplace<1>(std::move(value));
     return *this;
   }
-
 #ifdef __Fuchsia__
 
 ::test_typesinprotocols::ResourceUnion::ResourceUnion(ResourceUnion&& other) noexcept : ResourceUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
@@ -2810,7 +2806,6 @@ std::optional<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::Tag
     storage_->emplace<2>(std::move(value));
     return *this;
   }
-
 #ifdef __Fuchsia__
 
 ::test_typesinprotocols::ProtocolErrorResourceResult::ProtocolErrorResourceResult(ProtocolErrorResourceResult&& other) noexcept : ProtocolErrorResourceResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {

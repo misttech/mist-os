@@ -34,7 +34,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocollayouts::LocalTablePayload> {
   using type = ::test_protocollayouts::wire::LocalTablePayload;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest, ::test_protocollayouts::MainProtocolOneWayAnonRequest> {
   static ::test_protocollayouts::MainProtocolOneWayAnonRequest ToNatural(::test_protocollayouts::wire::MainProtocolOneWayAnonRequest src);
@@ -49,7 +48,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocollayouts::MainProtocolOneWayAnonRequest> {
   using type = ::test_protocollayouts::wire::MainProtocolOneWayAnonRequest;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse, ::test_protocollayouts::MainProtocolTwoWayAnonResponse> {
   static ::test_protocollayouts::MainProtocolTwoWayAnonResponse ToNatural(::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse src);
@@ -64,7 +62,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocollayouts::MainProtocolTwoWayAnonResponse> {
   using type = ::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest, ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest> {
   static ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest ToNatural(::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest src);

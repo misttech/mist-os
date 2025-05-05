@@ -11,9 +11,7 @@ class {{ .Name }};
 
 {{- define "Union:WireTypesHeader" }}
 {{ EnsureNamespace . }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 {{ .Docs }}
 class {{ .Name }} {
   public:
@@ -106,15 +104,11 @@ class {{ .Name }} {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-{{- if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Union:WireTypesSource" }}
-{{- if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType }}
 
 {{ . }}::{{ .Name }}() : ordinal_({{ .WireInvalidOrdinal }}), envelope_{} {}
 
@@ -343,14 +337,12 @@ template struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::Wi
 template struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintUnion<true>, false>;
 
 
-{{- if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Union:Traits:WireTypesHeader" }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 {{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
 template <>
 struct IsResource<{{ . }}> : public std::true_type {};
 {{- end }}
@@ -388,7 +380,5 @@ template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
 
-{{- if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}

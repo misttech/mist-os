@@ -10,9 +10,7 @@ class {{ .Name }};
 {{- end }}
 
 {{- define "Table:WireTypesHeader" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 {{ EnsureNamespace "" }}
 template<>
@@ -223,15 +221,11 @@ class {{ .WireTableExternalBuilder }} final : public ::fidl::internal::WireTable
 
 {{- EnsureNamespace . }}
 
-{{- if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Table:WireTypesSource" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 {{ EnsureNamespace "" }}
 
@@ -490,14 +484,12 @@ template struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::Wi
 
 static_assert(std::is_standard_layout_v<{{ . }}>);
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Table:Traits:WireTypesHeader" }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 {{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
 template <>
 struct IsResource<{{ . }}> : public std::true_type {};
 {{- end }}
@@ -531,7 +523,5 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-{{- if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}

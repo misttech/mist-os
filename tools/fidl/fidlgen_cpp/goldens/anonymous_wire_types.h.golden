@@ -65,7 +65,6 @@ struct SomeProtocolSomeMethodResponse {
 
   ::test_anonymous::wire::BitsMember bits_member = {};
 };
-
 }  // namespace wire
 }  // namespace test_anonymous
 

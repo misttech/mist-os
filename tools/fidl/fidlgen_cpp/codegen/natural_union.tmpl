@@ -11,10 +11,7 @@ class {{ .Name }};
 {{- end }}
 
 {{- define "Union:NaturalTypesHeader" }}
-{{ EnsureNamespace . }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType }}
 
 {{ .Docs }}
 class {{ .Name }} {
@@ -90,15 +87,11 @@ class {{ .Name }} {
 
 };
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType }}
 {{- end }}
 
 {{- define "Union:Traits:NaturalTypesHeader" }}
-  {{ if .IsResourceType }}
-  {{- IfdefFuchsia -}}
-  {{- end }}
+  {{- IfdefFuchsiaIf .IsResourceType -}}
 
   {{ if .IsResourceType }}
   template <>
@@ -123,16 +116,12 @@ class {{ .Name }} {
   struct internal::NaturalCodingTraits<{{ . }}, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<{{ . }}> {};
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 
 {{- define "Union:NaturalTypesSource" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 {{- EnsureNamespace "" }}
 
@@ -244,15 +233,11 @@ std::optional<{{ .TagEnum }}> {{ .NoLeading }}::IndexToTag(size_t index) {
   }
 {{- end }}
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Union:Traits:TypeConversionsHeader" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 {{ $wireType := .Wire }}
 {{ $naturalType := .Unified }}
@@ -276,17 +261,11 @@ template <>
 struct WireTypeForNaturalType<{{ $naturalType }}> {
     using type = {{ $wireType }};
 };
-
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{ EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Union:Traits:TypeConversionsSource" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
-
+{{- IfdefFuchsiaIf .IsResourceType }}
 {{ $wireType := .Wire }}
 {{ $naturalType := .Unified }}
 {{ $naturalType }} WireNaturalConversionTraits<{{ $wireType }}, {{ $naturalType }}>::ToNatural({{ $wireType }} src) {
@@ -319,8 +298,5 @@ struct WireTypeForNaturalType<{{ $naturalType }}> {
     {{- end }}
   }
 }
-
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{ EndifFuchsiaIf .IsResourceType -}}
 {{- end }}

@@ -12,9 +12,7 @@ class {{ .Name }};
 
 {{- define "Table:NaturalTypesHeader" }}
 {{ EnsureNamespace . }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 {{ .Docs }}
 class {{ .Name }} {
@@ -76,9 +74,7 @@ class {{ .Name }} {
     {{- end -}}
   );
 };
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 
@@ -87,9 +83,7 @@ class {{ .Name }} {
 
 
 {{- define "Table:Traits:NaturalTypesHeader" }}
-  {{ if .IsResourceType }}
-  {{- IfdefFuchsia -}}
-  {{- end }}
+  {{- IfdefFuchsiaIf .IsResourceType -}}
 
   {{ if .IsResourceType }}
   template <>
@@ -114,16 +108,12 @@ class {{ .Name }} {
   struct internal::NaturalCodingTraits<{{ . }}, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<{{ . }}> {};
 
-  {{ if .IsResourceType }}
-  {{- EndifFuchsia -}}
-  {{ end }}
+  {{- EndifFuchsiaIf .IsResourceType -}}
 {{ end }}
 
 
 {{- define "Table:NaturalTypesSource" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 {{- EnsureNamespace "" }}
 
@@ -185,15 +175,11 @@ bool {{ .NoLeading }}::IsEmpty() const {
 
 {{- end }}
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Table:Traits:TypeConversionsHeader" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 template <>
 struct WireNaturalConversionTraits<{{ .Wire }}, {{ .Unified }}> {
@@ -209,16 +195,11 @@ template <>
 struct WireTypeForNaturalType<{{ .Unified }}> {
     using type = {{ .Wire }};
 };
-
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{ EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Table:Traits:TypeConversionsSource" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 {{ .Unified }} WireNaturalConversionTraits<{{ .Wire }}, {{ .Unified }}>::ToNatural({{ .Wire }} src) {
   {{ .Unified }} dst;
@@ -242,7 +223,5 @@ struct WireTypeForNaturalType<{{ .Unified }}> {
   return builder.Build();
 }
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{ EndifFuchsiaIf .IsResourceType -}}
 {{- end }}

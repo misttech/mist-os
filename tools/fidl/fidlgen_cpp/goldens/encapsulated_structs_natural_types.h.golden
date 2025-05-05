@@ -422,7 +422,6 @@ struct IsStruct<::test_encapsulatedstructs::Int8Int32> : public std::true_type {
 template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::Int8Int32, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::Int8Int32, 8> {};
-
 template <>
 struct IsFidlType<::test_encapsulatedstructs::Int16Int8> : public std::true_type {};
 
@@ -441,7 +440,6 @@ struct IsStruct<::test_encapsulatedstructs::Int16Int8> : public std::true_type {
 template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::Int16Int8, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::Int16Int8, 4> {};
-
 template <>
 struct IsFidlType<::test_encapsulatedstructs::ArrayInt16Int8> : public std::true_type {};
 
@@ -460,7 +458,6 @@ struct IsStruct<::test_encapsulatedstructs::ArrayInt16Int8> : public std::true_t
 template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::ArrayInt16Int8, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::ArrayInt16Int8, 12> {};
-
 template <>
 struct IsFidlType<::test_encapsulatedstructs::StructPaddingTestStruct> : public std::true_type {};
 
@@ -479,7 +476,6 @@ struct IsStruct<::test_encapsulatedstructs::StructPaddingTestStruct> : public st
 template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::StructPaddingTestStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::StructPaddingTestStruct, 24> {};
-
 #ifdef __Fuchsia__
 
 template <>

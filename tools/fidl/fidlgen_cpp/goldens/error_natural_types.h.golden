@@ -201,7 +201,6 @@ struct IsStruct<::test_error::ExampleFooRequest> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_error::ExampleFooRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_error::ExampleFooRequest, 16> {};
-
 template <>
 struct IsFidlType<::test_error::ExampleFooResponse> : public std::true_type {};
 

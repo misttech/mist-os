@@ -132,6 +132,7 @@ static_assert(offsetof(::test_encapsulatedstructs::wire::StructPaddingTestStruct
 static_assert(sizeof(::test_encapsulatedstructs::wire::StructPaddingTestStruct) == ::fidl::TypeTraits<::test_encapsulatedstructs::wire::StructPaddingTestStruct>::kPrimarySize);
 
 #ifdef __Fuchsia__
+
 void ::test_encapsulatedstructs::wire::NonInlineStructTestStruct::_CloseHandles() {
   h.reset();
 }

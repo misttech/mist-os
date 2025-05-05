@@ -651,7 +651,6 @@ struct IsStruct<::test_protocolpayloads::LocalStructPayload> : public std::true_
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::LocalStructPayload, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::LocalStructPayload, 8> {};
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolOneWayAnonRequest> : public std::true_type {};
 
@@ -670,7 +669,6 @@ struct IsStruct<::test_protocolpayloads::MainProtocolOneWayAnonRequest> : public
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolOneWayAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOneWayAnonRequest, 8> {};
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 
@@ -689,7 +687,6 @@ struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonRequest> : public
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonRequest, 8> {};
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 
@@ -708,7 +705,6 @@ struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonResponse> : publi
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonResponse, 8> {};
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 
@@ -727,7 +723,6 @@ struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest>
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest, 8> {};
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 
@@ -746,7 +741,6 @@ struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse, 8> {};
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolOnAnonRequest> : public std::true_type {};
 
@@ -784,7 +778,6 @@ struct IsUnion<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult> 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult> {};
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 
@@ -803,7 +796,6 @@ struct IsUnion<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult> :
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult> {};
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
 

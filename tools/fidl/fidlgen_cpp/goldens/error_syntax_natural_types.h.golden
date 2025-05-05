@@ -202,7 +202,6 @@ struct IsStruct<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailReque
 template <>
 struct internal::NaturalCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, 16> {};
-
 template <>
 struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type {};
 

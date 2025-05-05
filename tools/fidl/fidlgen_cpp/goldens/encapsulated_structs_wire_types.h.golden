@@ -218,8 +218,8 @@ struct ::fidl::internal::WireCodingTraits<::test_encapsulatedstructs::wire::Stru
   static void Decode(
       internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
 #ifdef __Fuchsia__
+
 template <>
 struct IsResource<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> : public std::true_type {};
 

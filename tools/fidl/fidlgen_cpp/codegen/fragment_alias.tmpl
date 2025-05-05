@@ -6,22 +6,14 @@
 
 {{- define "Alias:NaturalTypesHeader" }}
 {{ EnsureNamespace . -}}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 using {{ .Name }} = {{ .Type }};
-{{- if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Alias:WireTypesHeader" }}
 {{ EnsureNamespace . -}}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 using {{ .Name }} = {{ .Type }};
-{{- if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}

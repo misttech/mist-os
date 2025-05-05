@@ -8,6 +8,7 @@
 #pragma clang diagnostic ignored "-Wshadow"
 
 #ifdef __Fuchsia__
+
 void ::test_handles::wire::Handles::_CloseHandles() {
   plain_handle.reset();
   bti_handle.reset();

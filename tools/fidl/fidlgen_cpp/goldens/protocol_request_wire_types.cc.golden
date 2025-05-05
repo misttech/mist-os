@@ -8,6 +8,7 @@
 #pragma clang diagnostic ignored "-Wshadow"
 
 #ifdef __Fuchsia__
+
 void ::test_protocolrequest::wire::ParentGetChildResponse::_CloseHandles() {
   c.reset();
 }

@@ -316,7 +316,6 @@ struct IsStruct<::test_arrays::StructSmallArray> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::StructSmallArray, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_arrays::StructSmallArray, 8> {};
-
 template <>
 struct IsFidlType<::test_arrays::StructLargeArray> : public std::true_type {};
 
@@ -353,7 +352,6 @@ struct IsTable<::test_arrays::TableSmallArray> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::TableSmallArray, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_arrays::TableSmallArray> {};
-
 template <>
 struct IsFidlType<::test_arrays::TableLargeArray> : public std::true_type {};
 
@@ -390,7 +388,6 @@ struct IsUnion<::test_arrays::UnionSmallArray> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::UnionSmallArray, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_arrays::UnionSmallArray> {};
-
 template <>
 struct IsFidlType<::test_arrays::UnionLargeArray> : public std::true_type {};
 

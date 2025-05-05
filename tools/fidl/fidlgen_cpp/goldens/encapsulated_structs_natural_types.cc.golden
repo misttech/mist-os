@@ -230,7 +230,6 @@ test_encapsulatedstructs::StructPaddingTestStruct::array() const {
   storage_.array = std::move(value);
   return *this;
 }
-
 #ifdef __Fuchsia__
 
 ::test_encapsulatedstructs::NonInlineStructTestStruct::NonInlineStructTestStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}

@@ -360,7 +360,6 @@ struct IsStruct<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFle
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest, 16> {};
-
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse> : public std::true_type {};
 
@@ -379,7 +378,6 @@ struct IsStruct<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFle
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse, 16> {};
-
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest> : public std::true_type {};
 
@@ -398,7 +396,6 @@ struct IsStruct<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseS
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest, 16> {};
-
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse> : public std::true_type {};
 
@@ -436,7 +433,6 @@ struct IsUnion<::test_requestflexibleenvelope::FlexibleFoo> : public std::true_t
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::FlexibleFoo, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_requestflexibleenvelope::FlexibleFoo> {};
-
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::StrictFoo> : public std::true_type {};
 
