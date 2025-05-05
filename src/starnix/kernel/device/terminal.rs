@@ -364,6 +364,17 @@ impl PendingSignals {
     }
 }
 
+/// Represents the type of erase operation that can be performed on terminal input.
+#[derive(Debug, PartialEq)]
+enum EraseType {
+    /// Erase a single character (typically triggered by backspace)
+    Character,
+    /// Erase a word (typically triggered by Ctrl+W)
+    Word,
+    /// Erase the entire line (typically triggered by Ctrl+U)
+    Line,
+}
+
 #[apply(state_implementation!)]
 impl TerminalMutableState<Base = Terminal> {
     /// Returns the terminal configuration.
@@ -691,23 +702,21 @@ impl TerminalMutableState<Base = Terminal> {
             }
 
             let mut maybe_erase_span = None;
+            let mut erase_type = None;
             if self.termios.has_local_flags(ICANON) {
-                if self.termios.has_local_flags(ECHOE) {
-                    if self.termios.is_erase(first_byte) {
-                        maybe_erase_span = Some(compute_last_character_span(
-                            &queue.read_buffer[..],
-                            &self.termios,
-                        ));
-                    } else if self.termios.is_werase(first_byte) {
-                        maybe_erase_span =
-                            Some(compute_last_word_span(&queue.read_buffer[..], &self.termios));
-                    }
+                if self.termios.is_erase(first_byte) {
+                    maybe_erase_span =
+                        Some(compute_last_character_span(&queue.read_buffer[..], &self.termios));
+                    erase_type = Some(EraseType::Character);
+                } else if self.termios.is_werase(first_byte) {
+                    maybe_erase_span =
+                        Some(compute_last_word_span(&queue.read_buffer[..], &self.termios));
+                    erase_type = Some(EraseType::Word);
                 }
-                if self.termios.has_local_flags(ECHOK) {
-                    if self.termios.is_kill(first_byte) {
-                        maybe_erase_span =
-                            Some(compute_last_line_span(&queue.read_buffer[..], &self.termios));
-                    }
+                if self.termios.is_kill(first_byte) {
+                    maybe_erase_span =
+                        Some(compute_last_line_span(&queue.read_buffer[..], &self.termios));
+                    erase_type = Some(EraseType::Line);
                 }
             }
 
@@ -723,32 +732,42 @@ impl TerminalMutableState<Base = Terminal> {
             if self.termios.has_local_flags(ECHOPRT) {
                 track_stub!(TODO("https://fxbug.dev/322874329"), "terminal ECHOPRT");
             }
-            if self.termios.has_local_flags(ECHOKE) {
-                track_stub!(TODO("https://fxbug.dev/322874191"), "terminal ECHOKE");
-            }
 
             // Anything written to the read buffer will have to be echoed.
             let mut echo_bytes = vec![];
             if self.termios.has_local_flags(ECHO) {
                 if let Some(erase_span) = maybe_erase_span {
-                    let erase_echo = [BACKSPACE_CHAR, b' ', BACKSPACE_CHAR];
-                    echo_bytes = erase_echo
-                        .iter()
-                        .cycle()
-                        .take(erase_echo.len() * erase_span.characters)
-                        .map(|c| *c)
-                        .collect();
-                } else if self.termios.has_local_flags(ECHOCTL)
-                    && matches!(first_byte, 0..=0x8 | 0xB..=0xC | 0xE..=0x1F)
-                {
-                    // If this bit is set and the ECHO bit is also set, echo
-                    // control characters with ‘^’ followed by the corresponding
-                    // text character. Thus, control-A echoes as ‘^A’. This is
-                    // usually the preferred mode for interactive input, because
-                    // echoing a control character back to the terminal could have
-                    // some undesired effect on the terminal.
-                    echo_bytes = vec![b'^', first_byte + CONTROL_OFFSET];
-                } else {
+                    match erase_type {
+                        Some(EraseType::Character) | Some(EraseType::Word) => {
+                            if self.termios.has_local_flags(ECHOE) {
+                                echo_bytes = generate_erase_echo(&erase_span);
+                            }
+                        }
+                        Some(EraseType::Line) => {
+                            if self.termios.has_local_flags(ECHOKE) {
+                                echo_bytes = generate_erase_echo(&erase_span);
+                            } else if self.termios.has_local_flags(ECHOK) {
+                                if let Some(control_character_echo) =
+                                    generate_control_character_echo(first_byte)
+                                {
+                                    echo_bytes = control_character_echo;
+                                }
+                                echo_bytes.push(b'\n');
+                            }
+                        }
+                        None => {
+                            unreachable!("Erase type should be Some when maybe_erase_span is Some")
+                        }
+                    }
+                }
+                if echo_bytes.is_empty() && self.termios.has_local_flags(ECHOCTL) {
+                    if let Some(control_character_echo) =
+                        generate_control_character_echo(first_byte)
+                    {
+                        echo_bytes = control_character_echo;
+                    }
+                }
+                if echo_bytes.is_empty() {
                     echo_bytes = character_bytes.clone();
                 }
             } else if self.termios.has_local_flags(ECHONL) && first_byte == b'\n' {
@@ -923,6 +942,25 @@ fn is_ascii(c: RawByte) -> bool {
 
 fn is_utf8_start(c: RawByte) -> bool {
     c & 0xC0 == 0xC0
+}
+
+fn generate_erase_echo(erase_span: &BufferSpan) -> Vec<RawByte> {
+    let erase_echo = [BACKSPACE_CHAR, b' ', BACKSPACE_CHAR];
+    erase_echo.iter().cycle().take(erase_echo.len() * erase_span.characters).map(|c| *c).collect()
+}
+
+fn generate_control_character_echo(c: RawByte) -> Option<Vec<RawByte>> {
+    if matches!(c, 0..=0x8 | 0xB..=0xC | 0xE..=0x1F) {
+        // If this bit is set and the ECHO bit is also set, echo
+        // control characters with ‘^’ followed by the corresponding
+        // text character. Thus, control-A echoes as ‘^A’. This is
+        // usually the preferred mode for interactive input, because
+        // echoing a control character back to the terminal could have
+        // some undesired effect on the terminal.
+        Some(vec![b'^', c + CONTROL_OFFSET])
+    } else {
+        None
+    }
 }
 
 #[derive(Default, Debug, Clone, Copy)]
