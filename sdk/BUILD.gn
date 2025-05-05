@@ -469,6 +469,10 @@ if (!is_host) {
       # https://fxbug.dev/327223536 are addressed sub-builds will never target
       # "PLATFORM" and this logic and GN variable can be removed.
       if (!sdk_inside_sub_build) {
+        subbuilds_target_name = "${main_target_name}_subbuilds"
+        all_subbuilds_for_merge_target_name =
+            "${main_target_name}_all_subbuilds_for_merge"
+
         # The collection for the IDK.
         # This target was historically always named "core".
         # Only built in the main build at "PLATFORM" for the target CPU.
@@ -478,7 +482,8 @@ if (!is_host) {
         # Hence the short name of this target.
         sdk_collection(main_target_name) {
           visibility = []
-          visibility = invoker.visibility
+          visibility =
+              invoker.visibility + [ ":${all_subbuilds_for_merge_target_name}" ]
 
           category = "partner"
           id = sdk_id
@@ -495,9 +500,10 @@ if (!is_host) {
         # more significantly, require adding complexity to support
         # //build/scripts/ninjatrace2json.py.
         # This should be okay since it should be rare that both variants are built.
-        idk_subbuilds("${main_target_name}_subbuilds") {
+        idk_subbuilds(subbuilds_target_name) {
           visibility = []
-          visibility = invoker.subbuilds_visibility
+          visibility = invoker.subbuilds_visibility +
+                       [ ":${all_subbuilds_for_merge_target_name}" ]
 
           sdk_collection_label = ":${main_target_name}_for_subbuilds"
           subbuild_prefix = "idk_subbuild.${main_target_name}_for_subbuilds"
@@ -507,6 +513,18 @@ if (!is_host) {
 
           target_cpus = idk_buildable_cpus
           api_levels = idk_buildable_api_levels
+        }
+
+        # Ensures all builds to be merged into the final Fuchsia IDK, including
+        # the main collection and all sub-builds for the current global GN args
+        # configuration, have been built.
+        group(all_subbuilds_for_merge_target_name) {
+          visibility = []
+          visibility = invoker.subbuilds_visibility
+          deps = [
+            ":${main_target_name}",
+            ":${subbuilds_target_name}",
+          ]
         }
 
         # All atoms to be produced by the main build for inclusion in the IDK.

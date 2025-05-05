@@ -21,6 +21,11 @@ import("//sdk/config.gni")
 #        Uses ${root_build_dir}/${subbuild_prefix}-api${api_level}-${cpu} as
 #        its build directory.
 #
+#    target_name
+#        A group depending on all of the actions above.
+#        This is convenient when building an IDK matching `target_cpus` and
+#        `api_levels` but may build more targets than needed in other cases.
+#
 # Each action will depend on sdk_collection_label as well as //sdk:idk_build_tools.
 #
 # Note that this does not define a top-level group() target that depends on all of
@@ -78,6 +83,9 @@ template("idk_subbuilds") {
         get_label_info(invoker.sdk_collection_label, "name")
   }
 
+  # Include the main collection build.
+  all_subbuild_targets = [ invoker.sdk_collection_label ]
+
   # First, define subbuild targets for the default API level.
   foreach(target_cpu, _target_cpus) {
     _subbuild_target = "${main_target_name}-${target_cpu}"
@@ -107,7 +115,13 @@ template("idk_subbuilds") {
                                "testonly",
                                "visibility",
                              ])
+      if (defined(visibility)) {
+        visibility += [ ":${main_target_name}" ]
+      }
     }
+
+    all_subbuild_targets +=
+        [ get_label_info(":${_subbuild_target}", "label_no_toolchain") ]
   }
 
   # Now, define subbuild targets for all individual API levels and CPUs.
@@ -140,7 +154,22 @@ template("idk_subbuilds") {
                                  "testonly",
                                  "visibility",
                                ])
+        if (defined(visibility)) {
+          visibility += [ ":${main_target_name}" ]
+        }
       }
+
+      all_subbuild_targets +=
+          [ get_label_info(":${_subbuild_target}", "label_no_toolchain") ]
     }
+  }
+
+  group(main_target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    deps = all_subbuild_targets
   }
 }
