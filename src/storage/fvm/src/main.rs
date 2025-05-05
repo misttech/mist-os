@@ -1818,7 +1818,7 @@ fn map_to_status(error: anyhow::Error) -> zx::Status {
     }
 }
 
-#[fuchsia::main(logging_tags = ["fvm"])]
+#[fuchsia::main(logging_tags = ["fvm"], threads = 2)]
 async fn main() -> Result<(), Error> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
