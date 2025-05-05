@@ -23,7 +23,7 @@ idk("pdk_idk") {
   # and `target_cpus` ensure there are no sub-builds that would use it.
   # Specifying a label serves to ensure no sub-builds are added because they
   # would require that this target exist.
-  idk_subbuilds_label = ":non_existent_idk_subbuilds"
+  idk_subbuilds_label_prefix = ":non_existent_idk_subbuilds"
 }
 
 idk_archive("idk_archive") {
