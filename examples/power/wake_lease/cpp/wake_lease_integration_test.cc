@@ -27,16 +27,15 @@ namespace {
 
 using fdf_power::testing::FakeActivityGovernorListener;
 using fdf_power::testing::FidlBoundServer;
-using fuchsia_power_broker::CurrentLevel;
 using fuchsia_power_broker::DependencyToken;
 using fuchsia_power_broker::DependencyType;
 using fuchsia_power_broker::ElementControl;
+using fuchsia_power_broker::ElementRunner;
 using fuchsia_power_broker::ElementSchema;
 using fuchsia_power_broker::LeaseControl;
 using fuchsia_power_broker::Lessor;
 using fuchsia_power_broker::LevelControlChannels;
 using fuchsia_power_broker::LevelDependency;
-using fuchsia_power_broker::RequiredLevel;
 using fuchsia_power_broker::Topology;
 using fuchsia_power_broker::wire::BinaryPowerLevel;
 using fuchsia_power_system::ActivityGovernor;
@@ -58,10 +57,9 @@ class ApplicationActivityElement {
   explicit ApplicationActivityElement(const std::string& name,
                                       const fidl::Client<ActivityGovernor>& activity_governor,
                                       const fidl::Client<Topology>& topology)
-      : current_level_endpoints_(fidl::CreateEndpoints<CurrentLevel>().value()),
-        element_control_endpoints_(fidl::CreateEndpoints<ElementControl>().value()),
-        lessor_endpoints_(fidl::CreateEndpoints<Lessor>().value()),
-        required_level_endpoints_(fidl::CreateEndpoints<RequiredLevel>().value()) {
+      : element_control_endpoints_(fidl::CreateEndpoints<ElementControl>().value()),
+        element_runner_endpoints_(fidl::CreateEndpoints<ElementRunner>().value()),
+        lessor_endpoints_(fidl::CreateEndpoints<Lessor>().value()) {
     activity_governor->GetPowerElements().Then([&](auto& result) {
       EXPECT_OK(result);
       DependencyToken token =
@@ -82,25 +80,22 @@ class ApplicationActivityElement {
         /*requires_token=*/std::move(requires_token),
         /*requires_level_by_preference=*/
         std::vector<uint8_t>({fidl::ToUnderlying(ApplicationActivityLevel::kActive)}));
-    LevelControlChannels level_control_channels(std::move(current_level_endpoints_.server),
-                                                std::move(required_level_endpoints_.server));
     ElementSchema schema{{
         .element_name = name,
         .initial_current_level = fidl::ToUnderlying(BinaryPowerLevel::kOn),
         .valid_levels = std::vector<uint8_t>({fidl::ToUnderlying(BinaryPowerLevel::kOff),
                                               fidl::ToUnderlying(BinaryPowerLevel::kOn)}),
-        .level_control_channels = std::move(level_control_channels),
         .lessor_channel = std::move(lessor_endpoints_.server),
         .element_control = std::move(element_control_endpoints_.server),
+        .element_runner = std::move(element_runner_endpoints_.client),
     }};
     schema.dependencies().emplace().push_back(std::move(dependency));
     return schema;
   }
 
-  fidl::Endpoints<CurrentLevel> current_level_endpoints_;
   fidl::Endpoints<ElementControl> element_control_endpoints_;
+  fidl::Endpoints<ElementRunner> element_runner_endpoints_;
   fidl::Endpoints<Lessor> lessor_endpoints_;
-  fidl::Endpoints<RequiredLevel> required_level_endpoints_;
 };
 
 // TODO(b/356953708): This test is currently broken on specific environments.
