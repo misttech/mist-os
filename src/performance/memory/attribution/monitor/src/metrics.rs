@@ -6,8 +6,7 @@ use anyhow::{anyhow, Result};
 use attribution_processing::digest::{BucketDefinition, Digest};
 use attribution_processing::AttributionDataProvider;
 use cobalt_client::traits::{AsEventCode, AsEventCodes};
-use fuchsia_async::{Interval, Task};
-use futures::stream::{StreamExt, TryStreamExt};
+use futures::stream::StreamExt;
 use futures::{try_join, TryFutureExt};
 use memory_metrics_registry::cobalt_registry;
 use std::sync::Arc;
@@ -159,53 +158,62 @@ pub async fn create_metric_event_logger(
     let (metric_event_logger, server_end) = fidl::endpoints::create_proxy();
     factory
         .create_metric_event_logger(&project_spec, server_end)
-        .await
-        .map_err(anyhow::Error::from)?
+        .await?
         .map_err(error_from_metrics_error)?;
     Ok(metric_event_logger)
 }
 
 /// Periodically upload metrics related to memory usage.
-pub fn collect_metrics(
+pub async fn collect_metrics_forever(
     attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
     kernel_stats_proxy: fkernel::StatsProxy,
     metric_event_logger: fmetrics::MetricEventLoggerProxy,
     bucket_definitions: Vec<BucketDefinition>,
-) -> Task<Result<()>> {
-    Task::spawn(async move {
-        Interval::new(zx::Duration::from_minutes(5))
-            .map(Ok::<(), anyhow::Error>)
-            .try_fold(
-                (attribution_data_service, kernel_stats_proxy, metric_event_logger),
-                |(attribution_data_service, kernel_stats_proxy, metric_event_logger), _| async {
-                    let timestamp = zx::BootInstant::get();
-                    let (kmem_stats, kmem_stats_compression) = try_join!(
-                        kernel_stats_proxy.get_memory_stats().map_err(anyhow::Error::from),
-                        kernel_stats_proxy
-                            .get_memory_stats_compression()
-                            .map_err(anyhow::Error::from)
-                    )?;
-                    let digest = Digest::compute(
-                        attribution_data_service.clone(),
-                        &kmem_stats,
-                        &kmem_stats_compression,
-                        &bucket_definitions,
-                    )?;
+) {
+    let mut timer = fuchsia_async::Interval::new(zx::Duration::from_minutes(5));
+    loop {
+        timer.next().await;
 
-                    let events = kmem_events(&kmem_stats)
-                        .chain(kmem_events_with_uptime(&kmem_stats, timestamp))
-                        .chain(digest_events(digest));
-                    metric_event_logger
-                        .log_metric_events(&events.collect::<Vec<fmetrics::MetricEvent>>())
-                        .await
-                        .map_err(anyhow::Error::from)?
-                        .map_err(error_from_metrics_error)?;
-                    Ok((attribution_data_service, kernel_stats_proxy, metric_event_logger))
-                },
-            )
-            .await?;
-        Ok(())
-    })
+        let result = collect_metrics_once(
+            &*attribution_data_service,
+            &kernel_stats_proxy,
+            &metric_event_logger,
+            &bucket_definitions,
+        )
+        .await;
+
+        if let Err(e) = result {
+            log::error!("Metrics collection failed: {e}");
+        }
+    }
+}
+
+async fn collect_metrics_once(
+    attribution_data_service: &impl AttributionDataProvider,
+    kernel_stats_proxy: &fkernel::StatsProxy,
+    metric_event_logger: &fmetrics::MetricEventLoggerProxy,
+    bucket_definitions: &Vec<BucketDefinition>,
+) -> Result<()> {
+    let timestamp = zx::BootInstant::get();
+    let (kmem_stats, kmem_stats_compression) = try_join!(
+        kernel_stats_proxy.get_memory_stats().map_err(anyhow::Error::from),
+        kernel_stats_proxy.get_memory_stats_compression().map_err(anyhow::Error::from)
+    )?;
+    let digest = Digest::compute(
+        &*attribution_data_service,
+        &kmem_stats,
+        &kmem_stats_compression,
+        &bucket_definitions,
+    )?;
+
+    let events = kmem_events(&kmem_stats)
+        .chain(kmem_events_with_uptime(&kmem_stats, timestamp))
+        .chain(digest_events(digest));
+    metric_event_logger
+        .log_metric_events(&events.collect::<Vec<fmetrics::MetricEvent>>())
+        .await?
+        .map_err(error_from_metrics_error)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -217,6 +225,7 @@ mod tests {
         PrincipalType, Resource, ResourceReference, ZXName,
     };
     use futures::task::Poll;
+    use futures::TryStreamExt;
     use std::time::Duration;
     use {fidl_fuchsia_memory_attribution_plugin as fplugin, fuchsia_async as fasync};
 
@@ -336,8 +345,12 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fmetrics::MetricEventLoggerMarker>();
 
         // Service under test.
-        let mut metrics_collector =
-            collect_metrics(data_provider, stats_provider, metric_event_logger, bucket_definitions);
+        let mut metrics_collector = fuchsia_async::Task::spawn(collect_metrics_forever(
+            data_provider,
+            stats_provider,
+            metric_event_logger,
+            bucket_definitions,
+        ));
 
         // Give the service the opportunity to run.
         assert!(

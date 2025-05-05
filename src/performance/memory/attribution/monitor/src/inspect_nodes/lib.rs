@@ -268,7 +268,7 @@ fn digest_service(
 
             // Compute the aggregation.
             let Digest { buckets } = Digest::compute(
-                attribution_data_service.clone(),
+                &*attribution_data_service,
                 &kmem_stats,
                 &kmem_stats_compression,
                 &bucket_definitions,

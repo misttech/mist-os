@@ -15,7 +15,7 @@ use fuchsia_trace::duration;
 use futures::StreamExt;
 use log::{error, warn};
 use memory_monitor2_config::Config;
-use metrics::{collect_metrics, create_metric_event_logger};
+use metrics::{collect_metrics_forever, create_metric_event_logger};
 use resources::Job;
 use snapshot::AttributionSnapshot;
 use std::sync::Arc;
@@ -104,12 +104,12 @@ async fn main() -> Result<(), Error> {
 
     let metric_event_logger_factory =
         connect_to_protocol::<fmetrics::MetricEventLoggerFactoryMarker>()?;
-    let _collect_metrics_task = collect_metrics(
+    let _collect_metrics_task = fuchsia_async::Task::spawn(collect_metrics_forever(
         attribution_data_provider.clone(),
         kernel_stats.clone(),
         create_metric_event_logger(metric_event_logger_factory).await?,
         bucket_definitions,
-    );
+    ));
 
     service_fs
         .for_each_concurrent(None, |stream| async {

@@ -9,7 +9,6 @@ use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use std::collections::hash_map::Entry::Occupied;
 use std::collections::HashMap;
-use std::sync::Arc;
 use {fidl_fuchsia_kernel as fkernel, fidl_fuchsia_memory_attribution_plugin as fplugin};
 
 const UNDIGESTED: &str = "Undigested";
@@ -160,7 +159,7 @@ impl Digest {
     /// Given means to query the system for memory usage, and a specification, this function
     /// aggregates the current memory usage into human displayable units we call buckets.
     pub fn compute(
-        attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
+        attribution_data_service: &impl AttributionDataProvider,
         kmem_stats: &fkernel::MemoryStats,
         kmem_stats_compression: &fkernel::MemoryStatsCompression,
         bucket_definitions: &Vec<BucketDefinition>,
@@ -249,7 +248,7 @@ mod tests {
     };
     use fidl_fuchsia_memory_attribution_plugin as fplugin;
 
-    fn get_attribution_data_provider() -> Arc<impl AttributionDataProvider + 'static> {
+    fn get_attribution_data_provider() -> FakeAttributionDataProvider {
         let attribution_data = AttributionData {
             principals_vec: vec![Principal {
                 identifier: PrincipalIdentifier(1),
@@ -305,7 +304,7 @@ mod tests {
                 resources: vec![ResourceReference::KernelObject(10)],
             }],
         };
-        Arc::new(FakeAttributionDataProvider { attribution_data })
+        FakeAttributionDataProvider { attribution_data }
     }
 
     fn get_kernel_stats() -> (fkernel::MemoryStats, fkernel::MemoryStatsCompression) {
@@ -356,7 +355,7 @@ mod tests {
     fn test_digest_no_definitions() {
         let (kernel_stats, kernel_stats_compression) = get_kernel_stats();
         let digest = Digest::compute(
-            get_attribution_data_provider(),
+            &get_attribution_data_provider(),
             &kernel_stats,
             &kernel_stats_compression,
             &vec![],
@@ -382,7 +381,7 @@ mod tests {
     fn test_digest_with_matching_vmo() -> Result<(), anyhow::Error> {
         let (kernel_stats, kernel_stats_compression) = get_kernel_stats();
         let digest = Digest::compute(
-            get_attribution_data_provider(),
+            &get_attribution_data_provider(),
             &kernel_stats,
             &kernel_stats_compression,
             &vec![BucketDefinition {
@@ -415,7 +414,7 @@ mod tests {
     fn test_digest_with_matching_process() -> Result<(), anyhow::Error> {
         let (kernel_stats, kernel_stats_compression) = get_kernel_stats();
         let digest = Digest::compute(
-            get_attribution_data_provider(),
+            &get_attribution_data_provider(),
             &kernel_stats,
             &kernel_stats_compression,
             &vec![BucketDefinition {
@@ -448,7 +447,7 @@ mod tests {
     fn test_digest_with_matching_process_and_vmo() -> Result<(), anyhow::Error> {
         let (kernel_stats, kernel_stats_compression) = get_kernel_stats();
         let digest = Digest::compute(
-            get_attribution_data_provider(),
+            &get_attribution_data_provider(),
             &kernel_stats,
             &kernel_stats_compression,
             &vec![BucketDefinition {
