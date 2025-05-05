@@ -14,10 +14,13 @@ Used by `sdk_final_manifest_golden` GN rules.
 """
 
 import argparse
+import dataclasses
 import json
 import os
+import pathlib
+import re
 import sys
-from typing import Sequence, TypedDict
+from typing import Sequence, TextIO, TypedDict
 
 HOST_TOOL_SCHEMES: Sequence[str] = [
     "host_tool",
@@ -27,6 +30,52 @@ HOST_TOOL_SCHEMES: Sequence[str] = [
 
 IdkPart = TypedDict("IdkPart", {"meta": str, "type": str})
 IdkManifest = TypedDict("IdkManifest", {"parts": Sequence[IdkPart]})
+
+# Looks like `#include "//foo/bar"`
+INCLUDE_RE = re.compile(r'#include\s*"//([^"]+)"\s*')
+
+
+@dataclasses.dataclass
+class GoldenFile:
+    path: pathlib.Path
+    includes: list["GoldenFile"]
+    atom_ids: set[str]
+
+    @staticmethod
+    def parse(path: pathlib.Path, source_root: pathlib.Path) -> "GoldenFile":
+        includes = []
+        atom_ids: set[str] = set()
+
+        with path.open() as f:
+            for line in f:
+                if m := INCLUDE_RE.match(line):
+                    include_path = source_root.joinpath(m[1])
+                    includes += [GoldenFile.parse(include_path, source_root)]
+                else:
+                    atom_ids.add(line.strip())
+        return GoldenFile(path=path, includes=includes, atom_ids=atom_ids)
+
+    def print(self, source_root: pathlib.Path, file: TextIO) -> None:
+        includes = [str(i.path.relative_to(source_root)) for i in self.includes]
+        for include in sorted(includes):
+            print('#include "//%s"' % include, file=file)
+        for id in sorted(self.atom_ids):
+            print(id, file=file)
+
+    def inherited_atoms(self) -> set[str]:
+        res = set()
+        for include in self.includes:
+            res |= include.all_atoms()
+        return res
+
+    def all_atoms(self) -> set[str]:
+        return {*self.atom_ids, *self.inherited_atoms()}
+
+    def all_manifest_paths(self) -> list[pathlib.Path]:
+        res = [self.path]
+        for include in self.includes:
+            res += include.all_manifest_paths()
+        return res
 
 
 def part_to_id(part: IdkPart) -> str:
@@ -71,18 +120,27 @@ def remove_tools_for_other_cpus(part_ids: set[str], cpu: str) -> set[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--manifest", help="Path to the IDK manifest", required=True
+        "--manifest",
+        type=pathlib.Path,
+        help="Path to the IDK manifest",
+        required=True,
     )
     parser.add_argument(
-        "--golden", help="Path to the golden file", required=True
+        "--golden",
+        type=pathlib.Path,
+        help="Path to the golden file",
+        required=True,
     )
     parser.add_argument(
-        "--inherit_golden",
-        help=(
-            "Inherit items from this golden file, if specified, and omit "
-            "any items from this file in the updated golden."
-        ),
-        required=False,
+        "--source_root",
+        type=pathlib.Path,
+        help="Path to the fuchsia source directory",
+        required=True,
+    )
+    parser.add_argument(
+        "--depfile",
+        type=pathlib.Path,
+        help="Path to output depfile",
     )
     parser.add_argument(
         "--only_verify_host_tools_for_cpu",
@@ -91,6 +149,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--updated_golden",
+        type=pathlib.Path,
         help=(
             "Path where a new version of the golden file will be written. The "
             "contents of this file will be meaningful iff "
@@ -108,24 +167,19 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    with open(args.manifest) as f:
+    with args.manifest.open() as f:
         manifest: IdkManifest = json.load(f)
     manifest_ids = {part_to_id(part) for part in manifest["parts"]}
 
-    with open(args.golden) as f:
-        golden_ids = {line.strip() for line in f}
+    golden = GoldenFile.parse(args.golden, args.source_root)
 
-    if args.inherit_golden:
-        with open(args.inherit_golden) as f:
-            inherit_golden_ids = {line.strip() for line in f}
-    else:
-        inherit_golden_ids = set()
-
-    effective_golden_ids = golden_ids | inherit_golden_ids
+    inherit_golden_ids = golden.inherited_atoms()
+    effective_golden_ids = golden.all_atoms()
 
     added_ids: set[str] = manifest_ids - effective_golden_ids
     removed_ids: set[str] = effective_golden_ids - manifest_ids
 
+    # Update the golden manifest file if possible.
     if args.only_verify_host_tools_for_cpu:
         added_ids = remove_tools_for_other_cpus(
             added_ids, args.only_verify_host_tools_for_cpu
@@ -136,12 +190,21 @@ def main() -> int:
 
         # Write the file even if it's not useful as an updated golden, because
         # GN expects it to be there.
-        with open(args.updated_golden, "w") as f:
+        with args.updated_golden.open("w") as f:
             print("Golden cannot be automatically updated.", file=f)
     else:
-        with open(args.updated_golden, "w") as f:
-            for id in sorted(manifest_ids - inherit_golden_ids):
-                print(id, file=f)
+        with args.updated_golden.open("w") as f:
+            golden.atom_ids = manifest_ids - inherit_golden_ids
+            golden.print(args.source_root, f)
+
+    if args.depfile:
+        with args.depfile.open("w") as f:
+            print(
+                str(args.updated_golden),
+                ": ",
+                " ".join(str(p) for p in golden.all_manifest_paths()),
+                file=f,
+            )
 
     if added_ids:
         print("Parts added to IDK:", file=sys.stderr)

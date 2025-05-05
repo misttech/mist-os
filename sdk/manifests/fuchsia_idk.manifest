@@ -1,3 +1,4 @@
+#include "//sdk/manifests/pdk.manifest"
 bind_library://bind/fuchsia
 bind_library://bind/fuchsia.acpi
 bind_library://bind/fuchsia.adc
@@ -65,6 +66,7 @@ cc_source_library://pkg/driver_component_cpp
 cc_source_library://pkg/driver_devfs_cpp
 cc_source_library://pkg/driver_fake_bti_cpp
 cc_source_library://pkg/driver_fake_gpio_cpp (unstable)
+cc_source_library://pkg/driver_fake_mmio_reg_cpp
 cc_source_library://pkg/driver_fake_object_cpp
 cc_source_library://pkg/driver_fake_platform_device_cpp (unstable)
 cc_source_library://pkg/driver_fake_resource_cpp (unstable)
@@ -84,7 +86,6 @@ cc_source_library://pkg/driver_runtime_testing_cpp
 cc_source_library://pkg/driver_symbols
 cc_source_library://pkg/driver_testing_cpp
 cc_source_library://pkg/driver_testing_scoped_global_logger_cpp
-cc_source_library://pkg/driver_fake_mmio_reg_cpp
 cc_source_library://pkg/fidl
 cc_source_library://pkg/fidl_base
 cc_source_library://pkg/fidl_cpp
@@ -147,59 +148,12 @@ data://pkg/syslog/syslog_sdk.json
 data://pkg/trace/trace.json
 data://pkg/vulkan/vulkan.json
 documentation://docs/low_level.json
-documentation://docs/metadata_schemas.json
 documentation://docs/musl_license.json
 documentation://docs/open_source.json
 documentation://docs/ref_docs.json
 documentation://docs/sdk_notice.json
 documentation://docs/vulkan_license.json
 experimental_python_e2e_test://python/rtc_conformance_test
-ffx_tool://tools/arm64/ffx_tools/ffx-agis
-ffx_tool://tools/arm64/ffx_tools/ffx-assembly
-ffx_tool://tools/arm64/ffx_tools/ffx-audio
-ffx_tool://tools/arm64/ffx_tools/ffx-component
-ffx_tool://tools/arm64/ffx_tools/ffx-coverage
-ffx_tool://tools/arm64/ffx_tools/ffx-debug
-ffx_tool://tools/arm64/ffx_tools/ffx-driver
-ffx_tool://tools/arm64/ffx_tools/ffx-emu
-ffx_tool://tools/arm64/ffx_tools/ffx-fuzz
-ffx_tool://tools/arm64/ffx_tools/ffx-inspect
-ffx_tool://tools/arm64/ffx_tools/ffx-log
-ffx_tool://tools/arm64/ffx_tools/ffx-package
-ffx_tool://tools/arm64/ffx_tools/ffx-process
-ffx_tool://tools/arm64/ffx_tools/ffx-product
-ffx_tool://tools/arm64/ffx_tools/ffx-profile
-ffx_tool://tools/arm64/ffx_tools/ffx-repository
-ffx_tool://tools/arm64/ffx_tools/ffx-scrutiny
-ffx_tool://tools/arm64/ffx_tools/ffx-session
-ffx_tool://tools/arm64/ffx_tools/ffx-setui
-ffx_tool://tools/arm64/ffx_tools/ffx-starnix
-ffx_tool://tools/arm64/ffx_tools/ffx-test
-ffx_tool://tools/arm64/ffx_tools/ffx-trace
-ffx_tool://tools/arm64/ffx_tools/ffx-wlan
-ffx_tool://tools/x64/ffx_tools/ffx-agis
-ffx_tool://tools/x64/ffx_tools/ffx-assembly
-ffx_tool://tools/x64/ffx_tools/ffx-audio
-ffx_tool://tools/x64/ffx_tools/ffx-component
-ffx_tool://tools/x64/ffx_tools/ffx-coverage
-ffx_tool://tools/x64/ffx_tools/ffx-debug
-ffx_tool://tools/x64/ffx_tools/ffx-driver
-ffx_tool://tools/x64/ffx_tools/ffx-emu
-ffx_tool://tools/x64/ffx_tools/ffx-fuzz
-ffx_tool://tools/x64/ffx_tools/ffx-inspect
-ffx_tool://tools/x64/ffx_tools/ffx-log
-ffx_tool://tools/x64/ffx_tools/ffx-package
-ffx_tool://tools/x64/ffx_tools/ffx-process
-ffx_tool://tools/x64/ffx_tools/ffx-product
-ffx_tool://tools/x64/ffx_tools/ffx-profile
-ffx_tool://tools/x64/ffx_tools/ffx-repository
-ffx_tool://tools/x64/ffx_tools/ffx-scrutiny
-ffx_tool://tools/x64/ffx_tools/ffx-session
-ffx_tool://tools/x64/ffx_tools/ffx-setui
-ffx_tool://tools/x64/ffx_tools/ffx-starnix
-ffx_tool://tools/x64/ffx_tools/ffx-test
-ffx_tool://tools/x64/ffx_tools/ffx-trace
-ffx_tool://tools/x64/ffx_tools/ffx-wlan
 fidl_library://fidl/fuchsia.accessibility.gesture
 fidl_library://fidl/fuchsia.accessibility.semantics
 fidl_library://fidl/fuchsia.accessibility.tts
@@ -253,7 +207,6 @@ fidl_library://fidl/fuchsia.factory
 fidl_library://fidl/fuchsia.factory.wlan
 fidl_library://fidl/fuchsia.feedback
 fidl_library://fidl/fuchsia.fonts
-fidl_library://fidl/fuchsia.location.gnss.types (unstable)
 fidl_library://fidl/fuchsia.gpu.agis
 fidl_library://fidl/fuchsia.gpu.magma
 fidl_library://fidl/fuchsia.hardware.adc
@@ -283,6 +236,7 @@ fidl_library://fidl/fuchsia.hardware.platform.device
 fidl_library://fidl/fuchsia.hardware.power (unstable)
 fidl_library://fidl/fuchsia.hardware.power.sensor
 fidl_library://fidl/fuchsia.hardware.power.statecontrol
+fidl_library://fidl/fuchsia.hardware.power.suspend (unstable)
 fidl_library://fidl/fuchsia.hardware.qualcomm.router (unstable)
 fidl_library://fidl/fuchsia.hardware.radar
 fidl_library://fidl/fuchsia.hardware.registers (unstable)
@@ -297,7 +251,6 @@ fidl_library://fidl/fuchsia.hardware.spi (unstable)
 fidl_library://fidl/fuchsia.hardware.spi.businfo (unstable)
 fidl_library://fidl/fuchsia.hardware.spiimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.spmi (unstable)
-fidl_library://fidl/fuchsia.hardware.power.suspend (unstable)
 fidl_library://fidl/fuchsia.hardware.temperature
 fidl_library://fidl/fuchsia.hardware.trippoint
 fidl_library://fidl/fuchsia.hardware.usb.dci (unstable)
@@ -320,6 +273,7 @@ fidl_library://fidl/fuchsia.ldsvc
 fidl_library://fidl/fuchsia.legacymetrics
 fidl_library://fidl/fuchsia.lightsensor
 fidl_library://fidl/fuchsia.location
+fidl_library://fidl/fuchsia.location.gnss.types (unstable)
 fidl_library://fidl/fuchsia.location.namedplace
 fidl_library://fidl/fuchsia.location.position
 fidl_library://fidl/fuchsia.location.sensor
@@ -413,60 +367,6 @@ fidl_library://fidl/fuchsia.wlan.product.deprecatedconfiguration
 fidl_library://fidl/fuchsia.wlan.softmac
 fidl_library://fidl/fuchsia.wlan.stats (unstable)
 fidl_library://fidl/zx
-host_tool://tools/arm64/assembly_config
-host_tool://tools/arm64/bindc
-host_tool://tools/arm64/blobfs-compression
-host_tool://tools/arm64/blobfs_do_not_depend
-host_tool://tools/arm64/bootserver
-host_tool://tools/arm64/cmc
-host_tool://tools/arm64/configc
-host_tool://tools/arm64/device-finder
-host_tool://tools/arm64/fake-omaha-client
-host_tool://tools/arm64/far
-host_tool://tools/arm64/ffx
-host_tool://tools/arm64/fidl-format
-host_tool://tools/arm64/fidlc
-host_tool://tools/arm64/fidlcat
-host_tool://tools/arm64/fidlgen_cpp
-host_tool://tools/arm64/fidlgen_hlcpp
-host_tool://tools/arm64/fidlgen_rust
-host_tool://tools/arm64/fssh
-host_tool://tools/arm64/funnel
-host_tool://tools/arm64/fvm
-host_tool://tools/arm64/gen-android-starnix-container
-host_tool://tools/arm64/merkleroot
-host_tool://tools/arm64/minfs
-host_tool://tools/arm64/symbolizer
-host_tool://tools/arm64/trace2json
-host_tool://tools/arm64/zbi
-host_tool://tools/arm64/zxdb
-host_tool://tools/x64/assembly_config
-host_tool://tools/x64/bindc
-host_tool://tools/x64/blobfs-compression
-host_tool://tools/x64/blobfs_do_not_depend
-host_tool://tools/x64/bootserver
-host_tool://tools/x64/cmc
-host_tool://tools/x64/configc
-host_tool://tools/x64/device-finder
-host_tool://tools/x64/fake-omaha-client
-host_tool://tools/x64/far
-host_tool://tools/x64/ffx
-host_tool://tools/x64/fidl-format
-host_tool://tools/x64/fidlc
-host_tool://tools/x64/fidlcat
-host_tool://tools/x64/fidlgen_cpp
-host_tool://tools/x64/fidlgen_hlcpp
-host_tool://tools/x64/fidlgen_rust
-host_tool://tools/x64/fssh
-host_tool://tools/x64/funnel
-host_tool://tools/x64/fvm
-host_tool://tools/x64/gen-android-starnix-container
-host_tool://tools/x64/merkleroot
-host_tool://tools/x64/minfs
-host_tool://tools/x64/symbolizer
-host_tool://tools/x64/trace2json
-host_tool://tools/x64/zbi
-host_tool://tools/x64/zxdb
 loadable_module://pkg/vulkan_layers
 package://packages/cmd-buf-benchmark-test
 package://packages/fake-build-info
