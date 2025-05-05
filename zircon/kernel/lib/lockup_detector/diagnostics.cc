@@ -150,7 +150,7 @@ void DumpCommonDiagnostics(cpu_num_t cpu, FILE* output_target, FailureSeverity s
     fprintf(output_target, "\n");
     zx_status_t status = DumpRegistersAndBacktrace(cpu, output_target);
     if (status != ZX_OK) {
-      fprintf(output_target, "failed to dump registers and backtrace: %d", status);
+      fprintf(output_target, "failed to dump registers and backtrace: %d\n", status);
     }
   }
 }
