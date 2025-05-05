@@ -3,8 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/config/compiler.gni")
-import("//build/config/fuchsia/platform_version.gni")
-import("//build/sdk/config.gni")
 import("//build/subbuild.gni")
 import("//sdk/config.gni")
 
@@ -30,6 +28,14 @@ import("//sdk/config.gni")
 # they need directly.
 #
 # Args:
+#    target_cpus: (required)
+#      List of target CPU architectures for which to generate sub-builds.
+#      This must include the default target_cpu value for the current build
+#      configuration.
+#
+#    api_levels: (required)
+#      List of API levels, as strings for which to generate sub-builds.
+#
 #    sdk_collection_label  (required)
 #      [GN Label] Label of sdk_collection() target to generate sub-builds for.
 #
@@ -46,6 +52,13 @@ import("//sdk/config.gni")
 #     Defaults to the name portion of the `sdk_collection_label`.
 #
 template("idk_subbuilds") {
+  assert(defined(invoker.target_cpus),
+         "target_cpus must be defined for $target_name")
+  assert(defined(invoker.api_levels),
+         "api_levels must be defined for $target_name")
+  assert(defined(invoker.sdk_collection_label),
+         "sdk_collection_label must be defined for $target_name")
+
   main_target_name = target_name
 
   if (defined(invoker.subbuild_prefix)) {
@@ -55,8 +68,8 @@ template("idk_subbuilds") {
         "idk_subbuild." + get_label_info(invoker.sdk_collection_label, "name")
   }
 
-  _api_levels = idk_buildable_api_levels
-  _target_cpus = idk_buildable_cpus
+  _api_levels = invoker.api_levels
+  _target_cpus = invoker.target_cpus
 
   if (defined(invoker.sdk_collection_name)) {
     _sdk_collection_dir_name = invoker.sdk_collection_name

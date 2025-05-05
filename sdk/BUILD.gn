@@ -504,6 +504,9 @@ if (!is_host) {
 
           # Use the same name as the collection so paths match.
           sdk_collection_name = main_target_name
+
+          target_cpus = idk_buildable_cpus
+          api_levels = idk_buildable_api_levels
         }
 
         # All atoms to be produced by the main build for inclusion in the IDK.

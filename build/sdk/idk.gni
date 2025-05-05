@@ -4,7 +4,6 @@
 
 import("//build/config/compiler.gni")
 import("//build/python/python_action.gni")
-import("//build/sdk/config.gni")
 import("//build/sdk/idk_subbuilds.gni")
 import("//build/toolchain/rbe.gni")
 import("//sdk/config.gni")
@@ -30,8 +29,8 @@ import("//sdk/config.gni")
 #      value for the current build configuration.
 #
 #    api_levels: (required)
-#      List of API levels, as integers, to build prebuilts for, in addition to
-#      the current (HEAD) one.
+#      List of API levels, as strings, for which to include prebuilts, in
+#      addition to the current (PLATFORM) one.
 #
 #    sdk_collection_label: (required)
 #      A single label for an sdk_collection() GN target.
@@ -106,6 +105,8 @@ template("idk") {
     idk_subbuilds(_subbuilds_target) {
       sdk_collection_label = invoker.sdk_collection_label
       subbuild_prefix = _subbuilds_dir_prefix
+      api_levels = invoker.api_levels
+      target_cpus = invoker.target_cpus
       forward_variables_from(invoker,
                              [
                                "testonly",
