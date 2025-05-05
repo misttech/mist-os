@@ -131,12 +131,6 @@ If the above fails with an error related to Ninja, then you may need to add
 the Fuchsia build assumes some libraries are stripped so `ninja
 install-toolchain-distribution-stripped` is necessary.
 
-Caution: Due to a [bug in Clang](https://bugs.llvm.org/show_bug.cgi?id=44097),
-builds with assertions enabled might crash while building Fuchsia. As a
-workaround, you can disable Clang assertions by setting
-`-DLLVM_ENABLE_ASSERTIONS=OFF` or using a release build
-(`-DCMAKE_BUILD_TYPE=Release`).
-
 ### Two-Stage Build Fuchsia Configuration {#two-stage-build}
 
 This is roughly equivalent to what is run on the prod builders and used to build
