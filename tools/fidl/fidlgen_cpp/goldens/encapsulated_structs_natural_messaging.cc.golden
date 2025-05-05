@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.encapsulatedstructs/cpp/natural_messaging.h>
 #include <fidl/test.encapsulatedstructs/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -10,3 +12,5 @@
 #pragma clang diagnostic ignored "-Wshadow"
 
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

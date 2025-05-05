@@ -6,29 +6,24 @@
 
 #include <fidl/test.foreigntypeinresponseusedthroughcompose/cpp/markers.h>
 #include <fidl/test.foreigntypeinresponseusedthroughcompose/cpp/wire_types.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
+#include <fidl/test.bottom/cpp/wire_messaging.h>
+#include <fidl/test.middle/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
-
-#include <fidl/test.bottom/cpp/wire_messaging.h>
-#include <fidl/test.middle/cpp/wire_messaging.h>
+#include <lib/fidl/cpp/wire/wire_messaging.h>
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
 namespace test_foreigntypeinresponseusedthroughcompose {
 
 class Top;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_foreigntypeinresponseusedthroughcompose
 
@@ -65,12 +60,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_foreigntypeinresponseusedth
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_foreigntypeinresponseusedthroughcompose {
 
-#endif  // __Fuchsia__
-}  // namespace test_foreigntypeinresponseusedthroughcompose
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo> final {
   FIDL_ALIGNDECL
@@ -88,8 +78,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo> final : public ::test_middle::wire::MiddleGetFooResponse {
@@ -130,7 +118,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
 
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>> : public std::true_type {};
 template <>
@@ -147,8 +134,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_foreigntypeinres
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>> : public std::true_type {};
@@ -181,7 +166,6 @@ struct TypeTraits<::fidl::WireResponse<::test_foreigntypeinresponseusedthroughco
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -412,13 +396,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_foreigntypeinresponseusedt
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::WireResult<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo> GetFoo();
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_foreigntypeinresponseusedthroughcompose::Top> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -445,6 +423,6 @@ class ::fidl::internal::WireBufferEventSender<::test_foreigntypeinresponseusedth
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

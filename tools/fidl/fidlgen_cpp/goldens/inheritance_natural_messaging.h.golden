@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.inheritance/cpp/markers.h>
 #include <fidl/test.inheritance/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -26,8 +28,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_inheritance::Super::Foo> {
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_inheritance::Super::Foo>&)>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_inheritance::Super::Foo> final : public ::test_inheritance::SuperFooResponse {
@@ -108,8 +108,6 @@ class ::fidl::internal::NaturalEventSender<::test_inheritance::Super>
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_inheritance::Super::Foo> : public ::fidl::CompleterBase {
  public:
@@ -151,8 +149,6 @@ class ::fidl::Server<::test_inheritance::Super> : public ::fidl::internal::Incom
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_inheritance::Super> final {
   NaturalServerDispatcher() = delete;
@@ -167,8 +163,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_inheritance::Super> fina
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_inheritance::Sub::Foo> {
   using Request = ::test_inheritance::SuperFooRequest;
@@ -179,8 +173,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_inheritance::Sub::Foo> {
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_inheritance::Sub::Foo>&)>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_inheritance::Sub::Foo> final : public ::test_inheritance::SuperFooResponse {
@@ -261,8 +253,6 @@ class ::fidl::internal::NaturalEventSender<::test_inheritance::Sub>
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_inheritance::Sub::Foo> : public ::fidl::CompleterBase {
  public:
@@ -304,8 +294,6 @@ class ::fidl::Server<::test_inheritance::Sub> : public ::fidl::internal::Incomin
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_inheritance::Sub> final {
   NaturalServerDispatcher() = delete;
@@ -320,6 +308,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_inheritance::Sub> final 
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

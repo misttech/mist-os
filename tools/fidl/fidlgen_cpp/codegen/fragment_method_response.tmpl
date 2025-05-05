@@ -6,9 +6,6 @@
 
 {{- define "Method:Response:WireMessagingHeader" }}
 {{- EnsureNamespace "" }}
-{{- if .Response.IsResource }}
-{{- IfdefFuchsia -}}
-{{- end }}
 
 {{- if .HasResponsePayload }}
 template<>
@@ -65,9 +62,6 @@ struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalResponse }}, ::fi
   static void Encode(internal::WireEncoder* encoder, {{ .WireTransactionalResponse }}* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-{{- if .Response.IsResource }}
-{{- EndifFuchsia -}}
-{{- end }}
 {{- end }}
 
 
@@ -75,9 +69,6 @@ struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalResponse }}, ::fi
 
 {{- define "Method:Response:WireMessagingSource" }}
   {{- EnsureNamespace "" }}
-{{- if .Response.IsResource }}
-{{- IfdefFuchsia -}}
-{{- end }}
 
   {{ if (and .ResponseFlattened .HasResponsePayload) }}
     {{ .WireResponse }}::{{ .WireResponse.Self }}({{ .ResponsePayload }} base) : {{ .ResponsePayload }}(std::move(base)) {}
@@ -156,15 +147,11 @@ struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalResponse }}, ::fi
   template
   struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalResponse }}, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-{{- if .Response.IsResource }}
-{{- EndifFuchsia -}}
-{{- end }}
 {{- end }}
 
 
 
 {{- define "Method:Response:NaturalMessagingHeader" }}
-{{- IfdefFuchsia -}}
 {{- EnsureNamespace "" }}
 
 template <>
@@ -198,8 +185,6 @@ class {{ .NaturalResponseConverter }} {
 };
 {{- end }}
 
-
-{{- EndifFuchsia -}}
 {{- end }}
 
 

@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.requestflexibleenvelope/cpp/natural_messaging.h>
 #include <fidl/test.requestflexibleenvelope/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -22,8 +24,6 @@ constexpr inline uint64_t kProtocol_RequestFlexibleResponseStrict_Ordinal = 5191
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kProtocol_RequestFlexibleResponseStrict_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_requestflexibleenvelope
 
 ::fidl::Response<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>::Response(::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse v) : ProtocolRequestStrictResponseFlexibleResponse(std::move(v)) {}
@@ -64,14 +64,6 @@ fidl::internal::NaturalClientImpl<::test_requestflexibleenvelope::Protocol>::Req
       });
 }
 
-namespace test_requestflexibleenvelope {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_requestflexibleenvelope
-
-#ifdef __Fuchsia__
-
 ::fidl::Result<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>
 fidl::internal::NaturalSyncClientImpl<::test_requestflexibleenvelope::Protocol>::RequestStrictResponseFlexible(const ::fidl::Request<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>& request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
@@ -109,8 +101,6 @@ fidl::internal::NaturalSyncClientImpl<::test_requestflexibleenvelope::Protocol>:
 ::fidl::internal::NaturalEventDispatcher<::test_requestflexibleenvelope::Protocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_requestflexibleenvelope::Protocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>::Reply(const ::fidl::Response<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_requestflexibleenvelope::kProtocol_RequestStrictResponseFlexible_Ordinal, ::test_requestflexibleenvelope::kProtocol_RequestStrictResponseFlexible_DynamicFlags};
@@ -134,8 +124,6 @@ void fidl::internal::NaturalCompleterBase<::test_requestflexibleenvelope::Protoc
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_requestflexibleenvelope::Protocol>::entries_[] = {
     {
@@ -186,6 +174,6 @@ void fidl::Server<::test_requestflexibleenvelope::Protocol>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_requestflexibleenvelope::Protocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

@@ -6,7 +6,6 @@
 
 #include <fidl/test.inheritance/cpp/markers.h>
 #include <fidl/test.inheritance/cpp/wire_types.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -27,8 +25,6 @@ namespace test_inheritance {
 class Super;
 
 class Sub;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_inheritance
 
@@ -66,12 +62,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_inheritance::Super> final {
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_inheritance {
 
-#endif  // __Fuchsia__
-}  // namespace test_inheritance
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo> final {
   FIDL_ALIGNDECL
@@ -92,8 +83,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_inheritance::Super::Foo> final : public ::test_inheritance::wire::SuperFooResponse {
@@ -134,7 +123,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
 
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>> : public std::true_type {};
 template <>
@@ -151,8 +139,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Sup
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>> : public std::true_type {};
@@ -185,7 +171,6 @@ struct TypeTraits<::fidl::WireResponse<::test_inheritance::Super::Foo>> {
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -400,16 +385,6 @@ struct ::fidl::internal::WireMethodTypes<::test_inheritance::Sub::Foo> {
           ::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>, ::fidl::internal::ChannelTransport>>;
 };
 
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-namespace test_inheritance {
-
-#ifdef __Fuchsia__
-}  // namespace test_inheritance
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_inheritance::Sub> final {
   WireServerDispatcher() = delete;
@@ -426,12 +401,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_inheritance::Sub> final {
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_inheritance {
 
-#endif  // __Fuchsia__
-}  // namespace test_inheritance
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo> final {
   FIDL_ALIGNDECL
@@ -452,8 +422,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_inheritance::Sub::Foo> final : public ::test_inheritance::wire::SuperFooResponse {
@@ -494,7 +462,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
 
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>> : public std::true_type {};
 template <>
@@ -511,8 +478,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Sub
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>> : public std::true_type {};
@@ -545,7 +510,6 @@ struct TypeTraits<::fidl::WireResponse<::test_inheritance::Sub::Foo>> {
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -778,13 +742,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_inheritance::Super> final 
   // Allocates 24 bytes of response buffer on the stack. Request is heap-allocated.
   ::fidl::WireResult<::test_inheritance::Super::Foo> Foo(::fidl::StringView s);
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_inheritance::Super> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -874,6 +832,6 @@ class ::fidl::internal::WireBufferEventSender<::test_inheritance::Sub>
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

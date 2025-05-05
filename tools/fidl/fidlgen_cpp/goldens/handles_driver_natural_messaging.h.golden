@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.handles/cpp/driver/wire_messaging.h>
 #include <fidl/test.handles/cpp/markers.h>
 #include <fidl/test.handles/cpp/natural_types.h>
@@ -11,8 +13,6 @@
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_handles::DriverProtocol> final : public ::fidl::internal::NaturalClientBase {
@@ -40,8 +40,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_handles::DriverProtocol> f
   explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_handles::DriverProtocol>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fdf::Server<::test_handles::DriverProtocol> : public ::fidl::internal::IncomingMessageDispatcher {
  public:
@@ -67,7 +65,6 @@ class ::fdf::Server<::test_handles::DriverProtocol> : public ::fidl::internal::I
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_handles::DriverProtocol> final {
@@ -83,6 +80,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_handles::DriverProtocol>
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

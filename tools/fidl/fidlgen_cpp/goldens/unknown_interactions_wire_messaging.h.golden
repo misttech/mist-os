@@ -7,18 +7,15 @@
   #include <fidl/test.unknowninteractions/cpp/markers.h>
   #include <fidl/test.unknowninteractions/cpp/wire_types.h>
 
-  #include <lib/fidl/cpp/wire/wire_messaging.h>
-
 #ifdef __Fuchsia__
 
-    #include <lib/fidl/cpp/wire/client.h>
-    #include <lib/fidl/cpp/wire/connect_service.h>
-    #include <lib/fidl/cpp/wire/server.h>
-    #include <lib/fidl/cpp/wire/service_handler.h>
-    #include <lib/fidl/cpp/wire/sync_call.h>
-    #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
+  #include <lib/fidl/cpp/wire/wire_messaging.h>
+  #include <lib/fidl/cpp/wire/client.h>
+  #include <lib/fidl/cpp/wire/connect_service.h>
+  #include <lib/fidl/cpp/wire/server.h>
+  #include <lib/fidl/cpp/wire/service_handler.h>
+  #include <lib/fidl/cpp/wire/sync_call.h>
+  #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 
   #pragma clang diagnostic push
   #pragma clang diagnostic ignored "-Wshadow"
@@ -30,8 +27,6 @@
   class UnknownInteractionsAjarProtocol;
 
   class UnknownInteractionsClosedProtocol;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_unknowninteractions
 
@@ -460,12 +455,8 @@ struct ::fidl::internal::WireServerDispatcher<::test_unknowninteractions::Unknow
   static const ::fidl::internal::MethodEntry entries_[];
   static const ::fidl::internal::MethodEntry* entries_end_;
   static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
-};namespace test_unknowninteractions {
+};
 
-#endif  // __Fuchsia__
-}  // namespace test_unknowninteractions
-
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictOneWay> final {
   FIDL_ALIGNDECL
@@ -520,8 +511,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 template<>
 struct ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWay> final {
   FIDL_ALIGNDECL
@@ -540,7 +529,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFields> final {
   FIDL_ALIGNDECL
@@ -559,8 +547,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFields>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFields> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsResponse {
@@ -601,7 +587,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnion> final {
   FIDL_ALIGNDECL
@@ -620,8 +605,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnion>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnion> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionResponse {
@@ -661,7 +644,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTable> final {
   FIDL_ALIGNDECL
@@ -680,8 +662,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTable>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTable> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableResponse {
@@ -721,7 +701,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayErr> final {
   FIDL_ALIGNDECL
@@ -740,8 +719,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrResult {
@@ -781,7 +758,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFieldsErr> final {
   FIDL_ALIGNDECL
@@ -800,8 +776,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFieldsErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFieldsErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResult {
@@ -841,7 +815,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnionErr> final {
   FIDL_ALIGNDECL
@@ -860,8 +833,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnionErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnionErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResult {
@@ -901,7 +872,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTableErr> final {
   FIDL_ALIGNDECL
@@ -920,8 +890,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTableErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTableErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResult {
@@ -961,7 +929,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWay> final {
   FIDL_ALIGNDECL
@@ -980,8 +947,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWay>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWay> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResult {
@@ -1021,7 +986,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFields> final {
   FIDL_ALIGNDECL
@@ -1040,8 +1004,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFields>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFields> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
@@ -1081,7 +1043,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnion> final {
   FIDL_ALIGNDECL
@@ -1100,8 +1061,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnion>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnion> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResult {
@@ -1141,7 +1100,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTable> final {
   FIDL_ALIGNDECL
@@ -1160,8 +1118,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTable>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTable> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResult {
@@ -1201,7 +1157,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayErr> final {
   FIDL_ALIGNDECL
@@ -1220,8 +1175,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResult {
@@ -1261,7 +1214,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFieldsErr> final {
   FIDL_ALIGNDECL
@@ -1280,8 +1232,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFieldsErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFieldsErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
@@ -1321,7 +1271,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnionErr> final {
   FIDL_ALIGNDECL
@@ -1340,8 +1289,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnionErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnionErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult {
@@ -1381,7 +1328,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTableErr> final {
   FIDL_ALIGNDECL
@@ -1400,8 +1346,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTableErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTableErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult {
@@ -1441,7 +1385,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEvent> final {
   FIDL_ALIGNDECL
@@ -1626,11 +1569,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictOneWay>> : public std::true_type {};
 template <>
@@ -1682,8 +1622,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWay>> : public std::true_type {};
 template <>
@@ -1701,7 +1639,7 @@ struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteract
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFields>> : public std::true_type {};
 template <>
@@ -1718,8 +1656,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFields>> : public std::true_type {};
@@ -1752,7 +1688,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnion>> : public std::true_type {};
 template <>
@@ -1769,8 +1705,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnion>> : public std::true_type {};
@@ -1803,7 +1737,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTable>> : public std::true_type {};
 template <>
@@ -1820,8 +1754,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTable>> : public std::true_type {};
@@ -1854,7 +1786,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayErr>> : public std::true_type {};
 template <>
@@ -1871,8 +1803,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayErr>> : public std::true_type {};
@@ -1905,7 +1835,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFieldsErr>> : public std::true_type {};
 template <>
@@ -1922,8 +1852,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFieldsErr>> : public std::true_type {};
@@ -1956,7 +1884,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnionErr>> : public std::true_type {};
 template <>
@@ -1973,8 +1901,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnionErr>> : public std::true_type {};
@@ -2007,7 +1933,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTableErr>> : public std::true_type {};
 template <>
@@ -2024,8 +1950,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTableErr>> : public std::true_type {};
@@ -2058,7 +1982,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWay>> : public std::true_type {};
 template <>
@@ -2075,8 +1999,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWay>> : public std::true_type {};
@@ -2109,7 +2031,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFields>> : public std::true_type {};
 template <>
@@ -2126,8 +2048,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFields>> : public std::true_type {};
@@ -2160,7 +2080,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnion>> : public std::true_type {};
 template <>
@@ -2177,8 +2097,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnion>> : public std::true_type {};
@@ -2211,7 +2129,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTable>> : public std::true_type {};
 template <>
@@ -2228,8 +2146,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTable>> : public std::true_type {};
@@ -2262,7 +2178,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayErr>> : public std::true_type {};
 template <>
@@ -2279,8 +2195,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayErr>> : public std::true_type {};
@@ -2313,7 +2227,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFieldsErr>> : public std::true_type {};
 template <>
@@ -2330,8 +2244,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFieldsErr>> : public std::true_type {};
@@ -2364,7 +2276,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnionErr>> : public std::true_type {};
 template <>
@@ -2381,8 +2293,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnionErr>> : public std::true_type {};
@@ -2415,7 +2325,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTableErr>> : public std::true_type {};
 template <>
@@ -2432,8 +2342,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTableErr>> : public std::true_type {};
@@ -2466,7 +2374,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEvent>> : public std::true_type {};
 template <>
@@ -2601,9 +2509,7 @@ struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteraction
   static constexpr bool kHasPointer = true;
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-}  // namespace fidl
+};}  // namespace fidl
 
     template<>
     struct ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWay>> final
@@ -4738,16 +4644,6 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
       using Request = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest;
 };
 
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-namespace test_unknowninteractions {
-
-#ifdef __Fuchsia__
-}  // namespace test_unknowninteractions
-
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_unknowninteractions::UnknownInteractionsAjarProtocol> final {
   WireServerDispatcher() = delete;
@@ -4762,12 +4658,8 @@ struct ::fidl::internal::WireServerDispatcher<::test_unknowninteractions::Unknow
   static const ::fidl::internal::MethodEntry entries_[];
   static const ::fidl::internal::MethodEntry* entries_end_;
   static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
-};namespace test_unknowninteractions {
+};
 
-#endif  // __Fuchsia__
-}  // namespace test_unknowninteractions
-
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictOneWay> final {
   FIDL_ALIGNDECL
@@ -4822,8 +4714,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 template<>
 struct ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWay> final {
   FIDL_ALIGNDECL
@@ -4842,7 +4732,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields> final {
   FIDL_ALIGNDECL
@@ -4861,8 +4750,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields> final : public ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
@@ -4903,7 +4790,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnion> final {
   FIDL_ALIGNDECL
@@ -4922,8 +4808,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnion>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnion> final : public ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
@@ -4963,7 +4847,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTable> final {
   FIDL_ALIGNDECL
@@ -4982,8 +4865,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTable>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTable> final : public ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
@@ -5023,7 +4904,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayErr> final {
   FIDL_ALIGNDECL
@@ -5042,8 +4922,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrResult {
@@ -5083,7 +4961,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFieldsErr> final {
   FIDL_ALIGNDECL
@@ -5102,8 +4979,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFieldsErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFieldsErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult {
@@ -5143,7 +5018,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnionErr> final {
   FIDL_ALIGNDECL
@@ -5162,8 +5036,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnionErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnionErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult {
@@ -5203,7 +5075,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTableErr> final {
   FIDL_ALIGNDECL
@@ -5222,8 +5093,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTableErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTableErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult {
@@ -5263,7 +5132,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEvent> final {
   FIDL_ALIGNDECL
@@ -5448,11 +5316,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictOneWay>> : public std::true_type {};
 template <>
@@ -5504,8 +5369,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWay>> : public std::true_type {};
 template <>
@@ -5523,7 +5386,7 @@ struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteract
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields>> : public std::true_type {};
 template <>
@@ -5540,8 +5403,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields>> : public std::true_type {};
@@ -5574,7 +5435,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnion>> : public std::true_type {};
 template <>
@@ -5591,8 +5452,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnion>> : public std::true_type {};
@@ -5625,7 +5484,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTable>> : public std::true_type {};
 template <>
@@ -5642,8 +5501,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTable>> : public std::true_type {};
@@ -5676,7 +5533,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayErr>> : public std::true_type {};
 template <>
@@ -5693,8 +5550,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayErr>> : public std::true_type {};
@@ -5727,7 +5582,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFieldsErr>> : public std::true_type {};
 template <>
@@ -5744,8 +5599,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFieldsErr>> : public std::true_type {};
@@ -5778,7 +5631,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnionErr>> : public std::true_type {};
 template <>
@@ -5795,8 +5648,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnionErr>> : public std::true_type {};
@@ -5829,7 +5680,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTableErr>> : public std::true_type {};
 template <>
@@ -5846,8 +5697,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTableErr>> : public std::true_type {};
@@ -5880,7 +5729,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEvent>> : public std::true_type {};
 template <>
@@ -6015,9 +5864,7 @@ struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteraction
   static constexpr bool kHasPointer = true;
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-}  // namespace fidl
+};}  // namespace fidl
 
     template<>
     struct ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWay>> final
@@ -7275,16 +7122,6 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
       using Request = ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest;
 };
 
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-namespace test_unknowninteractions {
-
-#ifdef __Fuchsia__
-}  // namespace test_unknowninteractions
-
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_unknowninteractions::UnknownInteractionsClosedProtocol> final {
   WireServerDispatcher() = delete;
@@ -7300,12 +7137,8 @@ struct ::fidl::internal::WireServerDispatcher<::test_unknowninteractions::Unknow
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};namespace test_unknowninteractions {
+};
 
-#endif  // __Fuchsia__
-}  // namespace test_unknowninteractions
-
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictOneWay> final {
   FIDL_ALIGNDECL
@@ -7342,8 +7175,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 template<>
 struct ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWay> final {
   FIDL_ALIGNDECL
@@ -7362,7 +7193,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields> final {
   FIDL_ALIGNDECL
@@ -7381,8 +7211,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields> final : public ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
@@ -7423,7 +7251,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnion> final {
   FIDL_ALIGNDECL
@@ -7442,8 +7269,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnion>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnion> final : public ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
@@ -7483,7 +7308,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTable> final {
   FIDL_ALIGNDECL
@@ -7502,8 +7326,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTable>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTable> final : public ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
@@ -7543,7 +7365,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayErr> final {
   FIDL_ALIGNDECL
@@ -7562,8 +7383,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrResult {
@@ -7603,7 +7422,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFieldsErr> final {
   FIDL_ALIGNDECL
@@ -7622,8 +7440,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFieldsErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFieldsErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult {
@@ -7663,7 +7479,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnionErr> final {
   FIDL_ALIGNDECL
@@ -7682,8 +7497,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnionErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnionErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult {
@@ -7723,7 +7536,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTableErr> final {
   FIDL_ALIGNDECL
@@ -7742,8 +7554,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTableErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTableErr> final : public ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult {
@@ -7783,7 +7593,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEvent> final {
   FIDL_ALIGNDECL
@@ -7876,11 +7685,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictOneWay>> : public std::true_type {};
 template <>
@@ -7915,8 +7721,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWay>> : public std::true_type {};
 template <>
@@ -7934,7 +7738,7 @@ struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteract
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields>> : public std::true_type {};
 template <>
@@ -7951,8 +7755,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields>> : public std::true_type {};
@@ -7985,7 +7787,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnion>> : public std::true_type {};
 template <>
@@ -8002,8 +7804,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnion>> : public std::true_type {};
@@ -8036,7 +7836,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTable>> : public std::true_type {};
 template <>
@@ -8053,8 +7853,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTable>> : public std::true_type {};
@@ -8087,7 +7885,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayErr>> : public std::true_type {};
 template <>
@@ -8104,8 +7902,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayErr>> : public std::true_type {};
@@ -8138,7 +7934,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFieldsErr>> : public std::true_type {};
 template <>
@@ -8155,8 +7951,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFieldsErr>> : public std::true_type {};
@@ -8189,7 +7983,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnionErr>> : public std::true_type {};
 template <>
@@ -8206,8 +8000,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnionErr>> : public std::true_type {};
@@ -8240,7 +8032,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTableErr>> : public std::true_type {};
 template <>
@@ -8257,8 +8049,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteracti
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTableErr>> : public std::true_type {};
@@ -8291,7 +8081,7 @@ struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEvent>> : public std::true_type {};
 template <>
@@ -8358,9 +8148,7 @@ struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteraction
   static constexpr bool kHasPointer = true;
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-}  // namespace fidl
+};}  // namespace fidl
 
     template<>
     struct ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWay>> final
@@ -9527,13 +9315,8 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_unknowninteractions::Unkno
 
   // Allocates 16 bytes of request buffer on the stack. Response is heap-allocated.
   ::fidl::WireResult<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTableErr> FlexibleTwoWayTableErr();
-};namespace fidl {
+};
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template<>
 class ::fidl::internal::WireWeakEventSender<::test_unknowninteractions::UnknownInteractionsProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -9992,7 +9775,7 @@ class ::fidl::internal::WireBufferEventSender<::test_unknowninteractions::Unknow
 
 };
 
-#endif  // __Fuchsia__
-
   #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__
 

@@ -6,7 +6,6 @@
 
 #include <fidl/test.driverhandle/cpp/markers.h>
 #include <fidl/test.driverhandle/cpp/wire_types.h>
-#include <lib/fidl_driver/cpp/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl_driver/cpp/server.h>
 #include <lib/fidl_driver/cpp/wire_client.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl_driver/cpp/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -28,7 +26,6 @@ class DriverProtocol;
 
 class HandlesInProtocol;
 
-#ifdef __Fuchsia__
 }  // namespace test_driverhandle
 
 template <>
@@ -47,15 +44,6 @@ struct ::fidl::internal::WireServerDispatcher<::test_driverhandle::DriverProtoco
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_driverhandle {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_driverhandle
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireEventHandlerInterface<::test_driverhandle::DriverProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -124,16 +112,6 @@ struct ::fidl::internal::WireMethodTypes<::test_driverhandle::HandlesInProtocol:
   using Completer = fidl::Completer<>;
 };
 
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-namespace test_driverhandle {
-
-#ifdef __Fuchsia__
-}  // namespace test_driverhandle
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_driverhandle::HandlesInProtocol> final {
   WireServerDispatcher() = delete;
@@ -150,12 +128,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_driverhandle::HandlesInProt
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_driverhandle {
 
-#endif  // __Fuchsia__
-}  // namespace test_driverhandle
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles> final {
   FIDL_ALIGNDECL
@@ -177,11 +150,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>> : public std::true_type {};
 template <>
@@ -200,7 +170,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::Ha
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
 }  // namespace fidl
 
 template <>
@@ -320,13 +289,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_driverhandle::DriverProtoc
  public:
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakBufferEventSender<::test_driverhandle::DriverProtocol> : public ::fdf::internal::WeakBufferEventSenderBase {
  public:
@@ -387,6 +350,6 @@ class ::fidl::internal::WireBufferEventSender<::test_driverhandle::HandlesInProt
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

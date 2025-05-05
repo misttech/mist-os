@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.unknowninteractions/cpp/driver/wire_messaging.h>
 #include <fidl/test.unknowninteractions/cpp/markers.h>
 #include <fidl/test.unknowninteractions/cpp/natural_types.h>
@@ -171,7 +173,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
       ::fit::callback<void(::fdf::Result<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr>&)>;
   using DomainError = int32_t;
 };
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWay> final {
@@ -581,8 +582,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_unknowninteractions::Unkno
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWay> : public ::fidl::CompleterBase {
  public:
@@ -842,7 +841,6 @@ class ::fdf::Server<::test_unknowninteractions::UnknownInteractionsDriverProtoco
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_unknowninteractions::UnknownInteractionsDriverProtocol> final {
@@ -856,8 +854,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_unknowninteractions::Unk
   static const ::fidl::internal::MethodEntry* entries_end_;
   static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictOneWay> {
@@ -942,7 +938,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
       ::fit::callback<void(::fdf::Result<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr>&)>;
   using DomainError = int32_t;
 };
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWay> final {
@@ -1150,8 +1145,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_unknowninteractions::Unkno
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWay> : public ::fidl::CompleterBase {
  public:
@@ -1299,7 +1292,6 @@ class ::fdf::Server<::test_unknowninteractions::UnknownInteractionsAjarDriverPro
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol> final {
@@ -1313,8 +1305,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_unknowninteractions::Unk
   static const ::fidl::internal::MethodEntry* entries_end_;
   static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictOneWay> {
@@ -1394,7 +1384,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
       ::fit::callback<void(::fdf::Result<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr>&)>;
   using DomainError = int32_t;
 };
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWay> final {
@@ -1597,8 +1586,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_unknowninteractions::Unkno
   explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWay> : public ::fidl::CompleterBase {
  public:
@@ -1741,7 +1728,6 @@ class ::fdf::Server<::test_unknowninteractions::UnknownInteractionsClosedDriverP
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol> final {
@@ -1757,6 +1743,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_unknowninteractions::Unk
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

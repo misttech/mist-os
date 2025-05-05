@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.nullable/cpp/markers.h>
 #include <fidl/test.nullable/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -26,8 +28,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_nullable::SimpleProtocol::Add
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_nullable::SimpleProtocol::Add>&)>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_nullable::SimpleProtocol::Add> final : public ::test_nullable::SimpleProtocolAddResponse {
@@ -108,8 +108,6 @@ class ::fidl::internal::NaturalEventSender<::test_nullable::SimpleProtocol>
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_nullable::SimpleProtocol::Add> : public ::fidl::CompleterBase {
  public:
@@ -151,8 +149,6 @@ class ::fidl::Server<::test_nullable::SimpleProtocol> : public ::fidl::internal:
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_nullable::SimpleProtocol> final {
   NaturalServerDispatcher() = delete;
@@ -167,6 +163,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_nullable::SimpleProtocol
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

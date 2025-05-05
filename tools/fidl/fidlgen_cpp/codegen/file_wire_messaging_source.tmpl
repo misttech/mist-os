@@ -22,6 +22,8 @@ Those libraries should not define business logic types or protocols, and we
 do not support them in the bindings. */}}
 {{- if not .SingleComponentLibraryName }}
 
+{{- IfdefFuchsia }}
+
 #include <{{ .Library | Filename "WireMessagingHeader" }}>
 
 #include <memory>
@@ -29,15 +31,14 @@ do not support them in the bindings. */}}
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-{{ "" }}
-
-
-
-{{- range (call .ProtocolsForTransport "Channel") }}
+{{ range (call .ProtocolsForTransport "Channel") }}
   {{ template "Protocol:WireMessagingSource" . }}
   {{ template "Protocol:EventSender:WireMessagingSource" . }}
 {{ end }}
 #pragma clang diagnostic pop
+
+{{- EndifFuchsia }}
+
 {{ end }}{{/* if not SingleComponentLibraryName */}}
 
 {{ UnsetTransport -}}

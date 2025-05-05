@@ -6,7 +6,6 @@
 
 #include <fidl/test.driveroneway/cpp/markers.h>
 #include <fidl/test.driveroneway/cpp/wire_types.h>
-#include <lib/fidl_driver/cpp/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl_driver/cpp/server.h>
 #include <lib/fidl_driver/cpp/wire_client.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl_driver/cpp/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -25,8 +23,6 @@
 namespace test_driveroneway {
 
 class OneWay;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_driveroneway
 
@@ -54,12 +50,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_driveroneway::OneWay> final
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_driveroneway {
 
-#endif  // __Fuchsia__
-}  // namespace test_driveroneway
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send> final {
   FIDL_ALIGNDECL
@@ -80,11 +71,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>> : public std::true_type {};
 template <>
@@ -101,7 +89,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_driveroneway::On
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
 }  // namespace fidl
 
 template <>
@@ -227,13 +214,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_driveroneway::OneWay> fina
  public:
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakBufferEventSender<::test_driveroneway::OneWay> : public ::fdf::internal::WeakBufferEventSenderBase {
  public:
@@ -247,6 +228,6 @@ class ::fidl::internal::WireBufferEventSender<::test_driveroneway::OneWay>
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

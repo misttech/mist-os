@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.placementofattributes/cpp/natural_messaging.h>
 #include <fidl/test.placementofattributes/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -16,8 +18,6 @@ constexpr inline uint64_t kExampleProtocol_Method_Ordinal = 6023439637367187273l
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kExampleProtocol_Method_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_placementofattributes
 
 ::fit::result<::fidl::OneWayError>
@@ -30,13 +30,6 @@ fidl::internal::NaturalClientImpl<::test_placementofattributes::ExampleProtocol>
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_placementofattributes {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_placementofattributes
-
-#ifdef __Fuchsia__
 
 ::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalSyncClientImpl<::test_placementofattributes::ExampleProtocol>::Method(const ::fidl::Request<::test_placementofattributes::ExampleProtocol::Method>& request) {
@@ -63,15 +56,11 @@ fidl::internal::NaturalSyncClientImpl<::test_placementofattributes::ExampleProto
 ::fidl::internal::NaturalEventDispatcher<::test_placementofattributes::ExampleProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_placementofattributes::ExampleProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 ::fidl::ProtocolHandler<::test_placementofattributes::ExampleProtocol> fidl::Server<::test_placementofattributes::ExampleProtocol>::bind_handler(async_dispatcher_t* dispatcher) {
   return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol> request) {
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_placementofattributes::ExampleProtocol>::entries_[] = {
     {
@@ -106,6 +95,6 @@ void fidl::Server<::test_placementofattributes::ExampleProtocol>::dispatch_messa
   ::fidl::internal::NaturalServerDispatcher<::test_placementofattributes::ExampleProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

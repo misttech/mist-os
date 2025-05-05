@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.emptystruct/cpp/natural_messaging.h>
 #include <fidl/test.emptystruct/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -28,8 +30,6 @@ constexpr inline uint64_t kEmptyProtocol_SendAndReceive_Ordinal = 53440121273464
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kEmptyProtocol_SendAndReceive_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_emptystruct
 
 ::fidl::Response<::test_emptystruct::EmptyProtocol::SendAndReceive>::Response(::test_emptystruct::EmptyProtocolSendAndReceiveResponse v) : EmptyProtocolSendAndReceiveResponse(std::move(v)) {}
@@ -61,13 +61,6 @@ fidl::internal::NaturalClientImpl<::test_emptystruct::EmptyProtocol>::Send(const
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_emptystruct {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_emptystruct
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_emptystruct::EmptyProtocol::SendAndReceive>
 fidl::internal::NaturalSyncClientImpl<::test_emptystruct::EmptyProtocol>::SendAndReceive(const ::fidl::Request<::test_emptystruct::EmptyProtocol::SendAndReceive>& request) {
@@ -144,8 +137,6 @@ void fidl::AsyncEventHandler<::test_emptystruct::EmptyProtocol>::Receive(::fidl:
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_emptystruct::EmptyProtocol::SendAndReceive>::Reply(const ::fidl::Response<::test_emptystruct::EmptyProtocol::SendAndReceive>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_emptystruct::kEmptyProtocol_SendAndReceive_Ordinal, ::test_emptystruct::kEmptyProtocol_SendAndReceive_DynamicFlags};
@@ -160,8 +151,6 @@ void fidl::internal::NaturalCompleterBase<::test_emptystruct::EmptyProtocol::Sen
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_emptystruct::EmptyProtocol>::entries_[] = {
     {
@@ -212,6 +201,6 @@ void fidl::Server<::test_emptystruct::EmptyProtocol>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_emptystruct::EmptyProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

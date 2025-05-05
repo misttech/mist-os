@@ -1,3 +1,6 @@
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.bitsconstants/cpp/driver/natural_messaging.h>
 #include <lib/fidl_driver/cpp/unknown_interactions.h>
 
@@ -5,3 +8,5 @@
 #pragma clang diagnostic ignored "-Wshadow"
 
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.protocollayoutssamelibrary/cpp/natural_messaging.h>
 #include <fidl/test.protocollayoutssamelibrary/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -58,8 +60,6 @@ constexpr inline uint64_t kComposedProtocol_OnNamedComposed_Ordinal = 1712755118
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kComposedProtocol_OnNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_protocollayoutssamelibrary
 
 ::fidl::Response<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>::Response(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse v) : ComposedProtocolTwoWayAnonComposedResponse(std::move(v)) {}
@@ -173,13 +173,6 @@ fidl::internal::NaturalClientImpl<::test_protocollayoutssamelibrary::ComposedPro
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_protocollayoutssamelibrary {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_protocollayoutssamelibrary
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>
 fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary::ComposedProtocol>::TwoWayAnonComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>& request) {
@@ -328,8 +321,6 @@ void fidl::AsyncEventHandler<::test_protocollayoutssamelibrary::ComposedProtocol
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>::Reply(const ::fidl::Response<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposed_DynamicFlags};
@@ -371,8 +362,6 @@ void fidl::internal::NaturalCompleterBase<::test_protocollayoutssamelibrary::Com
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocollayoutssamelibrary::ComposedProtocol>::entries_[] = {
     {
@@ -486,9 +475,6 @@ void fidl::Server<::test_protocollayoutssamelibrary::ComposedProtocol>::dispatch
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_protocollayoutssamelibrary::ComposedProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_protocollayoutssamelibrary {
 
 [[maybe_unused]]
@@ -586,8 +572,6 @@ constexpr inline uint64_t kMainProtocol_OnAnon_Ordinal = 977183060572945300lu;
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_protocollayoutssamelibrary
 
 ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>::Response(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse v) : ComposedProtocolTwoWayAnonComposedResponse(std::move(v)) {}
@@ -813,13 +797,6 @@ fidl::internal::NaturalClientImpl<::test_protocollayoutssamelibrary::MainProtoco
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_protocollayoutssamelibrary {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_protocollayoutssamelibrary
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>
 fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::TwoWayAnonComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>& request) {
@@ -1090,8 +1067,6 @@ void fidl::AsyncEventHandler<::test_protocollayoutssamelibrary::MainProtocol>::O
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>::Reply(const ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposed_DynamicFlags};
@@ -1169,8 +1144,6 @@ void fidl::internal::NaturalCompleterBase<::test_protocollayoutssamelibrary::Mai
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocollayoutssamelibrary::MainProtocol>::entries_[] = {
     {
@@ -1381,6 +1354,6 @@ void fidl::Server<::test_protocollayoutssamelibrary::MainProtocol>::dispatch_mes
   ::fidl::internal::NaturalServerDispatcher<::test_protocollayoutssamelibrary::MainProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

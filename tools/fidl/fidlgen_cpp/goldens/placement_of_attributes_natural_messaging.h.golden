@@ -5,6 +5,9 @@
 #pragma once
 
 #include <fidl/test.exampleusing/cpp/markers.h>
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.placementofattributes/cpp/markers.h>
 #include <fidl/test.placementofattributes/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -23,8 +26,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_placementofattributes::Exampl
 
   using Completer = fidl::Completer<>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_placementofattributes::ExampleProtocol> final : public ::fidl::internal::NaturalClientBase {
@@ -89,8 +90,6 @@ class ::fidl::internal::NaturalEventSender<::test_placementofattributes::Example
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::Server<::test_placementofattributes::ExampleProtocol> : public ::fidl::internal::IncomingMessageDispatcher {
  public:
@@ -123,8 +122,6 @@ class ::fidl::Server<::test_placementofattributes::ExampleProtocol> : public ::f
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_placementofattributes::ExampleProtocol> final {
   NaturalServerDispatcher() = delete;
@@ -139,6 +136,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_placementofattributes::E
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

@@ -6,6 +6,9 @@
 
 #include <fidl/test.bottom/cpp/markers.h>
 #include <fidl/test.middle/cpp/markers.h>
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.transitivedependenciescompose/cpp/markers.h>
 #include <fidl/test.transitivedependenciescompose/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -26,8 +29,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_transitivedependenciescompose
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_transitivedependenciescompose::Top::GetFoo>&)>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_transitivedependenciescompose::Top::GetFoo> final : public ::test_bottom::BottomGetFooResponse {
@@ -108,8 +109,6 @@ class ::fidl::internal::NaturalEventSender<::test_transitivedependenciescompose:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_transitivedependenciescompose::Top::GetFoo> : public ::fidl::CompleterBase {
  public:
@@ -150,8 +149,6 @@ class ::fidl::Server<::test_transitivedependenciescompose::Top> : public ::fidl:
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_transitivedependenciescompose::Top> final {
   NaturalServerDispatcher() = delete;
@@ -166,6 +163,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_transitivedependenciesco
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

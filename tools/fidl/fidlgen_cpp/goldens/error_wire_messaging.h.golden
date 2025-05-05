@@ -6,7 +6,6 @@
 
 #include <fidl/test.error/cpp/markers.h>
 #include <fidl/test.error/cpp/wire_types.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -25,8 +23,6 @@
 namespace test_error {
 
 class Example;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_error
 
@@ -65,12 +61,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_error::Example> final {
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_error {
 
-#endif  // __Fuchsia__
-}  // namespace test_error
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_error::Example::Foo> final {
   FIDL_ALIGNDECL
@@ -91,8 +82,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_error::Example::Foo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_error::Example::Foo> final : public ::test_error::wire::ExampleFooResult {
@@ -132,7 +121,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
 
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_error::Example::Foo>> : public std::true_type {};
 template <>
@@ -149,8 +137,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_error::Example::
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_error::Example::Foo>> : public std::true_type {};
@@ -183,7 +169,6 @@ struct TypeTraits<::fidl::WireResponse<::test_error::Example::Foo>> {
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -420,13 +405,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_error::Example> final : pu
   // Allocates 40 bytes of response buffer on the stack. Request is heap-allocated.
   ::fidl::WireResult<::test_error::Example::Foo> Foo(::fidl::StringView s);
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_error::Example> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -453,6 +432,6 @@ class ::fidl::internal::WireBufferEventSender<::test_error::Example>
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

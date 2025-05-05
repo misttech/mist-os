@@ -6,7 +6,6 @@
 
 {{- define "Protocol:EventHandler:WireMessagingHeader" }}
 {{- EnsureNamespace "" }}
-{{- IfdefFuchsia }}
 template<>
 class {{ .WireEventHandlerInterface }} : public ::fidl::internal::BaseEventHandlerInterface
 {{- if .HandlesOneWayUnknownInteractions -}}
@@ -59,14 +58,12 @@ class {{ .WireEventDispatcher }} final :
         ::fidl::internal::MessageStorageViewBase* storage_view) override;
   {{- end }}
 };
-{{- EndifFuchsia }}
 {{- end }}
 
 
 
 {{- define "Protocol:EventHandler:WireMessagingSource" }}
 {{ EnsureNamespace "" }}
-{{- IfdefFuchsia }}
 
 {{ .WireEventDispatcher }}::{{ .WireEventDispatcher.Self }}({{ .WireEventHandlerInterface }}* event_handler)
 : IncomingEventDispatcher(event_handler) {}
@@ -137,14 +134,12 @@ void {{ $.WireAsyncEventHandler.NoLeading }}::{{ .Name }}({{ if .HasResponsePayl
 {{- end }}
 
 
-{{- EndifFuchsia }}
 {{- end }}
 
 
 
 {{- define "Protocol:EventHandler:NaturalMessagingHeader" }}
 {{- EnsureNamespace "" }}
-{{- IfdefFuchsia }}
 template<>
 class {{ .NaturalEventHandlerInterface }} : public ::fidl::internal::BaseEventHandlerInterface
 {{- if .HandlesOneWayUnknownInteractions -}}
@@ -198,14 +193,12 @@ class {{ .NaturalEventDispatcher }} final :
         internal::MessageStorageViewBase* storage_view) override;
   {{- end }}
 };
-{{- EndifFuchsia }}
 {{- end }}
 
 
 
 {{- define "Protocol:EventHandler:NaturalMessagingSource" }}
 {{- EnsureNamespace "" }}
-{{- IfdefFuchsia }}
 
 {{ if .Transport.HasEvents }}
   ::fidl::Status {{ .NaturalSyncEventHandler.NoLeading }}::HandleOneEvent(
@@ -273,6 +266,4 @@ class {{ .NaturalEventDispatcher }} final :
 void {{ $.NaturalAsyncEventHandler.NoLeading }}::{{ .Name }}({{ if .HasResponsePayload }}{{ .NaturalEvent }}&{{ end }}) {}
 {{- end }}
 
-
-{{- EndifFuchsia }}
 {{- end }}

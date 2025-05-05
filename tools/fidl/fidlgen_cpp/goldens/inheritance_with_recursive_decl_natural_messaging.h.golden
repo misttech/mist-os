@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.inheritancewithrecursivedecl/cpp/markers.h>
 #include <fidl/test.inheritancewithrecursivedecl/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -22,8 +24,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_inheritancewithrecursivedecl:
 
   using Completer = fidl::Completer<>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::Parent> final : public ::fidl::internal::NaturalClientBase {
@@ -88,8 +88,6 @@ class ::fidl::internal::NaturalEventSender<::test_inheritancewithrecursivedecl::
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::Server<::test_inheritancewithrecursivedecl::Parent> : public ::fidl::internal::IncomingMessageDispatcher {
  public:
@@ -122,8 +120,6 @@ class ::fidl::Server<::test_inheritancewithrecursivedecl::Parent> : public ::fid
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursivedecl::Parent> final {
   NaturalServerDispatcher() = delete;
@@ -138,8 +134,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursive
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_inheritancewithrecursivedecl::Child::First> {
   using Request = ::test_inheritancewithrecursivedecl::ParentFirstRequest;
@@ -153,8 +147,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_inheritancewithrecursivedecl:
 
   using Completer = fidl::Completer<>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::Child> final : public ::fidl::internal::NaturalClientBase {
@@ -223,8 +215,6 @@ class ::fidl::internal::NaturalEventSender<::test_inheritancewithrecursivedecl::
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::Server<::test_inheritancewithrecursivedecl::Child> : public ::fidl::internal::IncomingMessageDispatcher {
  public:
@@ -263,8 +253,6 @@ class ::fidl::Server<::test_inheritancewithrecursivedecl::Child> : public ::fidl
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursivedecl::Child> final {
   NaturalServerDispatcher() = delete;
@@ -279,6 +267,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursive
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

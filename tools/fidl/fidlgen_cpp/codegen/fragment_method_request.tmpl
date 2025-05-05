@@ -6,7 +6,6 @@
 
 {{- define "Method:Request:WireMessagingHeader" }}
 {{- EnsureNamespace "" }}
-{{- IfdefFuchsia -}}
 
 template<>
 struct {{ .WireTransactionalRequest }} final {
@@ -37,7 +36,6 @@ struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalRequest }}, ::fid
   static void Encode(internal::WireEncoder* encoder, {{ .WireTransactionalRequest }}* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-{{- EndifFuchsia -}}
 {{- end }}
 
 
@@ -45,7 +43,6 @@ struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalRequest }}, ::fid
 
 {{- define "Method:Request:WireMessagingSource" }}
 {{- EnsureNamespace "" }}
-{{- IfdefFuchsia -}}
 
   {{ .WireTransactionalRequest }}::{{ .WireTransactionalRequest.Self }}() {
     ::fidl::InitTxnHeader(&header, 0, {{ .OrdinalName }}, {{ .DynamicFlagsName }});
@@ -89,7 +86,6 @@ struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalRequest }}, ::fid
   template struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalRequest }}, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalRequest }}, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-{{- EndifFuchsia -}}
 {{- end }}
 
 

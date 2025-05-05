@@ -2,14 +2,14 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.bindingsdenylist/cpp/natural_messaging.h>
 #include <fidl/test.bindingsdenylist/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
-
-#ifdef __Fuchsia__
 
 ::fidl::UnownedClientEnd<::test_bindingsdenylist::OnlyCppAndDeps> fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::OnlyCppAndDeps>::_client_end() const {
   return ::fidl::UnownedClientEnd<::test_bindingsdenylist::OnlyCppAndDeps>(
@@ -26,15 +26,11 @@
 ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::OnlyCppAndDeps>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyCppAndDeps>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 ::fidl::ProtocolHandler<::test_bindingsdenylist::OnlyCppAndDeps> fidl::Server<::test_bindingsdenylist::OnlyCppAndDeps>::bind_handler(async_dispatcher_t* dispatcher) {
   return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_bindingsdenylist::OnlyCppAndDeps> request) {
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::OnlyCppAndDeps>::entries_[] = {};
 
@@ -51,9 +47,6 @@ void fidl::Server<::test_bindingsdenylist::OnlyCppAndDeps>::dispatch_message(
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::OnlyCppAndDeps>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_bindingsdenylist {
 
 [[maybe_unused]]
@@ -85,8 +78,6 @@ constexpr inline uint64_t kDenyEachBinding_OnlyDenySyzkaller_Ordinal = 231904383
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenySyzkaller_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_bindingsdenylist
 
 ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>::Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> v) : result(std::move(v)) {}
@@ -219,14 +210,6 @@ fidl::internal::NaturalClientImpl<::test_bindingsdenylist::DenyEachBinding>::Onl
       });
 }
 
-namespace test_bindingsdenylist {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_bindingsdenylist
-
-#ifdef __Fuchsia__
-
 ::fidl::Result<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>
 fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::DenyEachBinding>::OnlyDenyDart(const ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>& request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
@@ -297,8 +280,6 @@ fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::DenyEachBinding>:
 ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::DenyEachBinding>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::DenyEachBinding>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>::Reply(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_bindingsdenylist::kDenyEachBinding_OnlyDenyDart_Ordinal, ::test_bindingsdenylist::kDenyEachBinding_OnlyDenyDart_DynamicFlags};
@@ -349,8 +330,6 @@ void fidl::internal::NaturalCompleterBase<::test_bindingsdenylist::DenyEachBindi
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::DenyEachBinding>::entries_[] = {
     {
@@ -464,15 +443,11 @@ void fidl::Server<::test_bindingsdenylist::DenyEachBinding>::dispatch_message(
 ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::Allowed>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::Allowed>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 ::fidl::ProtocolHandler<::test_bindingsdenylist::Allowed> fidl::Server<::test_bindingsdenylist::Allowed>::bind_handler(async_dispatcher_t* dispatcher) {
   return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_bindingsdenylist::Allowed> request) {
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::Allowed>::entries_[] = {};
 
@@ -489,9 +464,6 @@ void fidl::Server<::test_bindingsdenylist::Allowed>::dispatch_message(
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::Allowed>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_bindingsdenylist {
 
 [[maybe_unused]]
@@ -505,8 +477,6 @@ constexpr inline uint64_t kImportsSameNameContext_AlwaysAppearsInImportingLibrar
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kImportsSameNameContext_AlwaysAppearsInImportingLibrary_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_bindingsdenylist
 
 ::fit::result<::fidl::OneWayError>
@@ -526,13 +496,6 @@ fidl::internal::NaturalClientImpl<::test_bindingsdenylist::ImportsSameNameContex
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_bindingsdenylist {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_bindingsdenylist
-
-#ifdef __Fuchsia__
 
 ::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::ImportsSameNameContext>::Unattributed() {
@@ -567,15 +530,11 @@ fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::ImportsSameNameCo
 ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::ImportsSameNameContext>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::ImportsSameNameContext>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 ::fidl::ProtocolHandler<::test_bindingsdenylist::ImportsSameNameContext> fidl::Server<::test_bindingsdenylist::ImportsSameNameContext>::bind_handler(async_dispatcher_t* dispatcher) {
   return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext> request) {
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::ImportsSameNameContext>::entries_[] = {
     {
@@ -626,6 +585,6 @@ void fidl::Server<::test_bindingsdenylist::ImportsSameNameContext>::dispatch_mes
   ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::ImportsSameNameContext>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

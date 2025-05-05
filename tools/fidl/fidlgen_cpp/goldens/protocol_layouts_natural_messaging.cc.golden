@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.protocollayouts/cpp/natural_messaging.h>
 #include <fidl/test.protocollayouts/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -130,8 +132,6 @@ constexpr inline uint64_t kMainProtocol_OnAnon_Ordinal = 7275479350674227467lu;
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_protocollayouts
 
 ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnonComposed>::Response(::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse v) : ComposedProtocolTwoWayAnonComposedResponse(std::move(v)) {}
@@ -413,13 +413,6 @@ fidl::internal::NaturalClientImpl<::test_protocollayouts::MainProtocol>::OneWayA
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_protocollayouts {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_protocollayouts
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_protocollayouts::MainProtocol::TwoWayAnonComposed>
 fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::MainProtocol>::TwoWayAnonComposed(const ::fidl::Request<::test_protocollayouts::MainProtocol::TwoWayAnonComposed>& request) {
@@ -751,8 +744,6 @@ void fidl::AsyncEventHandler<::test_protocollayouts::MainProtocol>::OnAnon(::fid
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_protocollayouts::MainProtocol::TwoWayAnonComposed>::Reply(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnonComposed>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_TwoWayAnonComposed_Ordinal, ::test_protocollayouts::kMainProtocol_TwoWayAnonComposed_DynamicFlags};
@@ -848,8 +839,6 @@ void fidl::internal::NaturalCompleterBase<::test_protocollayouts::MainProtocol::
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocollayouts::MainProtocol>::entries_[] = {
     {
@@ -1107,9 +1096,6 @@ void fidl::Server<::test_protocollayouts::MainProtocol>::dispatch_message(
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_protocollayouts::MainProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_protocollayouts {
 
 [[maybe_unused]]
@@ -1165,8 +1151,6 @@ constexpr inline uint64_t kOpenProtocol_FlexibleOneWayNamedPayload_Ordinal = 152
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleOneWayNamedPayload_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_protocollayouts
 
 ::fidl::Response<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>::Response(::test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorResponse v) : ComposedOpenProtocolFlexibleTwoWayNoErrorResponse(std::move(v)) {}
@@ -1294,13 +1278,6 @@ fidl::internal::NaturalClientImpl<::test_protocollayouts::OpenProtocol>::Flexibl
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_protocollayouts {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_protocollayouts
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>
 fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtocol>::FlexibleTwoWayNoError(const ::fidl::Request<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>& request) {
@@ -1474,8 +1451,6 @@ void fidl::AsyncEventHandler<::test_protocollayouts::OpenProtocol>::StrictEvent(
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>::Reply(const ::fidl::Response<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayNoError_Ordinal, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayNoError_DynamicFlags};
@@ -1517,8 +1492,6 @@ void fidl::internal::NaturalCompleterBase<::test_protocollayouts::OpenProtocol::
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocollayouts::OpenProtocol>::entries_[] = {
     {
@@ -1665,6 +1638,6 @@ void fidl::Server<::test_protocollayouts::OpenProtocol>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_protocollayouts::OpenProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

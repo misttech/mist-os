@@ -6,28 +6,23 @@
 
 #include <fidl/test.placementofattributes/cpp/markers.h>
 #include <fidl/test.placementofattributes/cpp/wire_types.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
+#include <fidl/test.exampleusing/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
-
-#include <fidl/test.exampleusing/cpp/wire_messaging.h>
+#include <lib/fidl/cpp/wire/wire_messaging.h>
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
 namespace test_placementofattributes {
 
 class ExampleProtocol;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_placementofattributes
 
@@ -55,12 +50,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_placementofattributes::Exam
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_placementofattributes {
 
-#endif  // __Fuchsia__
-}  // namespace test_placementofattributes
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method> final {
   FIDL_ALIGNDECL
@@ -81,11 +71,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>> : public std::true_type {};
 template <>
@@ -102,7 +89,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_placementofattri
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
 }  // namespace fidl
 
 template <>
@@ -274,13 +260,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_placementofattributes::Exa
  public:
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_placementofattributes::ExampleProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -307,6 +287,6 @@ class ::fidl::internal::WireBufferEventSender<::test_placementofattributes::Exam
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.union/cpp/markers.h>
 #include <fidl/test.union/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -33,8 +35,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_union::TestProtocol::Flexible
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>&)>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> final : public ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
@@ -135,8 +135,6 @@ class ::fidl::internal::NaturalEventSender<::test_union::TestProtocol>
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> : public ::fidl::CompleterBase {
  public:
@@ -191,8 +189,6 @@ class ::fidl::Server<::test_union::TestProtocol> : public ::fidl::internal::Inco
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_union::TestProtocol> final {
   NaturalServerDispatcher() = delete;
@@ -207,6 +203,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_union::TestProtocol> fin
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

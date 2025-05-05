@@ -1,9 +1,11 @@
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.drivertwoway/cpp/driver/natural_messaging.h>
 #include <lib/fidl_driver/cpp/unknown_interactions.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
-
 namespace test_drivertwoway {
 
 [[maybe_unused]]
@@ -11,7 +13,6 @@ constexpr inline uint64_t kTwoWay_Add_Ordinal = 989730524426044687lu;
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kTwoWay_Add_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-#ifdef __Fuchsia__
 }  // namespace test_drivertwoway
 
 ::fidl::Response<::test_drivertwoway::TwoWay::Add>::Response(::test_drivertwoway::TwoWayAddResponse v) : TwoWayAddResponse(std::move(v)) {}
@@ -39,17 +40,8 @@ fidl::internal::NaturalClientImpl<::test_drivertwoway::TwoWay>::Add(const ::fidl
       });
 }
 
-namespace test_drivertwoway {
-
-#endif  // __Fuchsia__
-}  // namespace test_drivertwoway
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::NaturalEventDispatcher<::test_drivertwoway::TwoWay>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_drivertwoway::TwoWay>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
-
-#endif  // __Fuchsia__
 
 void fidl::internal::NaturalCompleterBase<::test_drivertwoway::TwoWay::Add>::Reply(const ::fidl::Response<::test_drivertwoway::TwoWay::Add>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
@@ -70,7 +62,6 @@ void fidl::internal::NaturalCompleterBase<::test_drivertwoway::TwoWay::Add>::Rep
     (void)::fdf::BindServer(dispatcher, std::move(request), impl);
   };
 }
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_drivertwoway::TwoWay>::entries_[] = {
     {
@@ -105,6 +96,6 @@ void fdf::Server<::test_drivertwoway::TwoWay>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_drivertwoway::TwoWay>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

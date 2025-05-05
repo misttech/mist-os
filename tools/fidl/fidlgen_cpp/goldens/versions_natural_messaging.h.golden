@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.versions/cpp/markers.h>
 #include <fidl/test.versions/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -16,23 +18,11 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
-
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_versions::OtherProtocol> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_versions::OtherProtocol> final
@@ -88,8 +78,6 @@ class ::fidl::internal::NaturalEventSender<::test_versions::OtherProtocol>
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::Server<::test_versions::OtherProtocol> : public ::fidl::internal::IncomingMessageDispatcher {
  public:
@@ -116,8 +104,6 @@ class ::fidl::Server<::test_versions::OtherProtocol> : public ::fidl::internal::
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_versions::OtherProtocol> final {
   NaturalServerDispatcher() = delete;
@@ -132,14 +118,10 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_versions::OtherProtocol>
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_versions::Protocol::Foo> {
   using Completer = fidl::Completer<>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_versions::Protocol> final : public ::fidl::internal::NaturalClientBase {
@@ -207,8 +189,6 @@ class ::fidl::internal::NaturalEventSender<::test_versions::Protocol>
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::Server<::test_versions::Protocol> : public ::fidl::internal::IncomingMessageDispatcher, public ::fidl::UnknownMethodHandler<::test_versions::Protocol> {
  public:
@@ -240,8 +220,6 @@ class ::fidl::Server<::test_versions::Protocol> : public ::fidl::internal::Incom
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_versions::Protocol> final {
   NaturalServerDispatcher() = delete;
@@ -255,6 +233,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_versions::Protocol> fina
   static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

@@ -6,7 +6,6 @@
 
 {{- define "Method:Event:WireMessagingHeader" }}
 {{- EnsureNamespace "" }}
-{{- IfdefFuchsia -}}
 
 template<>
 struct {{ .WireTransactionalEvent }} final {
@@ -37,14 +36,12 @@ struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalEvent }}, ::fidl:
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-{{- EndifFuchsia -}}
 {{- end }}
 
 
 
 {{- define "Method:Event:WireMessagingSource" }}
 {{- EnsureNamespace "" }}
-{{- IfdefFuchsia -}}
 
   {{ if .ResponseArgs }}
     {{ .WireTransactionalEvent }}::{{ .WireTransactionalEvent.Self }}({{ RenderParams .ResponseArgs }})
@@ -87,7 +84,6 @@ struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalEvent }}, ::fidl:
   template struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalEvent }}, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalEvent }}, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-{{- EndifFuchsia -}}
 {{- end }}
 
 

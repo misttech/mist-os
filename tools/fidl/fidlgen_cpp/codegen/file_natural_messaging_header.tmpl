@@ -30,6 +30,8 @@ Those libraries should not define business logic types or protocols, and we
 do not support them in the bindings. */}}
 {{- if not .SingleComponentLibraryName }}
 
+{{- IfdefFuchsia }}
+
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/internal/thenable.h>
 #include <lib/fidl/cpp/natural_types.h>
@@ -43,37 +45,23 @@ do not support them in the bindings. */}}
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-{{ "" }}
-
 {{ EnsureNamespace "fidl" }}
-{{ "" }}
 
 {{- /* Declare natural extensions to the wire messaging layer. */}}
-{{- range .Decls }}
-{{- if Eq .Kind Kinds.Protocol }}{{ $protocol := . }}
-{{- range $transport, $_ := .Transports }}
-{{- if eq $transport "Channel" -}}
-  {{- template "Protocol:NaturalMessagingHeader" $protocol }}
-{{ "" }}
-  {{- template "Protocol:Client:NaturalMessagingHeader" $protocol }}
-{{ "" }}
-  {{- template "Protocol:Caller:NaturalMessagingHeader" $protocol }}
-{{ "" }}
-  {{- template "Protocol:EventHandler:NaturalMessagingHeader" $protocol }}
-{{ "" }}
-  {{- template "Protocol:EventSender:NaturalMessagingHeader" $protocol }}
-{{ "" }}
-  {{- template "Protocol:Interface:NaturalMessagingHeader" $protocol }}
-{{ "" }}
-  {{- template "Protocol:Dispatcher:NaturalMessagingHeader" $protocol }}
-{{ "" }}
-  {{- /* TODO(https://fxbug.dev/42138399): Add more */}}
-{{- end }}
-{{- end }}
-{{- end }}
+{{ range (call .ProtocolsForTransport "Channel") }}
+  {{- template "Protocol:NaturalMessagingHeader" . }}
+  {{- template "Protocol:Client:NaturalMessagingHeader" . }}
+  {{- template "Protocol:Caller:NaturalMessagingHeader" . }}
+  {{- template "Protocol:EventHandler:NaturalMessagingHeader" . }}
+  {{- template "Protocol:EventSender:NaturalMessagingHeader" . }}
+  {{- template "Protocol:Interface:NaturalMessagingHeader" . }}
+  {{- template "Protocol:Dispatcher:NaturalMessagingHeader" . }}
 {{- end }}
 
 #pragma clang diagnostic pop
+
+{{ EndifFuchsia }}
+
 {{ end }}{{/* if not SingleComponentLibraryName */}}
 {{ UnsetTransport -}}
 {{ EndOfFile }}

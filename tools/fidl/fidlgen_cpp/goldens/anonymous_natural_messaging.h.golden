@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.anonymous/cpp/markers.h>
 #include <fidl/test.anonymous/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -27,8 +29,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_anonymous::SomeProtocol::Some
       ::fit::callback<void(::fidl::Result<::test_anonymous::SomeProtocol::SomeMethod>&)>;
   using DomainError = ::test_anonymous::SomeProtocolSomeMethodError;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod> final : public ::fit::result<::test_anonymous::SomeProtocolSomeMethodError, ::test_anonymous::SomeProtocolSomeMethodResponse> {
@@ -117,8 +117,6 @@ class ::fidl::internal::NaturalEventSender<::test_anonymous::SomeProtocol>
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_anonymous::SomeProtocol::SomeMethod> : public ::fidl::CompleterBase {
  public:
@@ -160,8 +158,6 @@ class ::fidl::Server<::test_anonymous::SomeProtocol> : public ::fidl::internal::
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_anonymous::SomeProtocol> final {
   NaturalServerDispatcher() = delete;
@@ -176,6 +172,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_anonymous::SomeProtocol>
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

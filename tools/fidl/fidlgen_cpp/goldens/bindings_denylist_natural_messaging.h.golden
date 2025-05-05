@@ -4,9 +4,12 @@
 
 #pragma once
 
+#include <fidl/test.dependent/cpp/markers.h>
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.bindingsdenylist/cpp/markers.h>
 #include <fidl/test.bindingsdenylist/cpp/natural_types.h>
-#include <fidl/test.dependent/cpp/markers.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/internal/thenable.h>
@@ -17,23 +20,11 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
-
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::OnlyCppAndDeps> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::OnlyCppAndDeps> final
@@ -89,8 +80,6 @@ class ::fidl::internal::NaturalEventSender<::test_bindingsdenylist::OnlyCppAndDe
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::Server<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fidl::internal::IncomingMessageDispatcher {
  public:
@@ -117,8 +106,6 @@ class ::fidl::Server<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fidl::i
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::OnlyCppAndDeps> final {
   NaturalServerDispatcher() = delete;
@@ -132,8 +119,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::OnlyCp
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart> {
@@ -194,8 +179,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_bindingsdenylist::DenyEachBin
       ::fit::callback<void(::fidl::Result<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller>&)>;
   using DomainError = uint32_t;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart> final : public ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> {
@@ -396,8 +379,6 @@ class ::fidl::internal::NaturalEventSender<::test_bindingsdenylist::DenyEachBind
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart> : public ::fidl::CompleterBase {
  public:
@@ -499,8 +480,6 @@ class ::fidl::Server<::test_bindingsdenylist::DenyEachBinding> : public ::fidl::
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::DenyEachBinding> final {
   NaturalServerDispatcher() = delete;
@@ -575,8 +554,6 @@ class ::fidl::internal::NaturalEventSender<::test_bindingsdenylist::Allowed>
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::Server<::test_bindingsdenylist::Allowed> : public ::fidl::internal::IncomingMessageDispatcher {
  public:
@@ -603,8 +580,6 @@ class ::fidl::Server<::test_bindingsdenylist::Allowed> : public ::fidl::internal
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::Allowed> final {
   NaturalServerDispatcher() = delete;
@@ -619,8 +594,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::Allowe
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_bindingsdenylist::ImportsSameNameContext::Unattributed> {
   using Completer = fidl::Completer<>;
@@ -630,8 +603,6 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_bindingsdenylist::ImportsSameNameContext::AlwaysAppearsInImportingLibrary> {
   using Completer = fidl::Completer<>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::ImportsSameNameContext> final : public ::fidl::internal::NaturalClientBase {
@@ -700,8 +671,6 @@ class ::fidl::internal::NaturalEventSender<::test_bindingsdenylist::ImportsSameN
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::Server<::test_bindingsdenylist::ImportsSameNameContext> : public ::fidl::internal::IncomingMessageDispatcher {
  public:
@@ -738,8 +707,6 @@ class ::fidl::Server<::test_bindingsdenylist::ImportsSameNameContext> : public :
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::ImportsSameNameContext> final {
   NaturalServerDispatcher() = delete;
@@ -754,6 +721,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::Import
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

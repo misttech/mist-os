@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.errorsyntax/cpp/natural_messaging.h>
 #include <fidl/test.errorsyntax/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -22,8 +24,6 @@ constexpr inline uint64_t kExampleUseOfErrorSyntax_CallWhichMayFail_Ordinal = 37
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kExampleUseOfErrorSyntax_CallWhichMayFail_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_errorsyntax
 
 ::fidl::Response<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>::Response(::fit::result<uint32_t, ::test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse> v) : result(std::move(v)) {}
@@ -78,14 +78,6 @@ fidl::internal::NaturalClientImpl<::test_errorsyntax::ExampleUseOfErrorSyntax>::
       });
 }
 
-namespace test_errorsyntax {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_errorsyntax
-
-#ifdef __Fuchsia__
-
 ::fidl::Result<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>
 fidl::internal::NaturalSyncClientImpl<::test_errorsyntax::ExampleUseOfErrorSyntax>::ComposedCallWhichMayFail(const ::fidl::Request<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>& request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
@@ -123,8 +115,6 @@ fidl::internal::NaturalSyncClientImpl<::test_errorsyntax::ExampleUseOfErrorSynta
 ::fidl::internal::NaturalEventDispatcher<::test_errorsyntax::ExampleUseOfErrorSyntax>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_errorsyntax::ExampleUseOfErrorSyntax>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>::Reply(const ::fidl::Response<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_errorsyntax::kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_Ordinal, ::test_errorsyntax::kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_DynamicFlags};
@@ -148,8 +138,6 @@ void fidl::internal::NaturalCompleterBase<::test_errorsyntax::ExampleUseOfErrorS
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_errorsyntax::ExampleUseOfErrorSyntax>::entries_[] = {
     {
@@ -200,6 +188,6 @@ void fidl::Server<::test_errorsyntax::ExampleUseOfErrorSyntax>::dispatch_message
   ::fidl::internal::NaturalServerDispatcher<::test_errorsyntax::ExampleUseOfErrorSyntax>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

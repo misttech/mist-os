@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.inheritance/cpp/natural_messaging.h>
 #include <fidl/test.inheritance/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -16,8 +18,6 @@ constexpr inline uint64_t ksuper_foo_Ordinal = 7540745593380780216lu;
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags ksuper_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_inheritance
 
 ::fidl::Response<::test_inheritance::Super::Foo>::Response(::test_inheritance::SuperFooResponse v) : SuperFooResponse(std::move(v)) {}
@@ -38,14 +38,6 @@ fidl::internal::NaturalClientImpl<::test_inheritance::Super>::Foo(const ::fidl::
         return base->SendTwoWay(msg, response_context);
       });
 }
-
-namespace test_inheritance {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_inheritance
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_inheritance::Super::Foo>
 fidl::internal::NaturalSyncClientImpl<::test_inheritance::Super>::Foo(const ::fidl::Request<::test_inheritance::Super::Foo>& request) {
@@ -73,8 +65,6 @@ fidl::internal::NaturalSyncClientImpl<::test_inheritance::Super>::Foo(const ::fi
 ::fidl::internal::NaturalEventDispatcher<::test_inheritance::Super>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritance::Super>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_inheritance::Super::Foo>::Reply(const ::fidl::Response<::test_inheritance::Super::Foo>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_inheritance::ksuper_foo_Ordinal, ::test_inheritance::ksuper_foo_DynamicFlags};
@@ -89,8 +79,6 @@ void fidl::internal::NaturalCompleterBase<::test_inheritance::Super::Foo>::Reply
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_inheritance::Super>::entries_[] = {
     {
@@ -124,9 +112,6 @@ void fidl::Server<::test_inheritance::Super>::dispatch_message(
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_inheritance::Super>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_inheritance {
 
 [[maybe_unused]]
@@ -134,8 +119,6 @@ constexpr inline uint64_t ksub_foo_Ordinal = 7540745593380780216lu;
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags ksub_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_inheritance
 
 ::fidl::Response<::test_inheritance::Sub::Foo>::Response(::test_inheritance::SuperFooResponse v) : SuperFooResponse(std::move(v)) {}
@@ -156,14 +139,6 @@ fidl::internal::NaturalClientImpl<::test_inheritance::Sub>::Foo(const ::fidl::Re
         return base->SendTwoWay(msg, response_context);
       });
 }
-
-namespace test_inheritance {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_inheritance
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_inheritance::Sub::Foo>
 fidl::internal::NaturalSyncClientImpl<::test_inheritance::Sub>::Foo(const ::fidl::Request<::test_inheritance::Sub::Foo>& request) {
@@ -191,8 +166,6 @@ fidl::internal::NaturalSyncClientImpl<::test_inheritance::Sub>::Foo(const ::fidl
 ::fidl::internal::NaturalEventDispatcher<::test_inheritance::Sub>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritance::Sub>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_inheritance::Sub::Foo>::Reply(const ::fidl::Response<::test_inheritance::Sub::Foo>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_inheritance::ksub_foo_Ordinal, ::test_inheritance::ksub_foo_DynamicFlags};
@@ -207,8 +180,6 @@ void fidl::internal::NaturalCompleterBase<::test_inheritance::Sub::Foo>::Reply(c
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_inheritance::Sub>::entries_[] = {
     {
@@ -243,6 +214,6 @@ void fidl::Server<::test_inheritance::Sub>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_inheritance::Sub>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

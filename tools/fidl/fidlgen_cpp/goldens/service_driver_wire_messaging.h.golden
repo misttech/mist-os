@@ -6,7 +6,6 @@
 
 #include <fidl/test.service/cpp/markers.h>
 #include <fidl/test.service/cpp/wire_types.h>
-#include <lib/fidl_driver/cpp/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl_driver/cpp/server.h>
 #include <lib/fidl_driver/cpp/wire_client.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl_driver/cpp/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -33,15 +31,13 @@ class EmptyService final {
   static constexpr bool kIsService = true;
   static constexpr char Name[] = "test.service.EmptyService";
   using Transport = ::fidl::internal::ChannelTransport;
-#ifdef __Fuchsia__
-  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport>;
 
-#endif  // __Fuchsia__
+  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport>;
 
   // Client protocol for connecting to member protocols of a service instance.
   class ServiceClient final {
     ServiceClient() = delete;
-#ifdef __Fuchsia__
+
    public:
     ServiceClient(::zx::channel dir, ::fidl::internal::ConnectMemberFunc connect_func) {
       (void)dir;
@@ -49,9 +45,8 @@ class EmptyService final {
     }
 
    private:
-#endif  // __Fuchsia__
   };
-#ifdef __Fuchsia__
+
   // Facilitates member protocol registration for servers.
   class InstanceHandler final : public fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport> {
    public:
@@ -68,8 +63,6 @@ class EmptyService final {
       // won't allow service declarations with duplicated names.
     }
   };
-
-#endif  // __Fuchsia__
 };
 
 }  // namespace test_service
@@ -78,3 +71,5 @@ namespace fidl {
 #pragma clang diagnostic pop
 
 }  // namespace fidl
+
+#endif  // __Fuchsia__

@@ -6,20 +6,17 @@
 
 #include <fidl/test.bindingsdenylist/cpp/markers.h>
 #include <fidl/test.bindingsdenylist/cpp/wire_types.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
+#include <fidl/test.dependent/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
-
-#include <fidl/test.dependent/cpp/wire_messaging.h>
+#include <lib/fidl/cpp/wire/wire_messaging.h>
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
@@ -33,7 +30,6 @@ class Allowed;
 
 class ImportsSameNameContext;
 
-#ifdef __Fuchsia__
 }  // namespace test_bindingsdenylist
 
 template <>
@@ -52,15 +48,6 @@ struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::OnlyCppAn
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_bindingsdenylist {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_bindingsdenylist
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::IncomingEventsHandleStorage<::test_bindingsdenylist::OnlyCppAndDeps> final : public ::fidl::internal::ChannelHandleStorageBase<::fidl::internal::IncomingEventsHandleStorage<::test_bindingsdenylist::OnlyCppAndDeps>> {
@@ -248,16 +235,6 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBindin
           ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller>, ::fidl::internal::ChannelTransport>>;
 };
 
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-namespace test_bindingsdenylist {
-
-#ifdef __Fuchsia__
-}  // namespace test_bindingsdenylist
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::DenyEachBinding> final {
   WireServerDispatcher() = delete;
@@ -274,12 +251,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::DenyEachB
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_bindingsdenylist {
 
-#endif  // __Fuchsia__
-}  // namespace test_bindingsdenylist
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart> final {
   FIDL_ALIGNDECL
@@ -300,8 +272,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart> final : public ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartResult {
@@ -339,7 +309,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo> final {
   FIDL_ALIGNDECL
@@ -360,8 +329,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo> final : public ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResult {
@@ -399,7 +366,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> final {
   FIDL_ALIGNDECL
@@ -420,8 +386,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> final : public ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult {
@@ -459,7 +423,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> final {
   FIDL_ALIGNDECL
@@ -480,8 +443,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> final : public ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResult {
@@ -519,7 +480,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller> final {
   FIDL_ALIGNDECL
@@ -540,8 +500,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller> final : public ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerResult {
@@ -581,7 +539,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
 
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>> : public std::true_type {};
 template <>
@@ -598,8 +555,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_bindingsdenylist
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>> : public std::true_type {};
@@ -632,7 +587,7 @@ struct TypeTraits<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding:
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo>> : public std::true_type {};
 template <>
@@ -649,8 +604,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_bindingsdenylist
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo>> : public std::true_type {};
@@ -683,7 +636,7 @@ struct TypeTraits<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding:
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> : public std::true_type {};
 template <>
@@ -700,8 +653,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_bindingsdenylist
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> : public std::true_type {};
@@ -734,7 +685,7 @@ struct TypeTraits<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding:
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust>> : public std::true_type {};
 template <>
@@ -751,8 +702,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_bindingsdenylist
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust>> : public std::true_type {};
@@ -785,7 +734,7 @@ struct TypeTraits<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding:
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller>> : public std::true_type {};
 template <>
@@ -802,8 +751,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_bindingsdenylist
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller>> : public std::true_type {};
@@ -836,7 +783,6 @@ struct TypeTraits<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding:
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -1472,15 +1418,6 @@ class ::fidl::WireServer<::test_bindingsdenylist::DenyEachBinding> : public ::fi
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-namespace test_bindingsdenylist {
-
-#ifdef __Fuchsia__
-}  // namespace test_bindingsdenylist
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::Allowed> final {
@@ -1498,15 +1435,6 @@ struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::Allowed> 
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_bindingsdenylist {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_bindingsdenylist
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::IncomingEventsHandleStorage<::test_bindingsdenylist::Allowed> final : public ::fidl::internal::ChannelHandleStorageBase<::fidl::internal::IncomingEventsHandleStorage<::test_bindingsdenylist::Allowed>> {
@@ -1613,16 +1541,6 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::ImportsSameNam
   using Completer = fidl::Completer<>;
 };
 
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-namespace test_bindingsdenylist {
-
-#ifdef __Fuchsia__
-}  // namespace test_bindingsdenylist
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::ImportsSameNameContext> final {
   WireServerDispatcher() = delete;
@@ -1639,12 +1557,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::ImportsSa
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_bindingsdenylist {
 
-#endif  // __Fuchsia__
-}  // namespace test_bindingsdenylist
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::ImportsSameNameContext::Unattributed> final {
   FIDL_ALIGNDECL
@@ -1679,11 +1592,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::ImportsSameNameContext::Unattributed>> : public std::true_type {};
 template <>
@@ -1717,7 +1627,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_bindingsdenylist
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
 }  // namespace fidl
 
 template <>
@@ -1925,13 +1834,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_bindingsdenylist::OnlyCppA
  public:
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -2175,6 +2078,6 @@ class ::fidl::internal::WireBufferEventSender<::test_bindingsdenylist::ImportsSa
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

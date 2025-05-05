@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.inheritancewithrecursivedecl/cpp/natural_messaging.h>
 #include <fidl/test.inheritancewithrecursivedecl/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -16,8 +18,6 @@ constexpr inline uint64_t kParent_First_Ordinal = 3973163707930985819lu;
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kParent_First_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_inheritancewithrecursivedecl
 
 ::fit::result<::fidl::OneWayError>
@@ -30,13 +30,6 @@ fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::Parent>::
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_inheritancewithrecursivedecl {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_inheritancewithrecursivedecl
-
-#ifdef __Fuchsia__
 
 ::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Parent>::First(::fidl::Request<::test_inheritancewithrecursivedecl::Parent::First> request) {
@@ -63,15 +56,11 @@ fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Paren
 ::fidl::internal::NaturalEventDispatcher<::test_inheritancewithrecursivedecl::Parent>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Parent>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 ::fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Parent> fidl::Server<::test_inheritancewithrecursivedecl::Parent>::bind_handler(async_dispatcher_t* dispatcher) {
   return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request) {
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursivedecl::Parent>::entries_[] = {
     {
@@ -105,9 +94,6 @@ void fidl::Server<::test_inheritancewithrecursivedecl::Parent>::dispatch_message
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursivedecl::Parent>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_inheritancewithrecursivedecl {
 
 [[maybe_unused]]
@@ -121,8 +107,6 @@ constexpr inline uint64_t kChild_Second_Ordinal = 2545123272820824165lu;
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kChild_Second_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_inheritancewithrecursivedecl
 
 ::fit::result<::fidl::OneWayError>
@@ -146,13 +130,6 @@ fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::Child>::S
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_inheritancewithrecursivedecl {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_inheritancewithrecursivedecl
-
-#ifdef __Fuchsia__
 
 ::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Child>::First(::fidl::Request<::test_inheritancewithrecursivedecl::Child::First> request) {
@@ -189,15 +166,11 @@ fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Child
 ::fidl::internal::NaturalEventDispatcher<::test_inheritancewithrecursivedecl::Child>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Child>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 ::fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Child> fidl::Server<::test_inheritancewithrecursivedecl::Child>::bind_handler(async_dispatcher_t* dispatcher) {
   return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child> request) {
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursivedecl::Child>::entries_[] = {
     {
@@ -248,6 +221,6 @@ void fidl::Server<::test_inheritancewithrecursivedecl::Child>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursivedecl::Child>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

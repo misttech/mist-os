@@ -5,9 +5,12 @@
 #pragma once
 
 #include <fidl/test.bottom/cpp/markers.h>
+#include <fidl/test.middle/cpp/markers.h>
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.foreigntypeinresponseusedthroughcompose/cpp/markers.h>
 #include <fidl/test.foreigntypeinresponseusedthroughcompose/cpp/natural_types.h>
-#include <fidl/test.middle/cpp/markers.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/internal/thenable.h>
@@ -26,8 +29,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_foreigntypeinresponseusedthro
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>&)>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo> final : public ::test_middle::MiddleGetFooResponse {
@@ -108,8 +109,6 @@ class ::fidl::internal::NaturalEventSender<::test_foreigntypeinresponseusedthrou
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo> : public ::fidl::CompleterBase {
  public:
@@ -150,8 +149,6 @@ class ::fidl::Server<::test_foreigntypeinresponseusedthroughcompose::Top> : publ
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_foreigntypeinresponseusedthroughcompose::Top> final {
   NaturalServerDispatcher() = delete;
@@ -166,6 +163,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_foreigntypeinresponseuse
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

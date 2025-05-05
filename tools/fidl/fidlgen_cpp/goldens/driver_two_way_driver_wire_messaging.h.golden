@@ -6,7 +6,6 @@
 
 #include <fidl/test.drivertwoway/cpp/markers.h>
 #include <fidl/test.drivertwoway/cpp/wire_types.h>
-#include <lib/fidl_driver/cpp/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl_driver/cpp/server.h>
 #include <lib/fidl_driver/cpp/wire_client.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl_driver/cpp/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -25,8 +23,6 @@
 namespace test_drivertwoway {
 
 class TwoWay;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_drivertwoway
 
@@ -64,12 +60,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_drivertwoway::TwoWay> final
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_drivertwoway {
 
-#endif  // __Fuchsia__
-}  // namespace test_drivertwoway
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add> final {
   FIDL_ALIGNDECL
@@ -90,8 +81,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_drivertwoway::TwoWay::Add> final : public ::test_drivertwoway::wire::TwoWayAddResponse {
@@ -132,7 +121,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
 
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>> : public std::true_type {};
 template <>
@@ -149,8 +137,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_drivertwoway::Tw
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>> : public std::true_type {};
@@ -183,7 +169,6 @@ struct TypeTraits<::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>> {
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -369,13 +354,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_drivertwoway::TwoWay> fina
   // Allocates 48 bytes of message buffer on the stack. No heap allocation necessary.
   ::fdf::WireUnownedResult<::test_drivertwoway::TwoWay::Add> Add(uint16_t addend1, uint16_t addend2);
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakBufferEventSender<::test_drivertwoway::TwoWay> : public ::fdf::internal::WeakBufferEventSenderBase {
  public:
@@ -389,6 +368,6 @@ class ::fidl::internal::WireBufferEventSender<::test_drivertwoway::TwoWay>
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

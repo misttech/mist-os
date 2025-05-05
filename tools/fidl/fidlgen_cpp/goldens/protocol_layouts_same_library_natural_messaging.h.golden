@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.protocollayoutssamelibrary/cpp/markers.h>
 #include <fidl/test.protocollayoutssamelibrary/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -85,8 +87,6 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed> {
   using Request = ::test_protocollayoutssamelibrary::UnionPayload;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed> final : public ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse {
@@ -266,8 +266,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocollayoutssamelibrary::Co
   ::fit::result<::fidl::OneWayError> OnNamedComposed(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed> : public ::fidl::CompleterBase {
  public:
@@ -366,8 +364,6 @@ class ::fidl::Server<::test_protocollayoutssamelibrary::ComposedProtocol> : publ
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocollayoutssamelibrary::ComposedProtocol> final {
   NaturalServerDispatcher() = delete;
@@ -381,8 +377,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocollayoutssamelibra
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed> {
@@ -523,8 +517,6 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnAnon> {
   using Request = ::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed> final : public ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse {
@@ -820,8 +812,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocollayoutssamelibrary::Ma
   ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest& payload);
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed> : public ::fidl::CompleterBase {
  public:
@@ -992,8 +982,6 @@ class ::fidl::Server<::test_protocollayoutssamelibrary::MainProtocol> : public :
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocollayoutssamelibrary::MainProtocol> final {
   NaturalServerDispatcher() = delete;
@@ -1008,6 +996,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocollayoutssamelibra
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

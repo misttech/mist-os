@@ -64,7 +64,6 @@ class {{ .WireSyncBufferClientImpl }} final :
 
 {{- define "Protocol:Caller:NaturalMessagingHeader" }}
 {{- EnsureNamespace "" }}
-{{- IfdefFuchsia }}
 
 template <>
 class {{ .NaturalSyncClientImpl }} final
@@ -86,14 +85,12 @@ class {{ .NaturalSyncClientImpl }} final
   {{ .UnownedClientEnd }} _client_end() const;
 };
 
-{{- EndifFuchsia }}
 {{- end }}
 
 
 
 {{- define "Protocol:Caller:NaturalMessagingSource" }}
 {{- EnsureNamespace "" }}
-{{- IfdefFuchsia }}
 
 {{ range .TwoWayMethods }}
   {{ .NaturalResult }}
@@ -131,6 +128,4 @@ class {{ .NaturalSyncClientImpl }} final
     _transport().get<{{ .Transport.Type }}>());
 }
 
-
-{{- EndifFuchsia }}
 {{- end }}

@@ -6,7 +6,6 @@
 
 #include <fidl/test.union/cpp/markers.h>
 #include <fidl/test.union/cpp/wire_types.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -25,8 +23,6 @@
 namespace test_union {
 
 class TestProtocol;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_union
 
@@ -80,12 +76,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_union::TestProtocol> final 
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_union {
 
-#endif  // __Fuchsia__
-}  // namespace test_union
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> final {
   FIDL_ALIGNDECL
@@ -103,8 +94,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> final : public ::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
@@ -143,7 +132,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> final {
   FIDL_ALIGNDECL
@@ -161,8 +149,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> final : public ::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
@@ -203,7 +189,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
 
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> : public std::true_type {};
 template <>
@@ -220,8 +205,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_union::TestProto
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> : public std::true_type {};
@@ -254,7 +237,7 @@ struct TypeTraits<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHe
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> : public std::true_type {};
 template <>
@@ -271,8 +254,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_union::TestProto
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> : public std::true_type {};
@@ -305,7 +286,6 @@ struct TypeTraits<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnion
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -647,13 +627,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_union::TestProtocol> final
   // Allocates 16 bytes of request buffer on the stack. Response is heap-allocated.
   ::fidl::WireResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> FlexibleUnionHenceResponseMustBeHeapAllocated();
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_union::TestProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -680,6 +654,6 @@ class ::fidl::internal::WireBufferEventSender<::test_union::TestProtocol>
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

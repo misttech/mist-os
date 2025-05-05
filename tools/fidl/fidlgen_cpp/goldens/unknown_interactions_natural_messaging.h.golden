@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.unknowninteractions/cpp/markers.h>
 #include <fidl/test.unknowninteractions/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -213,8 +215,6 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTable> {
   using Request = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWay> final {
@@ -742,8 +742,6 @@ class ::fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownIn
   ::fit::result<::fidl::OneWayError> FlexibleEventTable(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest& payload);
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWay> : public ::fidl::CompleterBase {
  public:
@@ -1004,8 +1002,6 @@ class ::fidl::Server<::test_unknowninteractions::UnknownInteractionsProtocol> : 
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_unknowninteractions::UnknownInteractionsProtocol> final {
   NaturalServerDispatcher() = delete;
@@ -1018,8 +1014,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_unknowninteractions::Unk
   static const ::fidl::internal::MethodEntry* entries_end_;
   static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictOneWay> {
@@ -1142,8 +1136,6 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTable> {
   using Request = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWay> final {
@@ -1453,8 +1445,6 @@ class ::fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownIn
   ::fit::result<::fidl::OneWayError> FlexibleEventTable(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest& payload);
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWay> : public ::fidl::CompleterBase {
  public:
@@ -1603,8 +1593,6 @@ class ::fidl::Server<::test_unknowninteractions::UnknownInteractionsAjarProtocol
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_unknowninteractions::UnknownInteractionsAjarProtocol> final {
   NaturalServerDispatcher() = delete;
@@ -1617,8 +1605,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_unknowninteractions::Unk
   static const ::fidl::internal::MethodEntry* entries_end_;
   static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictOneWay> {
@@ -1717,8 +1703,6 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTable> {
   using Request = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWay> final {
@@ -2000,8 +1984,6 @@ class ::fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownIn
   ::fit::result<::fidl::OneWayError> StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest& payload);
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWay> : public ::fidl::CompleterBase {
  public:
@@ -2145,8 +2127,6 @@ class ::fidl::Server<::test_unknowninteractions::UnknownInteractionsClosedProtoc
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_unknowninteractions::UnknownInteractionsClosedProtocol> final {
   NaturalServerDispatcher() = delete;
@@ -2161,6 +2141,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_unknowninteractions::Unk
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

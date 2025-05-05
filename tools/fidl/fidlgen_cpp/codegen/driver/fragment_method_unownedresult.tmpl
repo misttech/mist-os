@@ -77,7 +77,6 @@ class [[nodiscard]] {{ .WireUnownedResult }} final : public {{ .BaseWireResult }
 
 {{- define "driver/Method:UnownedResult:MessagingSource" }}
 {{- if .Transport.HasSyncClient }}
-{{- IfdefFuchsia -}}
 {{- EnsureNamespace "" }}
 {{- $args := (printf "%s client_end" .Protocol.UnownedClientEnd) }}
 {{- $args = (List $args "const ::fdf::Arena& arena") }}
@@ -122,6 +121,5 @@ class [[nodiscard]] {{ .WireUnownedResult }} final : public {{ .BaseWireResult }
     SetStatus(outgoing);
   {{- end }}
 }
-{{- EndifFuchsia -}}
 {{- end }}
 {{- end }}

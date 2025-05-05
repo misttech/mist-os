@@ -5,7 +5,6 @@
 */}}
 
 {{- define "Protocol:Dispatcher:WireMessagingHeader" }}
-{{- IfdefFuchsia }}
 {{- EnsureNamespace "" }}
 template<>
 struct {{ .WireServerDispatcher }} final {
@@ -27,13 +26,11 @@ struct {{ .WireServerDispatcher }} final {
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
   {{- end }}
 };
-{{- EndifFuchsia }}
 {{- end }}
 
 
 
 {{- define "Protocol:Dispatcher:WireMessagingSource" }}
-{{- IfdefFuchsia -}}
 {{ EnsureNamespace "" }}
 
 constexpr ::fidl::internal::MethodEntry {{ .WireServerDispatcher.NoLeading }}::entries_[] = {
@@ -122,14 +119,11 @@ void {{ .WireServer.NoLeading }}::dispatch_message(
   };
 }
 
-{{- EndifFuchsia -}}
-
 {{- end }}
 
 
 
 {{- define "Protocol:Dispatcher:NaturalMessagingHeader" }}
-{{- IfdefFuchsia }}
 {{- EnsureNamespace "" }}
 template<>
 struct {{ .NaturalServerDispatcher }} final {
@@ -149,13 +143,11 @@ struct {{ .NaturalServerDispatcher }} final {
   {{- end }}
 
 };
-{{- EndifFuchsia }}
 {{- end }}
 
 
 
 {{- define "Protocol:Dispatcher:NaturalMessagingSource" }}
-{{- IfdefFuchsia -}}
 {{ EnsureNamespace "" }}
 
 constexpr ::fidl::internal::MethodEntry {{ .NaturalServerDispatcher.NoLeading }}::entries_[] = {
@@ -217,6 +209,5 @@ void {{ .NaturalServer.NoLeading }}::dispatch_message(
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   {{ .NaturalServerDispatcher }}::Dispatch(this, std::move(msg), storage_view, txn);
 }
-{{- EndifFuchsia -}}
 
 {{- end }}

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.serializable/cpp/markers.h>
 #include <fidl/test.serializable/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -21,3 +23,5 @@ namespace fidl {
 #pragma clang diagnostic pop
 
 }  // namespace fidl
+
+#endif  // __Fuchsia__

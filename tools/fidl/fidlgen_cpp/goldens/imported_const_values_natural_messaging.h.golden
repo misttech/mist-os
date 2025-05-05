@@ -5,6 +5,9 @@
 #pragma once
 
 #include <fidl/test.dependent/cpp/markers.h>
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.importedconstvalues/cpp/markers.h>
 #include <fidl/test.importedconstvalues/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -22,3 +25,5 @@ namespace fidl {
 #pragma clang diagnostic pop
 
 }  // namespace fidl
+
+#endif  // __Fuchsia__

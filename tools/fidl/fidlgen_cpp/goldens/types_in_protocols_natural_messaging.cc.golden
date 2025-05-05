@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.typesinprotocols/cpp/natural_messaging.h>
 #include <fidl/test.typesinprotocols/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -226,8 +228,6 @@ constexpr inline uint64_t kProtocol_EventResource_Ordinal = 5745997765922613643l
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kProtocol_EventResource_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_typesinprotocols
 
 ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic>::Response(::test_typesinprotocols::Basic v) : Basic(std::move(v)) {}
@@ -724,13 +724,6 @@ fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::OneWayReso
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_typesinprotocols {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_typesinprotocols
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_typesinprotocols::Protocol::TwoWayBasic>
 fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWayBasic(const ::fidl::Request<::test_typesinprotocols::Protocol::TwoWayBasic>& request) {
@@ -1297,8 +1290,6 @@ void fidl::AsyncEventHandler<::test_typesinprotocols::Protocol>::EventResource(:
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::TwoWayBasic>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayBasic_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayBasic_DynamicFlags};
@@ -1466,8 +1457,6 @@ void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::Err
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_typesinprotocols::Protocol>::entries_[] = {
     {
@@ -1918,6 +1907,6 @@ void fidl::Server<::test_typesinprotocols::Protocol>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_typesinprotocols::Protocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

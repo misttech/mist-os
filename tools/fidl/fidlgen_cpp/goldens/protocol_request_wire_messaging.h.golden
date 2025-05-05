@@ -6,7 +6,6 @@
 
 #include <fidl/test.protocolrequest/cpp/markers.h>
 #include <fidl/test.protocolrequest/cpp/wire_types.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -28,7 +26,6 @@ class Child;
 
 class Parent;
 
-#ifdef __Fuchsia__
 }  // namespace test_protocolrequest
 
 template <>
@@ -47,15 +44,6 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocolrequest::Child> fin
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_protocolrequest {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_protocolrequest
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::IncomingEventsHandleStorage<::test_protocolrequest::Child> final : public ::fidl::internal::ChannelHandleStorageBase<::fidl::internal::IncomingEventsHandleStorage<::test_protocolrequest::Child>> {
@@ -198,16 +186,6 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::TakeChi
   using Completer = fidl::Completer<>;
 };
 
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-namespace test_protocolrequest {
-
-#ifdef __Fuchsia__
-}  // namespace test_protocolrequest
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_protocolrequest::Parent> final {
   WireServerDispatcher() = delete;
@@ -224,12 +202,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocolrequest::Parent> fi
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_protocolrequest {
 
-#endif  // __Fuchsia__
-}  // namespace test_protocolrequest
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild> final {
   FIDL_ALIGNDECL
@@ -384,11 +357,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>> : public std::true_type {};
 template <>
@@ -406,15 +376,12 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest:
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type {};
 template <>
 struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type {};
 template <>
 struct IsFidlType<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type {};
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type {};
 template <>
@@ -462,15 +429,12 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest:
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type {};
 template <>
 struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type {};
 template <>
 struct IsFidlType<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type {};
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type {};
 template <>
@@ -538,7 +502,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest:
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
 }  // namespace fidl
 
 template <>
@@ -956,13 +919,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_protocolrequest::Child> fi
  public:
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_protocolrequest::Child> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -1072,6 +1029,6 @@ class ::fidl::internal::WireBufferEventSender<::test_protocolrequest::Parent>
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

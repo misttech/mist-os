@@ -53,7 +53,6 @@ class [[nodiscard]] {{ .WireUnownedResult }} final : public {{ .BaseWireResult }
 
   {{- if .Transport.HasSyncClient }}
   {{- EnsureNamespace "" }}
-  {{- IfdefFuchsia -}}
     {{- $args := (printf "%s client_end" .Protocol.UnownedClientEnd) }}
     {{- $args = (List $args "::fidl::internal::AnyBufferAllocator& allocator") }}
     {{- $args = (List $args (printf "%s* request" .WireTransactionalRequest)) }}
@@ -114,7 +113,6 @@ class [[nodiscard]] {{ .WireUnownedResult }} final : public {{ .BaseWireResult }
       {{- end }}
     }
 
-    {{- EndifFuchsia -}}
   {{- end }}
 
   {{- if .HasResponsePayload }}

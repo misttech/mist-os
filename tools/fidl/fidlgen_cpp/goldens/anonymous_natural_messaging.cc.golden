@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.anonymous/cpp/natural_messaging.h>
 #include <fidl/test.anonymous/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -16,8 +18,6 @@ constexpr inline uint64_t kSomeProtocol_SomeMethod_Ordinal = 2515914517457749720
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kSomeProtocol_SomeMethod_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_anonymous
 
 ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod>::Response(::fit::result<::test_anonymous::SomeProtocolSomeMethodError, ::test_anonymous::SomeProtocolSomeMethodResponse> v) : result(std::move(v)) {}
@@ -46,14 +46,6 @@ fidl::internal::NaturalClientImpl<::test_anonymous::SomeProtocol>::SomeMethod(co
       });
 }
 
-namespace test_anonymous {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_anonymous
-
-#ifdef __Fuchsia__
-
 ::fidl::Result<::test_anonymous::SomeProtocol::SomeMethod>
 fidl::internal::NaturalSyncClientImpl<::test_anonymous::SomeProtocol>::SomeMethod(const ::fidl::Request<::test_anonymous::SomeProtocol::SomeMethod>& request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
@@ -80,8 +72,6 @@ fidl::internal::NaturalSyncClientImpl<::test_anonymous::SomeProtocol>::SomeMetho
 ::fidl::internal::NaturalEventDispatcher<::test_anonymous::SomeProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_anonymous::SomeProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_anonymous::SomeProtocol::SomeMethod>::Reply(const ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_anonymous::kSomeProtocol_SomeMethod_Ordinal, ::test_anonymous::kSomeProtocol_SomeMethod_DynamicFlags};
@@ -96,8 +86,6 @@ void fidl::internal::NaturalCompleterBase<::test_anonymous::SomeProtocol::SomeMe
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_anonymous::SomeProtocol>::entries_[] = {
     {
@@ -132,6 +120,6 @@ void fidl::Server<::test_anonymous::SomeProtocol>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_anonymous::SomeProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

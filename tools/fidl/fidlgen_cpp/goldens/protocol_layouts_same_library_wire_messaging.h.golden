@@ -7,18 +7,15 @@
   #include <fidl/test.protocollayoutssamelibrary/cpp/markers.h>
   #include <fidl/test.protocollayoutssamelibrary/cpp/wire_types.h>
 
-  #include <lib/fidl/cpp/wire/wire_messaging.h>
-
 #ifdef __Fuchsia__
 
-    #include <lib/fidl/cpp/wire/client.h>
-    #include <lib/fidl/cpp/wire/connect_service.h>
-    #include <lib/fidl/cpp/wire/server.h>
-    #include <lib/fidl/cpp/wire/service_handler.h>
-    #include <lib/fidl/cpp/wire/sync_call.h>
-    #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
+  #include <lib/fidl/cpp/wire/wire_messaging.h>
+  #include <lib/fidl/cpp/wire/client.h>
+  #include <lib/fidl/cpp/wire/connect_service.h>
+  #include <lib/fidl/cpp/wire/server.h>
+  #include <lib/fidl/cpp/wire/service_handler.h>
+  #include <lib/fidl/cpp/wire/sync_call.h>
+  #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 
   #pragma clang diagnostic push
   #pragma clang diagnostic ignored "-Wshadow"
@@ -28,8 +25,6 @@
   class ComposedProtocol;
 
   class MainProtocol;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_protocollayoutssamelibrary
 
@@ -168,12 +163,8 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocollayoutssamelibrary:
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};namespace test_protocollayoutssamelibrary {
+};
 
-#endif  // __Fuchsia__
-}  // namespace test_protocollayoutssamelibrary
-
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed> final {
   FIDL_ALIGNDECL
@@ -217,8 +208,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 template<>
 struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse {
 
@@ -257,7 +246,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError> final {
   FIDL_ALIGNDECL
@@ -279,8 +267,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult {
@@ -320,7 +306,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed> final {
   FIDL_ALIGNDECL
@@ -388,8 +373,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 template<>
 struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed> final : public ::test_protocollayoutssamelibrary::wire::TablePayload {
 
@@ -428,7 +411,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError> final {
   FIDL_ALIGNDECL
@@ -450,8 +432,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult {
@@ -491,7 +471,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed> final {
   FIDL_ALIGNDECL
@@ -516,11 +495,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>> : public std::true_type {};
 template <>
@@ -555,8 +531,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutss
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>> : public std::true_type {};
 template <>
@@ -588,7 +562,7 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::Compos
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>> : public std::true_type {};
 template <>
@@ -605,8 +579,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutss
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>> : public std::true_type {};
@@ -639,7 +611,7 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::Compos
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>> : public std::true_type {};
 template <>
@@ -691,8 +663,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutss
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>> : public std::true_type {};
 template <>
@@ -724,7 +694,7 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::Compos
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>> : public std::true_type {};
 template <>
@@ -741,8 +711,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutss
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>> : public std::true_type {};
@@ -775,7 +743,7 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::Compos
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed>> : public std::true_type {};
 template <>
@@ -791,9 +759,7 @@ struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssam
   static constexpr bool kHasPointer = true;
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-}  // namespace fidl
+};}  // namespace fidl
 
     template<>
     struct ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>> final
@@ -1670,16 +1636,6 @@ struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::Main
       using Request = ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest;
 };
 
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-namespace test_protocollayoutssamelibrary {
-
-#ifdef __Fuchsia__
-}  // namespace test_protocollayoutssamelibrary
-
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_protocollayoutssamelibrary::MainProtocol> final {
   WireServerDispatcher() = delete;
@@ -1695,12 +1651,8 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocollayoutssamelibrary:
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};namespace test_protocollayoutssamelibrary {
+};
 
-#endif  // __Fuchsia__
-}  // namespace test_protocollayoutssamelibrary
-
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed> final {
   FIDL_ALIGNDECL
@@ -1744,8 +1696,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 template<>
 struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse {
 
@@ -1784,7 +1734,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError> final {
   FIDL_ALIGNDECL
@@ -1806,8 +1755,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult {
@@ -1847,7 +1794,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed> final {
   FIDL_ALIGNDECL
@@ -1915,8 +1861,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 template<>
 struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed> final : public ::test_protocollayoutssamelibrary::wire::TablePayload {
 
@@ -1955,7 +1899,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError> final {
   FIDL_ALIGNDECL
@@ -1977,8 +1920,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult {
@@ -2018,7 +1959,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed> final {
   FIDL_ALIGNDECL
@@ -2086,8 +2026,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 template<>
 struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal> final : public ::test_protocollayoutssamelibrary::wire::TablePayload {
 
@@ -2126,7 +2064,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError> final {
   FIDL_ALIGNDECL
@@ -2148,8 +2085,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError> final : public ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult {
@@ -2189,7 +2124,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal> final {
   FIDL_ALIGNDECL
@@ -2257,8 +2191,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 template<>
 struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon> final : public ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse {
 
@@ -2297,7 +2229,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError> final {
   FIDL_ALIGNDECL
@@ -2319,8 +2250,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template<>
 struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError> final : public ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult {
@@ -2360,7 +2289,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template<>
 struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon> final {
   FIDL_ALIGNDECL
@@ -2385,11 +2313,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>> : public std::true_type {};
 template <>
@@ -2424,8 +2349,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutss
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>> : public std::true_type {};
 template <>
@@ -2457,7 +2380,7 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>> : public std::true_type {};
 template <>
@@ -2474,8 +2397,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutss
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>> : public std::true_type {};
@@ -2508,7 +2429,7 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>> : public std::true_type {};
 template <>
@@ -2560,8 +2481,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutss
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>> : public std::true_type {};
 template <>
@@ -2593,7 +2512,7 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>> : public std::true_type {};
 template <>
@@ -2610,8 +2529,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutss
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>> : public std::true_type {};
@@ -2644,7 +2561,7 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>> : public std::true_type {};
 template <>
@@ -2696,8 +2613,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutss
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>> : public std::true_type {};
 template <>
@@ -2729,7 +2644,7 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>> : public std::true_type {};
 template <>
@@ -2746,8 +2661,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutss
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>> : public std::true_type {};
@@ -2780,7 +2693,7 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>> : public std::true_type {};
 template <>
@@ -2832,8 +2745,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutss
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>> : public std::true_type {};
 template <>
@@ -2865,7 +2776,7 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>> : public std::true_type {};
 template <>
@@ -2882,8 +2793,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutss
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>> : public std::true_type {};
@@ -2916,7 +2825,7 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>> : public std::true_type {};
 template <>
@@ -2932,9 +2841,7 @@ struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssam
   static constexpr bool kHasPointer = true;
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-}  // namespace fidl
+};}  // namespace fidl
 
     template<>
     struct ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>> final
@@ -4178,13 +4085,8 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_protocollayoutssamelibrary
 
   // Allocates 88 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError> TwoWayNamedComposedWithError(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload);
-};namespace fidl {
+};
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template<>
 class ::fidl::internal::WireWeakEventSender<::test_protocollayoutssamelibrary::ComposedProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -4412,7 +4314,7 @@ class ::fidl::internal::WireBufferEventSender<::test_protocollayoutssamelibrary:
 
 };
 
-#endif  // __Fuchsia__
-
   #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__
 

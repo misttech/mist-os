@@ -5,6 +5,9 @@
 #pragma once
 
 #include <fidl/test.errorsyntax.parent/cpp/markers.h>
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.errorsyntax/cpp/markers.h>
 #include <fidl/test.errorsyntax/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -40,8 +43,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_errorsyntax::ExampleUseOfErro
       ::fit::callback<void(::fidl::Result<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>&)>;
   using DomainError = uint32_t;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> final : public ::fit::result<uint32_t, ::test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse> {
@@ -158,8 +159,6 @@ class ::fidl::internal::NaturalEventSender<::test_errorsyntax::ExampleUseOfError
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> : public ::fidl::CompleterBase {
  public:
@@ -216,8 +215,6 @@ class ::fidl::Server<::test_errorsyntax::ExampleUseOfErrorSyntax> : public ::fid
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_errorsyntax::ExampleUseOfErrorSyntax> final {
   NaturalServerDispatcher() = delete;
@@ -232,6 +229,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_errorsyntax::ExampleUseO
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

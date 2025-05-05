@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.transitivedependenciescompose/cpp/natural_messaging.h>
 #include <fidl/test.transitivedependenciescompose/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -16,8 +18,6 @@ constexpr inline uint64_t kTop_GetFoo_Ordinal = 2618685789258237543lu;
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kTop_GetFoo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_transitivedependenciescompose
 
 ::fidl::Response<::test_transitivedependenciescompose::Top::GetFoo>::Response(::test_bottom::BottomGetFooResponse v) : BottomGetFooResponse(std::move(v)) {}
@@ -37,14 +37,6 @@ fidl::internal::NaturalClientImpl<::test_transitivedependenciescompose::Top>::Ge
         return base->SendTwoWay(msg, response_context);
       });
 }
-
-namespace test_transitivedependenciescompose {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_transitivedependenciescompose
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_transitivedependenciescompose::Top::GetFoo>
 fidl::internal::NaturalSyncClientImpl<::test_transitivedependenciescompose::Top>::GetFoo() {
@@ -71,8 +63,6 @@ fidl::internal::NaturalSyncClientImpl<::test_transitivedependenciescompose::Top>
 ::fidl::internal::NaturalEventDispatcher<::test_transitivedependenciescompose::Top>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_transitivedependenciescompose::Top>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_transitivedependenciescompose::Top::GetFoo>::Reply(const ::fidl::Response<::test_transitivedependenciescompose::Top::GetFoo>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_transitivedependenciescompose::kTop_GetFoo_Ordinal, ::test_transitivedependenciescompose::kTop_GetFoo_DynamicFlags};
@@ -87,8 +77,6 @@ void fidl::internal::NaturalCompleterBase<::test_transitivedependenciescompose::
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_transitivedependenciescompose::Top>::entries_[] = {
     {
@@ -123,6 +111,6 @@ void fidl::Server<::test_transitivedependenciescompose::Top>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_transitivedependenciescompose::Top>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

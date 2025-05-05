@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.foreigntypeinresponseusedthroughcompose/cpp/natural_messaging.h>
 #include <fidl/test.foreigntypeinresponseusedthroughcompose/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -16,8 +18,6 @@ constexpr inline uint64_t kTop_GetFoo_Ordinal = 4619180266423108403lu;
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kTop_GetFoo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_foreigntypeinresponseusedthroughcompose
 
 ::fidl::Response<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>::Response(::test_middle::MiddleGetFooResponse v) : MiddleGetFooResponse(std::move(v)) {}
@@ -37,14 +37,6 @@ fidl::internal::NaturalClientImpl<::test_foreigntypeinresponseusedthroughcompose
         return base->SendTwoWay(msg, response_context);
       });
 }
-
-namespace test_foreigntypeinresponseusedthroughcompose {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_foreigntypeinresponseusedthroughcompose
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>
 fidl::internal::NaturalSyncClientImpl<::test_foreigntypeinresponseusedthroughcompose::Top>::GetFoo() {
@@ -71,8 +63,6 @@ fidl::internal::NaturalSyncClientImpl<::test_foreigntypeinresponseusedthroughcom
 ::fidl::internal::NaturalEventDispatcher<::test_foreigntypeinresponseusedthroughcompose::Top>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_foreigntypeinresponseusedthroughcompose::Top>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>::Reply(const ::fidl::Response<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_foreigntypeinresponseusedthroughcompose::kTop_GetFoo_Ordinal, ::test_foreigntypeinresponseusedthroughcompose::kTop_GetFoo_DynamicFlags};
@@ -87,8 +77,6 @@ void fidl::internal::NaturalCompleterBase<::test_foreigntypeinresponseusedthroug
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_foreigntypeinresponseusedthroughcompose::Top>::entries_[] = {
     {
@@ -123,6 +111,6 @@ void fidl::Server<::test_foreigntypeinresponseusedthroughcompose::Top>::dispatch
   ::fidl::internal::NaturalServerDispatcher<::test_foreigntypeinresponseusedthroughcompose::Top>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

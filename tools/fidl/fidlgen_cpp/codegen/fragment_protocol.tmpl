@@ -60,8 +60,6 @@
 {{ EnsureNamespace "fidl" }}
 {{ template "Protocol:Traits:WireMessagingHeader" . }}
 
-{{- IfdefFuchsia -}}
-
 {{- EnsureNamespace "" }}
 {{- range .TwoWayMethods -}}
   {{- if eq .Transport.Name "Channel" }}
@@ -137,7 +135,6 @@
 {{- end }}
 {{- end }}
 {{- template "Protocol:Interface:WireMessagingHeader" . }}
-{{- EndifFuchsia -}}
 
 {{- end }}
 
@@ -149,7 +146,6 @@
 {{ $method := . -}}
 {{- if .HasRequest }}
 
-{{- IfdefFuchsia -}}
 template <>
 struct IsFidlType<{{ .WireTransactionalRequest }}> : public std::true_type {};
 template <>
@@ -172,14 +168,12 @@ struct TypeTraits<{{ .WireTransactionalRequest }}> {
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-{{- EndifFuchsia -}}
 {{- end }}
 
 {{- if .HasResponse }}
 
 {{- if .IsEvent }}
 
-{{- IfdefFuchsia -}}
 template <>
 struct IsFidlType<{{ .WireTransactionalEvent }}> : public std::true_type {};
 template <>
@@ -202,8 +196,6 @@ struct TypeTraits<{{ .WireTransactionalEvent }}> {
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
 
-{{- EndifFuchsia -}}
-
 {{- else }}
 
 template <>
@@ -215,7 +207,6 @@ template <>
 struct IsFidlType<{{ .WireResponse }}> : public std::true_type {};
 {{- end }}
 {{- if .Response.IsResource }}
-{{- IfdefFuchsia -}}
 template <>
 struct IsResource<{{ .WireTransactionalResponse }}> : public std::true_type {};
 template <>
@@ -251,9 +242,6 @@ struct TypeTraits<{{ .WireResponse }}> {
 };
 {{- end }}
 
-{{- if .Response.IsResource }}
-{{- EndifFuchsia -}}
-{{- end }}
 {{- end }}
 
 {{- end }}

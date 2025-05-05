@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.doccomments/cpp/markers.h>
 #include <fidl/test.doccomments/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -24,8 +26,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_doccomments::Interface::Metho
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_doccomments::Interface::OnEvent> {
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_doccomments::Interface> final : public ::fidl::internal::NaturalClientBase {
@@ -117,8 +117,6 @@ class ::fidl::internal::NaturalEventSender<::test_doccomments::Interface>
   ::fit::result<::fidl::OneWayError> OnEvent();
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::Server<::test_doccomments::Interface> : public ::fidl::internal::IncomingMessageDispatcher {
  public:
@@ -153,8 +151,6 @@ class ::fidl::Server<::test_doccomments::Interface> : public ::fidl::internal::I
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_doccomments::Interface> final {
   NaturalServerDispatcher() = delete;
@@ -169,6 +165,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_doccomments::Interface> 
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

@@ -1,22 +1,20 @@
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.driverhandle/cpp/driver/natural_messaging.h>
 #include <lib/fidl_driver/cpp/unknown_interactions.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-#ifdef __Fuchsia__
-
 ::fidl::internal::NaturalEventDispatcher<::test_driverhandle::DriverProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_driverhandle::DriverProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
-
-#endif  // __Fuchsia__
 
 ::fidl::ProtocolHandler<::test_driverhandle::DriverProtocol> fdf::Server<::test_driverhandle::DriverProtocol>::bind_handler(fdf_dispatcher_t* dispatcher) {
   return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driverhandle::DriverProtocol> request) {
     (void)::fdf::BindServer(dispatcher, std::move(request), impl);
   };
 }
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_driverhandle::DriverProtocol>::entries_[] = {};
 
@@ -33,9 +31,6 @@ void fdf::Server<::test_driverhandle::DriverProtocol>::dispatch_message(
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_driverhandle::DriverProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_driverhandle {
 
 [[maybe_unused]]
@@ -43,7 +38,6 @@ constexpr inline uint64_t kHandlesInProtocol_SendHandles_Ordinal = 8904504160365
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kHandlesInProtocol_SendHandles_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-#ifdef __Fuchsia__
 }  // namespace test_driverhandle
 
 ::fit::result<::fidl::OneWayError>
@@ -63,24 +57,15 @@ fidl::internal::NaturalClientImpl<::test_driverhandle::HandlesInProtocol>::SendH
   ::fidl::OneWayStatus status = client_base().SendOneWay(_arena_msg, std::move(_options));
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_driverhandle {
-
-#endif  // __Fuchsia__
-}  // namespace test_driverhandle
-
-#ifdef __Fuchsia__
 
 ::fidl::internal::NaturalEventDispatcher<::test_driverhandle::HandlesInProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_driverhandle::HandlesInProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
-
-#endif  // __Fuchsia__
 
 ::fidl::ProtocolHandler<::test_driverhandle::HandlesInProtocol> fdf::Server<::test_driverhandle::HandlesInProtocol>::bind_handler(fdf_dispatcher_t* dispatcher) {
   return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driverhandle::HandlesInProtocol> request) {
     (void)::fdf::BindServer(dispatcher, std::move(request), impl);
   };
 }
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_driverhandle::HandlesInProtocol>::entries_[] = {
     {
@@ -115,6 +100,6 @@ void fdf::Server<::test_driverhandle::HandlesInProtocol>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_driverhandle::HandlesInProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

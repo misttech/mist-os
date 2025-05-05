@@ -6,7 +6,6 @@
 
 #include <fidl/test.requestflexibleenvelope/cpp/markers.h>
 #include <fidl/test.requestflexibleenvelope/cpp/wire_types.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -25,8 +23,6 @@
 namespace test_requestflexibleenvelope {
 
 class Protocol;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_requestflexibleenvelope
 
@@ -82,12 +78,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_requestflexibleenvelope::Pr
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_requestflexibleenvelope {
 
-#endif  // __Fuchsia__
-}  // namespace test_requestflexibleenvelope
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible> final {
   FIDL_ALIGNDECL
@@ -108,8 +99,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible> final : public ::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleResponse {
@@ -148,7 +137,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict> final {
   FIDL_ALIGNDECL
@@ -169,8 +157,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict> final : public ::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictResponse {
@@ -211,7 +197,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
 
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>> : public std::true_type {};
 template <>
@@ -228,8 +213,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_requestflexiblee
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>> : public std::true_type {};
@@ -262,7 +245,7 @@ struct TypeTraits<::fidl::WireResponse<::test_requestflexibleenvelope::Protocol:
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
+
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>> : public std::true_type {};
 template <>
@@ -279,8 +262,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_requestflexiblee
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>> : public std::true_type {};
@@ -313,7 +294,6 @@ struct TypeTraits<::fidl::WireResponse<::test_requestflexibleenvelope::Protocol:
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -659,13 +639,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_requestflexibleenvelope::P
   // Request is heap-allocated. Response is heap-allocated.
   ::fidl::WireResult<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict> RequestFlexibleResponseStrict(::test_requestflexibleenvelope::wire::FlexibleFoo s);
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_requestflexibleenvelope::Protocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -692,6 +666,6 @@ class ::fidl::internal::WireBufferEventSender<::test_requestflexibleenvelope::Pr
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

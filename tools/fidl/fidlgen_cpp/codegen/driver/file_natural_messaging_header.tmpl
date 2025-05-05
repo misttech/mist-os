@@ -19,6 +19,8 @@ fidl/{{ .LibraryDots }}/cpp/driver/natural_messaging.h
 
   #pragma once
 
+  {{ IfdefFuchsia}}
+
   #include <lib/fidl_driver/cpp/natural_messaging.h>
 
   #include <{{ .Library | Filename "Markers" }}>
@@ -28,24 +30,17 @@ fidl/{{ .LibraryDots }}/cpp/driver/natural_messaging.h
   #pragma clang diagnostic push
   #pragma clang diagnostic ignored "-Wshadow"
 
-  {{ IfdefFuchsia }}
-  {{ EndifFuchsia }}
-
-  {{- range .Decls }}
-  {{- if Eq .Kind Kinds.Protocol }}{{ $protocol := . }}
-  {{- range $transport, $_ := .Transports }}
-  {{- if eq $transport "Driver" -}}
-  {{- template "Protocol:NaturalMessagingHeader" $protocol }}
-  {{- template "Protocol:Client:driver/NaturalMessagingHeader" $protocol }}
-  {{- template "Protocol:EventHandler:NaturalMessagingHeader" $protocol }}
-  {{- template "Protocol:Interface:NaturalMessagingHeader" $protocol }}
-  {{- template "Protocol:Dispatcher:NaturalMessagingHeader" $protocol }}
-  {{- end }}
-  {{- end }}
-  {{- end }}
+  {{- range (call .ProtocolsForTransport "Driver") }}
+    {{- template "Protocol:NaturalMessagingHeader" . }}
+    {{- template "Protocol:Client:driver/NaturalMessagingHeader" . }}
+    {{- template "Protocol:EventHandler:NaturalMessagingHeader" . }}
+    {{- template "Protocol:Interface:NaturalMessagingHeader" . }}
+    {{- template "Protocol:Dispatcher:NaturalMessagingHeader" . }}
   {{- end }}
 
   #pragma clang diagnostic pop
+
+  {{ EndifFuchsia }}
 
   {{ UnsetTransport -}}
   {{ EndOfFile }}

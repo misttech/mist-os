@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.protocols/cpp/markers.h>
 #include <fidl/test.protocols/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -72,8 +74,6 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse> {
   using Request = ::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_protocols::WithAndWithoutRequestResponse::NoRequestEmptyResponse> final {
@@ -233,8 +233,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocols::WithAndWithoutReque
   ::fit::result<::fidl::OneWayError> OnWithResponse(const ::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest& payload);
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_protocols::WithAndWithoutRequestResponse::NoRequestEmptyResponse> : public ::fidl::CompleterBase {
  public:
@@ -330,8 +328,6 @@ class ::fidl::Server<::test_protocols::WithAndWithoutRequestResponse> : public :
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::WithAndWithoutRequestResponse> final {
   NaturalServerDispatcher() = delete;
@@ -345,8 +341,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::WithAndWithou
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::ResponseAsStruct> {
@@ -387,8 +381,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::H
       ::fit::callback<void(::fidl::Result<::test_protocols::WithErrorSyntax::HandleInResult>&)>;
   using DomainError = uint32_t;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct> final : public ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxResponseAsStructResponse> {
@@ -561,8 +553,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocols::WithErrorSyntax>
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_protocols::WithErrorSyntax::ResponseAsStruct> : public ::fidl::CompleterBase {
  public:
@@ -645,8 +635,6 @@ class ::fidl::Server<::test_protocols::WithErrorSyntax> : public ::fidl::interna
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::WithErrorSyntax> final {
   NaturalServerDispatcher() = delete;
@@ -660,8 +648,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::WithErrorSynt
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::ChannelProtocol::MethodA> {
@@ -705,8 +691,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::ChannelProtocol::M
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocols::ChannelProtocol::MutateSocket>&)>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_protocols::ChannelProtocol::MethodB> final : public ::test_protocols::ChannelProtocolMethodBResponse {
@@ -838,8 +822,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocols::ChannelProtocol>
   ::fit::result<::fidl::OneWayError> EventA(const ::test_protocols::ChannelProtocolEventARequest& payload);
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_protocols::ChannelProtocol::MethodB> : public ::fidl::CompleterBase {
  public:
@@ -917,8 +899,6 @@ class ::fidl::Server<::test_protocols::ChannelProtocol> : public ::fidl::interna
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::ChannelProtocol> final {
   NaturalServerDispatcher() = delete;
@@ -933,14 +913,10 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::ChannelProtoc
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::DiscoverableProtocol::Method> {
   using Completer = fidl::Completer<>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_protocols::DiscoverableProtocol> final : public ::fidl::internal::NaturalClientBase {
@@ -1005,8 +981,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocols::DiscoverableProtoco
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::Server<::test_protocols::DiscoverableProtocol> : public ::fidl::internal::IncomingMessageDispatcher {
  public:
@@ -1037,8 +1011,6 @@ class ::fidl::Server<::test_protocols::DiscoverableProtocol> : public ::fidl::in
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::DiscoverableProtocol> final {
@@ -1114,8 +1086,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocols::AnotherDiscoverable
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::Server<::test_protocols::AnotherDiscoverableProtocol> : public ::fidl::internal::IncomingMessageDispatcher {
  public:
@@ -1141,8 +1111,6 @@ class ::fidl::Server<::test_protocols::AnotherDiscoverableProtocol> : public ::f
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::AnotherDiscoverableProtocol> final {
@@ -1218,8 +1186,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocols::PlatformServer>
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::Server<::test_protocols::PlatformServer> : public ::fidl::internal::IncomingMessageDispatcher {
  public:
@@ -1246,8 +1212,6 @@ class ::fidl::Server<::test_protocols::PlatformServer> : public ::fidl::internal
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::PlatformServer> final {
   NaturalServerDispatcher() = delete;
@@ -1261,8 +1225,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::PlatformServe
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::HandleRightsProtocol::NoResponseMethod> {
@@ -1286,8 +1248,6 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::HandleRightsProtocol::AnEvent> {
   using Request = ::test_protocols::HandleRightsProtocolAnEventRequest;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_protocols::HandleRightsProtocol::ResponseMethod> final : public ::test_protocols::HandleRightsProtocolResponseMethodResponse {
@@ -1381,8 +1341,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocols::HandleRightsProtoco
   ::fit::result<::fidl::OneWayError> AnEvent(::test_protocols::HandleRightsProtocolAnEventRequest payload);
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_protocols::HandleRightsProtocol::ResponseMethod> : public ::fidl::CompleterBase {
  public:
@@ -1430,8 +1388,6 @@ class ::fidl::Server<::test_protocols::HandleRightsProtocol> : public ::fidl::in
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::HandleRightsProtocol> final {
   NaturalServerDispatcher() = delete;
@@ -1445,8 +1401,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::HandleRightsP
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithProtocolEnds::ClientEnds> {
@@ -1480,8 +1434,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithProtocolEnds::
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocols::WithProtocolEnds::StructContainingEnds>&)>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_protocols::WithProtocolEnds::ClientEnds> final : public ::test_protocols::WithProtocolEndsClientEndsResponse {
@@ -1602,8 +1554,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocols::WithProtocolEnds>
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_protocols::WithProtocolEnds::ClientEnds> : public ::fidl::CompleterBase {
  public:
@@ -1675,8 +1625,6 @@ class ::fidl::Server<::test_protocols::WithProtocolEnds> : public ::fidl::intern
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::WithProtocolEnds> final {
   NaturalServerDispatcher() = delete;
@@ -1691,16 +1639,12 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::WithProtocolE
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::ManyParameters::Fifteen> {
   using Request = ::test_protocols::ManyParametersFifteenRequest;
 
   using Completer = fidl::Completer<>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_protocols::ManyParameters> final : public ::fidl::internal::NaturalClientBase {
@@ -1765,8 +1709,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocols::ManyParameters>
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::Server<::test_protocols::ManyParameters> : public ::fidl::internal::IncomingMessageDispatcher {
  public:
@@ -1799,8 +1741,6 @@ class ::fidl::Server<::test_protocols::ManyParameters> : public ::fidl::internal
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::ManyParameters> final {
   NaturalServerDispatcher() = delete;
@@ -1815,8 +1755,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::ManyParameter
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::MethodWithUnion::UnionMethod> {
   using Request = ::test_protocols::MethodWithUnionUnionMethodRequest;
@@ -1827,8 +1765,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::MethodWithUnion::U
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocols::MethodWithUnion::UnionMethod>&)>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_protocols::MethodWithUnion::UnionMethod> final : public ::test_protocols::MethodWithUnionUnionMethodResponse {
@@ -1909,8 +1845,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocols::MethodWithUnion>
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_protocols::MethodWithUnion::UnionMethod> : public ::fidl::CompleterBase {
  public:
@@ -1952,8 +1886,6 @@ class ::fidl::Server<::test_protocols::MethodWithUnion> : public ::fidl::interna
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::MethodWithUnion> final {
   NaturalServerDispatcher() = delete;
@@ -1968,6 +1900,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::MethodWithUni
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

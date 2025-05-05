@@ -1,22 +1,20 @@
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.driverservice/cpp/driver/natural_messaging.h>
 #include <lib/fidl_driver/cpp/unknown_interactions.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-#ifdef __Fuchsia__
-
 ::fidl::internal::NaturalEventDispatcher<::test_driverservice::SomeDriverProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_driverservice::SomeDriverProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
-
-#endif  // __Fuchsia__
 
 ::fidl::ProtocolHandler<::test_driverservice::SomeDriverProtocol> fdf::Server<::test_driverservice::SomeDriverProtocol>::bind_handler(fdf_dispatcher_t* dispatcher) {
   return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driverservice::SomeDriverProtocol> request) {
     (void)::fdf::BindServer(dispatcher, std::move(request), impl);
   };
 }
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_driverservice::SomeDriverProtocol>::entries_[] = {};
 
@@ -34,6 +32,6 @@ void fdf::Server<::test_driverservice::SomeDriverProtocol>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_driverservice::SomeDriverProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

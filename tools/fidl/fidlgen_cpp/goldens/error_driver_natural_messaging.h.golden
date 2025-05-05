@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.error/cpp/driver/wire_messaging.h>
 #include <fidl/test.error/cpp/markers.h>
 #include <fidl/test.error/cpp/natural_types.h>
@@ -13,3 +15,5 @@
 #pragma clang diagnostic ignored "-Wshadow"
 
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

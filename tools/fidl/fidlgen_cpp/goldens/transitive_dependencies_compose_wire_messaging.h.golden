@@ -6,29 +6,24 @@
 
 #include <fidl/test.transitivedependenciescompose/cpp/markers.h>
 #include <fidl/test.transitivedependenciescompose/cpp/wire_types.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
+#include <fidl/test.bottom/cpp/wire_messaging.h>
+#include <fidl/test.middle/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
-
-#include <fidl/test.bottom/cpp/wire_messaging.h>
-#include <fidl/test.middle/cpp/wire_messaging.h>
+#include <lib/fidl/cpp/wire/wire_messaging.h>
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
 namespace test_transitivedependenciescompose {
 
 class Top;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_transitivedependenciescompose
 
@@ -65,12 +60,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_transitivedependenciescompo
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_transitivedependenciescompose {
 
-#endif  // __Fuchsia__
-}  // namespace test_transitivedependenciescompose
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo> final {
   FIDL_ALIGNDECL
@@ -88,8 +78,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo> final : public ::test_bottom::wire::BottomGetFooResponse {
@@ -130,7 +118,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
 
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>> : public std::true_type {};
 template <>
@@ -147,8 +134,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_transitivedepend
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>> : public std::true_type {};
@@ -181,7 +166,6 @@ struct TypeTraits<::fidl::WireResponse<::test_transitivedependenciescompose::Top
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -412,13 +396,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_transitivedependenciescomp
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::WireResult<::test_transitivedependenciescompose::Top::GetFoo> GetFoo();
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_transitivedependenciescompose::Top> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -445,6 +423,6 @@ class ::fidl::internal::WireBufferEventSender<::test_transitivedependenciescompo
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

@@ -6,7 +6,6 @@
 
 #include <fidl/test.anonymous/cpp/markers.h>
 #include <fidl/test.anonymous/cpp/wire_types.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -25,8 +23,6 @@
 namespace test_anonymous {
 
 class SomeProtocol;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_anonymous
 
@@ -65,12 +61,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_anonymous::SomeProtocol> fi
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_anonymous {
 
-#endif  // __Fuchsia__
-}  // namespace test_anonymous
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_anonymous::SomeProtocol::SomeMethod> final {
   FIDL_ALIGNDECL
@@ -91,8 +82,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_anonymous::SomeProtocol::SomeMethod>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod> final : public ::test_anonymous::wire::SomeProtocolSomeMethodResult {
@@ -132,7 +121,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
 
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_anonymous::SomeProtocol::SomeMethod>> : public std::true_type {};
 template <>
@@ -149,8 +137,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_anonymous::SomeP
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct IsFidlType<::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod>> : public std::true_type {};
@@ -183,7 +169,6 @@ struct TypeTraits<::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMetho
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -420,13 +405,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_anonymous::SomeProtocol> f
   // Allocates 128 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::WireResult<::test_anonymous::SomeProtocol::SomeMethod> SomeMethod(::test_anonymous::wire::UnionMember union_member, ::test_anonymous::wire::TableMember table_member);
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_anonymous::SomeProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -453,6 +432,6 @@ class ::fidl::internal::WireBufferEventSender<::test_anonymous::SomeProtocol>
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

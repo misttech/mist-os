@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.union/cpp/natural_messaging.h>
 #include <fidl/test.union/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -22,8 +24,6 @@ constexpr inline uint64_t kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllo
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_union
 
 ::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>::Response(::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse v) : TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(std::move(v)) {}
@@ -62,14 +62,6 @@ fidl::internal::NaturalClientImpl<::test_union::TestProtocol>::FlexibleUnionHenc
       });
 }
 
-namespace test_union {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_union
-
-#ifdef __Fuchsia__
-
 ::fidl::Result<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>
 fidl::internal::NaturalSyncClientImpl<::test_union::TestProtocol>::StrictUnionHenceResponseMayBeStackAllocated() {
   ::fidl::internal::NaturalMessageEncoder encoder{
@@ -105,8 +97,6 @@ fidl::internal::NaturalSyncClientImpl<::test_union::TestProtocol>::FlexibleUnion
 ::fidl::internal::NaturalEventDispatcher<::test_union::TestProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_union::TestProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>::Reply(const ::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_union::kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal, ::test_union::kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_DynamicFlags};
@@ -130,8 +120,6 @@ void fidl::internal::NaturalCompleterBase<::test_union::TestProtocol::FlexibleUn
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_union::TestProtocol>::entries_[] = {
     {
@@ -182,6 +170,6 @@ void fidl::Server<::test_union::TestProtocol>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_union::TestProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

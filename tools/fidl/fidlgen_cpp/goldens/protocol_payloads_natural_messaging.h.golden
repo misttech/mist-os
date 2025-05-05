@@ -5,6 +5,9 @@
 #pragma once
 
 #include <fidl/test.protocolpayloads.imported/cpp/markers.h>
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.protocolpayloads/cpp/markers.h>
 #include <fidl/test.protocolpayloads/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -156,8 +159,6 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtocol::OnAnon> {
   using Request = ::test_protocolpayloads::MainProtocolOnAnonRequest;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposed> final : public ::test_protocolpayloads_imported::ImportStructPayload {
@@ -453,8 +454,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocolpayloads::MainProtocol
   ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocolpayloads::MainProtocolOnAnonRequest& payload);
 };
 
-#endif  // __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_protocolpayloads::MainProtocol::TwoWayComposed> : public ::fidl::CompleterBase {
  public:
@@ -625,8 +624,6 @@ class ::fidl::Server<::test_protocolpayloads::MainProtocol> : public ::fidl::int
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocolpayloads::MainProtocol> final {
   NaturalServerDispatcher() = delete;
@@ -641,6 +638,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocolpayloads::MainPr
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

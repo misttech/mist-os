@@ -6,7 +6,6 @@
 
 #include <fidl/test.doccomments/cpp/markers.h>
 #include <fidl/test.doccomments/cpp/wire_types.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -27,8 +25,6 @@ namespace test_doccomments {
 class Interface;
 
 class Service;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_doccomments
 
@@ -60,12 +56,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_doccomments::Interface> fin
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_doccomments {
 
-#endif  // __Fuchsia__
-}  // namespace test_doccomments
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_doccomments::Interface::Method> final {
   FIDL_ALIGNDECL
@@ -102,11 +93,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
       internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_doccomments::Interface::Method>> : public std::true_type {};
 template <>
@@ -140,7 +128,6 @@ struct TypeTraits<::fidl::internal::TransactionalEvent<::test_doccomments::Inter
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-
 }  // namespace fidl
 
 template <>
@@ -296,11 +283,7 @@ class ::fidl::WireServer<::test_doccomments::Interface> : public ::fidl::interna
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
 namespace test_doccomments {
 
 /// service comment #1
@@ -313,10 +296,8 @@ class Service final {
   static constexpr bool kIsService = true;
   static constexpr char Name[] = "test.doccomments.Service";
   using Transport = ::fidl::internal::ChannelTransport;
-#ifdef __Fuchsia__
-  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport>;
 
-#endif  // __Fuchsia__
+  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport>;
 
   class Interface final {
    public:
@@ -330,7 +311,7 @@ class Service final {
   // Client protocol for connecting to member protocols of a service instance.
   class ServiceClient final {
     ServiceClient() = delete;
-#ifdef __Fuchsia__
+
    public:
     ServiceClient(::zx::channel dir, ::fidl::internal::ConnectMemberFunc connect_func)
         : dir_(std::move(dir)), connect_func_(connect_func) {}
@@ -378,10 +359,8 @@ class Service final {
    private:
     ::zx::channel dir_;
     ::fidl::internal::ConnectMemberFunc connect_func_;
-
-#endif  // __Fuchsia__
   };
-#ifdef __Fuchsia__
+
   // Facilitates member protocol registration for servers.
   class InstanceHandler final : public fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport> {
    public:
@@ -411,15 +390,9 @@ class Service final {
       return this->AddMember<::test_doccomments::Interface>(std::move(handler), "interface");
     }
   };
-
-#endif  // __Fuchsia__
 };
 
 }  // namespace test_doccomments
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_doccomments::Interface> : public ::fidl::internal::ClientImplBase {
@@ -463,13 +436,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_doccomments::Interface> fi
  public:
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_doccomments::Interface> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -516,6 +483,6 @@ class ::fidl::internal::WireBufferEventSender<::test_doccomments::Interface>
   fidl::OneWayStatus OnEvent();
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

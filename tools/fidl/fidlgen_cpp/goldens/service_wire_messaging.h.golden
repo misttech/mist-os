@@ -6,7 +6,6 @@
 
 #include <fidl/test.service/cpp/markers.h>
 #include <fidl/test.service/cpp/wire_types.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl/cpp/wire/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -35,8 +33,6 @@ class SingleMemberService;
 class MultiHeterogeneousMemberService;
 
 class MultiHomogeneousMemberService;
-
-#ifdef __Fuchsia__
 
 }  // namespace test_service
 
@@ -63,12 +59,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_service::FirstProtocol> fin
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_service {
 
-#endif  // __Fuchsia__
-}  // namespace test_service
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst> final {
   FIDL_ALIGNDECL
@@ -86,11 +77,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst>> : public std::true_type {};
 template <>
@@ -107,7 +95,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_service::FirstPr
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
 }  // namespace fidl
 
 template <>
@@ -250,16 +237,6 @@ struct ::fidl::internal::WireMethodTypes<::test_service::SecondProtocol::MethodO
   using Completer = fidl::Completer<>;
 };
 
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-namespace test_service {
-
-#ifdef __Fuchsia__
-}  // namespace test_service
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_service::SecondProtocol> final {
   WireServerDispatcher() = delete;
@@ -276,12 +253,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_service::SecondProtocol> fi
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_service {
 
-#endif  // __Fuchsia__
-}  // namespace test_service
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond> final {
   FIDL_ALIGNDECL
@@ -299,11 +271,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond>> : public std::true_type {};
 template <>
@@ -320,7 +289,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_service::SecondP
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
 }  // namespace fidl
 
 template <>
@@ -455,11 +423,7 @@ class ::fidl::WireServer<::test_service::SecondProtocol> : public ::fidl::intern
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
 namespace test_service {
 
 class EmptyService final {
@@ -469,15 +433,13 @@ class EmptyService final {
   static constexpr bool kIsService = true;
   static constexpr char Name[] = "test.service.EmptyService";
   using Transport = ::fidl::internal::ChannelTransport;
-#ifdef __Fuchsia__
-  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport>;
 
-#endif  // __Fuchsia__
+  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport>;
 
   // Client protocol for connecting to member protocols of a service instance.
   class ServiceClient final {
     ServiceClient() = delete;
-#ifdef __Fuchsia__
+
    public:
     ServiceClient(::zx::channel dir, ::fidl::internal::ConnectMemberFunc connect_func) {
       (void)dir;
@@ -485,9 +447,8 @@ class EmptyService final {
     }
 
    private:
-#endif  // __Fuchsia__
   };
-#ifdef __Fuchsia__
+
   // Facilitates member protocol registration for servers.
   class InstanceHandler final : public fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport> {
    public:
@@ -504,8 +465,6 @@ class EmptyService final {
       // won't allow service declarations with duplicated names.
     }
   };
-
-#endif  // __Fuchsia__
 };
 
 class SingleMemberService final {
@@ -515,10 +474,8 @@ class SingleMemberService final {
   static constexpr bool kIsService = true;
   static constexpr char Name[] = "test.service.SingleMemberService";
   using Transport = ::fidl::internal::ChannelTransport;
-#ifdef __Fuchsia__
-  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport>;
 
-#endif  // __Fuchsia__
+  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport>;
 
   class SingleMember final {
    public:
@@ -532,7 +489,7 @@ class SingleMemberService final {
   // Client protocol for connecting to member protocols of a service instance.
   class ServiceClient final {
     ServiceClient() = delete;
-#ifdef __Fuchsia__
+
    public:
     ServiceClient(::zx::channel dir, ::fidl::internal::ConnectMemberFunc connect_func)
         : dir_(std::move(dir)), connect_func_(connect_func) {}
@@ -580,10 +537,8 @@ class SingleMemberService final {
    private:
     ::zx::channel dir_;
     ::fidl::internal::ConnectMemberFunc connect_func_;
-
-#endif  // __Fuchsia__
   };
-#ifdef __Fuchsia__
+
   // Facilitates member protocol registration for servers.
   class InstanceHandler final : public fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport> {
    public:
@@ -613,8 +568,6 @@ class SingleMemberService final {
       return this->AddMember<::test_service::FirstProtocol>(std::move(handler), "single_member");
     }
   };
-
-#endif  // __Fuchsia__
 };
 
 class MultiHeterogeneousMemberService final {
@@ -624,10 +577,8 @@ class MultiHeterogeneousMemberService final {
   static constexpr bool kIsService = true;
   static constexpr char Name[] = "test.service.MultiHeterogeneousMemberService";
   using Transport = ::fidl::internal::ChannelTransport;
-#ifdef __Fuchsia__
-  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport>;
 
-#endif  // __Fuchsia__
+  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport>;
 
   class FirstMember final {
    public:
@@ -650,7 +601,7 @@ class MultiHeterogeneousMemberService final {
   // Client protocol for connecting to member protocols of a service instance.
   class ServiceClient final {
     ServiceClient() = delete;
-#ifdef __Fuchsia__
+
    public:
     ServiceClient(::zx::channel dir, ::fidl::internal::ConnectMemberFunc connect_func)
         : dir_(std::move(dir)), connect_func_(connect_func) {}
@@ -738,10 +689,8 @@ class MultiHeterogeneousMemberService final {
    private:
     ::zx::channel dir_;
     ::fidl::internal::ConnectMemberFunc connect_func_;
-
-#endif  // __Fuchsia__
   };
-#ifdef __Fuchsia__
+
   // Facilitates member protocol registration for servers.
   class InstanceHandler final : public fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport> {
    public:
@@ -784,8 +733,6 @@ class MultiHeterogeneousMemberService final {
       return this->AddMember<::test_service::SecondProtocol>(std::move(handler), "second_member");
     }
   };
-
-#endif  // __Fuchsia__
 };
 
 class MultiHomogeneousMemberService final {
@@ -795,10 +742,8 @@ class MultiHomogeneousMemberService final {
   static constexpr bool kIsService = true;
   static constexpr char Name[] = "test.service.MultiHomogeneousMemberService";
   using Transport = ::fidl::internal::ChannelTransport;
-#ifdef __Fuchsia__
-  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport>;
 
-#endif  // __Fuchsia__
+  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport>;
 
   class FirstMember final {
    public:
@@ -821,7 +766,7 @@ class MultiHomogeneousMemberService final {
   // Client protocol for connecting to member protocols of a service instance.
   class ServiceClient final {
     ServiceClient() = delete;
-#ifdef __Fuchsia__
+
    public:
     ServiceClient(::zx::channel dir, ::fidl::internal::ConnectMemberFunc connect_func)
         : dir_(std::move(dir)), connect_func_(connect_func) {}
@@ -909,10 +854,8 @@ class MultiHomogeneousMemberService final {
    private:
     ::zx::channel dir_;
     ::fidl::internal::ConnectMemberFunc connect_func_;
-
-#endif  // __Fuchsia__
   };
-#ifdef __Fuchsia__
+
   // Facilitates member protocol registration for servers.
   class InstanceHandler final : public fidl::ServiceInstanceHandler<::fidl::internal::ChannelTransport> {
    public:
@@ -955,15 +898,9 @@ class MultiHomogeneousMemberService final {
       return this->AddMember<::test_service::FirstProtocol>(std::move(handler), "second_member");
     }
   };
-
-#endif  // __Fuchsia__
 };
 
 }  // namespace test_service
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_service::FirstProtocol> : public ::fidl::internal::ClientImplBase {
@@ -999,13 +936,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_service::FirstProtocol> fi
  public:
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_service::FirstProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -1093,6 +1024,6 @@ class ::fidl::internal::WireBufferEventSender<::test_service::SecondProtocol>
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

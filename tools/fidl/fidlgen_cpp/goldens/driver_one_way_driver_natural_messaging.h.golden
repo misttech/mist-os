@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.driveroneway/cpp/driver/wire_messaging.h>
 #include <fidl/test.driveroneway/cpp/markers.h>
 #include <fidl/test.driveroneway/cpp/natural_types.h>
@@ -18,7 +20,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_driveroneway::OneWay::Send> {
 
   using Completer = fidl::Completer<>;
 };
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_driveroneway::OneWay> final : public ::fidl::internal::NaturalClientBase {
@@ -46,8 +47,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_driveroneway::OneWay> fina
  public:
   explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_driveroneway::OneWay>* event_handler);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fdf::Server<::test_driveroneway::OneWay> : public ::fidl::internal::IncomingMessageDispatcher {
@@ -80,7 +79,6 @@ class ::fdf::Server<::test_driveroneway::OneWay> : public ::fidl::internal::Inco
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_driveroneway::OneWay> final {
@@ -96,6 +94,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_driveroneway::OneWay> fi
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__
