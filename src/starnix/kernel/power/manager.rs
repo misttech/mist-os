@@ -284,6 +284,7 @@ impl SuspendResumeManager {
                         for (i, name) in names.iter().enumerate() {
                             names_array.set(i, name);
                         }
+                        node.record(names_array);
                     }
                 });
                 fuchsia_trace::instant!(
