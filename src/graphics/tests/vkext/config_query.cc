@@ -24,6 +24,11 @@ std::optional<uint32_t> GetGpuVendorId() {
   return std::optional<uint32_t>{};
 }
 
+bool SupportsSysmemA2B10G10R10() {
+  auto& c = GetConfig();
+  return c.support_sysmem_a2b10g10r10();
+}
+
 bool SupportsSysmemYuv() {
   auto& c = GetConfig();
   return c.support_sysmem_yuv();
