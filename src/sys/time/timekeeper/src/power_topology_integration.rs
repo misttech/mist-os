@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context, Result};
-use fidl::endpoints::{create_proxy, ProtocolMarker};
+use anyhow::{anyhow, Context, Error, Result};
+use fidl::endpoints::{create_endpoints, ProtocolMarker};
 use fuchsia_component::client;
 use futures::channel::mpsc;
-use futures::{future, Future, SinkExt, StreamExt};
+use futures::{future, Future, SinkExt, StreamExt, TryStreamExt};
 use log::{debug, error};
 use {fidl_fuchsia_power_broker as fpb, fidl_fuchsia_power_system as fps, fuchsia_async as fasync};
 
@@ -38,7 +38,7 @@ async fn manage_internal<F, G>(
 ) -> Result<fasync::Task<()>>
 where
     G: Future<Output = fasync::Task<()>>,
-    F: Fn(fpb::CurrentLevelProxy, fpb::RequiredLevelProxy) -> G,
+    F: Fn(fpb::ElementRunnerRequestStream) -> G,
 {
     let power_elements = governor_proxy
         .get_power_elements()
@@ -55,24 +55,22 @@ where
                 requires_level_by_preference: vec![REQUIRED_LEVEL],
             }];
 
-            let (current, current_level_channel) = create_proxy::<fpb::CurrentLevelMarker>();
-            let (required, required_level_channel) = create_proxy::<fpb::RequiredLevelMarker>();
+            let (element_runner_client, element_runner_server) =
+                create_endpoints::<fpb::ElementRunnerMarker>();
             let result = topology_proxy
                 .add_element(fpb::ElementSchema {
                     element_name: Some(ELEMENT_NAME.into()),
                     initial_current_level: Some(POWER_ON),
                     valid_levels: Some(vec![POWER_ON, POWER_OFF]),
                     dependencies: Some(deps),
-                    level_control_channels: Some(fpb::LevelControlChannels {
-                        current: current_level_channel,
-                        required: required_level_channel,
-                    }),
+                    element_runner: Some(element_runner_client),
                     ..Default::default()
                 })
                 .await
                 .context("while calling fuchsia.power.broker.Topology/AddElement")?;
+            let element_runner = element_runner_server.into_stream();
             match result {
-                Ok(_) => return Ok(loop_fn(current, required).await),
+                Ok(_) => return Ok(loop_fn(element_runner).await),
                 Err(e) => return Err(anyhow!("error while adding element: {:?}", e)),
             }
         }
@@ -88,19 +86,20 @@ where
 // we can insert a power transition process in between.
 //
 // Returns the task spawned for transition control.
-async fn management_loop(
-    current: fpb::CurrentLevelProxy,
-    required: fpb::RequiredLevelProxy,
-) -> fasync::Task<()> {
+async fn management_loop(mut element_runner: fpb::ElementRunnerRequestStream) -> fasync::Task<()> {
     // The Sender is used to ensure that rcv_task does not send before send_task
     // is done.
     let (mut send, mut rcv) = mpsc::channel::<(u8, mpsc::Sender<()>)>(1);
 
     let rcv_task = fasync::Task::local(async move {
         loop {
-            let result = required.watch().await;
+            let Ok(Some(request)) = element_runner.try_next().await else {
+                error!("error while waiting for element runner request, bailing");
+                break;
+            };
+            let result = handle_element_runner_set_level(request).await;
             match result {
-                Ok(Ok(level)) => {
+                Ok((level, responder)) => {
                     let (s, mut r) = mpsc::channel::<()>(1);
                     // For now, we just echo the power level back to the power broker.
                     if let Err(e) = send.send((level, s)).await {
@@ -109,10 +108,8 @@ async fn management_loop(
                     }
                     // Wait until rcv_task propagates the new required level.
                     r.next().await.unwrap();
-                }
-                Ok(Err(e)) => {
-                    error!("error while watching level, bailing: {:?}", e);
-                    break;
+                    // Respond to SetLevel, indicating the level transition is complete.
+                    responder.send().expect("set_level resp failed");
                 }
                 Err(e) => {
                     error!("error while watching level, bailing: {:?}", e);
@@ -124,26 +121,38 @@ async fn management_loop(
     });
     let send_task = fasync::Task::local(async move {
         while let Some((new_level, mut s)) = rcv.next().await {
-            match current.update(new_level).await {
-                Ok(Ok(())) => {
-                    // Allow rcv_task to proceed.
-                    s.send(()).await.unwrap();
+            match new_level {
+                POWER_OFF => {
+                    debug!("new required level: power off");
                 }
-                Ok(Err(e)) => {
-                    error!("error while watching level, bailing: {:?}", e);
-                    break;
+                POWER_ON => {
+                    debug!("new required level: power on");
                 }
-                Err(e) => {
-                    error!("error while watching level, bailing: {:?}", e);
-                    break;
+                _ => {
+                    error!("invalid required level: {}", new_level);
                 }
             }
+            // Handle level transition here.
+            s.send(()).await.unwrap();
         }
         debug!("no longer reporting required level");
     });
     fasync::Task::local(async move {
         future::join(rcv_task, send_task).await;
     })
+}
+
+async fn handle_element_runner_set_level(
+    request: fpb::ElementRunnerRequest,
+) -> Result<(u8, fpb::ElementRunnerSetLevelResponder), Error> {
+    match request {
+        fpb::ElementRunnerRequest::SetLevel { level, responder } => {
+            return Ok((level, responder));
+        }
+        fidl_fuchsia_power_broker::ElementRunnerRequest::_UnknownMethod { .. } => {
+            return Err(Error::msg("ElementRunnerRequest::_UnknownMethod received"));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -153,89 +162,27 @@ mod tests {
     use fidl::endpoints;
     use log::debug;
 
-    // Returns immediately.
-    async fn async_send_via(s: &mut mpsc::Sender<u8>, value: u8) {
-        let mut c = s.clone();
-        fasync::Task::local(async move {
-            c.send(value).await.expect("always succeeds");
-        })
-        .detach();
-    }
-
-    // Waits for a value to be available on the receiver.
-    async fn block_recv_from(s: &mut mpsc::Receiver<u8>) -> u8 {
-        let level = s.next().await.expect("always succeeds");
-        level
-    }
-
     #[fuchsia::test]
     async fn propagate_level() {
-        let (current, mut current_stream) =
-            endpoints::create_proxy_and_stream::<fpb::CurrentLevelMarker>();
-        let (required, mut required_stream) =
-            endpoints::create_proxy_and_stream::<fpb::RequiredLevelMarker>();
-
-        // Send the power level in from test into the handler.
-        let (mut in_send, mut in_recv) = mpsc::channel(1);
-
-        // Get the power level out from the handler into the test.
-        let (mut out_send, mut out_recv) = mpsc::channel(1);
-
-        // Serve the topology streams asynchronously.
-        fasync::Task::local(async move {
-            debug!("topology: start listening for requests.");
-            while let Some(next) = current_stream.next().await {
-                let request: fpb::CurrentLevelRequest = next.unwrap();
-                debug!("topology: request: {:?}", request);
-                match request {
-                    fpb::CurrentLevelRequest::Update { current_level, responder, .. } => {
-                        out_send.send(current_level).await.expect("always succeeds");
-                        responder.send(Ok(())).unwrap();
-                    }
-                    _ => {
-                        unimplemented!();
-                    }
-                }
-            }
-        })
-        .detach();
-        fasync::Task::local(async move {
-            debug!("topology: start listening for requests.");
-            while let Some(next) = required_stream.next().await {
-                let request: fpb::RequiredLevelRequest = next.unwrap();
-                debug!("topology: request: {:?}", request);
-                match request {
-                    fpb::RequiredLevelRequest::Watch { responder, .. } => {
-                        // Emulate hanging get response: block on a new value, then report that
-                        // value.
-                        let new_level = in_recv.next().await.expect("always succeeds");
-                        responder.send(Ok(new_level)).unwrap();
-                    }
-                    _ => {
-                        unimplemented!();
-                    }
-                }
-            }
-        })
-        .detach();
+        let (element_runner_client, element_runner_server) =
+            create_endpoints::<fpb::ElementRunnerMarker>();
+        let element_runner = element_runner_server.into_stream();
+        let element_runner_proxy = element_runner_client.into_proxy();
 
         // Management loop is also asynchronous.
         fasync::Task::local(async move {
-            management_loop(current, required).await.await;
+            management_loop(element_runner).await.await;
         })
         .detach();
 
-        async_send_via(&mut in_send, POWER_ON).await;
-        assert_eq!(POWER_ON, block_recv_from(&mut out_recv).await);
+        assert!(element_runner_proxy.set_level(POWER_ON).await.is_ok());
 
-        async_send_via(&mut in_send, POWER_OFF).await;
-        assert_eq!(POWER_OFF, block_recv_from(&mut out_recv).await);
+        assert!(element_runner_proxy.set_level(POWER_OFF).await.is_ok());
 
-        async_send_via(&mut in_send, POWER_ON).await;
-        assert_eq!(POWER_ON, block_recv_from(&mut out_recv).await);
+        assert!(element_runner_proxy.set_level(POWER_ON).await.is_ok());
     }
 
-    async fn empty_loop(_: fpb::CurrentLevelProxy, _: fpb::RequiredLevelProxy) -> fasync::Task<()> {
+    async fn empty_loop(_: fpb::ElementRunnerRequestStream) -> fasync::Task<()> {
         fasync::Task::local(async move {})
     }
 
