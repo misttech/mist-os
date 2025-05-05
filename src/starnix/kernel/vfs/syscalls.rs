@@ -110,6 +110,40 @@ uapi::check_arch_independent_layout! {
         aio_flags,
         aio_resfd,
     }
+
+    statx_timestamp {
+        tv_sec,
+        tv_nsec,
+    }
+
+    statx {
+        stx_mask,
+        stx_blksize,
+        stx_attributes,
+        stx_nlink,
+        stx_uid,
+        stx_gid,
+        stx_mode,
+        stx_ino,
+        stx_size,
+        stx_blocks,
+        stx_attributes_mask,
+        stx_atime,
+        stx_btime,
+        stx_ctime,
+        stx_mtime,
+        stx_rdev_major,
+        stx_rdev_minor,
+        stx_dev_major,
+        stx_dev_minor,
+        stx_mnt_id,
+        stx_dio_mem_align,
+        stx_dio_offset_align,
+        stx_subvol,
+        stx_atomic_write_unit_min,
+        stx_atomic_write_unit_max,
+        stx_atomic_write_segments_max,
+    }
 }
 
 // Constants from bionic/libc/include/sys/stat.h
@@ -3594,6 +3628,17 @@ mod arch32 {
         super::sys_fadvise64(locked, current_task, fd, offset, len, advice)
     }
 
+    pub fn sys_arch32_sendfile64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        out_fd: FdNumber,
+        in_fd: FdNumber,
+        user_offset: UserRef<uapi::off_t>,
+        count: i32,
+    ) -> Result<usize, Errno> {
+        super::sys_sendfile(locked, current_task, out_fd, in_fd, user_offset.into(), count)
+    }
+
     pub use super::{
         sys_chdir as sys_arch32_chdir, sys_chroot as sys_arch32_chroot,
         sys_copy_file_range as sys_arch32_copy_file_range, sys_dup3 as sys_arch32_dup3,
@@ -3618,8 +3663,9 @@ mod arch32 {
         sys_preadv as sys_arch32_preadv, sys_pselect6 as sys_arch32_pselect6,
         sys_readv as sys_arch32_readv, sys_removexattr as sys_arch32_removexattr,
         sys_renameat2 as sys_arch32_renameat2, sys_select as sys_arch32__newselect,
-        sys_setxattr as sys_arch32_setxattr, sys_splice as sys_arch32_splice,
-        sys_statfs as sys_arch32_statfs, sys_symlinkat as sys_arch32_symlinkat,
+        sys_sendfile as sys_arch32_sendfile, sys_setxattr as sys_arch32_setxattr,
+        sys_splice as sys_arch32_splice, sys_statfs as sys_arch32_statfs,
+        sys_statx as sys_arch32_statx, sys_symlinkat as sys_arch32_symlinkat,
         sys_sync as sys_arch32_sync, sys_tee as sys_arch32_tee,
         sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,

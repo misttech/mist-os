@@ -980,12 +980,13 @@ mod arch32 {
 
     pub use super::{
         sys_accept as sys_arch32_accept, sys_accept4 as sys_arch32_accept4,
-        sys_bind as sys_arch32_bind, sys_getsockname as sys_arch32_getsockname,
-        sys_getsockopt as sys_arch32_getsockopt, sys_listen as sys_arch32_listen,
-        sys_recvfrom as sys_arch32_recvfrom, sys_recvmmsg as sys_arch32_recvmmsg,
-        sys_recvmsg as sys_arch32_recvmsg, sys_sendmsg as sys_arch32_sendmsg,
-        sys_sendto as sys_arch32_sendto, sys_setsockopt as sys_arch32_setsockopt,
-        sys_shutdown as sys_arch32_shutdown, sys_socketpair as sys_arch32_socketpair,
+        sys_bind as sys_arch32_bind, sys_getpeername as sys_arch32_getpeername,
+        sys_getsockname as sys_arch32_getsockname, sys_getsockopt as sys_arch32_getsockopt,
+        sys_listen as sys_arch32_listen, sys_recvfrom as sys_arch32_recvfrom,
+        sys_recvmmsg as sys_arch32_recvmmsg, sys_recvmsg as sys_arch32_recvmsg,
+        sys_sendmsg as sys_arch32_sendmsg, sys_sendto as sys_arch32_sendto,
+        sys_setsockopt as sys_arch32_setsockopt, sys_shutdown as sys_arch32_shutdown,
+        sys_socketpair as sys_arch32_socketpair,
     };
 
     pub fn sys_arch32_send(

@@ -55,6 +55,7 @@ mod arch32 {
     use crate::task::syscalls::do_clone;
     use crate::task::CurrentTask;
     use linux_uapi::{clone_args, pid_t};
+    use starnix_logging::track_stub;
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
     use starnix_uapi::signals::SIGCHLD;
@@ -68,6 +69,18 @@ mod arch32 {
         addr: UserAddress,
     ) -> Result<(), Errno> {
         current_task.thread_state.registers.set_thread_pointer_register(addr.ptr() as u64);
+        Ok(())
+    }
+
+    #[allow(non_snake_case)]
+    pub fn sys_arch32_ARM_cacheflush(
+        _locked: &mut Locked<'_, Unlocked>,
+        _current_task: &mut CurrentTask,
+        _start_addr: UserAddress,
+        _end_addr: UserAddress,
+        _: u64,
+    ) -> Result<(), Errno> {
+        track_stub!(TODO("https://fxbug.dev/415739883"), "Implement ARM_cacheflush syscall");
         Ok(())
     }
 

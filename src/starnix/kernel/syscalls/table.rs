@@ -141,16 +141,17 @@ pub fn dispatch_syscall(
     #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
     mod aarch64_arch32 {
         pub use crate::arch::syscalls::{
-            sys_arch32_ARM_set_tls, sys_arch32_vfork, sys_clone as sys_arch32_clone,
+            sys_arch32_ARM_cacheflush, sys_arch32_ARM_set_tls, sys_arch32_vfork,
+            sys_clone as sys_arch32_clone,
         };
         pub use crate::bpf::syscalls::sys_arch32_bpf;
         pub use crate::mm::syscalls::{
-            sys_arch32_futex, sys_arch32_madvise, sys_arch32_mincore, sys_arch32_mlock,
-            sys_arch32_mlock2, sys_arch32_mlockall, sys_arch32_mmap2, sys_arch32_mremap,
-            sys_arch32_msync, sys_arch32_munlock, sys_arch32_munlockall, sys_arch32_munmap,
-            sys_arch32_process_mrelease, sys_arch32_process_vm_readv, sys_arch32_set_robust_list,
-            sys_arch32_userfaultfd, sys_brk as sys_arch32_brk, sys_mprotect as sys_arch32_mprotect,
-            sys_process_madvise as sys_arch32_process_madvise,
+            sys_arch32_futex, sys_arch32_madvise, sys_arch32_membarrier, sys_arch32_mincore,
+            sys_arch32_mlock, sys_arch32_mlock2, sys_arch32_mlockall, sys_arch32_mmap2,
+            sys_arch32_mremap, sys_arch32_msync, sys_arch32_munlock, sys_arch32_munlockall,
+            sys_arch32_munmap, sys_arch32_process_mrelease, sys_arch32_process_vm_readv,
+            sys_arch32_set_robust_list, sys_arch32_userfaultfd, sys_brk as sys_arch32_brk,
+            sys_mprotect as sys_arch32_mprotect, sys_process_madvise as sys_arch32_process_madvise,
         };
         pub use crate::perf::sys_arch32_perf_event_open;
         pub use crate::signals::syscalls::{
@@ -181,13 +182,14 @@ pub fn dispatch_syscall(
             sys_arch32_execve, sys_arch32_getegid32, sys_arch32_geteuid32, sys_arch32_getgid32,
             sys_arch32_getgroups32, sys_arch32_getpgid, sys_arch32_getppid, sys_arch32_getpriority,
             sys_arch32_getresgid32, sys_arch32_getresuid32, sys_arch32_getrusage,
-            sys_arch32_ioprio_set, sys_arch32_ptrace, sys_arch32_sched_get_priority_max,
-            sys_arch32_sched_get_priority_min, sys_arch32_sched_getaffinity,
-            sys_arch32_sched_getparam, sys_arch32_sched_setaffinity, sys_arch32_sched_setparam,
-            sys_arch32_sched_setscheduler, sys_arch32_seccomp, sys_arch32_setfsuid,
-            sys_arch32_setfsuid32, sys_arch32_setgid32, sys_arch32_setgroups32, sys_arch32_setns,
-            sys_arch32_setpgid, sys_arch32_setpriority, sys_arch32_setresgid32,
-            sys_arch32_setresuid32, sys_arch32_setreuid, sys_arch32_setrlimit, sys_arch32_setsid,
+            sys_arch32_ioprio_set, sys_arch32_ptrace, sys_arch32_quotactl,
+            sys_arch32_sched_get_priority_max, sys_arch32_sched_get_priority_min,
+            sys_arch32_sched_getaffinity, sys_arch32_sched_getparam, sys_arch32_sched_setaffinity,
+            sys_arch32_sched_setparam, sys_arch32_sched_setscheduler, sys_arch32_seccomp,
+            sys_arch32_setfsuid, sys_arch32_setfsuid32, sys_arch32_setgid32,
+            sys_arch32_setgroups32, sys_arch32_setns, sys_arch32_setpgid, sys_arch32_setpriority,
+            sys_arch32_setregid32, sys_arch32_setresgid32, sys_arch32_setresuid32,
+            sys_arch32_setreuid, sys_arch32_setreuid32, sys_arch32_setrlimit, sys_arch32_setsid,
             sys_arch32_syslog, sys_arch32_ugetrlimit, sys_arch32_unshare,
             sys_capget as sys_arch32_capget, sys_capset as sys_arch32_capset,
             sys_clone3 as sys_arch32_clone3, sys_exit as sys_arch32_exit,
@@ -199,11 +201,12 @@ pub fn dispatch_syscall(
             sys_setuid as sys_arch32_setuid32,
         };
         pub use crate::vfs::socket::syscalls::{
-            sys_arch32_accept, sys_arch32_accept4, sys_arch32_bind, sys_arch32_getsockname,
-            sys_arch32_getsockopt, sys_arch32_listen, sys_arch32_recv, sys_arch32_recvfrom,
-            sys_arch32_recvmmsg, sys_arch32_recvmsg, sys_arch32_send, sys_arch32_sendmsg,
-            sys_arch32_sendto, sys_arch32_setsockopt, sys_arch32_shutdown, sys_arch32_socketpair,
-            sys_connect as sys_arch32_connect, sys_socket as sys_arch32_socket,
+            sys_arch32_accept, sys_arch32_accept4, sys_arch32_bind, sys_arch32_getpeername,
+            sys_arch32_getsockname, sys_arch32_getsockopt, sys_arch32_listen, sys_arch32_recv,
+            sys_arch32_recvfrom, sys_arch32_recvmmsg, sys_arch32_recvmsg, sys_arch32_send,
+            sys_arch32_sendmsg, sys_arch32_sendto, sys_arch32_setsockopt, sys_arch32_shutdown,
+            sys_arch32_socketpair, sys_connect as sys_arch32_connect,
+            sys_socket as sys_arch32_socket,
         };
         pub use crate::vfs::syscalls::{
             sys_arch32__llseek, sys_arch32__newselect, sys_arch32_access,
@@ -224,11 +227,12 @@ pub fn dispatch_syscall(
             sys_arch32_poll, sys_arch32_ppoll, sys_arch32_pread64, sys_arch32_preadv,
             sys_arch32_pselect6, sys_arch32_pwrite64, sys_arch32_readlink, sys_arch32_readv,
             sys_arch32_removexattr, sys_arch32_rename, sys_arch32_renameat2, sys_arch32_rmdir,
-            sys_arch32_setxattr, sys_arch32_splice, sys_arch32_stat64, sys_arch32_statfs,
-            sys_arch32_statfs64, sys_arch32_symlink, sys_arch32_symlinkat, sys_arch32_sync,
-            sys_arch32_tee, sys_arch32_timerfd_create, sys_arch32_timerfd_settime,
-            sys_arch32_truncate, sys_arch32_umask, sys_arch32_unlink, sys_arch32_utimensat,
-            sys_arch32_vmsplice, sys_close as sys_arch32_close, sys_dup as sys_arch32_dup,
+            sys_arch32_sendfile, sys_arch32_sendfile64, sys_arch32_setxattr, sys_arch32_splice,
+            sys_arch32_stat64, sys_arch32_statfs, sys_arch32_statfs64, sys_arch32_statx,
+            sys_arch32_symlink, sys_arch32_symlinkat, sys_arch32_sync, sys_arch32_tee,
+            sys_arch32_timerfd_create, sys_arch32_timerfd_settime, sys_arch32_truncate,
+            sys_arch32_umask, sys_arch32_unlink, sys_arch32_utimensat, sys_arch32_vmsplice,
+            sys_close as sys_arch32_close, sys_dup as sys_arch32_dup,
             sys_faccessat as sys_arch32_faccessat, sys_fcntl as sys_arch32_fcntl64,
             sys_getcwd as sys_arch32_getcwd, sys_getdents64 as sys_arch32_getdents64,
             sys_getxattr as sys_arch32_getxattr, sys_ioctl as sys_arch32_ioctl,
@@ -236,9 +240,8 @@ pub fn dispatch_syscall(
             sys_mount as sys_arch32_mount, sys_openat as sys_arch32_openat,
             sys_pipe2 as sys_arch32_pipe2, sys_pwritev as sys_arch32_pwritev,
             sys_read as sys_arch32_read, sys_readlinkat as sys_arch32_readlinkat,
-            sys_sendfile as sys_arch32_sendfile, sys_umount2 as sys_arch32_umount2,
-            sys_unlinkat as sys_arch32_unlinkat, sys_write as sys_arch32_write,
-            sys_writev as sys_arch32_writev,
+            sys_umount2 as sys_arch32_umount2, sys_unlinkat as sys_arch32_unlinkat,
+            sys_write as sys_arch32_write, sys_writev as sys_arch32_writev,
         };
     }
     #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
@@ -267,6 +270,7 @@ pub fn dispatch_syscall(
 
             // go/keep-sorted start
 
+            ARM_cacheflush[3],
             ARM_set_tls[1],
             _llseek[5],
             _newselect[5],
@@ -331,6 +335,7 @@ pub fn dispatch_syscall(
             geteuid32[0],
             getgid32[0],
             getgroups32[2],
+            getpeername[3],
             getpgid[1],
             getpid[0],
             getppid[0],
@@ -364,6 +369,7 @@ pub fn dispatch_syscall(
             lseek[3],
             lsetxattr[5],
             madvise[3],
+            membarrier[3],
             memfd_create[2],
             mincore[3],
             mkdir[2],
@@ -401,6 +407,7 @@ pub fn dispatch_syscall(
             ptrace[4],
             pwrite64[6],
             pwritev[4],
+            quotactl[4],
             read[3],
             readlink[3],
             readlinkat[4],
@@ -434,6 +441,7 @@ pub fn dispatch_syscall(
             sched_yield[0],
             seccomp[3],
             send[4],
+            sendfile64[4],
             sendfile[4],
             sendmsg[3],
             sendto[6],
@@ -447,8 +455,10 @@ pub fn dispatch_syscall(
             setns[2],
             setpgid[2],
             setpriority[3],
+            setregid32[2],
             setresgid32[3],
             setresuid32[3],
+            setreuid32[2],
             setreuid[2],
             setrlimit[2],
             setsid[0],
@@ -467,6 +477,7 @@ pub fn dispatch_syscall(
             stat64[2],
             statfs64[3],
             statfs[2],
+            statx[5],
             symlink[2],
             symlinkat[3],
             sync[0],
