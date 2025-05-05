@@ -71,7 +71,7 @@
             to: "#starnix_runner",
         },
         {
-            protocol: [ "fuchsia.netpol.socketproxy.StarnixNetworks" ],
+            protocol: [ "fuchsia.net.policy.socketproxy.StarnixNetworks" ],
             from: "#network",
             to: "#starnix_runner",
             availability: "optional",
