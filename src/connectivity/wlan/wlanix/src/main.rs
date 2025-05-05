@@ -1062,6 +1062,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
     responder: WithDefaultDrop<fidl_wlanix::Nl80211MessageResponder>,
     state: Arc<Mutex<WifiState>>,
     iface_manager: Arc<I>,
+    telemetry_sender: TelemetrySender,
 ) -> Result<(), Error> {
     let payload = match netlink_message {
         fidl_wlanix::Nl80211Message {
@@ -1180,9 +1181,15 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         .take()
                         .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
                         .context("Failed to ack TriggerScan")?;
+                    telemetry_sender.send(TelemetryEvent::ScanStart);
                     match client_iface.trigger_scan().await {
                         Ok(ScanEnd::Complete) => {
                             info!("Passive scan completed successfully");
+                            telemetry_sender.send(TelemetryEvent::ScanResult {
+                                result: wlan_telemetry::ScanResult::Complete {
+                                    num_results: client_iface.get_last_scan_results().len(),
+                                },
+                            });
                             if let Some(proxy) = state.lock().scan_multicast_proxy.as_ref() {
                                 proxy
                                     .message(fidl_wlanix::Nl80211MulticastMessageRequest {
@@ -1197,6 +1204,9 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         }
                         Ok(ScanEnd::Cancelled) => {
                             info!("Passive scan terminated");
+                            telemetry_sender.send(TelemetryEvent::ScanResult {
+                                result: wlan_telemetry::ScanResult::Cancelled,
+                            });
                             if let Some(proxy) = state.lock().scan_multicast_proxy.as_ref() {
                                 proxy
                                     .message(fidl_wlanix::Nl80211MulticastMessageRequest {
@@ -1211,6 +1221,9 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         }
                         Err(e) => {
                             error!("Failed to run passive scan: {:?}", e);
+                            telemetry_sender.send(TelemetryEvent::ScanResult {
+                                result: wlan_telemetry::ScanResult::Failed,
+                            });
                             if let Some(proxy) = state.lock().scan_multicast_proxy.as_ref() {
                                 proxy
                                     .message(fidl_wlanix::Nl80211MulticastMessageRequest {
@@ -1240,6 +1253,9 @@ async fn handle_nl80211_message<I: IfaceManager>(
                 Ok((client_iface, _)) => match client_iface.abort_scan().await {
                     Ok(()) => {
                         info!("Aborted scan successfully");
+                        telemetry_sender.send(TelemetryEvent::ScanResult {
+                            result: wlan_telemetry::ScanResult::Cancelled,
+                        });
                         responder
                             .take()
                             .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
@@ -1398,6 +1414,7 @@ async fn serve_nl80211<I: IfaceManager>(
     mut reqs: fidl_wlanix::Nl80211RequestStream,
     state: Arc<Mutex<WifiState>>,
     iface_manager: Arc<I>,
+    telemetry_sender: TelemetrySender,
 ) {
     loop {
         let Some(req) = reqs.next().await else {
@@ -1412,6 +1429,7 @@ async fn serve_nl80211<I: IfaceManager>(
                         WithDefaultDrop::new(responder),
                         Arc::clone(&state),
                         Arc::clone(&iface_manager),
+                        telemetry_sender.clone(),
                     )
                     .await
                     {
@@ -1481,7 +1499,13 @@ async fn handle_wlanix_request<I: IfaceManager>(
             info!("fidl_wlanix::WlanixRequest::GetNl80211");
             if let Some(nl80211) = payload.nl80211 {
                 let nl80211_stream = nl80211.into_stream();
-                serve_nl80211(nl80211_stream, Arc::clone(&state), Arc::clone(&iface_manager)).await;
+                serve_nl80211(
+                    nl80211_stream,
+                    Arc::clone(&state),
+                    Arc::clone(&iface_manager),
+                    telemetry_sender,
+                )
+                .await;
             }
         }
         fidl_wlanix::WlanixRequest::_UnknownMethod { ordinal, .. } => {
@@ -2788,7 +2812,9 @@ mod tests {
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new());
-        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager, telemetry_sender);
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let mut mcast_stream = get_nl80211_mcast(&proxy, "doesnt_exist");
@@ -2841,7 +2867,9 @@ mod tests {
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
-        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager, telemetry_sender);
         let mut nl80211_fut = pin!(nl80211_fut);
 
         // Create an nl80211 message with invalid command
@@ -2873,7 +2901,9 @@ mod tests {
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
-        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager, telemetry_sender);
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_interface_message = build_nl80211_message(Nl80211Cmd::GetInterface, vec![]);
@@ -2907,7 +2937,9 @@ mod tests {
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
-        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager, telemetry_sender);
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_station_message = build_nl80211_message(
@@ -2936,7 +2968,9 @@ mod tests {
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
-        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        let (telemetry_sender, mut telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager, telemetry_sender);
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let mut mcast_stream = get_nl80211_mcast(&proxy, "scan");
@@ -2957,12 +2991,22 @@ mod tests {
 
         let mut trigger_scan_fut = pin!(trigger_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ScanStart)));
+
         let responses = assert_variant!(
             exec.run_until_stalled(&mut trigger_scan_fut),
             Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
         );
         assert_eq!(responses.len(), 1);
         assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Ack));
+
+        assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ScanResult {
+                result: wlan_telemetry::ScanResult::Complete { .. }
+            }))
+        );
 
         // With our faked scan results we expect an immediate multicast notification.
         let mcast_msg =
@@ -2977,7 +3021,9 @@ mod tests {
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
-        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager, telemetry_sender);
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let trigger_scan_message = build_nl80211_message(Nl80211Cmd::TriggerScan, vec![]);
@@ -3001,7 +3047,9 @@ mod tests {
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
-        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager, telemetry_sender);
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let trigger_scan_message =
@@ -3019,9 +3067,12 @@ mod tests {
         );
     }
 
-    #[test_case(Ok(ScanEnd::Cancelled); "Scan cancelled by user")]
-    #[test_case(Err(format_err!("scan ended unexpectedly")); "Scan fails with error")]
-    fn scan_abort(scan_result: Result<ScanEnd, Error>) {
+    #[test_case(Ok(ScanEnd::Cancelled), wlan_telemetry::ScanResult::Cancelled; "Scan cancelled by user")]
+    #[test_case(Err(format_err!("scan ended unexpectedly")), wlan_telemetry::ScanResult::Failed; "Scan fails with error")]
+    fn trigger_scan_failed_or_cancelled(
+        scan_result: Result<ScanEnd, Error>,
+        expected_telemetry_result: wlan_telemetry::ScanResult,
+    ) {
         let mut exec = fasync::TestExecutor::new();
         let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
@@ -3029,7 +3080,9 @@ mod tests {
         let (iface_manager, scan_end_sender) =
             TestIfaceManager::new_with_client_and_scan_end_sender();
         let iface_manager = Arc::new(iface_manager);
-        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        let (telemetry_sender, mut telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager, telemetry_sender);
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let mut mcast_stream = get_nl80211_mcast(&proxy, "scan");
@@ -3052,11 +3105,58 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut trigger_scan_fut), Poll::Ready(_));
         assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ScanStart)));
+
         // After ending the scan we expect wlanix to broadcast the scan abort.
         scan_end_sender.send(scan_result).expect("Failed to send scan result");
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         let message = assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Ready(message) => message);
         assert_eq!(message.payload.cmd, Nl80211Cmd::ScanAborted);
+
+        let scan_result = assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ScanResult { result })) => result
+        );
+        assert_eq!(scan_result, expected_telemetry_result);
+    }
+
+    #[test]
+    fn abort_scan_sends_telemetry() {
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
+
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let iface_manager = Arc::new(TestIfaceManager::new_with_client());
+        let (telemetry_sender, mut telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager, telemetry_sender);
+        let mut nl80211_fut = pin!(nl80211_fut);
+
+        let mut mcast_stream = get_nl80211_mcast(&proxy, "scan");
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+
+        let next_mcast = next_mcast_message(&mut mcast_stream);
+        let mut next_mcast = pin!(next_mcast);
+        assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+
+        let abort_scan_message = build_nl80211_message(
+            Nl80211Cmd::AbortScan,
+            vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
+        );
+        let abort_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
+            message: Some(abort_scan_message),
+            ..Default::default()
+        });
+
+        let mut abort_scan_fut = pin!(abort_scan_fut);
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut abort_scan_fut), Poll::Ready(_));
+
+        let scan_result = assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ScanResult { result })) => result
+        );
+        assert_eq!(scan_result, wlan_telemetry::ScanResult::Cancelled);
     }
 
     #[test]
@@ -3066,7 +3166,9 @@ mod tests {
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
-        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager, telemetry_sender);
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_scan_message = build_nl80211_message(
@@ -3096,7 +3198,9 @@ mod tests {
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
-        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager, telemetry_sender);
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_scan_message = build_nl80211_message(Nl80211Cmd::GetScan, vec![]);
@@ -3120,7 +3224,9 @@ mod tests {
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
-        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager, telemetry_sender);
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_reg_message =
