@@ -171,8 +171,18 @@ void SerialDevice::DevfsConnect(fidl::ServerEnd<fuchsia_hardware_serial::DeviceP
 
 void SerialDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
   FDF_LOG(TRACE, "SerialDevice::PrepareStop");
-  Enable(false);
-  completer(zx::ok());
+
+  fdf::Arena arena('SERI');
+  serial_.buffer(arena)->CancelAll().Then([&serial = serial_, arena = std::move(arena),
+                                           completer = std::move(completer)](auto&) mutable {
+    // Explicitly ignoring the result of CancelAll.
+    FDF_LOG(TRACE, "SerialDevice::PrepareStop - pending operations aborted");
+    serial.buffer(arena)->Enable(false).Then([completer = std::move(completer)](auto&) mutable {
+      FDF_LOG(TRACE, "SerialDevice::PrepareStop - disabled serial");
+      // Explicitly ignoring the result of Enable.
+      completer(zx::ok());
+    });
+  });
 }
 
 zx::result<> SerialDevice::Start() {
