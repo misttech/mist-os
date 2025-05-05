@@ -431,9 +431,7 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(uint8_t* buffer, size_
 
   size_t remaining = uart_end - *uart_src;
   size_t copy_size = packet_length - *buffer_offset;
-  if (copy_size > remaining) {
-    copy_size = remaining;
-  }
+  copy_size = std::min(copy_size, remaining);
 
   ZX_ASSERT(*buffer_offset + copy_size <= buffer_size);
   memcpy(buffer + *buffer_offset, *uart_src, copy_size);
