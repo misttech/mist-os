@@ -29,11 +29,13 @@ rustc_library("hvdcp_opti_module") {
     "//sdk/fidl/fuchsia.hardware.qcom.hvdcpopti:fuchsia.hardware.qcom.hvdcpopti_rust",
     "//sdk/rust/zx",
     "//src/lib/fdio/rust:fdio",
+    "//src/lib/fidl/rust/fidl",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_syscalls",
     "//src/starnix/lib/starnix_uapi",
+    "//third_party/rust_crates:futures-util",
     "//third_party/rust_crates:zerocopy",
   ]
 }

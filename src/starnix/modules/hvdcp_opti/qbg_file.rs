@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::utils::{connect_to_device, ReadWriteBytesFile};
+use super::utils::{connect_to_device, connect_to_device_async, ReadWriteBytesFile};
 use fidl_fuchsia_hardware_qcom_hvdcpopti as fhvdcpopti;
+use futures_util::StreamExt;
 use starnix_core::device::kobject::KObject;
 use starnix_core::fs::sysfs::KObjectSymlinkDirectory;
 use starnix_core::mm::MemoryAccessorExt;
@@ -11,10 +12,10 @@ use starnix_core::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Wai
 use starnix_core::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
     DirectoryEntryType, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    InputBuffer, OutputBuffer, VecDirectory, VecDirectoryEntry,
+    InputBuffer, OutputBuffer, VecDirectory, VecDirectoryEntry, VecInputBuffer,
 };
 use starnix_logging::{log_error, log_warn, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, Locked, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -24,7 +25,8 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error};
-use std::sync::Weak;
+use std::collections::VecDeque;
+use std::sync::{Arc, Weak};
 
 pub const QBGIOCXCFG: u32 = 0x80684201;
 pub const QBGIOCXEPR: u32 = 0x80304202;
@@ -33,12 +35,12 @@ pub const QBGIOCXSTEPCHGCFG: u32 = 0xC0F74204;
 
 pub fn create_qbg_device(
     _locked: &mut Locked<'_, DeviceOpen>,
-    _current_task: &CurrentTask,
+    current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
-    Ok(Box::new(QbgDeviceFile::new()))
+    Ok(Box::new(QbgDeviceFile::new(current_task)))
 }
 
 pub struct QbgClassDirectory {
@@ -92,16 +94,67 @@ impl FsNodeOps for QbgClassDirectory {
     }
 }
 
+struct QbgDeviceState {
+    waiters: WaitQueue,
+    read_queue: Mutex<VecDeque<VecInputBuffer>>,
+}
+
+impl QbgDeviceState {
+    fn new() -> Self {
+        Self { waiters: WaitQueue::default(), read_queue: Mutex::new(VecDeque::new()) }
+    }
+
+    fn handle_event(&self, event: fhvdcpopti::DeviceEvent) {
+        let fhvdcpopti::DeviceEvent::OnFifoData { data } = event;
+        self.read_queue.lock().push_back(data.into());
+        self.waiters.notify_fd_events(FdEvents::POLLIN);
+    }
+}
+
+async fn run_qbg_device_event_loop(
+    device_state: Arc<QbgDeviceState>,
+    mut event_stream: fhvdcpopti::DeviceEventStream,
+) {
+    loop {
+        match event_stream.next().await {
+            Some(Ok(event)) => {
+                device_state.handle_event(event);
+            }
+            Some(Err(e)) => {
+                log_error!("qbg: Received error from device event stream: {}", e);
+                break;
+            }
+            None => {
+                log_warn!("qbg: Exhausted device event stream");
+                break;
+            }
+        }
+    }
+
+    device_state.waiters.notify_fd_events(FdEvents::POLLHUP);
+}
+
+fn spawn_qbg_device_tasks(device_state: Arc<QbgDeviceState>, current_task: &CurrentTask) {
+    current_task.kernel().kthreads.spawn_future(async move {
+        // Connect to the device on the main thread. The thread from which the task is being
+        // spawned does not yet have an executor, so it cannot make an async FIDL connection.
+        let proxy = connect_to_device_async().expect("Could not connect to hvdcpopti service");
+        run_qbg_device_event_loop(device_state, proxy.take_event_stream()).await;
+    });
+}
+
 struct QbgDeviceFile {
     hvdcpopti: fhvdcpopti::DeviceSynchronousProxy,
-    waiters: WaitQueue,
+    state: Arc<QbgDeviceState>,
 }
 
 impl QbgDeviceFile {
-    pub fn new() -> Self {
+    pub fn new(current_task: &CurrentTask) -> Self {
+        let state = Arc::new(QbgDeviceState::new());
+        spawn_qbg_device_tasks(state.clone(), current_task);
         Self {
             hvdcpopti: connect_to_device().expect("Could not connect to hvdcpopti service"),
-            waiters: WaitQueue::default(),
+            state,
         }
     }
 }
@@ -194,32 +247,32 @@ impl FileOps for QbgDeviceFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         _offset: usize,
         buffer: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        // Only used by qbg daemon and is not opened with O_NONBLOCK
-        if file.flags().contains(OpenFlags::NONBLOCK) {
-            log_error!("Non-blocking reads are not supported");
-            return error!(EINVAL);
-        }
+        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
+            let mut queue = self.state.read_queue.lock();
+            if queue.is_empty() {
+                return error!(EAGAIN);
+            }
 
-        let fhvdcpopti::DeviceEvent::OnFifoData { data } =
-            self.hvdcpopti.wait_for_event(zx::MonotonicInstant::INFINITE).map_err(|e| {
-                log_error!("Failed ot receive event: {:?}", e);
-                errno!(EINVAL)
-            })?;
+            // Try and pull as much data from the queue as possible to fill the buffer.
+            while buffer.available() > 0 {
+                let Some(data) = queue.front_mut() else {
+                    break;
+                };
 
-        if data.len() > buffer.available() {
-            log_warn!("Buffer too small");
-            // This means the data will only be partially written, with the rest discarded.
-            // Instead of attempting this, we'll instead return error to the client.
-            return error!(EINVAL);
-        }
+                buffer.write_buffer(data)?;
+                if data.available() == 0 {
+                    queue.pop_front();
+                }
+            }
 
-        buffer.write(&data)
+            Ok(buffer.bytes_written())
+        })
     }
 
     fn write(
@@ -251,6 +304,19 @@ impl FileOps for QbgDeviceFile {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        Some(self.waiters.wait_async_fd_events(waiter, events, handler))
+        Some(self.state.waiters.wait_async_fd_events(waiter, events, handler))
+    }
+
+    fn query_events(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        let mut events = FdEvents::POLLOUT;
+        if !self.state.read_queue.lock().is_empty() {
+            events |= FdEvents::POLLIN;
+        }
+        Ok(events)
     }
 }

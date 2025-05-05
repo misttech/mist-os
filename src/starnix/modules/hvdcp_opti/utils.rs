@@ -14,7 +14,11 @@ use starnix_uapi::{errno, error};
 use std::borrow::Cow;
 
 const HVDCP_OPTI_DIRECTORY: &str = "/svc/fuchsia.hardware.qcom.hvdcpopti.Service";
-pub fn connect_to_device() -> Result<fhvdcpopti::DeviceSynchronousProxy, Errno> {
+
+// TODO(b/415333931): Change the connection logic to not eagerly connect upon module initialization
+// or panic if the server is not available.
+
+fn connect_to_device_channel() -> Result<zx::Channel, Errno> {
     let mut dir = std::fs::read_dir(HVDCP_OPTI_DIRECTORY).map_err(|_| errno!(EINVAL))?;
     let Some(Ok(entry)) = dir.next() else {
         return error!(EBUSY);
@@ -24,8 +28,15 @@ pub fn connect_to_device() -> Result<fhvdcpopti::DeviceSynchronousProxy, Errno> 
 
     let (client_channel, server_channel) = zx::Channel::create();
     fdio::service_connect(&path, server_channel).map_err(|_| errno!(EINVAL))?;
+    Ok(client_channel)
+}
 
-    Ok(fhvdcpopti::DeviceSynchronousProxy::new(client_channel))
+pub fn connect_to_device() -> Result<fhvdcpopti::DeviceSynchronousProxy, Errno> {
+    Ok(fhvdcpopti::DeviceSynchronousProxy::new(connect_to_device_channel()?))
+}
+
+pub fn connect_to_device_async() -> Result<fhvdcpopti::DeviceProxy, Errno> {
+    Ok(fhvdcpopti::DeviceProxy::new(fidl::AsyncChannel::from_channel(connect_to_device_channel()?)))
 }
 
 // Current QBG context dump size is 2448 bytes (612 u32 members).
