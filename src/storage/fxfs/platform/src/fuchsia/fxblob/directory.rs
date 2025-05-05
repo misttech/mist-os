@@ -122,23 +122,34 @@ impl BlobDirectory {
     }
 
     /// Attempt to lookup and cache the blob with `id` in this directory.
-    ///
-    /// *WARNING*: Use caution when performing operations on the returned node handle. Unlike
-    /// [`Self::open_blob`], this function doesn't modify the node's open count, so the underlying
-    /// node can still be purged/unlinked even if there are still references to the node.
     pub(crate) async fn lookup_blob(self: &Arc<Self>, hash: Hash) -> Result<Arc<FxBlob>, Error> {
         // For simplify lookup logic, we re-use `open_blob` just decrement the open count before
         // returning the node handle.
         self.open_blob(&hash.into()).await?.ok_or_else(|| FxfsError::NotFound.into()).map(|blob| {
-            let node = blob.take();
-            node.clone().open_count_sub_one();
-            node
+            // Downgrade from an OpenedNode<Node> to a Node.
+            blob.clone()
         })
     }
 
-    /// Attempt to open and cache the blob with `id` in this directory. Returns `Ok(None)` if no
-    /// blob matching `id` was found.
-    pub(crate) async fn open_blob(
+    /// Open blob and get the child vmo. This allows the creation of the child vmo to be atomic with
+    /// the open.
+    pub(crate) async fn open_blob_get_vmo(
+        self: &Arc<Self>,
+        id: &Identifier,
+    ) -> Result<(Arc<FxBlob>, zx::Vmo), Error> {
+        let store = self.store();
+        let fs = store.filesystem();
+        let keys = lock_keys![LockKey::object(store.store_object_id(), self.directory.object_id())];
+        // A lock needs to be held over searching the directory and incrementing the open count.
+        let _guard = fs.lock_manager().read_lock(keys.clone()).await;
+        let blob = self.open_blob_locked(id).await?.ok_or(FxfsError::NotFound)?;
+        let vmo = blob.create_child_vmo()?;
+        // Downgrade from an OpenedNode<Node> to a Node.
+        Ok((blob.clone(), vmo))
+    }
+
+    /// Wraps ['open_blob_locked'] while taking the locks.
+    async fn open_blob(
         self: &Arc<Self>,
         id: &Identifier,
     ) -> Result<Option<OpenedNode<FxBlob>>, Error> {
@@ -147,7 +158,16 @@ impl BlobDirectory {
         let keys = lock_keys![LockKey::object(store.store_object_id(), self.directory.object_id())];
         // A lock needs to be held over searching the directory and incrementing the open count.
         let _guard = fs.lock_manager().read_lock(keys.clone()).await;
+        self.open_blob_locked(id).await
+    }
 
+    /// Attempt to open and cache the blob with `id` in this directory. Returns `Ok(None)` if no
+    /// blob matching `id` was found. Requires holding locks for at least the object store and
+    /// directory object.
+    async fn open_blob_locked(
+        self: &Arc<Self>,
+        id: &Identifier,
+    ) -> Result<Option<OpenedNode<FxBlob>>, Error> {
         let node = match self
             .directory
             .directory()
