@@ -89,8 +89,6 @@ python_host_test("fuchsia_controller_isolate_directory_test") {
 }
 
 python_host_test("fuchsia_controller_e2e_test") {
-  # TODO(https://fxbug.dev/346628306): Resolve mypy errors and enable type checking
-  enable_mypy = false
   main_source = "e2e.py"
   libraries = [
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_python",
