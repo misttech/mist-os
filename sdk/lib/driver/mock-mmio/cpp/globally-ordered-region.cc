@@ -62,9 +62,10 @@ fdf::MmioBuffer GloballyOrderedRegion::GetMmioBuffer() {
 
 uint64_t GloballyOrderedRegion::Read(zx_off_t address, GloballyOrderedRegion::Size size) const {
   const std::lock_guard<std::mutex> lock(mutex_);
-  if (access_index_ >= access_list_.size()) {
-    return 0;
-  }
+  ZX_ASSERT_MSG(access_index_ < access_list_.size(),
+                "Unexpected MMIO access after all expected accesses completed. "
+                "Got %d-byte read at address 0x%" PRIx64,
+                SizeInt(size), uint64_t{address});
 
   const GloballyOrderedRegion::Access& expected_access = access_list_[access_index_];
   ++access_index_;
@@ -95,7 +96,10 @@ uint64_t GloballyOrderedRegion::Read(zx_off_t address, GloballyOrderedRegion::Si
 void GloballyOrderedRegion::Write(zx_off_t address, uint64_t value,
                                   GloballyOrderedRegion::Size size) const {
   const std::lock_guard<std::mutex> lock(mutex_);
-  ZX_ASSERT(access_index_ < access_list_.size());
+  ZX_ASSERT_MSG(access_index_ < access_list_.size(),
+                "Unexpected MMIO access after all expected accesses completed. "
+                "Got %d-byte write of %" PRIu64 " (0x%" PRIx64 ") at address 0x%" PRIx64,
+                SizeInt(size), value, value, uint64_t{address});
 
   const GloballyOrderedRegion::Access& expected_access = access_list_[access_index_];
   ++access_index_;
