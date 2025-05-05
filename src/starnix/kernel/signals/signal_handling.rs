@@ -12,7 +12,7 @@ use crate::task::{
     CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskWriteGuard, ThreadState, Waiter,
 };
 use extended_pstate::ExtendedPstateState;
-use starnix_logging::{log_trace, log_warn};
+use starnix_logging::{log_info, log_trace, log_warn};
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
 use starnix_types::arch::ArchWidth;
@@ -258,6 +258,7 @@ pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut Curr
             siginfo.clone(),
             &mut current_task.thread_state.registers,
             &current_task.thread_state.extended_pstate,
+            None,
         ) {
             current_task.thread_group_exit(locked, status);
         }
@@ -271,6 +272,7 @@ pub fn deliver_signal(
     mut siginfo: SignalInfo,
     registers: &mut RegisterState,
     extended_pstate: &ExtendedPstateState,
+    restricted_exception: Option<zx::sys::zx_restricted_exception_t>,
 ) -> Option<ExitStatus> {
     loop {
         let sigaction = task.thread_group().signal_actions.get(siginfo.signal);
@@ -340,6 +342,13 @@ pub fn deliver_signal(
             DeliveryAction::CoreDump => {
                 task_state.set_flags(TaskFlags::DUMP_ON_EXIT, true);
                 drop(task_state);
+                if let Some(exception) = restricted_exception {
+                    log_info!(
+                        registers:?=exception.state,
+                        exception:?=exception.exception;
+                        "Restricted mode exception caused core dump",
+                    );
+                }
                 return Some(ExitStatus::CoreDump(siginfo));
             }
             DeliveryAction::Stop => {

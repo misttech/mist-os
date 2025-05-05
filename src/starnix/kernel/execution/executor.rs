@@ -363,7 +363,12 @@ fn process_restricted_exit(
             current_task.thread_state.registers =
                 zx::sys::zx_thread_state_general_regs_t::from(&restricted_exception.state).into();
             let exception_result = current_task.process_exception(&restricted_exception.exception);
-            process_completed_exception(&mut locked, current_task, exception_result);
+            process_completed_exception(
+                &mut locked,
+                current_task,
+                exception_result,
+                restricted_exception,
+            );
         }
         zx::sys::ZX_RESTRICTED_REASON_KICK => {
             firehose_trace_instant!(
@@ -627,6 +632,7 @@ fn process_completed_exception(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     exception_result: ExceptionResult,
+    restricted_exception: zx::sys::zx_restricted_exception_t,
 ) {
     match exception_result {
         ExceptionResult::Handled => {}
@@ -652,6 +658,7 @@ fn process_completed_exception(
                     signal.into(),
                     &mut registers,
                     &current_task.thread_state.extended_pstate,
+                    Some(restricted_exception),
                 ) {
                     current_task.thread_group_exit(locked, status);
                 }
