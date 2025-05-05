@@ -30,9 +30,8 @@ TEST_P(SocketTest, SocketTakesProcessLabel) {
   const SocketTestCase& test_case = GetParam();
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_test_no_trans_t:s0"), fit::ok());
 
-  fbl::unique_fd sockfd;
-  ASSERT_THAT((sockfd = fbl::unique_fd(socket(test_case.domain, test_case.type, 0))),
-              SyscallSucceeds());
+  fbl::unique_fd sockfd = fbl::unique_fd(socket(test_case.domain, test_case.type, 0));
+  ASSERT_TRUE(sockfd) << strerror(errno);
   EXPECT_EQ(GetLabel(sockfd.get()), "test_u:test_r:socket_test_no_trans_t:s0");
 }
 
@@ -88,10 +87,9 @@ TEST_P(SocketTransitionTest, SocketLabelingAccountsForTransitions) {
   const SocketTransitionTestCase& test_case = GetParam();
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_test_t:s0"), fit::ok());
 
-  fbl::unique_fd sockfd;
-  ASSERT_THAT(
-      (sockfd = fbl::unique_fd(socket(test_case.domain, test_case.type, test_case.protocol))),
-      SyscallSucceeds());
+  fbl::unique_fd sockfd =
+      fbl::unique_fd(socket(test_case.domain, test_case.type, test_case.protocol));
+  ASSERT_TRUE(sockfd) << strerror(errno);
   EXPECT_EQ(GetLabel(sockfd.get()), test_case.expected_label);
 }
 
@@ -118,8 +116,8 @@ INSTANTIATE_TEST_SUITE_P(
 TEST(SocketTest, SockFileLabelIsCorrect) {
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_test_t:s0"), fit::ok());
 
-  fbl::unique_fd sockfd;
-  ASSERT_THAT((sockfd = fbl::unique_fd(socket(AF_UNIX, SOCK_STREAM, 0))), SyscallSucceeds());
+  fbl::unique_fd sockfd = fbl::unique_fd(socket(AF_UNIX, SOCK_STREAM, 0));
+  ASSERT_TRUE(sockfd) << strerror(errno);
 
   struct sockaddr_un sock_addr;
   const char* kSockPath = "/tmp/test_sock_file";
