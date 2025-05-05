@@ -9,9 +9,9 @@ import fidl_codec
 
 class FuchsiaControllerTest(unittest.TestCase):
     def setUp(self) -> None:
-        fidl_codec.add_ir_path(  # type: ignore[attr-defined] # we don't have types for this cpp file
+        fidl_codec.add_ir_path(
             "fidling/gen/src/developer/ffx/lib/fuchsia-controller/fidl/fuchsia.controller.test.fidl.json"
         )
-        fidl_codec.add_ir_path(  # type: ignore[attr-defined] # we don't have types for this cpp file
+        fidl_codec.add_ir_path(
             "fidling/gen/src/developer/ffx/lib/fuchsia-controller/fidl/fuchsia.controller.othertest.fidl.json"
         )

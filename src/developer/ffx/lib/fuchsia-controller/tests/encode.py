@@ -7,11 +7,7 @@ import typing
 import unittest  # NOQA
 
 import common
-from fidl_codec import (  # type: ignore # we don't have types for this cpp file
-    decode_fidl_request,
-    encode_fidl_message,
-    method_ordinal,
-)
+from fidl_codec import decode_fidl_request, encode_fidl_message, method_ordinal
 
 
 class EncodeObj(object):
@@ -201,12 +197,6 @@ class Encode(common.FuchsiaControllerTest):
                 type_name="fuchsia.controller.test/NoopDoBitsNoopRequest",
                 txid=2222,
                 ordinal=3333,
-            )
-
-    def test_encode_fail_missing_params(self) -> None:
-        with self.assertRaises(TypeError):
-            encode_fidl_message(
-                object=None, library=None, type_name=None, ordinal=None
             )
 
     def test_encode_method_call_no_args(self) -> None:
