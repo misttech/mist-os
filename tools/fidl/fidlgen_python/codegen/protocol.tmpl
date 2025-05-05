@@ -47,7 +47,7 @@ class {{ .PythonServerName }}(ServerBase, ABC):
 
 {{ range .PythonMethods }}
     {{ if .HasRequest -}}
-    _MethodResponse_{{ .PythonName }}: typing.TypeAlias = {{ if (or .HasFrameworkError .HasError) }}typing.Union[
+    {{ .PythonResponseAlias }}: typing.TypeAlias = {{ if (or .HasFrameworkError .HasError) }}typing.Union[
         {{- if .HasFrameworkError -}}
         FrameworkError,
         {{ end -}}
@@ -73,7 +73,7 @@ class {{ .PythonServerName }}(ServerBase, ABC):
         {{- if .PythonRequestPayload }}
         request: {{ .PythonRequestPayload.PythonType.PythonName }},
         {{- end }}
-    ) -> typing.Coroutine[typing.Any, typing.Any, _MethodResponse_{{ .PythonName }}] | _MethodResponse_{{ .PythonName }}:
+    ) -> typing.Coroutine[typing.Any, typing.Any, {{ .PythonResponseAlias }}] | {{ .PythonResponseAlias }}:
         ...
     {{ else -}}
     def {{ .PythonName }}(

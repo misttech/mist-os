@@ -455,16 +455,13 @@ class SimpleProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_add: typing.TypeAlias = SimpleProtocolAddResponse
+    AddResponse: typing.TypeAlias = SimpleProtocolAddResponse
 
     @abstractmethod
     def add(
         self,
         request: SimpleProtocolAddRequest,
-    ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_add]
-        | _MethodResponse_add
-    ):
+    ) -> typing.Coroutine[typing.Any, typing.Any, AddResponse] | AddResponse:
         ...
 
 

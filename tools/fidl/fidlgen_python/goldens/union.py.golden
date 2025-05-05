@@ -2090,7 +2090,7 @@ class TestProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_strict_union_hence_response_may_be_stack_allocated: typing.TypeAlias = (
+    StrictUnionHenceResponseMayBeStackAllocatedResponse: typing.TypeAlias = (
         TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse
     )
 
@@ -2101,13 +2101,13 @@ class TestProtocolServer(ServerBase, ABC):
         typing.Coroutine[
             typing.Any,
             typing.Any,
-            _MethodResponse_strict_union_hence_response_may_be_stack_allocated,
+            StrictUnionHenceResponseMayBeStackAllocatedResponse,
         ]
-        | _MethodResponse_strict_union_hence_response_may_be_stack_allocated
+        | StrictUnionHenceResponseMayBeStackAllocatedResponse
     ):
         ...
 
-    _MethodResponse_flexible_union_hence_response_must_be_heap_allocated: typing.TypeAlias = (
+    FlexibleUnionHenceResponseMustBeHeapAllocatedResponse: typing.TypeAlias = (
         TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
     )
 
@@ -2118,9 +2118,9 @@ class TestProtocolServer(ServerBase, ABC):
         typing.Coroutine[
             typing.Any,
             typing.Any,
-            _MethodResponse_flexible_union_hence_response_must_be_heap_allocated,
+            FlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
         ]
-        | _MethodResponse_flexible_union_hence_response_must_be_heap_allocated
+        | FlexibleUnionHenceResponseMustBeHeapAllocatedResponse
     ):
         ...
 

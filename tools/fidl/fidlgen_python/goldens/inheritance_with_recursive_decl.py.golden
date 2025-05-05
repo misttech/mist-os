@@ -128,27 +128,26 @@ class ChildServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_first: typing.TypeAlias = None
+    FirstResponse: typing.TypeAlias = None
 
     @abstractmethod
     def first(
         self,
         request: ParentFirstRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_first]
-        | _MethodResponse_first
+        typing.Coroutine[typing.Any, typing.Any, FirstResponse] | FirstResponse
     ):
         ...
 
-    _MethodResponse_second: typing.TypeAlias = None
+    SecondResponse: typing.TypeAlias = None
 
     @abstractmethod
     def second(
         self,
         request: ChildSecondRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_second]
-        | _MethodResponse_second
+        typing.Coroutine[typing.Any, typing.Any, SecondResponse]
+        | SecondResponse
     ):
         ...
 
@@ -258,15 +257,14 @@ class ParentServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_first: typing.TypeAlias = None
+    FirstResponse: typing.TypeAlias = None
 
     @abstractmethod
     def first(
         self,
         request: ParentFirstRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_first]
-        | _MethodResponse_first
+        typing.Coroutine[typing.Any, typing.Any, FirstResponse] | FirstResponse
     ):
         ...
 

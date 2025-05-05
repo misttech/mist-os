@@ -1265,21 +1265,19 @@ class ComposedProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_one_way_anon_composed: typing.TypeAlias = None
+    OneWayAnonComposedResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_anon_composed(
         self,
         request: ComposedProtocolOneWayAnonComposedRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_anon_composed
-        ]
-        | _MethodResponse_one_way_anon_composed
+        typing.Coroutine[typing.Any, typing.Any, OneWayAnonComposedResponse]
+        | OneWayAnonComposedResponse
     ):
         ...
 
-    _MethodResponse_two_way_anon_composed: typing.TypeAlias = (
+    TwoWayAnonComposedResponse: typing.TypeAlias = (
         ComposedProtocolTwoWayAnonComposedResponse
     )
 
@@ -1288,19 +1286,15 @@ class ComposedProtocolServer(ServerBase, ABC):
         self,
         request: ComposedProtocolTwoWayAnonComposedRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_anon_composed
-        ]
-        | _MethodResponse_two_way_anon_composed
+        typing.Coroutine[typing.Any, typing.Any, TwoWayAnonComposedResponse]
+        | TwoWayAnonComposedResponse
     ):
         ...
 
-    _MethodResponse_two_way_anon_composed_with_error: typing.TypeAlias = (
-        typing.Union[
-            DomainError,
-            ComposedProtocolTwoWayAnonComposedWithErrorResponse,
-        ]
-    )
+    TwoWayAnonComposedWithErrorResponse: typing.TypeAlias = typing.Union[
+        DomainError,
+        ComposedProtocolTwoWayAnonComposedWithErrorResponse,
+    ]
 
     @abstractmethod
     def two_way_anon_composed_with_error(
@@ -1308,11 +1302,9 @@ class ComposedProtocolServer(ServerBase, ABC):
         request: ComposedProtocolTwoWayAnonComposedWithErrorRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any,
-            typing.Any,
-            _MethodResponse_two_way_anon_composed_with_error,
+            typing.Any, typing.Any, TwoWayAnonComposedWithErrorResponse
         ]
-        | _MethodResponse_two_way_anon_composed_with_error
+        | TwoWayAnonComposedWithErrorResponse
     ):
         ...
 
@@ -1328,40 +1320,34 @@ class ComposedProtocolServer(ServerBase, ABC):
             5307191872315199016, "test.protocollayoutssamelibrary", msg
         )
 
-    _MethodResponse_one_way_named_composed: typing.TypeAlias = None
+    OneWayNamedComposedResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_named_composed(
         self,
         request: TablePayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_named_composed
-        ]
-        | _MethodResponse_one_way_named_composed
+        typing.Coroutine[typing.Any, typing.Any, OneWayNamedComposedResponse]
+        | OneWayNamedComposedResponse
     ):
         ...
 
-    _MethodResponse_two_way_named_composed: typing.TypeAlias = TablePayload
+    TwoWayNamedComposedResponse: typing.TypeAlias = TablePayload
 
     @abstractmethod
     def two_way_named_composed(
         self,
         request: UnionPayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_named_composed
-        ]
-        | _MethodResponse_two_way_named_composed
+        typing.Coroutine[typing.Any, typing.Any, TwoWayNamedComposedResponse]
+        | TwoWayNamedComposedResponse
     ):
         ...
 
-    _MethodResponse_two_way_named_composed_with_error: typing.TypeAlias = (
-        typing.Union[
-            DomainError,
-            UnionPayload,
-        ]
-    )
+    TwoWayNamedComposedWithErrorResponse: typing.TypeAlias = typing.Union[
+        DomainError,
+        UnionPayload,
+    ]
 
     @abstractmethod
     def two_way_named_composed_with_error(
@@ -1369,11 +1355,9 @@ class ComposedProtocolServer(ServerBase, ABC):
         request: TablePayload,
     ) -> (
         typing.Coroutine[
-            typing.Any,
-            typing.Any,
-            _MethodResponse_two_way_named_composed_with_error,
+            typing.Any, typing.Any, TwoWayNamedComposedWithErrorResponse
         ]
-        | _MethodResponse_two_way_named_composed_with_error
+        | TwoWayNamedComposedWithErrorResponse
     ):
         ...
 
@@ -1692,21 +1676,19 @@ class MainProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_one_way_anon_composed: typing.TypeAlias = None
+    OneWayAnonComposedResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_anon_composed(
         self,
         request: ComposedProtocolOneWayAnonComposedRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_anon_composed
-        ]
-        | _MethodResponse_one_way_anon_composed
+        typing.Coroutine[typing.Any, typing.Any, OneWayAnonComposedResponse]
+        | OneWayAnonComposedResponse
     ):
         ...
 
-    _MethodResponse_two_way_anon_composed: typing.TypeAlias = (
+    TwoWayAnonComposedResponse: typing.TypeAlias = (
         ComposedProtocolTwoWayAnonComposedResponse
     )
 
@@ -1715,19 +1697,15 @@ class MainProtocolServer(ServerBase, ABC):
         self,
         request: ComposedProtocolTwoWayAnonComposedRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_anon_composed
-        ]
-        | _MethodResponse_two_way_anon_composed
+        typing.Coroutine[typing.Any, typing.Any, TwoWayAnonComposedResponse]
+        | TwoWayAnonComposedResponse
     ):
         ...
 
-    _MethodResponse_two_way_anon_composed_with_error: typing.TypeAlias = (
-        typing.Union[
-            DomainError,
-            ComposedProtocolTwoWayAnonComposedWithErrorResponse,
-        ]
-    )
+    TwoWayAnonComposedWithErrorResponse: typing.TypeAlias = typing.Union[
+        DomainError,
+        ComposedProtocolTwoWayAnonComposedWithErrorResponse,
+    ]
 
     @abstractmethod
     def two_way_anon_composed_with_error(
@@ -1735,11 +1713,9 @@ class MainProtocolServer(ServerBase, ABC):
         request: ComposedProtocolTwoWayAnonComposedWithErrorRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any,
-            typing.Any,
-            _MethodResponse_two_way_anon_composed_with_error,
+            typing.Any, typing.Any, TwoWayAnonComposedWithErrorResponse
         ]
-        | _MethodResponse_two_way_anon_composed_with_error
+        | TwoWayAnonComposedWithErrorResponse
     ):
         ...
 
@@ -1755,40 +1731,34 @@ class MainProtocolServer(ServerBase, ABC):
             5307191872315199016, "test.protocollayoutssamelibrary", msg
         )
 
-    _MethodResponse_one_way_named_composed: typing.TypeAlias = None
+    OneWayNamedComposedResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_named_composed(
         self,
         request: TablePayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_named_composed
-        ]
-        | _MethodResponse_one_way_named_composed
+        typing.Coroutine[typing.Any, typing.Any, OneWayNamedComposedResponse]
+        | OneWayNamedComposedResponse
     ):
         ...
 
-    _MethodResponse_two_way_named_composed: typing.TypeAlias = TablePayload
+    TwoWayNamedComposedResponse: typing.TypeAlias = TablePayload
 
     @abstractmethod
     def two_way_named_composed(
         self,
         request: UnionPayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_named_composed
-        ]
-        | _MethodResponse_two_way_named_composed
+        typing.Coroutine[typing.Any, typing.Any, TwoWayNamedComposedResponse]
+        | TwoWayNamedComposedResponse
     ):
         ...
 
-    _MethodResponse_two_way_named_composed_with_error: typing.TypeAlias = (
-        typing.Union[
-            DomainError,
-            UnionPayload,
-        ]
-    )
+    TwoWayNamedComposedWithErrorResponse: typing.TypeAlias = typing.Union[
+        DomainError,
+        UnionPayload,
+    ]
 
     @abstractmethod
     def two_way_named_composed_with_error(
@@ -1796,11 +1766,9 @@ class MainProtocolServer(ServerBase, ABC):
         request: TablePayload,
     ) -> (
         typing.Coroutine[
-            typing.Any,
-            typing.Any,
-            _MethodResponse_two_way_named_composed_with_error,
+            typing.Any, typing.Any, TwoWayNamedComposedWithErrorResponse
         ]
-        | _MethodResponse_two_way_named_composed_with_error
+        | TwoWayNamedComposedWithErrorResponse
     ):
         ...
 
@@ -1816,31 +1784,31 @@ class MainProtocolServer(ServerBase, ABC):
             1712755118419701115, "test.protocollayoutssamelibrary", msg
         )
 
-    _MethodResponse_one_way_local: typing.TypeAlias = None
+    OneWayLocalResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_local(
         self,
         request: TablePayload,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_one_way_local]
-        | _MethodResponse_one_way_local
+        typing.Coroutine[typing.Any, typing.Any, OneWayLocalResponse]
+        | OneWayLocalResponse
     ):
         ...
 
-    _MethodResponse_two_way_local: typing.TypeAlias = TablePayload
+    TwoWayLocalResponse: typing.TypeAlias = TablePayload
 
     @abstractmethod
     def two_way_local(
         self,
         request: UnionPayload,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_two_way_local]
-        | _MethodResponse_two_way_local
+        typing.Coroutine[typing.Any, typing.Any, TwoWayLocalResponse]
+        | TwoWayLocalResponse
     ):
         ...
 
-    _MethodResponse_two_way_local_with_error: typing.TypeAlias = typing.Union[
+    TwoWayLocalWithErrorResponse: typing.TypeAlias = typing.Union[
         DomainError,
         UnionPayload,
     ]
@@ -1850,10 +1818,8 @@ class MainProtocolServer(ServerBase, ABC):
         self,
         request: TablePayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_local_with_error
-        ]
-        | _MethodResponse_two_way_local_with_error
+        typing.Coroutine[typing.Any, typing.Any, TwoWayLocalWithErrorResponse]
+        | TwoWayLocalWithErrorResponse
     ):
         ...
 
@@ -1869,33 +1835,31 @@ class MainProtocolServer(ServerBase, ABC):
             8208103053879750285, "test.protocollayoutssamelibrary", msg
         )
 
-    _MethodResponse_one_way_anon: typing.TypeAlias = None
+    OneWayAnonResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_anon(
         self,
         request: MainProtocolOneWayAnonRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_one_way_anon]
-        | _MethodResponse_one_way_anon
+        typing.Coroutine[typing.Any, typing.Any, OneWayAnonResponse]
+        | OneWayAnonResponse
     ):
         ...
 
-    _MethodResponse_two_way_anon: typing.TypeAlias = (
-        MainProtocolTwoWayAnonResponse
-    )
+    TwoWayAnonResponse: typing.TypeAlias = MainProtocolTwoWayAnonResponse
 
     @abstractmethod
     def two_way_anon(
         self,
         request: MainProtocolTwoWayAnonRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_two_way_anon]
-        | _MethodResponse_two_way_anon
+        typing.Coroutine[typing.Any, typing.Any, TwoWayAnonResponse]
+        | TwoWayAnonResponse
     ):
         ...
 
-    _MethodResponse_two_way_anon_with_error: typing.TypeAlias = typing.Union[
+    TwoWayAnonWithErrorResponse: typing.TypeAlias = typing.Union[
         DomainError,
         MainProtocolTwoWayAnonWithErrorResponse,
     ]
@@ -1905,10 +1869,8 @@ class MainProtocolServer(ServerBase, ABC):
         self,
         request: MainProtocolTwoWayAnonWithErrorRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_anon_with_error
-        ]
-        | _MethodResponse_two_way_anon_with_error
+        typing.Coroutine[typing.Any, typing.Any, TwoWayAnonWithErrorResponse]
+        | TwoWayAnonWithErrorResponse
     ):
         ...
 

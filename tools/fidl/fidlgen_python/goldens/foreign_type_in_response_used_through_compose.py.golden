@@ -55,16 +55,14 @@ class TopServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_get_foo: typing.TypeAlias = (
-        fidl_test_middle.MiddleGetFooResponse
-    )
+    GetFooResponse: typing.TypeAlias = fidl_test_middle.MiddleGetFooResponse
 
     @abstractmethod
     def get_foo(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_get_foo]
-        | _MethodResponse_get_foo
+        typing.Coroutine[typing.Any, typing.Any, GetFooResponse]
+        | GetFooResponse
     ):
         ...
 

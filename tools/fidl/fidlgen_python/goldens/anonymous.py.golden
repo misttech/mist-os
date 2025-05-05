@@ -588,7 +588,7 @@ class SomeProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_some_method: typing.TypeAlias = typing.Union[
+    SomeMethodResponse: typing.TypeAlias = typing.Union[
         DomainError,
         SomeProtocolSomeMethodResponse,
     ]
@@ -598,8 +598,8 @@ class SomeProtocolServer(ServerBase, ABC):
         self,
         request: SomeProtocolSomeMethodRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_some_method]
-        | _MethodResponse_some_method
+        typing.Coroutine[typing.Any, typing.Any, SomeMethodResponse]
+        | SomeMethodResponse
     ):
         ...
 

@@ -1157,7 +1157,7 @@ class DenyEachBindingServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_only_deny_cpp: typing.TypeAlias = typing.Union[
+    OnlyDenyCppResponse: typing.TypeAlias = typing.Union[
         DomainError,
         DenyEachBindingOnlyDenyCppResponse,
     ]
@@ -1167,12 +1167,12 @@ class DenyEachBindingServer(ServerBase, ABC):
         self,
         request: DenyEachBindingOnlyDenyCppRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_only_deny_cpp]
-        | _MethodResponse_only_deny_cpp
+        typing.Coroutine[typing.Any, typing.Any, OnlyDenyCppResponse]
+        | OnlyDenyCppResponse
     ):
         ...
 
-    _MethodResponse_only_deny_dart: typing.TypeAlias = typing.Union[
+    OnlyDenyDartResponse: typing.TypeAlias = typing.Union[
         DomainError,
         DenyEachBindingOnlyDenyDartResponse,
     ]
@@ -1182,12 +1182,12 @@ class DenyEachBindingServer(ServerBase, ABC):
         self,
         request: DenyEachBindingOnlyDenyDartRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_only_deny_dart]
-        | _MethodResponse_only_deny_dart
+        typing.Coroutine[typing.Any, typing.Any, OnlyDenyDartResponse]
+        | OnlyDenyDartResponse
     ):
         ...
 
-    _MethodResponse_only_deny_go: typing.TypeAlias = typing.Union[
+    OnlyDenyGoResponse: typing.TypeAlias = typing.Union[
         DomainError,
         DenyEachBindingOnlyDenyGoResponse,
     ]
@@ -1197,12 +1197,12 @@ class DenyEachBindingServer(ServerBase, ABC):
         self,
         request: DenyEachBindingOnlyDenyGoRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_only_deny_go]
-        | _MethodResponse_only_deny_go
+        typing.Coroutine[typing.Any, typing.Any, OnlyDenyGoResponse]
+        | OnlyDenyGoResponse
     ):
         ...
 
-    _MethodResponse_only_deny_rust: typing.TypeAlias = typing.Union[
+    OnlyDenyRustResponse: typing.TypeAlias = typing.Union[
         DomainError,
         DenyEachBindingOnlyDenyRustResponse,
     ]
@@ -1212,12 +1212,12 @@ class DenyEachBindingServer(ServerBase, ABC):
         self,
         request: DenyEachBindingOnlyDenyRustRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_only_deny_rust]
-        | _MethodResponse_only_deny_rust
+        typing.Coroutine[typing.Any, typing.Any, OnlyDenyRustResponse]
+        | OnlyDenyRustResponse
     ):
         ...
 
-    _MethodResponse_only_deny_syzkaller: typing.TypeAlias = typing.Union[
+    OnlyDenySyzkallerResponse: typing.TypeAlias = typing.Union[
         DomainError,
         DenyEachBindingOnlyDenySyzkallerResponse,
     ]
@@ -1227,10 +1227,8 @@ class DenyEachBindingServer(ServerBase, ABC):
         self,
         request: DenyEachBindingOnlyDenySyzkallerRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_only_deny_syzkaller
-        ]
-        | _MethodResponse_only_deny_syzkaller
+        typing.Coroutine[typing.Any, typing.Any, OnlyDenySyzkallerResponse]
+        | OnlyDenySyzkallerResponse
     ):
         ...
 
@@ -1411,29 +1409,27 @@ class ImportsSameNameContextServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_unattributed: typing.TypeAlias = None
+    UnattributedResponse: typing.TypeAlias = None
 
     @abstractmethod
     def unattributed(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_unattributed]
-        | _MethodResponse_unattributed
+        typing.Coroutine[typing.Any, typing.Any, UnattributedResponse]
+        | UnattributedResponse
     ):
         ...
 
-    _MethodResponse_always_appears_in_importing_library: typing.TypeAlias = None
+    AlwaysAppearsInImportingLibraryResponse: typing.TypeAlias = None
 
     @abstractmethod
     def always_appears_in_importing_library(
         self,
     ) -> (
         typing.Coroutine[
-            typing.Any,
-            typing.Any,
-            _MethodResponse_always_appears_in_importing_library,
+            typing.Any, typing.Any, AlwaysAppearsInImportingLibraryResponse
         ]
-        | _MethodResponse_always_appears_in_importing_library
+        | AlwaysAppearsInImportingLibraryResponse
     ):
         ...
 

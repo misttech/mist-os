@@ -380,14 +380,14 @@ class InterfaceServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_method: typing.TypeAlias = None
+    MethodResponse: typing.TypeAlias = None
 
     @abstractmethod
     def method(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_method]
-        | _MethodResponse_method
+        typing.Coroutine[typing.Any, typing.Any, MethodResponse]
+        | MethodResponse
     ):
         ...
 

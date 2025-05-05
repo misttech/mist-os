@@ -52,16 +52,14 @@ class FirstProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_method_on_first: typing.TypeAlias = None
+    MethodOnFirstResponse: typing.TypeAlias = None
 
     @abstractmethod
     def method_on_first(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_method_on_first
-        ]
-        | _MethodResponse_method_on_first
+        typing.Coroutine[typing.Any, typing.Any, MethodOnFirstResponse]
+        | MethodOnFirstResponse
     ):
         ...
 
@@ -151,16 +149,14 @@ class SecondProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_method_on_second: typing.TypeAlias = None
+    MethodOnSecondResponse: typing.TypeAlias = None
 
     @abstractmethod
     def method_on_second(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_method_on_second
-        ]
-        | _MethodResponse_method_on_second
+        typing.Coroutine[typing.Any, typing.Any, MethodOnSecondResponse]
+        | MethodOnSecondResponse
     ):
         ...
 

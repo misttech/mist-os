@@ -1761,15 +1761,15 @@ class ChannelProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_method_a: typing.TypeAlias = None
+    MethodAResponse: typing.TypeAlias = None
 
     @abstractmethod
     def method_a(
         self,
         request: ChannelProtocolMethodARequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_method_a]
-        | _MethodResponse_method_a
+        typing.Coroutine[typing.Any, typing.Any, MethodAResponse]
+        | MethodAResponse
     ):
         ...
 
@@ -1785,41 +1785,39 @@ class ChannelProtocolServer(ServerBase, ABC):
         )
         self._send_event(2220452875311597006, "test.protocols", msg)
 
-    _MethodResponse_method_b: typing.TypeAlias = ChannelProtocolMethodBResponse
+    MethodBResponse: typing.TypeAlias = ChannelProtocolMethodBResponse
 
     @abstractmethod
     def method_b(
         self,
         request: ChannelProtocolMethodBRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_method_b]
-        | _MethodResponse_method_b
+        typing.Coroutine[typing.Any, typing.Any, MethodBResponse]
+        | MethodBResponse
     ):
         ...
 
-    _MethodResponse_take_handle: typing.TypeAlias = None
+    TakeHandleResponse: typing.TypeAlias = None
 
     @abstractmethod
     def take_handle(
         self,
         request: ChannelProtocolTakeHandleRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_take_handle]
-        | _MethodResponse_take_handle
+        typing.Coroutine[typing.Any, typing.Any, TakeHandleResponse]
+        | TakeHandleResponse
     ):
         ...
 
-    _MethodResponse_mutate_socket: typing.TypeAlias = (
-        ChannelProtocolMutateSocketResponse
-    )
+    MutateSocketResponse: typing.TypeAlias = ChannelProtocolMutateSocketResponse
 
     @abstractmethod
     def mutate_socket(
         self,
         request: ChannelProtocolMutateSocketRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_mutate_socket]
-        | _MethodResponse_mutate_socket
+        typing.Coroutine[typing.Any, typing.Any, MutateSocketResponse]
+        | MutateSocketResponse
     ):
         ...
 
@@ -1986,14 +1984,14 @@ class DiscoverableProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_method: typing.TypeAlias = None
+    MethodResponse: typing.TypeAlias = None
 
     @abstractmethod
     def method(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_method]
-        | _MethodResponse_method
+        typing.Coroutine[typing.Any, typing.Any, MethodResponse]
+        | MethodResponse
     ):
         ...
 
@@ -2091,21 +2089,19 @@ class HandleRightsProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_no_response_method: typing.TypeAlias = None
+    NoResponseMethodResponse: typing.TypeAlias = None
 
     @abstractmethod
     def no_response_method(
         self,
         request: HandleRightsProtocolNoResponseMethodRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_no_response_method
-        ]
-        | _MethodResponse_no_response_method
+        typing.Coroutine[typing.Any, typing.Any, NoResponseMethodResponse]
+        | NoResponseMethodResponse
     ):
         ...
 
-    _MethodResponse_response_method: typing.TypeAlias = (
+    ResponseMethodResponse: typing.TypeAlias = (
         HandleRightsProtocolResponseMethodResponse
     )
 
@@ -2114,10 +2110,8 @@ class HandleRightsProtocolServer(ServerBase, ABC):
         self,
         request: HandleRightsProtocolResponseMethodRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_response_method
-        ]
-        | _MethodResponse_response_method
+        typing.Coroutine[typing.Any, typing.Any, ResponseMethodResponse]
+        | ResponseMethodResponse
     ):
         ...
 
@@ -2256,15 +2250,15 @@ class ManyParametersServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_fifteen: typing.TypeAlias = None
+    FifteenResponse: typing.TypeAlias = None
 
     @abstractmethod
     def fifteen(
         self,
         request: ManyParametersFifteenRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_fifteen]
-        | _MethodResponse_fifteen
+        typing.Coroutine[typing.Any, typing.Any, FifteenResponse]
+        | FifteenResponse
     ):
         ...
 
@@ -2386,17 +2380,15 @@ class MethodWithUnionServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_union_method: typing.TypeAlias = (
-        MethodWithUnionUnionMethodResponse
-    )
+    UnionMethodResponse: typing.TypeAlias = MethodWithUnionUnionMethodResponse
 
     @abstractmethod
     def union_method(
         self,
         request: MethodWithUnionUnionMethodRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_union_method]
-        | _MethodResponse_union_method
+        typing.Coroutine[typing.Any, typing.Any, UnionMethodResponse]
+        | UnionMethodResponse
     ):
         ...
 
@@ -2596,33 +2588,29 @@ class WithAndWithoutRequestResponseServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_no_request_no_response: typing.TypeAlias = None
+    NoRequestNoResponseResponse: typing.TypeAlias = None
 
     @abstractmethod
     def no_request_no_response(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_no_request_no_response
-        ]
-        | _MethodResponse_no_request_no_response
+        typing.Coroutine[typing.Any, typing.Any, NoRequestNoResponseResponse]
+        | NoRequestNoResponseResponse
     ):
         ...
 
-    _MethodResponse_no_request_empty_response: typing.TypeAlias = None
+    NoRequestEmptyResponseResponse: typing.TypeAlias = None
 
     @abstractmethod
     def no_request_empty_response(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_no_request_empty_response
-        ]
-        | _MethodResponse_no_request_empty_response
+        typing.Coroutine[typing.Any, typing.Any, NoRequestEmptyResponseResponse]
+        | NoRequestEmptyResponseResponse
     ):
         ...
 
-    _MethodResponse_no_request_with_response: typing.TypeAlias = (
+    NoRequestWithResponseResponse: typing.TypeAlias = (
         WithAndWithoutRequestResponseNoRequestWithResponseResponse
     )
 
@@ -2630,28 +2618,24 @@ class WithAndWithoutRequestResponseServer(ServerBase, ABC):
     def no_request_with_response(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_no_request_with_response
-        ]
-        | _MethodResponse_no_request_with_response
+        typing.Coroutine[typing.Any, typing.Any, NoRequestWithResponseResponse]
+        | NoRequestWithResponseResponse
     ):
         ...
 
-    _MethodResponse_with_request_no_response: typing.TypeAlias = None
+    WithRequestNoResponseResponse: typing.TypeAlias = None
 
     @abstractmethod
     def with_request_no_response(
         self,
         request: WithAndWithoutRequestResponseWithRequestNoResponseRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_with_request_no_response
-        ]
-        | _MethodResponse_with_request_no_response
+        typing.Coroutine[typing.Any, typing.Any, WithRequestNoResponseResponse]
+        | WithRequestNoResponseResponse
     ):
         ...
 
-    _MethodResponse_with_request_empty_response: typing.TypeAlias = None
+    WithRequestEmptyResponseResponse: typing.TypeAlias = None
 
     @abstractmethod
     def with_request_empty_response(
@@ -2659,13 +2643,13 @@ class WithAndWithoutRequestResponseServer(ServerBase, ABC):
         request: WithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_with_request_empty_response
+            typing.Any, typing.Any, WithRequestEmptyResponseResponse
         ]
-        | _MethodResponse_with_request_empty_response
+        | WithRequestEmptyResponseResponse
     ):
         ...
 
-    _MethodResponse_with_request_with_response: typing.TypeAlias = (
+    WithRequestWithResponseResponse: typing.TypeAlias = (
         WithAndWithoutRequestResponseWithRequestWithResponseResponse
     )
 
@@ -2675,9 +2659,9 @@ class WithAndWithoutRequestResponseServer(ServerBase, ABC):
         request: WithAndWithoutRequestResponseWithRequestWithResponseRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_with_request_with_response
+            typing.Any, typing.Any, WithRequestWithResponseResponse
         ]
-        | _MethodResponse_with_request_with_response
+        | WithRequestWithResponseResponse
     ):
         ...
 
@@ -2917,7 +2901,7 @@ class WithErrorSyntaxServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_response_as_struct: typing.TypeAlias = typing.Union[
+    ResponseAsStructResponse: typing.TypeAlias = typing.Union[
         DomainError,
         WithErrorSyntaxResponseAsStructResponse,
     ]
@@ -2926,14 +2910,12 @@ class WithErrorSyntaxServer(ServerBase, ABC):
     def response_as_struct(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_response_as_struct
-        ]
-        | _MethodResponse_response_as_struct
+        typing.Coroutine[typing.Any, typing.Any, ResponseAsStructResponse]
+        | ResponseAsStructResponse
     ):
         ...
 
-    _MethodResponse_error_as_primitive: typing.TypeAlias = typing.Union[
+    ErrorAsPrimitiveResponse: typing.TypeAlias = typing.Union[
         DomainError,
         None,
     ]
@@ -2942,14 +2924,12 @@ class WithErrorSyntaxServer(ServerBase, ABC):
     def error_as_primitive(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_error_as_primitive
-        ]
-        | _MethodResponse_error_as_primitive
+        typing.Coroutine[typing.Any, typing.Any, ErrorAsPrimitiveResponse]
+        | ErrorAsPrimitiveResponse
     ):
         ...
 
-    _MethodResponse_error_as_enum: typing.TypeAlias = typing.Union[
+    ErrorAsEnumResponse: typing.TypeAlias = typing.Union[
         DomainError,
         None,
     ]
@@ -2958,12 +2938,12 @@ class WithErrorSyntaxServer(ServerBase, ABC):
     def error_as_enum(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_error_as_enum]
-        | _MethodResponse_error_as_enum
+        typing.Coroutine[typing.Any, typing.Any, ErrorAsEnumResponse]
+        | ErrorAsEnumResponse
     ):
         ...
 
-    _MethodResponse_handle_in_result: typing.TypeAlias = typing.Union[
+    HandleInResultResponse: typing.TypeAlias = typing.Union[
         DomainError,
         WithErrorSyntaxHandleInResultResponse,
     ]
@@ -2972,10 +2952,8 @@ class WithErrorSyntaxServer(ServerBase, ABC):
     def handle_in_result(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_handle_in_result
-        ]
-        | _MethodResponse_handle_in_result
+        typing.Coroutine[typing.Any, typing.Any, HandleInResultResponse]
+        | HandleInResultResponse
     ):
         ...
 
@@ -3129,35 +3107,31 @@ class WithProtocolEndsServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_client_ends: typing.TypeAlias = (
-        WithProtocolEndsClientEndsResponse
-    )
+    ClientEndsResponse: typing.TypeAlias = WithProtocolEndsClientEndsResponse
 
     @abstractmethod
     def client_ends(
         self,
         request: WithProtocolEndsClientEndsRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_client_ends]
-        | _MethodResponse_client_ends
+        typing.Coroutine[typing.Any, typing.Any, ClientEndsResponse]
+        | ClientEndsResponse
     ):
         ...
 
-    _MethodResponse_server_ends: typing.TypeAlias = (
-        WithProtocolEndsServerEndsResponse
-    )
+    ServerEndsResponse: typing.TypeAlias = WithProtocolEndsServerEndsResponse
 
     @abstractmethod
     def server_ends(
         self,
         request: WithProtocolEndsServerEndsRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_server_ends]
-        | _MethodResponse_server_ends
+        typing.Coroutine[typing.Any, typing.Any, ServerEndsResponse]
+        | ServerEndsResponse
     ):
         ...
 
-    _MethodResponse_struct_containing_ends: typing.TypeAlias = (
+    StructContainingEndsResponse: typing.TypeAlias = (
         WithProtocolEndsStructContainingEndsResponse
     )
 
@@ -3166,10 +3140,8 @@ class WithProtocolEndsServer(ServerBase, ABC):
         self,
         request: WithProtocolEndsStructContainingEndsRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_struct_containing_ends
-        ]
-        | _MethodResponse_struct_containing_ends
+        typing.Coroutine[typing.Any, typing.Any, StructContainingEndsResponse]
+        | StructContainingEndsResponse
     ):
         ...
 

@@ -222,16 +222,13 @@ class EmptyProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_send: typing.TypeAlias = None
+    SendResponse: typing.TypeAlias = None
 
     @abstractmethod
     def send(
         self,
         request: EmptyProtocolSendRequest,
-    ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_send]
-        | _MethodResponse_send
-    ):
+    ) -> typing.Coroutine[typing.Any, typing.Any, SendResponse] | SendResponse:
         ...
 
     def receive(
@@ -244,7 +241,7 @@ class EmptyProtocolServer(ServerBase, ABC):
         )
         self._send_event(2301564782476583487, "test.emptystruct", msg)
 
-    _MethodResponse_send_and_receive: typing.TypeAlias = (
+    SendAndReceiveResponse: typing.TypeAlias = (
         EmptyProtocolSendAndReceiveResponse
     )
 
@@ -253,10 +250,8 @@ class EmptyProtocolServer(ServerBase, ABC):
         self,
         request: EmptyProtocolSendAndReceiveRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_send_and_receive
-        ]
-        | _MethodResponse_send_and_receive
+        typing.Coroutine[typing.Any, typing.Any, SendAndReceiveResponse]
+        | SendAndReceiveResponse
     ):
         ...
 

@@ -278,15 +278,12 @@ class ProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_foo: typing.TypeAlias = None
+    FooResponse: typing.TypeAlias = None
 
     @abstractmethod
     def foo(
         self,
-    ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_foo]
-        | _MethodResponse_foo
-    ):
+    ) -> typing.Coroutine[typing.Any, typing.Any, FooResponse] | FooResponse:
         ...
 
 

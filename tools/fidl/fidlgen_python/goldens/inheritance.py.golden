@@ -116,16 +116,13 @@ class SubServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_foo: typing.TypeAlias = SuperFooResponse
+    FooResponse: typing.TypeAlias = SuperFooResponse
 
     @abstractmethod
     def foo(
         self,
         request: SuperFooRequest,
-    ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_foo]
-        | _MethodResponse_foo
-    ):
+    ) -> typing.Coroutine[typing.Any, typing.Any, FooResponse] | FooResponse:
         ...
 
 
@@ -215,16 +212,13 @@ class SuperServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_foo: typing.TypeAlias = SuperFooResponse
+    FooResponse: typing.TypeAlias = SuperFooResponse
 
     @abstractmethod
     def foo(
         self,
         request: SuperFooRequest,
-    ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_foo]
-        | _MethodResponse_foo
-    ):
+    ) -> typing.Coroutine[typing.Any, typing.Any, FooResponse] | FooResponse:
         ...
 
 
