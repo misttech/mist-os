@@ -8,7 +8,6 @@ Tests of various (mostly hardcoded) properties returned from a WifiChip.
 import asyncio
 
 import fidl_fuchsia_wlan_wlanix as fidl_wlanix
-from antlion import base_test
 from mobly import test_runner
 from mobly.asserts import assert_equal
 from wlanix_testing import base_test
@@ -76,6 +75,7 @@ class WifiChipCorrectnessAndConsistencyTest(base_test.WifiChipBaseTestClass):
         response = asyncio.run(
             self.wifi_chip_proxy.get_sta_iface_names()
         ).unwrap()
+        assert response.iface_names is not None
         assert_equal(
             len(response.iface_names),
             0,

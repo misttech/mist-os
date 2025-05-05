@@ -11,15 +11,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 import fidl_fuchsia_wlan_device_service as fidl_wlan_device_service
-from antlion import base_test
 from antlion.controllers import fuchsia_device
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from honeydew.typing.custom_types import FidlEndpoint
-from mobly import test_runner
+from mobly import base_test, test_runner
 from mobly.asserts import abort_class_if
 
 
-class WlanCanaryTest(AsyncAdapter, base_test.AntlionBaseTest):
+class WlanCanaryTest(AsyncAdapter, base_test.BaseTestClass):
     def setup_class(self) -> None:
         fuchsia_devices = self.register_controller(fuchsia_device)
 
