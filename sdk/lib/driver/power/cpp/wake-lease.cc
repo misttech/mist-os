@@ -13,11 +13,6 @@
 
 namespace fdf_power {
 
-WakeLease::WakeLease(async_dispatcher_t* dispatcher, std::string_view lease_name,
-                     fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client,
-                     inspect::Node* parent_node, bool log)
-    : TimeoutWakeLease(dispatcher, lease_name, std::move(sag_client), parent_node, log) {}
-
 TimeoutWakeLease::TimeoutWakeLease(
     async_dispatcher_t* dispatcher, std::string_view lease_name,
     fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client, inspect::Node* parent_node,

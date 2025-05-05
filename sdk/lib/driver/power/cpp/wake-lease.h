@@ -107,13 +107,6 @@ class TimeoutWakeLease : public fidl::WireServer<fuchsia_power_system::ActivityG
   inspect::UintProperty wake_lease_last_refreshed_timestamp_;
 };
 
-class WakeLease : public TimeoutWakeLease {
- public:
-  WakeLease(async_dispatcher_t* dispatcher, std::string_view lease_name,
-            fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client,
-            inspect::Node* parent_node = nullptr, bool log = false);
-};
-
 // This is probably not the implementation you're looking for, consider using
 // `SharedWakeLeaseProvider`. `ManualWakeLease` may be appropriate if
 // `SharedWakeLeaseProvider` does not fit your needs.
