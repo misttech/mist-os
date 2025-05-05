@@ -121,21 +121,10 @@ def GetResolvedClangFromRust(tag, platforms):
 
 
 def main():
-    possible_manifest_locations = [
-        # Open-source checkout
-        "toolchain",
-        # Internal checkout
-        os.path.join("fuchsia", "toolchain"),
-        # smart-integration checkout
-        os.path.join("platform", "fuchsia", "toolchain"),
-    ]
-
     default_jiri_manifest = None
-    for path in possible_manifest_locations:
-        abs_path = os.path.join(FUCHSIA_DIR, "integration", path)
-        if os.path.exists(abs_path):
-            default_jiri_manifest = abs_path
-            break
+    abs_path = os.path.join(FUCHSIA_DIR, "manifests", "toolchain")
+    if os.path.exists(abs_path):
+        default_jiri_manifest = abs_path
 
     assert default_jiri_manifest, "failed to locate toolchain manifest"
 
@@ -264,7 +253,7 @@ before commands are run for any package.
     run(cmd)
 
     update_lockfiles = os.path.join(
-        FUCHSIA_DIR, "integration", "update-lockfiles.sh"
+        FUCHSIA_DIR, "manifests", "update-lockfiles.sh"
     )
     if os.path.isfile(update_lockfiles):
         run([update_lockfiles])
