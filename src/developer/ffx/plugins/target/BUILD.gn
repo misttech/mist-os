@@ -17,6 +17,7 @@ ffx_plugin("ffx_target") {
     "clear-preferred-ssh-address:ffx_target_clear_preferred_ssh_address",
     "default:ffx_target_default",
     "echo:ffx_target_echo",
+    "fastboot:ffx_fastboot_tool",
     "flash:ffx_flash",
     "get-ssh-address:ffx_get_ssh_address",
     "get-time:ffx_target_get_time",

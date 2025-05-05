@@ -11,6 +11,14 @@ ffx/target/default/get.golden
 ffx/target/default/set.golden
 ffx/target/default/unset.golden
 ffx/target/echo.golden
+ffx/target/fastboot.golden
+ffx/target/fastboot/continue.golden
+ffx/target/fastboot/flash.golden
+ffx/target/fastboot/getvar.golden
+ffx/target/fastboot/oem.golden
+ffx/target/fastboot/reboot.golden
+ffx/target/fastboot/sparse.golden
+ffx/target/fastboot/stage.golden
 ffx/target/flash.golden
 ffx/target/get-ssh-address.golden
 ffx/target/get-time.golden

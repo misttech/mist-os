@@ -21,6 +21,7 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/fastboot/transport/factory:*",
     "//src/developer/ffx/lib/manual_targets:*",
     "//src/developer/ffx/plugins/target/bootloader:*",
+    "//src/developer/ffx/plugins/target/fastboot:*",
     "//src/developer/ffx/plugins/target/flash:*",
   ]
 

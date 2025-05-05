@@ -182,7 +182,7 @@ async fn flash_partition_sparse<F: FastbootInterface>(
 }
 
 pub async fn flash_partition<F: FileResolver + Sync, T: FastbootInterface>(
-    messenger: &Sender<Event>,
+    messenger: Sender<Event>,
     file_resolver: &mut F,
     name: &str,
     file: &str,
@@ -193,7 +193,25 @@ pub async fn flash_partition<F: FileResolver + Sync, T: FastbootInterface>(
     let file_to_upload =
         file_resolver.get_file(file).await.context("reconciling file for upload")?;
     tracing::debug!("Preparing to upload {}", file_to_upload);
+    flash_partition_impl(
+        messenger,
+        name,
+        &file_to_upload,
+        fastboot_interface,
+        min_timeout_secs,
+        flash_timeout_rate_mb_per_second,
+    )
+    .await
+}
 
+pub async fn flash_partition_impl<T: FastbootInterface>(
+    messenger: Sender<Event>,
+    name: &str,
+    file_to_upload: &str,
+    fastboot_interface: &mut T,
+    min_timeout_secs: u64,
+    flash_timeout_rate_mb_per_second: u64,
+) -> Result<()> {
     // If the given file to flash is bigger than what the device can download
     // at once, we need to make a sparse image out of the given file
     let mut file_handle = File::open(&file_to_upload)
@@ -250,7 +268,7 @@ pub async fn flash_partition<F: FileResolver + Sync, T: FastbootInterface>(
 
                 flash_partition_sparse(
                     name,
-                    messenger,
+                    &messenger,
                     &unsparsed_temp_path.to_str().unwrap(),
                     fastboot_interface,
                     max_download_size,
@@ -264,7 +282,7 @@ pub async fn flash_partition<F: FileResolver + Sync, T: FastbootInterface>(
                 );
                 flash_partition_sparse(
                     name,
-                    messenger,
+                    &messenger,
                     &file_to_upload,
                     fastboot_interface,
                     max_download_size,
@@ -274,7 +292,7 @@ pub async fn flash_partition<F: FileResolver + Sync, T: FastbootInterface>(
             }
         }
     } else {
-        do_flash(name, messenger, fastboot_interface, &file_to_upload, timeout).await?;
+        do_flash(name, &messenger, fastboot_interface, &file_to_upload, timeout).await?;
     }
     messenger
         .send(Event::FlashPartitionFinished {
@@ -402,7 +420,7 @@ pub async fn flash_partitions<F: FileResolver + Sync, P: Partition, T: FastbootI
             (Some(var), Some(value)) => {
                 if verify_variable_value(var, value, fastboot_interface).await? {
                     flash_partition(
-                        messenger,
+                        messenger.clone(),
                         file_resolver,
                         partition.name(),
                         partition.file(),
@@ -415,7 +433,7 @@ pub async fn flash_partitions<F: FileResolver + Sync, P: Partition, T: FastbootI
             }
             _ => {
                 flash_partition(
-                    messenger,
+                    messenger.clone(),
                     file_resolver,
                     partition.name(),
                     partition.file(),

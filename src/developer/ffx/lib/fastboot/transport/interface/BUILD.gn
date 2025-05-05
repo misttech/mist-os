@@ -20,6 +20,7 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/fastboot:*",
     "//src/developer/ffx/lib/fastboot/transport/factory:*",
     "//src/developer/ffx/lib/manual_targets:*",
+    "//src/developer/ffx/plugins/target/fastboot:*",
   ]
 
   deps = [

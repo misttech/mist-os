@@ -16,6 +16,7 @@ rustc_library("lib") {
     "//src/developer/ffx/daemon/protocols/target_collection:*",
     "//src/developer/ffx/daemon/target:*",
     "//src/developer/ffx/plugins/target/bootloader:*",
+    "//src/developer/ffx/plugins/target/fastboot:*",
     "//src/developer/ffx/plugins/target/flash:*",
 
     # TODO(https://fxbug.dev/404090546): Refactor FlashManifestVersion to a smaller crate
