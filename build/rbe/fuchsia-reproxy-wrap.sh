@@ -330,6 +330,15 @@ then
   }
 fi
 
+# Diagnostics: report any RBE_ environment variables, as these may
+# override configured settings for reclient.
+if env | grep -q "^RBE_"
+then
+  echo "WARNING: detected the following reclient overrides in the environment:"
+  echo "  (if you encounter RBE-related errors, try unsetting these.)"
+  env | grep "^RBE" || :
+fi
+
 # Startup reproxy.
 # Use the same config for bootstrap as for reproxy.
 # This also checks for authentication, and prompts the user to
