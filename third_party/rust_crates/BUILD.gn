@@ -268,7 +268,7 @@ group("downcast-rs") {
 }
 
 group("dyn-clone") {
-  public_deps = [ ":dyn-clone-v1_0_5" ]
+  public_deps = [ ":dyn-clone-v1_0_19" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -5359,18 +5359,18 @@ rust_library("downcast-rs-v2_0_1") {
   applicable_licenses = [ ":downcast-rs-v2_0_1.license" ]
 }
 
-license("dyn-clone-v1_0_5.license") {
+license("dyn-clone-v1_0_19.license") {
   public_package_name = "dyn_clone"
   license_files = [
-    "//third_party/rust_crates/vendor/dyn-clone-1.0.5/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/dyn-clone-1.0.5/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/dyn-clone-1.0.19/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/dyn-clone-1.0.19/LICENSE-MIT",
   ]
 }
 
-rust_library("dyn-clone-v1_0_5") {
+rust_library("dyn-clone-v1_0_19") {
   crate_name = "dyn_clone"
-  crate_root = "//third_party/rust_crates/vendor/dyn-clone-1.0.5/src/lib.rs"
-  output_name = "dyn_clone-6a4f417762877a3"
+  crate_root = "//third_party/rust_crates/vendor/dyn-clone-1.0.19/src/lib.rs"
+  output_name = "dyn_clone-24a57329900761ca"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -5380,13 +5380,13 @@ rust_library("dyn-clone-v1_0_5") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=6a4f417762877a3",
-    "-Cextra-filename=-6a4f417762877a3",
+    "-Cmetadata=24a57329900761ca",
+    "-Cextra-filename=-24a57329900761ca",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":dyn-clone-v1_0_5.license" ]
+  applicable_licenses = [ ":dyn-clone-v1_0_19.license" ]
 }
 
 license("easy-parallel-v3_1_0.license") {
@@ -14554,7 +14554,7 @@ rust_library("schemars-v0_8_10") {
 
   deps = []
   deps += [ ":chrono-v0_4_34" ]
-  deps += [ ":dyn-clone-v1_0_5" ]
+  deps += [ ":dyn-clone-v1_0_19" ]
   deps += [ ":indexmap-v1_9_2" ]
   deps += [ ":schemars_derive-v0_8_10($host_toolchain)" ]
   deps += [ ":serde-v1_0_204" ]

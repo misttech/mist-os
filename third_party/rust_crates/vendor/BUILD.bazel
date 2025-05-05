@@ -763,14 +763,14 @@ alias(
 )
 
 alias(
-    name = "dyn-clone-1.0.5",
-    actual = "//third_party/rust_crates/vendor/dyn-clone-1.0.5:dyn_clone",
+    name = "dyn-clone-1.0.19",
+    actual = "//third_party/rust_crates/vendor/dyn-clone-1.0.19:dyn_clone",
     tags = ["manual"],
 )
 
 alias(
     name = "dyn-clone",
-    actual = "//third_party/rust_crates/vendor/dyn-clone-1.0.5:dyn_clone",
+    actual = "//third_party/rust_crates/vendor/dyn-clone-1.0.19:dyn_clone",
     tags = ["manual"],
 )
 

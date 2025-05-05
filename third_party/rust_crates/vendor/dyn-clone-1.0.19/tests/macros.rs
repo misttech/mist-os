@@ -1,3 +1,5 @@
+#![allow(clippy::extra_unused_type_parameters)]
+
 use dyn_clone::{clone_trait_object, DynClone};
 
 fn assert_clone<T: Clone>() {}
@@ -43,4 +45,13 @@ fn test_where_clause() {
     clone_trait_object!(<T> Trait<T> where T: Clone);
 
     assert_clone::<Box<dyn Trait<u32>>>();
+}
+
+#[test]
+fn test_lifetime() {
+    trait Trait<'a>: DynClone {}
+
+    clone_trait_object!(<'a> Trait<'a>);
+
+    assert_clone::<Box<dyn Trait>>();
 }
