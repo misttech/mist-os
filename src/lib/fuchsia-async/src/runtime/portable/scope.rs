@@ -281,7 +281,7 @@ mod tests {
                 assert!(futures::poll!(&mut on_no_tasks).is_pending());
             }
 
-            let _ = task2.cancel();
+            let _ = task2.abort();
 
             let on_no_tasks2 = pin!(scope.on_no_tasks());
             let on_no_tasks3 = pin!(scope.on_no_tasks());

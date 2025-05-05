@@ -270,7 +270,7 @@ impl Drop for ActiveGuard {
             inner.active_count -= 1;
             if inner.active_count == 0 {
                 if let Some(task) = inner.fake_active_task.take() {
-                    let _ = task.cancel();
+                    let _ = task.abort();
                 }
             }
             inner.active_count == 0 && inner.shutdown_state == ShutdownState::Shutdown

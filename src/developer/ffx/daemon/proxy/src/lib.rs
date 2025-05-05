@@ -622,7 +622,7 @@ mod test {
                         }
                         DaemonRequest::Quit { responder, .. } => {
                             std::fs::remove_file(sockpath).unwrap();
-                            listen_task.cancel().await;
+                            listen_task.abort().await;
                             responder.send(true).unwrap();
                             // This is how long the daemon sleeps for, which
                             // is a workaround for the fact that we have no

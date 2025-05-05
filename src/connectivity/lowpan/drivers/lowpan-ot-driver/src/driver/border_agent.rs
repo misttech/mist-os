@@ -280,7 +280,7 @@ impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
 
             let old_service = self.border_agent_service.lock().take();
             if let Some(task) = old_service {
-                if let Some(Err(err)) = task.cancel().await {
+                if let Some(Err(err)) = task.abort().await {
                     warn!(
                         tag = "meshcop";
                         "update_border_agent_service: Previous publication task ended with an \

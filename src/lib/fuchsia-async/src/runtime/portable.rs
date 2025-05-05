@@ -91,9 +91,10 @@ pub mod task {
             self.abort_on_drop = false;
         }
 
-        /// Cancel a task and returns a future that resolves once the cancellation is complete.  The
-        /// future can be ignored in which case the task will still be cancelled.
-        pub fn cancel(mut self) -> impl Future<Output = Option<T>> {
+        /// Abort a task and returns a future that resolves once the task is
+        /// aborted. The future can be ignored in which case the task will still
+        /// be aborted.
+        pub fn abort(mut self) -> impl Future<Output = Option<T>> {
             self.task.abort();
             async move {
                 let res = (&mut self.task).await;

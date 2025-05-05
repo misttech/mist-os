@@ -491,8 +491,8 @@ pub(super) async fn state_watcher(peer: Arc<RwLock<RemotePeer>>) {
 
     trace!("state_watcher shutting down. aborting processors");
 
-    let _ = make_control_channel_task.cancel();
-    let _ = make_browse_channel_task.cancel();
+    let _ = make_control_channel_task.abort();
+    let _ = make_browse_channel_task.abort();
 
     // Stop processing state changes on the browse channel.
     // This needs to happen before stopping the control channel.

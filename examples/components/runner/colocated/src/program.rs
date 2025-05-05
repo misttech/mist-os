@@ -101,7 +101,7 @@ impl Controllable for ColocatedProgram {
         let task = self.task.take();
         async {
             if let Some(task) = task {
-                _ = task.cancel();
+                _ = task.abort();
             }
         }
         .boxed()

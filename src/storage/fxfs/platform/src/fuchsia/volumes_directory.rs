@@ -505,10 +505,10 @@ impl VolumesDirectory {
     /// Terminates all opened volumes.  This will not cancel any profiling that might be taking
     /// place.
     pub async fn terminate(self: &Arc<Self>) {
-        // Cancel the profiling timer task.
+        // Abort the profiling timer task.
         let profiling_state = self.profiling_state.lock().await.take();
         if let Some((_, timer_task)) = profiling_state {
-            timer_task.cancel().await;
+            timer_task.abort().await;
         }
         self.lock().await.terminate().await
     }

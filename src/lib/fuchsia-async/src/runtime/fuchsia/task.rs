@@ -35,9 +35,10 @@ impl<T> JoinHandle<T> {
         Self { scope, task_id, phantom: PhantomData }
     }
 
-    /// Cancel a task and returns a future that resolves once the cancellation is complete.  The
-    /// future can be ignored in which case the task will still be cancelled.
-    pub fn cancel(mut self) -> impl Future<Output = Option<T>> {
+    /// Aborts a task and returns a future that resolves once the task is
+    /// aborted. The future can be ignored in which case the task will still be
+    /// aborted.
+    pub fn abort(mut self) -> impl Future<Output = Option<T>> {
         // SAFETY: We spawned the task so the return type should be correct.
         let result = unsafe { self.scope.abort_task(self.task_id) };
         async move {
@@ -175,10 +176,11 @@ impl<T: 'static> Task<T> {
 }
 
 impl<T: 'static> Task<T> {
-    /// Cancel a task and returns a future that resolves once the cancellation is complete.  The
-    /// future can be ignored in which case the task will still be cancelled.
-    pub fn cancel(self) -> impl Future<Output = Option<T>> {
-        self.detach_on_drop().cancel()
+    /// Aborts a task and returns a future that resolves once the task is
+    /// aborted. The future can be ignored in which case the task will still be
+    /// aborted.
+    pub fn abort(self) -> impl Future<Output = Option<T>> {
+        self.detach_on_drop().abort()
     }
 }
 

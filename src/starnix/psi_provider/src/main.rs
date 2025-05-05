@@ -206,7 +206,7 @@ impl PsiProvider {
 impl Drop for PsiProvider {
     fn drop(&mut self) {
         if let Some(task) = self.history_updater_task.take() {
-            let _ = task.cancel();
+            let _ = task.abort();
         }
     }
 }

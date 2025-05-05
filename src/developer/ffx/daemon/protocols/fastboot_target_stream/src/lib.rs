@@ -141,7 +141,7 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
 
     async fn stop(&mut self, _cx: &Context) -> Result<()> {
         if let Some(task) = self.fastboot_task.take() {
-            task.cancel().await;
+            task.abort().await;
         }
         Ok(())
     }

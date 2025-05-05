@@ -1712,8 +1712,8 @@ mod tests {
 
         // Running the executor after cancelling the task isn't currently
         // necessary, but we might decide to do async cleanup in the future.
-        assert_eq!(task1.cancel().now_or_never(), None);
-        assert_eq!(task2.cancel().now_or_never(), Some(Some(())));
+        assert_eq!(task1.abort().now_or_never(), None);
+        assert_eq!(task2.abort().now_or_never(), Some(Some(())));
 
         assert_eq!(executor.run_until_stalled(&mut pending::<()>()), Poll::Pending);
         assert_eq!(scope.lock().all_tasks().len(), 0);
@@ -1739,7 +1739,7 @@ mod tests {
         let mut join = pin!(scope.join().fuse());
         let _ = executor.run_until_stalled(&mut join);
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(1));
-        let _ = task2.cancel();
+        let _ = task2.abort();
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
     }
 
@@ -1752,13 +1752,13 @@ mod tests {
         let outstanding_task = scope.spawn(pending::<()>());
         let cancelled_task = scope.spawn(pending::<()>());
         assert_eq!(
-            executor.run_until_stalled(&mut pin!(cancelled_task.cancel())),
+            executor.run_until_stalled(&mut pin!(cancelled_task.abort())),
             Poll::Ready(None)
         );
         let mut join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Pending);
         assert_eq!(
-            executor.run_until_stalled(&mut pin!(outstanding_task.cancel())),
+            executor.run_until_stalled(&mut pin!(outstanding_task.abort())),
             Poll::Ready(None)
         );
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
@@ -2136,7 +2136,7 @@ mod tests {
 
         assert!(executor.run_until_stalled(&mut on_no_tasks).is_pending());
 
-        let _ = task2.cancel();
+        let _ = task2.abort();
 
         let on_no_tasks2 = pin!(scope.on_no_tasks());
         let on_no_tasks3 = pin!(scope.on_no_tasks());
@@ -2266,7 +2266,7 @@ mod tests {
                 })
             };
 
-            assert_eq!(task.cancel().await, None);
+            assert_eq!(task.abort().await, None);
             while Arc::strong_count(&ref_count) != 1 {
                 yield_to_executor().await;
             }
@@ -2284,7 +2284,7 @@ mod tests {
                 yield_to_executor().await;
             }
 
-            assert_eq!(task.cancel().await, Some(()));
+            assert_eq!(task.abort().await, Some(()));
         });
 
         assert!(e.ehandle.root_scope.lock().results.is_empty());
@@ -2311,7 +2311,7 @@ mod tests {
                     running.1.wait(&mut guard);
                 }
             }
-            assert_eq!(task.cancel().await, Some("foo"));
+            assert_eq!(task.abort().await, Some("foo"));
             assert!(!*running.0.lock());
         });
     }
@@ -2363,9 +2363,9 @@ mod tests {
     #[test]
     fn test_dropped_cancel_cleans_up() {
         test_clean_up(|task| {
-            let cancel_fut = std::pin::pin!(task.cancel());
+            let abort_fut = std::pin::pin!(task.abort());
             let waker = futures::task::noop_waker();
-            assert!(cancel_fut.poll(&mut Context::from_waker(&waker)).is_pending());
+            assert!(abort_fut.poll(&mut Context::from_waker(&waker)).is_pending());
         });
     }
 
