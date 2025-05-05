@@ -6,22 +6,12 @@ device in fastboot mode to verify behavior.
 The primary purpose here is for developer workflows that are not regularly
 tested in infra, e.g. things like `getvar` variables.
 
-Currently these tests do not run in infra and must be run manually.
-
 ## Supported devices
 
-These tests have only been verified on these physical devices:
-
-* NUC
-* VIM3
-
-It should be possible to get them working on other physical devices without too
-much pain; the main requirements are that the device supports:
+Any physical device should work as long as it supports:
 
 * rebooting from an SSH shell into the bootloader (i.e. `dm reboot bootloader`)
 * fastboot over USB or TCP
-
-There is currently no support for running these tests on an emulator.
 
 ## Run manually
 
