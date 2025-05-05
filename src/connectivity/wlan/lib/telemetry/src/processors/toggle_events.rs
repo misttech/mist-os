@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::util::cobalt_logger::log_cobalt_1dot1_batch;
+use crate::util::cobalt_logger::log_cobalt_batch;
 use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
 use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_contrib::inspect_log;
@@ -20,7 +20,7 @@ pub enum ClientConnectionsToggleEvent {
 
 pub struct ToggleLogger {
     toggle_inspect_node: BoundedListNode,
-    cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     /// This is None until telemetry is notified of an off or on event, since these metrics don't
     /// currently need to know the starting state.
     current_state: Option<ClientConnectionsToggleEvent>,
@@ -33,7 +33,7 @@ pub struct ToggleLogger {
 
 impl ToggleLogger {
     pub fn new(
-        cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+        cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
         inspect_node: &InspectNode,
     ) -> Self {
         // Initialize inspect children
@@ -43,7 +43,7 @@ impl ToggleLogger {
         let time_started = None;
         let time_stopped = None;
 
-        Self { toggle_inspect_node, cobalt_1dot1_proxy, current_state, time_started, time_stopped }
+        Self { toggle_inspect_node, cobalt_proxy, current_state, time_started, time_stopped }
     }
 
     pub async fn log_toggle_event(&mut self, event_type: ClientConnectionsToggleEvent) {
@@ -100,7 +100,7 @@ impl ToggleLogger {
         self.current_state = Some(event_type);
 
         if !metric_events.is_empty() {
-            log_cobalt_1dot1_batch!(self.cobalt_1dot1_proxy, &metric_events, "log_toggle_events",);
+            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "log_toggle_events");
         }
     }
 }
@@ -118,7 +118,7 @@ mod tests {
     fn test_toggle_is_recorded_to_inspect() {
         let mut test_helper = setup_test();
         let node = test_helper.create_inspect_node("wlan_mock_node");
-        let mut toggle_logger = ToggleLogger::new(test_helper.cobalt_1dot1_proxy.clone(), &node);
+        let mut toggle_logger = ToggleLogger::new(test_helper.cobalt_proxy.clone(), &node);
 
         let event = ClientConnectionsToggleEvent::Enabled;
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
@@ -167,8 +167,7 @@ mod tests {
     fn test_quick_toggle_metric_is_recorded() {
         let mut test_helper = setup_test();
         let inspect_node = test_helper.create_inspect_node("test_stats");
-        let mut toggle_logger =
-            ToggleLogger::new(test_helper.cobalt_1dot1_proxy.clone(), &inspect_node);
+        let mut toggle_logger = ToggleLogger::new(test_helper.cobalt_proxy.clone(), &inspect_node);
 
         // Start with client connections enabled.
         let mut test_time = fasync::MonotonicInstant::from_nanos(123);
@@ -203,8 +202,7 @@ mod tests {
     fn test_quick_toggle_no_metric_is_recorded_if_not_quick() {
         let mut test_helper = setup_test();
         let inspect_node = test_helper.create_inspect_node("test_stats");
-        let mut toggle_logger =
-            ToggleLogger::new(test_helper.cobalt_1dot1_proxy.clone(), &inspect_node);
+        let mut toggle_logger = ToggleLogger::new(test_helper.cobalt_proxy.clone(), &inspect_node);
 
         // Start with client connections enabled.
         let mut test_time = fasync::MonotonicInstant::from_nanos(123);
@@ -235,8 +233,7 @@ mod tests {
         // quick toggles since the following ones don't change the state.
         let mut test_helper = setup_test();
         let inspect_node = test_helper.create_inspect_node("test_stats");
-        let mut toggle_logger =
-            ToggleLogger::new(test_helper.cobalt_1dot1_proxy.clone(), &inspect_node);
+        let mut toggle_logger = ToggleLogger::new(test_helper.cobalt_proxy.clone(), &inspect_node);
 
         // Start with client connections enabled.
         let mut test_time = fasync::MonotonicInstant::from_nanos(123);
@@ -271,8 +268,7 @@ mod tests {
     fn test_log_client_connection_enabled() {
         let mut test_helper = setup_test();
         let inspect_node = test_helper.create_inspect_node("test_stats");
-        let mut toggle_logger =
-            ToggleLogger::new(test_helper.cobalt_1dot1_proxy.clone(), &inspect_node);
+        let mut toggle_logger = ToggleLogger::new(test_helper.cobalt_proxy.clone(), &inspect_node);
 
         // Start with client connections enabled.
         test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000));

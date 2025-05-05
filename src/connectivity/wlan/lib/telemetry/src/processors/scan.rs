@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::util::cobalt_logger::log_cobalt_1dot1_batch;
+use crate::util::cobalt_logger::log_cobalt_batch;
 use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
 use {fuchsia_async as fasync, wlan_legacy_metrics_registry as metrics};
 
@@ -30,7 +30,7 @@ impl ScanLogger {
             event_codes: vec![],
             payload: MetricEventPayload::Count(1),
         }];
-        log_cobalt_1dot1_batch!(self.cobalt_proxy, &metric_events, "handle_scan_start");
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_scan_start");
     }
 
     pub async fn handle_scan_result(&mut self, result: ScanResult) {
@@ -72,7 +72,7 @@ impl ScanLogger {
         }
 
         if !metric_events.is_empty() {
-            log_cobalt_1dot1_batch!(self.cobalt_proxy, &metric_events, "handle_scan_result");
+            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_scan_result");
         }
     }
 }
@@ -108,7 +108,7 @@ mod tests {
     #[fuchsia::test]
     fn test_handle_scan_start() {
         let mut test_helper = setup_test();
-        let mut scan_logger = ScanLogger::new(test_helper.cobalt_1dot1_proxy.clone());
+        let mut scan_logger = ScanLogger::new(test_helper.cobalt_proxy.clone());
 
         run_handle_scan_start(&mut test_helper, &mut scan_logger);
 
@@ -120,7 +120,7 @@ mod tests {
     #[fuchsia::test]
     fn test_handle_scan_result_complete() {
         let mut test_helper = setup_test();
-        let mut scan_logger = ScanLogger::new(test_helper.cobalt_1dot1_proxy.clone());
+        let mut scan_logger = ScanLogger::new(test_helper.cobalt_proxy.clone());
 
         test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(20_000_000));
         run_handle_scan_start(&mut test_helper, &mut scan_logger);
@@ -139,7 +139,7 @@ mod tests {
     #[fuchsia::test]
     fn test_handle_scan_result_empty() {
         let mut test_helper = setup_test();
-        let mut scan_logger = ScanLogger::new(test_helper.cobalt_1dot1_proxy.clone());
+        let mut scan_logger = ScanLogger::new(test_helper.cobalt_proxy.clone());
 
         run_handle_scan_start(&mut test_helper, &mut scan_logger);
 
@@ -156,7 +156,7 @@ mod tests {
     #[fuchsia::test]
     fn test_handle_scan_result_cancelled() {
         let mut test_helper = setup_test();
-        let mut scan_logger = ScanLogger::new(test_helper.cobalt_1dot1_proxy.clone());
+        let mut scan_logger = ScanLogger::new(test_helper.cobalt_proxy.clone());
 
         run_handle_scan_start(&mut test_helper, &mut scan_logger);
 
@@ -171,7 +171,7 @@ mod tests {
     #[fuchsia::test]
     fn test_handle_scan_result_failure() {
         let mut test_helper = setup_test();
-        let mut scan_logger = ScanLogger::new(test_helper.cobalt_1dot1_proxy.clone());
+        let mut scan_logger = ScanLogger::new(test_helper.cobalt_proxy.clone());
 
         run_handle_scan_start(&mut test_helper, &mut scan_logger);
 
@@ -204,7 +204,7 @@ mod tests {
         metric_id: u32,
     ) {
         let mut test_helper = setup_test();
-        let mut scan_logger = ScanLogger::new(test_helper.cobalt_1dot1_proxy.clone());
+        let mut scan_logger = ScanLogger::new(test_helper.cobalt_proxy.clone());
 
         run_handle_scan_result(&mut test_helper, &mut scan_logger, scan_result);
 

@@ -61,12 +61,12 @@ pub enum TelemetryEvent {
 /// Attempts to connect to the Cobalt service.
 pub async fn setup_cobalt_proxy(
 ) -> Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, anyhow::Error> {
-    let cobalt_1dot1_svc = fuchsia_component::client::connect_to_protocol::<
+    let cobalt_svc = fuchsia_component::client::connect_to_protocol::<
         fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
     >()
     .context("failed to connect to metrics service")?;
 
-    let (cobalt_1dot1_proxy, cobalt_1dot1_server) =
+    let (cobalt_proxy, cobalt_server) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
     let project_spec = fidl_fuchsia_metrics::ProjectSpec {
@@ -75,8 +75,8 @@ pub async fn setup_cobalt_proxy(
         ..Default::default()
     };
 
-    match cobalt_1dot1_svc.create_metric_event_logger(&project_spec, cobalt_1dot1_server).await {
-        Ok(_) => Ok(cobalt_1dot1_proxy),
+    match cobalt_svc.create_metric_event_logger(&project_spec, cobalt_server).await {
+        Ok(_) => Ok(cobalt_proxy),
         Err(err) => Err(format_err!("failed to create metrics event logger: {:?}", err)),
     }
 }
@@ -112,7 +112,7 @@ pub fn setup_disconnected_persistence_req_sender() -> auto_persist::PersistenceR
 const TELEMETRY_QUERY_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(10);
 
 pub fn serve_telemetry(
-    cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     inspect_node: InspectNode,
     inspect_path: &str,
@@ -140,22 +140,21 @@ pub fn serve_telemetry(
 
     // Create and initialize modules
     let connect_disconnect = processors::connect_disconnect::ConnectDisconnectLogger::new(
-        cobalt_1dot1_proxy.clone(),
+        cobalt_proxy.clone(),
         &inspect_node,
         &inspect_metadata_node,
         &format!("{inspect_path}/{METADATA_NODE_NAME}"),
         persistence_req_sender,
         &time_matrix_client,
     );
-    let power_logger =
-        processors::power::PowerLogger::new(cobalt_1dot1_proxy.clone(), &inspect_node);
-    let mut scan_logger = processors::scan::ScanLogger::new(cobalt_1dot1_proxy.clone());
+    let power_logger = processors::power::PowerLogger::new(cobalt_proxy.clone(), &inspect_node);
+    let mut scan_logger = processors::scan::ScanLogger::new(cobalt_proxy.clone());
     let mut toggle_logger =
-        processors::toggle_events::ToggleLogger::new(cobalt_1dot1_proxy.clone(), &inspect_node);
+        processors::toggle_events::ToggleLogger::new(cobalt_proxy.clone(), &inspect_node);
 
     let client_iface_counters_logger =
         processors::client_iface_counters::ClientIfaceCountersLogger::new(
-            cobalt_1dot1_proxy,
+            cobalt_proxy,
             monitor_svc_proxy,
             &time_matrix_client,
             driver_counters_time_series_client,

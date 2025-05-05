@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::util::cobalt_logger::log_cobalt_1dot1_batch;
+use crate::util::cobalt_logger::log_cobalt_batch;
 use derivative::Derivative;
 use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
 use fuchsia_inspect::Node as InspectNode;
@@ -154,7 +154,7 @@ pub struct DisconnectInfo {
 
 pub struct ConnectDisconnectLogger {
     connection_state: Arc<Mutex<ConnectionState>>,
-    cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     connect_events_node: Mutex<AutoPersist<BoundedListNode>>,
     disconnect_events_node: Mutex<AutoPersist<BoundedListNode>>,
     inspect_metadata_node: Mutex<InspectMetadataNode>,
@@ -166,7 +166,7 @@ pub struct ConnectDisconnectLogger {
 
 impl ConnectDisconnectLogger {
     pub fn new<S: InspectSender>(
-        cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+        cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
         inspect_node: &InspectNode,
         inspect_metadata_node: &InspectNode,
         inspect_metadata_path: &str,
@@ -176,7 +176,7 @@ impl ConnectDisconnectLogger {
         let connect_events = inspect_node.create_child("connect_events");
         let disconnect_events = inspect_node.create_child("disconnect_events");
         let this = Self {
-            cobalt_1dot1_proxy,
+            cobalt_proxy,
             connection_state: Arc::new(Mutex::new(ConnectionState::Idle(IdleState {}))),
             connect_events_node: Mutex::new(AutoPersist::new(
                 BoundedListNode::new(connect_events, INSPECT_CONNECT_EVENTS_LIMIT),
@@ -286,11 +286,7 @@ impl ConnectDisconnectLogger {
             });
         }
 
-        log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
-            &metric_events,
-            "log_connect_attempt_cobalt_metrics",
-        );
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "log_connect_attempt_cobalt_metrics");
     }
 
     pub async fn log_disconnect(&self, info: &DisconnectInfo) {
@@ -343,11 +339,7 @@ impl ConnectDisconnectLogger {
             payload: MetricEventPayload::IntegerValue(info.connected_duration.into_millis()),
         });
 
-        log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
-            &metric_events,
-            "log_disconnect_cobalt_metrics",
-        );
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "log_disconnect_cobalt_metrics");
     }
 
     pub async fn handle_periodic_telemetry(&self) {
@@ -367,11 +359,7 @@ impl ConnectDisconnectLogger {
         }
 
         if !metric_events.is_empty() {
-            log_cobalt_1dot1_batch!(
-                self.cobalt_1dot1_proxy,
-                &metric_events,
-                "handle_periodic_telemetry",
-            );
+            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_periodic_telemetry");
         }
     }
 }
@@ -516,7 +504,7 @@ mod tests {
             harness.inspect_node.create_child("wlan_connect_disconnect"),
         );
         let logger = ConnectDisconnectLogger::new(
-            harness.cobalt_1dot1_proxy.clone(),
+            harness.cobalt_proxy.clone(),
             &harness.inspect_node,
             &harness.inspect_metadata_node,
             &harness.inspect_metadata_path,
@@ -579,7 +567,7 @@ mod tests {
     fn test_log_connect_attempt_inspect() {
         let mut test_helper = setup_test();
         let logger = ConnectDisconnectLogger::new(
-            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.cobalt_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             &test_helper.inspect_metadata_path,
@@ -636,7 +624,7 @@ mod tests {
     fn test_log_connect_attempt_cobalt() {
         let mut test_helper = setup_test();
         let logger = ConnectDisconnectLogger::new(
-            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.cobalt_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             &test_helper.inspect_metadata_path,
@@ -674,7 +662,7 @@ mod tests {
     fn test_successive_connect_attempt_failures_cobalt_zero_failures() {
         let mut test_helper = setup_test();
         let logger = ConnectDisconnectLogger::new(
-            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.cobalt_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             &test_helper.inspect_metadata_path,
@@ -703,7 +691,7 @@ mod tests {
     fn test_successive_connect_attempt_failures_cobalt_one_failure_then_success(n_failures: usize) {
         let mut test_helper = setup_test();
         let logger = ConnectDisconnectLogger::new(
-            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.cobalt_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             &test_helper.inspect_metadata_path,
@@ -761,7 +749,7 @@ mod tests {
     fn test_successive_connect_attempt_failures_cobalt_one_failure_then_timeout(n_failures: usize) {
         let mut test_helper = setup_test();
         let logger = ConnectDisconnectLogger::new(
-            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.cobalt_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             &test_helper.inspect_metadata_path,
@@ -822,7 +810,7 @@ mod tests {
     fn test_log_disconnect_inspect() {
         let mut test_helper = setup_test();
         let logger = ConnectDisconnectLogger::new(
-            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.cobalt_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             &test_helper.inspect_metadata_path,
@@ -915,7 +903,7 @@ mod tests {
     fn test_log_disconnect_cobalt() {
         let mut test_helper = setup_test();
         let logger = ConnectDisconnectLogger::new(
-            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.cobalt_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             &test_helper.inspect_metadata_path,
@@ -984,7 +972,7 @@ mod tests {
     ) {
         let mut test_helper = setup_test();
         let logger = ConnectDisconnectLogger::new(
-            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.cobalt_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             &test_helper.inspect_metadata_path,
@@ -1014,7 +1002,7 @@ mod tests {
     fn test_log_downtime_post_disconnect_on_reconnect() {
         let mut test_helper = setup_test();
         let logger = ConnectDisconnectLogger::new(
-            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.cobalt_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             &test_helper.inspect_metadata_path,

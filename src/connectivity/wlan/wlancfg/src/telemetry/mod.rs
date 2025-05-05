@@ -514,7 +514,7 @@ const TELEMETRY_QUERY_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::f
 /// the appropriate stats.
 pub fn serve_telemetry(
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
-    cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     inspect_node: InspectNode,
     external_inspect_node: InspectNode,
     persistence_req_sender: auto_persist::PersistenceReqSender,
@@ -535,7 +535,7 @@ pub fn serve_telemetry(
         let mut telemetry = Telemetry::new(
             cloned_sender,
             monitor_svc_proxy,
-            cobalt_1dot1_proxy,
+            cobalt_proxy,
             inspect_node,
             external_inspect_node,
             persistence_req_sender,
@@ -874,7 +874,7 @@ impl HistogramsNode {
 
 // Macro wrapper for logging simple events (occurrence, integer, histogram, string)
 // and log a warning when the status is not Ok
-macro_rules! log_cobalt_1dot1 {
+macro_rules! log_cobalt {
     ($cobalt_proxy:expr, $method_name:ident, $metric_id:expr, $value:expr, $event_codes:expr $(,)?) => {{
         let status = $cobalt_proxy.$method_name($metric_id, $value, $event_codes).await;
         match status {
@@ -885,7 +885,7 @@ macro_rules! log_cobalt_1dot1 {
     }};
 }
 
-macro_rules! log_cobalt_1dot1_batch {
+macro_rules! log_cobalt_batch {
     ($cobalt_proxy:expr, $events:expr, $context:expr $(,)?) => {{
         let status = $cobalt_proxy.log_metric_events($events).await;
         match status {
@@ -967,13 +967,13 @@ impl Telemetry {
     pub fn new(
         telemetry_sender: TelemetrySender,
         monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
-        cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+        cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
         inspect_node: InspectNode,
         external_inspect_node: InspectNode,
         persistence_req_sender: auto_persist::PersistenceReqSender,
         defect_sender: mpsc::Sender<Defect>,
     ) -> Self {
-        let stats_logger = StatsLogger::new(cobalt_1dot1_proxy, &inspect_node);
+        let stats_logger = StatsLogger::new(cobalt_proxy, &inspect_node);
         inspect_record_connection_status(&inspect_node, telemetry_sender.clone());
         let get_iface_stats_fail_count = inspect_node.create_uint("get_iface_stats_fail_count", 0);
         let scan_events = inspect_node.create_child("scan_events");
@@ -1747,11 +1747,11 @@ fn round_to_nearest_second(duration: zx::MonotonicDuration) -> i64 {
 
 pub async fn connect_to_metrics_logger_factory(
 ) -> Result<fidl_fuchsia_metrics::MetricEventLoggerFactoryProxy, Error> {
-    let cobalt_1dot1_svc = fuchsia_component::client::connect_to_protocol::<
+    let cobalt_svc = fuchsia_component::client::connect_to_protocol::<
         fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
     >()
     .context("failed to connect to metrics service")?;
-    Ok(cobalt_1dot1_svc)
+    Ok(cobalt_svc)
 }
 
 // Communicates with the MetricEventLoggerFactory service to create a MetricEventLoggerProxy for
@@ -1759,7 +1759,7 @@ pub async fn connect_to_metrics_logger_factory(
 pub async fn create_metrics_logger(
     factory_proxy: &fidl_fuchsia_metrics::MetricEventLoggerFactoryProxy,
 ) -> Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, Error> {
-    let (cobalt_1dot1_proxy, cobalt_1dot1_server) =
+    let (cobalt_proxy, cobalt_server) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
     let project_spec = fidl_fuchsia_metrics::ProjectSpec {
@@ -1769,12 +1769,12 @@ pub async fn create_metrics_logger(
     };
 
     let status = factory_proxy
-        .create_metric_event_logger(&project_spec, cobalt_1dot1_server)
+        .create_metric_event_logger(&project_spec, cobalt_server)
         .await
         .context("failed to create metrics event logger")?;
 
     match status {
-        Ok(_) => Ok(cobalt_1dot1_proxy),
+        Ok(_) => Ok(cobalt_proxy),
         Err(err) => Err(format_err!("failed to create metrics event logger: {:?}", err)),
     }
 }
@@ -1863,7 +1863,7 @@ async fn diff_and_log_tx_counters(
 }
 
 struct StatsLogger {
-    cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     time_series_stats: Arc<Mutex<TimeSeriesStats>>,
     last_1d_stats: Arc<Mutex<WindowedStats<StatCounters>>>,
     last_7d_stats: Arc<Mutex<WindowedStats<StatCounters>>>,
@@ -1890,7 +1890,7 @@ struct StatsLogger {
 
 impl StatsLogger {
     pub fn new(
-        cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+        cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
         inspect_node: &InspectNode,
     ) -> Self {
         let time_series_stats = Arc::new(Mutex::new(TimeSeriesStats::new()));
@@ -1909,7 +1909,7 @@ impl StatsLogger {
             inspect_create_counters(inspect_node, "7d_counters", Arc::clone(&last_7d_stats));
 
         Self {
-            cobalt_1dot1_proxy,
+            cobalt_proxy,
             time_series_stats,
             last_1d_stats,
             last_7d_stats,
@@ -2280,8 +2280,8 @@ impl StatsLogger {
             }
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_daily_1d_cobalt_metrics",
         ));
@@ -2300,8 +2300,8 @@ impl StatsLogger {
                 payload: MetricEventPayload::IntegerValue(float_to_ten_thousandth(dpdc_ratio)),
             });
 
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+                self.cobalt_proxy,
                 &metric_events,
                 "log_daily_7d_cobalt_metrics",
             ));
@@ -2409,8 +2409,8 @@ impl StatsLogger {
             }
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_daily_detailed_cobalt_metrics",
         ));
@@ -2432,8 +2432,8 @@ impl StatsLogger {
     // Send out the RSSI and RSSI velocity metrics that have been collected over the last hour.
     async fn log_hourly_rssi_histogram_metrics(&mut self) {
         let rssi_buckets: Vec<_> = self.rssi_hist.values().copied().collect();
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer_histogram,
             metrics::CONNECTION_RSSI_METRIC_ID,
             &rssi_buckets,
@@ -2442,8 +2442,8 @@ impl StatsLogger {
         self.rssi_hist.clear();
 
         let velocity_buckets: Vec<_> = self.rssi_velocity_hist.values().copied().collect();
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer_histogram,
             metrics::RSSI_VELOCITY_METRIC_ID,
             &velocity_buckets,
@@ -2500,8 +2500,8 @@ impl StatsLogger {
             payload: MetricEventPayload::IntegerValue(c.no_rx_duration.into_micros()),
         });
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_hourly_fleetwise_quality_cobalt_metrics",
         ));
@@ -2670,8 +2670,8 @@ impl StatsLogger {
             });
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_disconnect_cobalt_metrics",
         ));
@@ -2689,8 +2689,8 @@ impl StatsLogger {
             51..=100 => ActiveScanSsidsRequested::FiftyOneToOneHundred,
             101.. => ActiveScanSsidsRequested::OneHundredAndOneOrMore,
         };
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::ACTIVE_SCAN_REQUESTED_FOR_NETWORK_SELECTION_MIGRATED_METRIC_ID,
             1,
@@ -2713,8 +2713,8 @@ impl StatsLogger {
             51..=100 => ActiveScanSsidsRequested::FiftyOneToOneHundred,
             101.. => ActiveScanSsidsRequested::OneHundredAndOneOrMore,
         };
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::ACTIVE_SCAN_REQUESTED_FOR_POLICY_API_METRIC_ID,
             1,
@@ -2763,8 +2763,8 @@ impl StatsLogger {
             });
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_saved_network_counts",
         ));
@@ -2774,8 +2774,8 @@ impl StatsLogger {
         &mut self,
         time_since_last_scan: zx::MonotonicDuration,
     ) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             metrics::LAST_SCAN_AGE_WHEN_SCAN_REQUESTED_MIGRATED_METRIC_ID,
             time_since_last_scan.into_micros(),
@@ -2841,8 +2841,8 @@ impl StatsLogger {
             payload: MetricEventPayload::Count(1),
         });
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_connection_selection_scan_results",
         ));
@@ -2863,8 +2863,8 @@ impl StatsLogger {
             ap_state,
             connect_start_time,
         );
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_establish_connection_cobalt_metrics",
         ));
@@ -2973,8 +2973,8 @@ impl StatsLogger {
     ) {
         let disconnect_source_dim =
             convert::convert_disconnect_source(&disconnect_info.disconnect_source);
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             metrics::DOWNTIME_BREAKDOWN_BY_DISCONNECT_REASON_METRIC_ID,
             downtime.into_micros(),
@@ -3021,8 +3021,8 @@ impl StatsLogger {
             _ => {}
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_reconnect_cobalt_metrics",
         ));
@@ -3122,8 +3122,8 @@ impl StatsLogger {
             });
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_device_connected_cobalt_metrics",
         ));
@@ -3134,24 +3134,24 @@ impl StatsLogger {
 
         append_device_connected_channel_cobalt_metrics(&mut metric_events, primary_channel);
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_device_connected_channel_cobalt_metrics",
         ));
     }
 
     async fn log_policy_roam_scan_metrics(&mut self, reasons: Vec<RoamReason>) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::POLICY_ROAM_SCAN_COUNT_METRIC_ID,
             1,
             &[],
         ));
         for reason in reasons {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::POLICY_ROAM_SCAN_COUNT_BY_ROAM_REASON_METRIC_ID,
                 1,
@@ -3165,23 +3165,23 @@ impl StatsLogger {
         request: PolicyRoamRequest,
         connected_duration: zx::MonotonicDuration,
     ) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::POLICY_ROAM_ATTEMPT_COUNT_METRIC_ID,
             1,
             &[],
         ));
         for reason in &request.reasons {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::POLICY_ROAM_ATTEMPT_COUNT_BY_ROAM_REASON_METRIC_ID,
                 1,
                 &[convert::convert_roam_reason_dimension(*reason) as u32],
             ));
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_integer,
                 metrics::POLICY_ROAM_CONNECTED_DURATION_BEFORE_ROAM_ATTEMPT_METRIC_ID,
                 connected_duration.into_minutes(),
@@ -3218,8 +3218,8 @@ impl StatsLogger {
             (false, false) => NonDfsToNonDfs as u32,
         };
         for reason in &request.reasons {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::POLICY_ROAM_ATTEMPT_COUNT_DETAILED_METRIC_ID,
                 1,
@@ -3238,8 +3238,8 @@ impl StatsLogger {
         }
 
         // Log a disconnect, since the device left the original AP.
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::POLICY_ROAM_DISCONNECT_COUNT_METRIC_ID,
             1,
@@ -3250,8 +3250,8 @@ impl StatsLogger {
 
         // Log with roam reasons
         for reason in &request.reasons {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::POLICY_ROAM_DISCONNECT_COUNT_BY_ROAM_REASON_METRIC_ID,
                 1,
@@ -3261,8 +3261,8 @@ impl StatsLogger {
 
         if result.status_code == fidl_ieee80211::StatusCode::Success {
             self.log_stat(StatOp::AddPolicyRoamSuccessfulCount(request.reasons)).await;
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_integer,
                 metrics::POLICY_ROAM_RECONNECT_DURATION_METRIC_ID,
                 fasync::MonotonicDuration::from(result_time - request_time).into_micros(),
@@ -3274,8 +3274,8 @@ impl StatsLogger {
     /// Log metrics that will be used to analyze when roaming would happen before roams are
     /// enabled.
     async fn log_would_roam_connect(&mut self) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::POLICY_ROAM_ATTEMPT_COUNT_METRIC_ID,
             1,
@@ -3288,8 +3288,8 @@ impl StatsLogger {
         disabled_duration: zx::MonotonicDuration,
     ) {
         if disabled_duration < USER_RESTART_TIME_THRESHOLD {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::CLIENT_CONNECTIONS_STOP_AND_START_METRIC_ID,
                 1,
@@ -3302,8 +3302,8 @@ impl StatsLogger {
         &mut self,
         enabled_duration: zx::MonotonicDuration,
     ) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             metrics::CLIENT_CONNECTIONS_ENABLED_DURATION_MIGRATED_METRIC_ID,
             enabled_duration.into_micros(),
@@ -3312,8 +3312,8 @@ impl StatsLogger {
     }
 
     async fn log_stop_ap_cobalt_metrics(&mut self, enabled_duration: zx::MonotonicDuration) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             metrics::ACCESS_POINT_ENABLED_DURATION_MIGRATED_METRIC_ID,
             enabled_duration.into_micros(),
@@ -3355,8 +3355,8 @@ impl StatsLogger {
 
     async fn log_iface_creation_result(&mut self, result: Result<(), ()>) {
         if result.is_err() {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::INTERFACE_CREATION_FAILURE_METRIC_ID,
                 1,
@@ -3374,8 +3374,8 @@ impl StatsLogger {
 
     async fn log_iface_destruction_result(&mut self, result: Result<(), ()>) {
         if result.is_err() {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::INTERFACE_DESTRUCTION_FAILURE_METRIC_ID,
                 1,
@@ -3418,8 +3418,8 @@ impl StatsLogger {
 
         // Log general occurrence metrics for any observed defects
         for issue in issues {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 issue.as_metric_id(),
                 1,
@@ -3429,8 +3429,8 @@ impl StatsLogger {
     }
 
     async fn log_connection_failure(&mut self) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::CONNECTION_FAILURES_METRIC_ID,
             1,
@@ -3440,8 +3440,8 @@ impl StatsLogger {
 
     async fn log_ap_start_result(&mut self, result: Result<(), ()>) {
         if result.is_err() {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::AP_START_FAILURE_METRIC_ID,
                 1,
@@ -3489,8 +3489,8 @@ impl StatsLogger {
                 ScanReason::RoamSearch => ProactiveRoaming,
             }
         };
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::SUCCESSFUL_SCAN_REQUEST_FULFILLMENT_TIME_METRIC_ID,
             1,
@@ -3528,8 +3528,8 @@ impl StatsLogger {
                 15.. => FifteenOrMore,
             }
         };
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::SCAN_QUEUE_STATISTICS_AFTER_COMPLETED_SCAN_METRIC_ID,
             1,
@@ -3538,8 +3538,8 @@ impl StatsLogger {
     }
 
     async fn log_consecutive_counter_stats_failures(&mut self, count: i64) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             // TODO(https://fxbug.dev/404889275): Consider renaming the Cobalt
             // metric name to no longer to refer to "counter"
@@ -3611,8 +3611,8 @@ impl StatsLogger {
         let avg_score = sum_score / (signals.len() + 1) as u32;
 
         let delta = (avg_score as i64).saturating_sub(baseline_score as i64);
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            &self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            &self.cobalt_proxy,
             log_integer,
             metric_id,
             delta,
@@ -3665,8 +3665,8 @@ impl StatsLogger {
         let average_rssi = sum_rssi / (signals.len() + 1) as i64;
 
         let delta = (average_rssi).saturating_sub(baseline_signal.rssi_dbm as i64);
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            &self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            &self.cobalt_proxy,
             log_integer,
             metric_id,
             delta,
@@ -3932,8 +3932,8 @@ impl StatsLogger {
                     }
                 ];
 
-                self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-                    self.cobalt_1dot1_proxy,
+                self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+                    self.cobalt_proxy,
                     &metric_events,
                     "log_short_duration_connection_metrics",
                 ));
@@ -3992,8 +3992,8 @@ impl StatsLogger {
             _ => (),
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_network_selection_metrics",
         ));
@@ -4114,8 +4114,8 @@ impl StatsLogger {
             });
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_bss_selection_cobalt_metrics",
         ));
@@ -4147,8 +4147,8 @@ impl StatsLogger {
             sum_scores = sum_scores.saturating_add(&(score as u32));
         }
         let avg = sum_scores / (signals.len()) as u32;
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             metrics::CONNECTION_SCORE_AVERAGE_METRIC_ID,
             avg as i64,
@@ -4170,8 +4170,8 @@ impl StatsLogger {
             sum_rssi = sum_rssi.saturating_add(s.signal.rssi_dbm as i64);
         }
         let average_rssi = sum_rssi / (signals.len()) as i64;
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             metrics::CONNECTION_RSSI_AVERAGE_METRIC_ID,
             average_rssi,
@@ -4207,8 +4207,8 @@ impl StatsLogger {
             }
         };
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::RECOVERY_OCCURRENCE_METRIC_ID,
             1,
@@ -4223,7 +4223,7 @@ impl StatsLogger {
             metric_id: u32,
             event_codes: &[u32],
         ) {
-            throttled_error_logger.throttle_error(log_cobalt_1dot1!(
+            throttled_error_logger.throttle_error(log_cobalt!(
                 proxy,
                 log_occurrence,
                 metric_id,
@@ -4241,7 +4241,7 @@ impl StatsLogger {
             RecoveryReason::CreateIfaceFailure(_) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::INTERFACE_CREATION_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code()],
                 )
@@ -4250,7 +4250,7 @@ impl StatsLogger {
             RecoveryReason::DestroyIfaceFailure(_) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::INTERFACE_DESTRUCTION_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code()],
                 )
@@ -4259,7 +4259,7 @@ impl StatsLogger {
             RecoveryReason::Timeout(mechanism) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::TIMEOUT_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code(), mechanism.as_event_code()],
                 )
@@ -4268,7 +4268,7 @@ impl StatsLogger {
             RecoveryReason::ConnectFailure(mechanism) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code(), mechanism.as_event_code()],
                 )
@@ -4277,7 +4277,7 @@ impl StatsLogger {
             RecoveryReason::StartApFailure(mechanism) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::START_ACCESS_POINT_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code(), mechanism.as_event_code()],
                 )
@@ -4286,7 +4286,7 @@ impl StatsLogger {
             RecoveryReason::ScanFailure(mechanism) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::SCAN_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code(), mechanism.as_event_code()],
                 )
@@ -4295,7 +4295,7 @@ impl StatsLogger {
             RecoveryReason::ScanCancellation(mechanism) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::SCAN_CANCELLATION_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code(), mechanism.as_event_code()],
                 )
@@ -4304,7 +4304,7 @@ impl StatsLogger {
             RecoveryReason::ScanResultsEmpty(mechanism) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::EMPTY_SCAN_RESULTS_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code(), mechanism.as_event_code()],
                 )
@@ -4349,8 +4349,8 @@ impl StatsLogger {
             }
         };
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::SME_OPERATION_TIMEOUT_METRIC_ID,
             1,
@@ -4855,7 +4855,7 @@ mod tests {
         let (sender, _receiver) = mpsc::channel::<TelemetryEvent>(TELEMETRY_EVENT_BUFFER_SIZE);
         let (monitor_svc_proxy, _monitor_svc_stream) =
             create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>();
-        let (cobalt_1dot1_proxy, _cobalt_1dot1_stream) =
+        let (cobalt_proxy, _cobalt_stream) =
             create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
         let inspector = Inspector::default();
         let inspect_node = inspector.root().create_child("stats");
@@ -4866,7 +4866,7 @@ mod tests {
         let mut telemetry = Telemetry::new(
             TelemetrySender::new(sender),
             monitor_svc_proxy,
-            cobalt_1dot1_proxy.clone(),
+            cobalt_proxy.clone(),
             inspect_node,
             external_inspect_node,
             persistence_req_sender,
@@ -8576,7 +8576,7 @@ mod tests {
 
         // Expect that Cobalt has been notified of the recovery event
         assert_variant!(
-            test_helper.exec.run_until_stalled(&mut test_helper.cobalt_1dot1_stream.next()),
+            test_helper.exec.run_until_stalled(&mut test_helper.cobalt_stream.next()),
             Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogOccurrence {
                 metric_id, event_codes, responder, ..
             }))) => {
@@ -8835,13 +8835,13 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Construct a StatsLogger
-        let (cobalt_1dot1_proxy, mut cobalt_1dot1_stream) =
+        let (cobalt_proxy, mut cobalt_stream) =
             create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
         let inspector = Inspector::default();
         let inspect_node = inspector.root().create_child("stats");
 
-        let mut stats_logger = StatsLogger::new(cobalt_1dot1_proxy, &inspect_node);
+        let mut stats_logger = StatsLogger::new(cobalt_proxy, &inspect_node);
 
         // Log the test telemetry event.
         let fut = stats_logger.log_post_recovery_result(reason, outcome);
@@ -8850,7 +8850,7 @@ mod tests {
 
         // Verify the metric that was emitted.
         assert_variant!(
-            exec.run_until_stalled(&mut cobalt_1dot1_stream.next()),
+            exec.run_until_stalled(&mut cobalt_stream.next()),
             Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogOccurrence {
                 metric_id, event_codes, responder, ..
             }))) => {
@@ -10145,7 +10145,7 @@ mod tests {
 
         // Expect that Cobalt has been notified of the timeout
         assert_variant!(
-            test_helper.exec.run_until_stalled(&mut test_helper.cobalt_1dot1_stream.next()),
+            test_helper.exec.run_until_stalled(&mut test_helper.cobalt_stream.next()),
             Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogOccurrence {
                 metric_id, event_codes, responder, ..
             }))) => {
@@ -10161,7 +10161,7 @@ mod tests {
         inspector: Inspector,
         monitor_svc_stream: fidl_fuchsia_wlan_device_service::DeviceMonitorRequestStream,
         telemetry_svc_stream: Option<fidl_fuchsia_wlan_sme::TelemetryRequestStream>,
-        cobalt_1dot1_stream: fidl_fuchsia_metrics::MetricEventLoggerRequestStream,
+        cobalt_stream: fidl_fuchsia_metrics::MetricEventLoggerRequestStream,
         persistence_stream: mpsc::Receiver<String>,
         iface_stats_resp:
             Option<Box<dyn Fn() -> fidl_fuchsia_wlan_sme::TelemetryGetIfaceStatsResult>>,
@@ -10276,7 +10276,7 @@ mod tests {
                 let _result = self.advance_test_fut(test_fut);
                 made_progress = false;
                 while let Poll::Ready(Some(Ok(req))) =
-                    self.exec.run_until_stalled(&mut self.cobalt_1dot1_stream.next())
+                    self.exec.run_until_stalled(&mut self.cobalt_stream.next())
                 {
                     self.cobalt_events.append(&mut req.respond_to_metric_req(Ok(())));
                     made_progress = true;
@@ -10494,7 +10494,7 @@ mod tests {
         let (monitor_svc_proxy, monitor_svc_stream) =
             create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>();
 
-        let (cobalt_1dot1_proxy, cobalt_1dot1_stream) =
+        let (cobalt_proxy, cobalt_stream) =
             create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
         let inspector = Inspector::default();
@@ -10504,7 +10504,7 @@ mod tests {
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let (telemetry_sender, test_fut) = serve_telemetry(
             monitor_svc_proxy,
-            cobalt_1dot1_proxy.clone(),
+            cobalt_proxy.clone(),
             inspect_node,
             external_inspect_node.create_child("stats"),
             persistence_req_sender,
@@ -10520,7 +10520,7 @@ mod tests {
             inspector,
             monitor_svc_stream,
             telemetry_svc_stream: None,
-            cobalt_1dot1_stream,
+            cobalt_stream,
             persistence_stream,
             iface_stats_resp: None,
             cobalt_events: vec![],
