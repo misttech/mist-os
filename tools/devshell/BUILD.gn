@@ -105,6 +105,7 @@ test_scripts = [
   "tests/subcommands/fx_setup_go_test",
   "tests/subcommands/fx_ssh_test",
   "tests/subcommands/fx_unset_device_test",
+  "tests/subcommands/fx_use_test",
 
   # tests that currently can't be included in automation.
   # use 'fx self-test' to run them manually:
@@ -225,6 +226,7 @@ host_script_test_data("fx_bash_tests") {
         "//tools/devshell/tests/subcommands/data/fx_test_test/tests_multiple_in_package.json",
         "//tools/devshell/tests/subcommands/data/fx_test_test/tests_package_server_integration.json",
         "//tools/devshell/unset-device",
+        "//tools/devshell/use",
         "//tools/devshell/vendor",
       ]
     },

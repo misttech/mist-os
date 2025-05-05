@@ -25,24 +25,41 @@ BT_MOCKED_TOOLS=(
 
 declare fx ffx
 
+init_fake_ffx() {
+  echo > "${ffx}_mock_errors"
+  cat >"${ffx}.mock_side_effects" <<INPUT
+if [[ \${@: -1} == "get" ]]; then
+  if [[ -n "\$FUCHSIA_DEVICE_ADDR" ]]; then
+    echo "\$FUCHSIA_DEVICE_ADDR"
+  elif [[ -n "\$FUCHSIA_NODENAME" ]]; then
+    echo "\$FUCHSIA_NODENAME"
+  else
+    echo "No default target." >&2
+    echo "If exactly one target is connected, ffx will use that." >&2
+  fi
+fi
+INPUT
+}
+
 BT_SET_UP() {
   source "${BT_TEMP_DIR}/tools/devshell/lib/vars.sh"
   source "${BT_TEMP_DIR}/tools/devshell/tests/lib/fuchsia-mock.sh"
   fx="$(btf::setup_fx)"
   fx-config-read
   ffx="$(btf::make_installed_hosttools_mock ffx)"
+  init_fake_ffx
 }
 
 TEST_log_raw() {
-  echo "testing" > "${ffx}.mock_stdout"
   BT_EXPECT ${fx} -t testing log --legacy --raw
   btf::expect-mock-args "${ffx}.mock_state.2" --config fuchsia.analytics.ffx_invoker=fx target default get
+  BT_EXPECT_FILE_CONTAINS "${ffx}_mock_errors" ""
 }
 
 TEST_log() {
-  echo "testing" > "${ffx}.mock_stdout"
   BT_EXPECT ${fx} -t testing log --flag1 --flag2
   btf::expect-mock-args "${ffx}.mock_state.2" log --flag1 --flag2
+  BT_EXPECT_FILE_CONTAINS "${ffx}_mock_errors" ""
 }
 
 BT_RUN_TESTS "$@"

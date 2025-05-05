@@ -40,7 +40,7 @@ TEST_ssh_ipv4_port() {
   addr="127.0.0.1:8022"
   cat >> "${ffx}.mock_side_effects" << EOF
   if [ "\$3" == "target" ] || [ "\$1" == "target" ]; then
-     echo $addr
+     echo \$FUCHSIA_NODENAME
   else
      echo "/path/to/ssh.priv"
   fi
@@ -54,7 +54,7 @@ TEST_ssh_ipv6_port() {
     addr="[fe80::7:8%eth0]:222"
     cat >> "${ffx}.mock_side_effects" << EOF
   if [ "\$3" == "target" ] || [ "\$1" == "target" ]; then
-     echo $addr
+     echo \$FUCHSIA_NODENAME
   else
      echo "/path/to/ssh.priv"
   fi
@@ -83,7 +83,7 @@ TEST_ssh_addr() {
   addr="127.0.0.1"
     cat >> "${ffx}.mock_side_effects" << EOF
   if [ "\$3" == "target" ] || [ "\$1" == "target" ]; then
-     echo $addr
+     echo \$FUCHSIA_NODENAME
   else
      echo "/path/to/ssh.priv"
   fi

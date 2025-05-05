@@ -316,6 +316,11 @@ while [[ $# -ne 0 ]]; do
         fx-error "Invalid device: $1. See valid values in 'fx help set-device'"
         exit 1
       fi
+      # $FUCHSIA_DEVICE_ADDR can shadow $FUCHSIA_NODENAME which we use to
+      # effectuate `-t|--target`, so we unset it here.
+      # The precedence of these environment variables is defined by
+      # //src/developer/ffx/data/config.json
+      unset FUCHSIA_DEVICE_ADDR
       # This name needs to be coordinated with ffx default configuration
       # LINT.IfChange
       export FUCHSIA_NODENAME="$1"
@@ -372,10 +377,10 @@ if [[ $# -lt 1 ]]; then
   exit 1
 fi
 
-# Check that the $FUCHSIA_NODENAME applied by `-d` is not overridden by ffx
+# Check that the $FUCHSIA_NODENAME applied by `-t` is not overridden by ffx
 # user-level configuration.
 if [[ "$_check_default_target" == "true" ]]; then
-  fx-build-dir-if-present && fx-check-default-target || exit 1
+  fx-build-dir-if-present && fx-check-ffx-default-target --error || exit 1
 fi
 
 command_name="$1"

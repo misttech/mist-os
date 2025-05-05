@@ -52,6 +52,24 @@ expect_args() {
   done
 }
 
+init_fake_ffx() {
+  echo > "${ffx}.mock_errors"
+  cat >"${ffx}.mock_side_effects" <<INPUT
+if [[ \${@: -1} == "get" ]]; then
+  if [[ -n "\$FUCHSIA_DEVICE_ADDR" ]]; then
+    echo "\$FUCHSIA_DEVICE_ADDR"
+  elif [[ -n "\$FUCHSIA_NODENAME" ]]; then
+    echo "\$FUCHSIA_NODENAME"
+  else
+    echo "No default target." >&2
+    echo "If exactly one target is connected, ffx will use that." >&2
+  fi
+else
+  echo "Disallowed command: \$*" >> ${ffx}.mock_errors
+fi
+INPUT
+}
+
 # ensure that set-device invocations of ffx use the proper network flags
 TEST_setdevice() {
   ${fx} set-device >/dev/null 2>&1
@@ -63,13 +81,12 @@ TEST_setdevice() {
 
 # ensure that get-fuchsia-device-addr doesn't try to resolve IPv4 addresses
 TEST_getdeviceaddr_resolved_ipv4_addresses() {
+  init_fake_ffx
   local addrs=("127.0.0.1" "255.255.255.255" "1.0.0.1")
   local counter=1
   for addr in "${addrs[@]}"; do
-    echo "${addr}" > "${ffx}.mock_stdout"
-    BT_EXPECT_EQ "$(${fx} -d "${addr}" get-device-addr)" "${addr}"
-    echo "${addr}:8022" > "${ffx}.mock_stdout"
-    BT_EXPECT_EQ "$(${fx} -d "${addr}:8022" get-device-addr)" "${addr}"
+    BT_EXPECT_EQ "$(${fx} -t "${addr}" get-device-addr)" "${addr}"
+    BT_EXPECT_EQ "$(${fx} -t "${addr}:8022" get-device-addr)" "${addr}"
 
     # default target get is called 4 times
     expect_args "${ffx}.mock_state.${counter}" "target" "default" "get"
@@ -88,11 +105,13 @@ TEST_getdeviceaddr_resolved_ipv4_addresses() {
     ((counter+=1))
     BT_EXPECT_FILE_DOES_NOT_EXIST "${ffx}.mock_state.${counter}"
   done
+  BT_EXPECT_FILE_CONTAINS "${ffx}.mock_errors" ""
 }
 
 # ensure that get-fuchsia-device-addr doesn't try to resolve IPv6 addresses
 # using "fx set-device 'address'"
 TEST_getdeviceaddr_resolved_ipv6_addresses_setdevice() {
+  init_fake_ffx
   local addrs=("1:2:3:4" "1::" "b1::8" "1:2:3:4:5:6::8" \
     "1:2:3:4:5:6::8" "1::7:f8" "1:a2:3:b4:5::7:8" "1:2:3:d4:5e::8" "a1::6:7:8" \
     "1:2:c3:4a::6:7:8f" "1:2:3:4::8" "1::5:6:d7:8" "1:2:3::5:6:7:8" "d1:2:3::8" \
@@ -102,7 +121,6 @@ TEST_getdeviceaddr_resolved_ipv6_addresses_setdevice() {
   local counter=1
   for addr in "${addrs[@]}"; do
     # fx syntax requires that IPv6 address is surrounded by square brackets
-    echo "[${addr}]" > "${ffx}.mock_stdout"
     BT_EXPECT ${fx} set-device "[${addr}]" >/dev/null
     BT_EXPECT_EQ "$(${fx} get-device-addr)" "${addr}"
 
@@ -121,11 +139,13 @@ TEST_getdeviceaddr_resolved_ipv6_addresses_setdevice() {
     ((counter+=1))
     BT_EXPECT_FILE_DOES_NOT_EXIST "${ffx}.mock_state.${counter}"
   done
+  BT_EXPECT_FILE_CONTAINS "${ffx}.mock_errors" ""
 }
 
 # ensure that get-fuchsia-device-addr doesn't try to resolve IPv6 addresses
 # using "fx -t 'address' ..."
 TEST_getdeviceaddr_resolved_ipv6_addresses() {
+  init_fake_ffx
   local addrs=("1:2:3:4" "1::" "b1::8" "1:2:3:4:5:6::8" \
     "1:2:3:4:5:6::8" "1::7:f8" "1:a2:3:b4:5::7:8" "1:2:3:d4:5e::8" "a1::6:7:8" \
     "1:2:c3:4a::6:7:8f" "1:2:3:4::8" "1::5:6:d7:8" "1:2:3::5:6:7:8" "d1:2:3::8" \
@@ -134,7 +154,6 @@ TEST_getdeviceaddr_resolved_ipv6_addresses() {
 
   local counter=1
   for addr in "${addrs[@]}"; do
-    echo "[${addr}]" > "${ffx}.mock_stdout"
     # fx syntax requires that IPv6 address is surrounded by square brackets
     BT_EXPECT_EQ "$(${fx} -t "[${addr}]" get-device-addr)"  "${addr}"
 
@@ -149,6 +168,7 @@ TEST_getdeviceaddr_resolved_ipv6_addresses() {
     ((counter+=1))
     BT_EXPECT_FILE_DOES_NOT_EXIST "${ffx}.mock_state.${counter}"
   done
+  BT_EXPECT_FILE_CONTAINS "${ffx}.mock_errors" ""
 }
 
 # ensure `fx -t` fails if ffx is overridding the default target

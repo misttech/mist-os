@@ -19,6 +19,7 @@ BT_SET_UP() {
   base_dir="${BT_TEMP_DIR}"
   source "${BT_TEMP_DIR}/tools/devshell/tests/lib/fuchsia-mock.sh"
   fx="$(btf::setup_fx)"
+  FUCHSIA_DIR="${BT_TEMP_DIR}"
 }
 
 _create_subcommand() {
@@ -44,6 +45,8 @@ _create_subcommand() {
 
 ## ${long_description_1}
 ## ${long_description_2}
+
+source "${FUCHSIA_DIR}/tools/devshell/lib/vars.sh" || exit $?
 
 echo "${subcommand_output}"
 EOF
@@ -176,6 +179,92 @@ TEST_fx-run_from_different_version() {
   BT_EXPECT_EQ $? 1
   BT_EXPECT_STRING_CONTAINS_SUBSTRING "${output}" "${line1}"
   BT_EXPECT_STRING_CONTAINS_SUBSTRING "${output}" "${line2} ${BT_TEMP_DIR}"
+}
+
+# Tests that $FUCHSIA_NODENAME and $FUCHSIA_DEVICE_ADDR are set appropriately
+# when no default targets are set.
+TEST_fx-target-flag-unspecified-test() {
+  local subcommand="mycommand1"
+  _create_subcommand "${subcommand}" "tools/devshell" "<\${FUCHSIA_NODENAME},\${FUCHSIA_DEVICE_ADDR}>"
+  local out="${BT_TEMP_DIR}/_fx_stdout"
+
+  echo "fx-default-target" > "${FUCHSIA_DIR}/out/default.device"
+  BT_EXPECT "${fx}" "${subcommand}" >"$out" 2>&1
+
+  BT_EXPECT_FILE_CONTAINS "${out}" "<,>"
+}
+
+# Tests that $FUCHSIA_NODENAME and $FUCHSIA_DEVICE_ADDR are set appropriately
+# when a default target is set via `fx set-device`.
+TEST_fx-target-flag-unspecified-default-device-test() {
+  local subcommand="mycommand1"
+  _create_subcommand "${subcommand}" "tools/devshell" "<\${FUCHSIA_NODENAME},\${FUCHSIA_DEVICE_ADDR}>"
+  local out="${BT_TEMP_DIR}/_fx_stdout"
+
+  echo "fx-default-target" > "${FUCHSIA_DIR}/out/default.device"
+  BT_EXPECT "${fx}" "${subcommand}" >"$out" 2>&1
+
+  BT_EXPECT_FILE_CONTAINS "${out}" "<,>"
+}
+
+# Tests that $FUCHSIA_NODENAME and $FUCHSIA_DEVICE_ADDR are set appropriately
+# when `fx -t` is specified, and that a non-fatal warning is emitted when
+# we can't check the ffx default target.
+TEST_fx-target-short-flag-specified-no-ffx-test() {
+  local subcommand="mycommand1"
+  _create_subcommand "${subcommand}" "tools/devshell" "<\${FUCHSIA_NODENAME},\${FUCHSIA_DEVICE_ADDR}>"
+  local out="${BT_TEMP_DIR}/_fx_stdout"
+
+  BT_EXPECT "${fx}" -t foo "${subcommand}" >"$out" 2>&1
+
+  BT_EXPECT_FILE_CONTAINS "${out}" "WARNING: ffx not found in build directory, skipping verification that effective target device is foo.
+WARNING: Please run \`ffx target default get\` after the build to confirm.
+<foo,>"
+}
+
+# Tests that $FUCHSIA_NODENAME and $FUCHSIA_DEVICE_ADDR are overridden when
+# `fx --target` is specified and a fx-level default target is set.
+TEST_fx-target-long-flag-specified-ffx-present-with-env-test() {
+  ffx="$(btf::make_installed_hosttools_mock ffx)"
+  local subcommand="mycommand1"
+  _create_subcommand "${subcommand}" "tools/devshell" "<\${FUCHSIA_NODENAME},\${FUCHSIA_DEVICE_ADDR}>"
+  local out="${BT_TEMP_DIR}/_fx_stdout"
+
+  echo "fx-default-target" > "${FUCHSIA_DIR}/out/default.device"
+  BT_EXPECT FUCHSIA_NODENAME=bar FUCHSIA_DEVICE_ADDR=baz "${fx}" --target=foo "${subcommand}" >"$out" 2>&1
+
+  BT_EXPECT_FILE_CONTAINS "${out}" "<foo,>"
+}
+
+# Tests that fx errors out with the correct error message if a ffx-level default
+# target is configured and the fx subcommand isn't run.
+TEST_fx-target-long-flag-specified-ffx-error-test() {
+  ffx="$(btf::make_installed_hosttools_mock ffx)"
+  local subcommand="mycommand1"
+  _create_subcommand "${subcommand}" "tools/devshell" "This should not print."
+  local out="${BT_TEMP_DIR}/_fx_stdout"
+
+  echo "ffx-target" > "${ffx}.mock_stdout"
+  BT_EXPECT_FAIL "${fx}" --target=foo "${subcommand}" >"$out" 2>&1
+
+  BT_EXPECT_FILE_CONTAINS "${out}" "ERROR: The build level device foo is overridden by the user level device \"ffx-target\".
+ERROR: Please run \`ffx target default unset\` to fix this."
+}
+
+# Tests that fx errors out with the correct error message if a default targets
+# are configured on all levels and the fx subcommand isn't run.
+TEST_fx-target-long-specified-ffx-error-with-env-flag-test() {
+  ffx="$(btf::make_installed_hosttools_mock ffx)"
+  local subcommand="mycommand1"
+  _create_subcommand "${subcommand}" "tools/devshell" "This should not print."
+  local out="${BT_TEMP_DIR}/_fx_stdout"
+
+  echo "fx-default-target" > "${FUCHSIA_DIR}/out/default.device"
+  echo "ffx-target" > "${ffx}.mock_stdout"
+  BT_EXPECT_FAIL FUCHSIA_NODENAME=bar FUCHSIA_DEVICE_ADDR=baz "${fx}" --target=foo "${subcommand}" >"$out" 2>&1
+
+  BT_EXPECT_FILE_CONTAINS "${out}" "ERROR: The build level device foo is overridden by the user level device \"ffx-target\".
+ERROR: Please run \`ffx target default unset\` to fix this."
 }
 
 BT_RUN_TESTS "$@"

@@ -107,15 +107,36 @@ function main {
     local -r full_build_dir="${FUCHSIA_DIR}/${build_dir}"
   fi
 
-  if [[ -e "${full_build_dir}/args.gn" ]]; then
-    fx-change-build-dir "${build_dir}"
-    fx-check-default-target
-    exit $?
-  else
+  if [[ ! -e "${full_build_dir}/args.gn" ]]; then
     fx-error "\"${build_dir}\" is not a valid build dir."
-    echo ""
+    echo >&2
     fx-command-help
     exit 1
+  fi
+
+  fx-change-build-dir "${build_dir}"
+
+  function external-default-target-env-warning {
+    fx-warn "The default device configured for ${build_dir} is \"${FUCHSIA_NODENAME}\"."
+    fx-warn "However, you've overriden this by setting ${ENV_VARS}."
+    fx-warn "If you want to use \"${FUCHSIA_NODENAME}\", please unset the ${ENV_VAR_NAMES} environment variable."
+
+    # Add a newline to distinguish this as a separate warning than the potential
+    # ffx-related warning below.
+    echo >&2
+  }
+  if [[ -e "${FUCHSIA_BUILD_DIR}.device" ]]; then
+    # Ensure the below checks will report the correct error message.
+    FUCHSIA_NODENAME="$(<"${FUCHSIA_BUILD_DIR}.device")"
+
+    # Check if the user has set a default target via environment variable(s)
+    # which can override default targets set by `fx set-device`.
+    fx-if-target-set-by-env external-default-target-env-warning
+
+    # Check if the user has set a default target via `ffx target default set`
+    # which can override default targets set by `fx set-device`.
+    # Ignore the return code since this will just be a warning.
+    fx-check-ffx-default-target || true
   fi
 }
 
