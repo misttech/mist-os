@@ -588,7 +588,7 @@ where
 
         if !message_bytes.is_empty() {
             current_task
-                .write_memory(message_header.control + cmsg_bytes_written, &message_bytes)?;
+                .write_memory((message_header.control + cmsg_bytes_written)?, &message_bytes)?;
             cmsg_bytes_written += message_bytes.len();
             if !truncated {
                 cmsg_bytes_written = cmsg_align(current_task, cmsg_bytes_written)?;
@@ -663,7 +663,7 @@ pub fn sys_recvmmsg(
 
     let mut index = 0usize;
     while index < vlen as usize {
-        let current_ptr = user_mmsgvec.at(index);
+        let current_ptr = user_mmsgvec.at(index)?;
         let mut current_mmsghdr = current_task.read_multi_arch_object(current_ptr)?;
         match recvmsg_internal_with_header(
             locked,
@@ -772,7 +772,8 @@ where
         if space < header_size {
             break;
         }
-        let cmsg_ref = CMsgHdrPtr::new(current_task, message_header.control + next_message_offset);
+        let cmsg_ref =
+            CMsgHdrPtr::new(current_task, (message_header.control + next_message_offset)?);
         let cmsg = current_task.read_multi_arch_object(cmsg_ref)?;
         // If the message header is not long enough to fit the required fields of the
         // control data, return EINVAL.
@@ -781,10 +782,9 @@ where
         }
 
         let data_size = std::cmp::min(cmsg.cmsg_len as usize - header_size, space);
-        let data = current_task.read_memory_to_vec(
-            message_header.control + next_message_offset + header_size,
-            data_size,
-        )?;
+        let next_data_offset = next_message_offset + header_size;
+        let data = current_task
+            .read_memory_to_vec((message_header.control + next_data_offset)?, data_size)?;
         next_message_offset += cmsg_align(current_task, header_size + data.len())?;
         let data = AncillaryData::from_cmsg(
             current_task,
@@ -843,7 +843,7 @@ pub fn sys_sendmmsg(
 
     let mut index = 0usize;
     while index < vlen as usize {
-        let current_ptr = user_mmsgvec.at(index);
+        let current_ptr = user_mmsgvec.at(index)?;
         let mut current_mmsghdr = current_task.read_multi_arch_object(current_ptr)?;
         match sendmsg_internal_with_header(locked, current_task, &file, &current_mmsghdr.hdr, flags)
         {

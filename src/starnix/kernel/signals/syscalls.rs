@@ -1046,8 +1046,8 @@ mod tests {
             .expect("failed to call sigaltstack");
 
         // Changing the sigaltstack while we are there should be an error.
-        current_task.thread_state.registers.rsp =
-            (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
+        let next_addr = (sigaltstack_addr + sigaltstack_addr_size).unwrap();
+        current_task.thread_state.registers.rsp = next_addr.ptr() as u64;
         ss.ss_flags = SS_DISABLE as i32;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
         assert_eq!(
@@ -1057,8 +1057,12 @@ mod tests {
 
         // However, setting the rsp to a different value outside the alt stack should allow us to
         // disable it.
-        current_task.thread_state.registers.rsp =
-            (sigaltstack_addr + sigaltstack_addr_size + 0x1000usize).ptr() as u64;
+        let next_ss_addr = sigaltstack_addr
+            .checked_add(sigaltstack_addr_size)
+            .unwrap()
+            .checked_add(0x1000usize)
+            .unwrap();
+        current_task.thread_state.registers.rsp = next_ss_addr.ptr() as u64;
         let ss = sigaltstack { ss_flags: SS_DISABLE as i32, ..sigaltstack::default() };
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
         sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
@@ -1098,7 +1102,7 @@ mod tests {
 
         // Changing the sigaltstack while we are there should be an error.
         current_task.thread_state.registers.rsp =
-            (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
+            (sigaltstack_addr + sigaltstack_addr_size).unwrap().ptr() as u64;
         ss.ss_flags = SS_DISABLE as i32;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
         assert_eq!(
@@ -1252,7 +1256,8 @@ mod tests {
         let set = UserRef::<SigSet>::new(addr);
         current_task.write_object(set, &new_mask).expect("failed to set mask");
 
-        let old_set = UserRef::<SigSet>::new(addr + std::mem::size_of::<SigSet>());
+        let old_addr_range = (addr + std::mem::size_of::<SigSet>()).unwrap();
+        let old_set = UserRef::<SigSet>::new(old_addr_range);
         let how = SIG_SETMASK;
 
         assert_eq!(
@@ -1290,7 +1295,8 @@ mod tests {
         let set = UserRef::<SigSet>::new(addr);
         current_task.write_object(set, &new_mask).expect("failed to set mask");
 
-        let old_set = UserRef::<SigSet>::new(addr + std::mem::size_of::<SigSet>());
+        let old_addr_range = (addr + std::mem::size_of::<SigSet>()).unwrap();
+        let old_set = UserRef::<SigSet>::new(old_addr_range);
         let how = SIG_BLOCK;
 
         assert_eq!(
@@ -1328,7 +1334,8 @@ mod tests {
         let set = UserRef::<SigSet>::new(addr);
         current_task.write_object(set, &new_mask).expect("failed to set mask");
 
-        let old_set = UserRef::<SigSet>::new(addr + std::mem::size_of::<SigSet>());
+        let old_addr_range = (addr + std::mem::size_of::<SigSet>()).unwrap();
+        let old_set = UserRef::<SigSet>::new(old_addr_range);
         let how = SIG_UNBLOCK;
 
         assert_eq!(
@@ -1366,7 +1373,8 @@ mod tests {
         let set = UserRef::<SigSet>::new(addr);
         current_task.write_object(set, &new_mask).expect("failed to set mask");
 
-        let old_set = UserRef::<SigSet>::new(addr + std::mem::size_of::<SigSet>());
+        let old_addr_range = (addr + std::mem::size_of::<SigSet>()).unwrap();
+        let old_set = UserRef::<SigSet>::new(old_addr_range);
         let how = SIG_UNBLOCK;
 
         assert_eq!(
@@ -1404,7 +1412,8 @@ mod tests {
         let set = UserRef::<SigSet>::new(addr);
         current_task.write_object(set, &new_mask).expect("failed to set mask");
 
-        let old_set = UserRef::<SigSet>::new(addr + std::mem::size_of::<SigSet>());
+        let old_addr_range = (addr + std::mem::size_of::<SigSet>()).unwrap();
+        let old_set = UserRef::<SigSet>::new(old_addr_range);
         let how = SIG_BLOCK;
 
         assert_eq!(

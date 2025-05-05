@@ -895,7 +895,7 @@ mod tests {
 
         let input_iovec = smallvec![
             UserBuffer { address: addr, length: 25 },
-            UserBuffer { address: addr + 64usize, length: 12 },
+            UserBuffer { address: (addr + 64usize).expect("Memory mapped OOB!"), length: 12 },
         ];
 
         // Test incorrect callback.
@@ -968,7 +968,7 @@ mod tests {
 
         let output_iovec = smallvec![
             UserBuffer { address: addr, length: 25 },
-            UserBuffer { address: addr + 64usize, length: 12 },
+            UserBuffer { address: (addr + 64usize).expect("Memory was mapped OOB!"), length: 12 },
         ];
 
         let mm = current_task.deref();

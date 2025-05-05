@@ -838,7 +838,7 @@ pub fn sys_openat2(
     while pos < size {
         let length = std::cmp::min(size - pos, *PAGE_SIZE as usize);
         let extra_bytes =
-            current_task.read_buffer(&UserBuffer { address: how_ref.addr() + pos, length })?;
+            current_task.read_buffer(&UserBuffer { address: (how_ref.addr() + pos)?, length })?;
         for b in extra_bytes {
             if b != 0 {
                 return error!(E2BIG);
@@ -1641,7 +1641,7 @@ pub fn sys_pipe2(
     log_trace!("pipe2 -> [{:#x}, {:#x}]", fd_read.raw(), fd_write.raw());
 
     current_task.write_object(user_pipe, &fd_read)?;
-    let user_pipe = user_pipe.next();
+    let user_pipe = user_pipe.next()?;
     current_task.write_object(user_pipe, &fd_write)?;
 
     Ok(())
@@ -2602,7 +2602,7 @@ pub fn poll(
     let waiter = FileWaiter::<usize>::default();
 
     for (index, poll_descriptor) in pollfds.iter_mut().enumerate() {
-        *poll_descriptor = current_task.read_object(user_pollfds.at(index))?;
+        *poll_descriptor = current_task.read_object(user_pollfds.at(index)?)?;
         poll_descriptor.revents = 0;
         if poll_descriptor.fd < 0 {
             continue;
@@ -2637,7 +2637,7 @@ pub fn poll(
     }
 
     for (index, poll_descriptor) in pollfds.iter().enumerate() {
-        current_task.write_object(user_pollfds.at(index), poll_descriptor)?;
+        current_task.write_object(user_pollfds.at(index)?, poll_descriptor)?;
     }
 
     Ok(unique_ready_items.into_iter().filter(Clone::clone).count())
@@ -3090,7 +3090,7 @@ pub fn sys_io_submit(
             }
         };
 
-        iocb_addrs = iocb_addrs.next();
+        iocb_addrs = iocb_addrs.next()?;
     }
 
     Ok(num_submitted)
@@ -3808,7 +3808,8 @@ mod tests {
         let path_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(path_addr, file_path.as_bytes()).expect("failed to clear struct");
 
-        let user_stat = UserRef::new(path_addr + file_path.len());
+        let memory_len = (path_addr + file_path.len()).expect("OOB memory allocation!");
+        let user_stat = UserRef::new(memory_len);
         current_task.write_object(user_stat, &default_statfs(0)).expect("failed to clear struct");
 
         let user_path = UserCString::new(&current_task, path_addr);

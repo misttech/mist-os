@@ -950,7 +950,7 @@ impl FileOps for MemFile {
         match task.state_code() {
             TaskStateCode::Zombie => Ok(0),
             TaskStateCode::Running | TaskStateCode::Sleeping | TaskStateCode::TracingStop => {
-                let mut addr = UserAddress::default() + offset;
+                let mut addr = UserAddress::from(offset as u64);
                 data.write_each(&mut |bytes| {
                     let read_bytes = if current_task.has_same_address_space(&task) {
                         current_task.read_memory_partial(addr, bytes)
@@ -959,7 +959,7 @@ impl FileOps for MemFile {
                     }
                     .map_err(|_| errno!(EIO))?;
                     let actual = read_bytes.len();
-                    addr += actual;
+                    addr = (addr + actual)?;
                     Ok(actual)
                 })
             }
@@ -978,13 +978,13 @@ impl FileOps for MemFile {
         match task.state_code() {
             TaskStateCode::Zombie => Ok(0),
             TaskStateCode::Running | TaskStateCode::Sleeping | TaskStateCode::TracingStop => {
-                let addr = UserAddress::default() + offset;
+                let addr = UserAddress::from(offset as u64);
                 let mut written = 0;
                 let result = data.peek_each(&mut |bytes| {
                     let actual = if current_task.has_same_address_space(&task) {
-                        current_task.write_memory_partial(addr + written, bytes)
+                        current_task.write_memory_partial((addr + written)?, bytes)
                     } else {
-                        task.write_memory_partial(addr + written, bytes)
+                        task.write_memory_partial((addr + written)?, bytes)
                     }
                     .map_err(|_| errno!(EIO))?;
                     written += actual;

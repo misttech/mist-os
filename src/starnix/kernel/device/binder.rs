@@ -1408,37 +1408,32 @@ impl SharedMemory {
             .and_then(|v| v.checked_add(security_context_buffer_length))
             .ok_or_else(|| errno!(EINVAL))?;
         let base_offset = self.allocate(total_length)?;
+        let security_context_buffer = if security_context_buffer_length > 0 {
+            Some(SharedBuffer::new(
+                self,
+                base_offset + data_cap + offsets_length + sg_buffers_length,
+                security_context_buffer_length,
+            )?)
+        } else {
+            None
+        };
 
-        // SAFETY: The offsets and lengths have been bounds-checked above. Constructing a
-        // `SharedBuffer` should be safe.
-        unsafe {
-            Ok(SharedMemoryAllocation {
-                data_buffer: SharedBuffer::new_unchecked(self, base_offset, data_length),
-                offsets_buffer: SharedBuffer::new_unchecked(
-                    self,
-                    base_offset + data_cap,
-                    offsets_length,
-                ),
-                scatter_gather_buffer: SharedBuffer::new_unchecked(
-                    self,
-                    base_offset + data_cap + offsets_length,
-                    sg_buffers_length,
-                ),
-                security_context_buffer: (security_context_buffer_length > 0).then(|| {
-                    SharedBuffer::new_unchecked(
-                        self,
-                        base_offset + data_cap + offsets_length + sg_buffers_length,
-                        security_context_buffer_length,
-                    )
-                }),
-            })
-        }
+        Ok(SharedMemoryAllocation {
+            data_buffer: SharedBuffer::new(self, base_offset, data_length)?,
+            offsets_buffer: SharedBuffer::new(self, base_offset + data_cap, offsets_length)?,
+            scatter_gather_buffer: SharedBuffer::new(
+                self,
+                base_offset + data_cap + offsets_length,
+                sg_buffers_length,
+            )?,
+            security_context_buffer,
+        })
     }
 
     // Reclaim the buffer so that it can be reused.
     fn free_buffer(&mut self, buffer: UserAddress) -> Result<(), Errno> {
         // Sanity check that the buffer being freed came from this memory region.
-        if buffer < self.user_address || buffer >= self.user_address + self.length {
+        if buffer < self.user_address || buffer >= (self.user_address + self.length)? {
             return error!(EINVAL);
         }
         let offset = buffer - self.user_address;
@@ -1455,6 +1450,8 @@ struct SharedBuffer<'a, T> {
     offset: usize,
     /// The length of the buffer in bytes.
     length: usize,
+    /// The underlying buffer.
+    user_buffer: UserBuffer,
     // A zero-sized type that satisfies the compiler's need for the struct to reference `T`, which
     // is used in `as_mut_bytes` and `as_bytes`.
     _phantom_data: std::marker::PhantomData<T>,
@@ -1462,18 +1459,20 @@ struct SharedBuffer<'a, T> {
 
 impl<'a, T: IntoBytes> SharedBuffer<'a, T> {
     /// Creates a new `SharedBuffer`, which represents a sub-region of `memory` starting at `offset`
-    /// bytes, with `length` bytes.
-    ///
-    /// This is unsafe because the caller is responsible for bounds-checking the sub-region and
-    /// ensuring it is not aliased.
-    unsafe fn new_unchecked(memory: &'a SharedMemory, offset: usize, length: usize) -> Self {
-        Self { memory, offset, length, _phantom_data: std::marker::PhantomData }
+    /// bytes, with `length` bytes. Will return EFAULT if the sub-region is not within memory bounds.
+    /// The caller is responsible for ensuring it is not aliased.
+    fn new(memory: &'a SharedMemory, offset: usize, length: usize) -> Result<Self, Errno> {
+        let memory_address = (memory.user_address + offset)?;
+        // Validate that the entire buffer length is valid as well.
+        let _ = (memory_address + length)?;
+        let user_buffer = UserBuffer { address: memory_address, length: length };
+        Ok(Self { memory, offset, length, user_buffer, _phantom_data: std::marker::PhantomData })
     }
 
     /// Returns a mutable slice of the buffer.
     fn as_mut_bytes(&mut self) -> &'a mut [T] {
-        // SAFETY: `offset + length` was bounds-checked by `allocate_buffers`, and the
-        // memory region pointed to was zero-allocated by mapping a new VMO.
+        // SAFETY: `offset + length` was bounds-checked by `new`, and the memory region pointed to
+        // was zero-allocated by mapping a new VMO in `allocate_buffers`.
         unsafe {
             std::slice::from_raw_parts_mut(
                 self.memory.kernel_address.add(self.offset) as *mut T,
@@ -1484,8 +1483,8 @@ impl<'a, T: IntoBytes> SharedBuffer<'a, T> {
 
     /// Returns an immutable slice of the buffer.
     fn as_bytes(&self) -> &'a [T] {
-        // SAFETY: `offset + length` was bounds-checked by `allocate_buffers`, and the
-        // memory region pointed to was zero-allocated by mapping a new VMO.
+        // SAFETY: `offset + length` was bounds-checked by `new`, and the memory region pointed to
+        // was zero-allocated by mapping a new VMO in `allocate_buffers`.
         unsafe {
             std::slice::from_raw_parts(
                 self.memory.kernel_address.add(self.offset) as *const T,
@@ -1496,7 +1495,7 @@ impl<'a, T: IntoBytes> SharedBuffer<'a, T> {
 
     /// The userspace address and length of the buffer.
     fn user_buffer(&self) -> UserBuffer {
-        UserBuffer { address: self.memory.user_address + self.offset, length: self.length }
+        self.user_buffer
     }
 }
 
@@ -4550,7 +4549,7 @@ impl BinderDriver {
                         let padded_length =
                             round_up_to_increment(length, std::mem::size_of::<binder_uintptr_t>())?;
                         sg_remaining_buffer = UserBuffer {
-                            address: sg_remaining_buffer.address + padded_length,
+                            address: (sg_remaining_buffer.address + padded_length)?,
                             length: sg_remaining_buffer.length - padded_length,
                         };
                         sg_buffer_offset += padded_length;
@@ -5219,7 +5218,7 @@ pub mod tests {
                     .data_buffer;
                 buffer.memory.user_address + buffer.offset
             };
-            addresses.push(address);
+            addresses.push(address.expect("buffer address range is out of bounds!"));
         }
         addresses
     }
@@ -5518,16 +5517,19 @@ pub mod tests {
         );
         assert_eq!(
             allocations.offsets_buffer.user_buffer(),
-            UserBuffer { address: BASE_ADDR + 8usize, length: OFFSETS_LEN }
+            UserBuffer { address: (BASE_ADDR + 8usize).unwrap(), length: OFFSETS_LEN }
         );
         assert_eq!(
             allocations.scatter_gather_buffer.user_buffer(),
-            UserBuffer { address: BASE_ADDR + 8usize + OFFSETS_LEN, length: BUFFERS_LEN }
+            UserBuffer {
+                address: (BASE_ADDR + (8usize + OFFSETS_LEN)).unwrap(),
+                length: BUFFERS_LEN
+            }
         );
         assert_eq!(
             allocations.security_context_buffer.as_ref().expect("security_context").user_buffer(),
             UserBuffer {
-                address: BASE_ADDR + 8usize + OFFSETS_LEN + BUFFERS_LEN,
+                address: (BASE_ADDR + (8usize + OFFSETS_LEN + BUFFERS_LEN)).unwrap(),
                 length: SECURITY_CONTEXT_BUFFER_LEN
             }
         );
@@ -5601,19 +5603,32 @@ pub mod tests {
         );
         assert_eq!(
             allocations.offsets_buffer.user_buffer(),
-            UserBuffer { address: BASE_ADDR + BUF1_DATA_LEN, length: BUF1_OFFSETS_LEN }
+            UserBuffer {
+                address: BASE_ADDR.checked_add(BUF1_DATA_LEN).unwrap(),
+                length: BUF1_OFFSETS_LEN
+            }
         );
         assert_eq!(
             allocations.scatter_gather_buffer.user_buffer(),
             UserBuffer {
-                address: BASE_ADDR + BUF1_DATA_LEN + BUF1_OFFSETS_LEN,
+                address: BASE_ADDR
+                    .checked_add(BUF1_DATA_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_OFFSETS_LEN)
+                    .unwrap(),
                 length: BUF1_BUFFERS_LEN
             }
         );
         assert_eq!(
             allocations.security_context_buffer.expect("security_context").user_buffer(),
             UserBuffer {
-                address: BASE_ADDR + BUF1_DATA_LEN + BUF1_OFFSETS_LEN + BUF1_BUFFERS_LEN,
+                address: BASE_ADDR
+                    .checked_add(BUF1_DATA_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_OFFSETS_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_BUFFERS_LEN)
+                    .unwrap(),
                 length: BUF1_SECURITY_CONTEXT_BUFFER_LEN
             }
         );
@@ -5634,10 +5649,14 @@ pub mod tests {
             allocations.data_buffer.user_buffer(),
             UserBuffer {
                 address: BASE_ADDR
-                    + BUF1_DATA_LEN
-                    + BUF1_OFFSETS_LEN
-                    + BUF1_BUFFERS_LEN
-                    + BUF1_SECURITY_CONTEXT_BUFFER_LEN,
+                    .checked_add(BUF1_DATA_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_OFFSETS_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_BUFFERS_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_SECURITY_CONTEXT_BUFFER_LEN)
+                    .unwrap(),
                 length: BUF2_DATA_LEN
             }
         );
@@ -5645,11 +5664,16 @@ pub mod tests {
             allocations.offsets_buffer.user_buffer(),
             UserBuffer {
                 address: BASE_ADDR
-                    + BUF1_DATA_LEN
-                    + BUF1_OFFSETS_LEN
-                    + BUF1_BUFFERS_LEN
-                    + BUF1_SECURITY_CONTEXT_BUFFER_LEN
-                    + BUF2_DATA_LEN,
+                    .checked_add(BUF1_DATA_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_OFFSETS_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_BUFFERS_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_SECURITY_CONTEXT_BUFFER_LEN)
+                    .unwrap()
+                    .checked_add(BUF2_DATA_LEN)
+                    .unwrap(),
                 length: BUF2_OFFSETS_LEN
             }
         );
@@ -5767,17 +5791,17 @@ pub mod tests {
         let buffer_1 = {
             let allocations =
                 shared_memory.allocate_buffers(VMO_LENGTH / 4, 0, 0, 0).expect("couldn't allocate");
-            allocations.data_buffer.memory.user_address + allocations.data_buffer.offset
+            (allocations.data_buffer.memory.user_address + allocations.data_buffer.offset).unwrap()
         };
         let buffer_2 = {
             let allocations =
                 shared_memory.allocate_buffers(VMO_LENGTH / 4, 0, 0, 0).expect("couldn't allocate");
-            allocations.data_buffer.memory.user_address + allocations.data_buffer.offset
+            (allocations.data_buffer.memory.user_address + allocations.data_buffer.offset).unwrap()
         };
         let buffer_3 = {
             let allocations =
                 shared_memory.allocate_buffers(VMO_LENGTH / 4, 0, 0, 0).expect("couldn't allocate");
-            allocations.data_buffer.memory.user_address + allocations.data_buffer.offset
+            (allocations.data_buffer.memory.user_address + allocations.data_buffer.offset).unwrap()
         };
 
         // Attempt to allocate a buffer at the end that is larger than 1/4th.
@@ -6204,11 +6228,12 @@ pub mod tests {
                 cookie: 0,
             }));
 
-            let offsets_addr = data_addr
+            let offsets_addr = (data_addr
                 + sender
                     .task
                     .write_memory(data_addr, &transaction_data)
-                    .expect("failed to write transaction data");
+                    .expect("failed to write transaction data"))
+            .unwrap();
 
             // Write the offsets data (where in the data buffer `flat_binder_object`s are).
             let offsets_data: u64 = BINDER_DATA.len() as u64;
@@ -6260,11 +6285,11 @@ pub mod tests {
 
             // Check that the returned buffers are in-bounds of process 2's shared memory.
             assert!(data_buffer.address >= BASE_ADDR);
-            assert!(data_buffer.address < BASE_ADDR + VMO_LENGTH);
+            assert!(data_buffer.address < BASE_ADDR.checked_add(VMO_LENGTH).unwrap());
             assert!(offsets_buffer.address >= BASE_ADDR);
-            assert!(offsets_buffer.address < BASE_ADDR + VMO_LENGTH);
+            assert!(offsets_buffer.address < BASE_ADDR.checked_add(VMO_LENGTH).unwrap());
             assert!(security_context_buffer.address >= BASE_ADDR);
-            assert!(security_context_buffer.address < BASE_ADDR + VMO_LENGTH);
+            assert!(security_context_buffer.address < BASE_ADDR.checked_add(VMO_LENGTH).unwrap());
 
             // Verify the contents of the copied data in process 2's shared memory VMO.
             let mut buffer = [0u8; BINDER_DATA.len() + std::mem::size_of::<flat_binder_object>()];
@@ -6988,7 +7013,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -7182,7 +7207,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -7302,7 +7327,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8144,7 +8169,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (object, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8286,7 +8311,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (object, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8399,7 +8424,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8459,7 +8484,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8519,7 +8544,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8605,7 +8630,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8892,7 +8917,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8959,7 +8984,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()

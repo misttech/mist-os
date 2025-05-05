@@ -707,7 +707,7 @@ impl MemoryManagerState {
         }
 
         profile_duration!("FinishMapping");
-        let end = (mapped_addr + length).round_up(*PAGE_SIZE)?;
+        let end = (mapped_addr + length)?.round_up(*PAGE_SIZE)?;
 
         if let DesiredAddress::FixedOverwrite(addr) = addr {
             assert_eq!(addr, mapped_addr);
@@ -1010,7 +1010,7 @@ impl MemoryManagerState {
         // the source range in place. This must be done now and visible to processes, even if
         // a later failure causes the remap operation to fail.
         if src_length != 0 && src_length > dst_length {
-            self.unmap(mm, src_addr + dst_length, src_length - dst_length, released_mappings)?;
+            self.unmap(mm, (src_addr + dst_length)?, src_length - dst_length, released_mappings)?;
         }
 
         let dst_addr_for_map = match dst_addr {
@@ -1852,7 +1852,9 @@ impl MemoryManagerState {
         {
             return Err(());
         }
-        Ok((addr - self.user_vmar_info.base).ptr())
+        (addr - self.user_vmar_info.base)
+            .map(|addr| addr.ptr())
+            .map_err(|_| ())
     }
 
     fn get_mappings_for_vmsplice(
@@ -1882,7 +1884,7 @@ impl MemoryManagerState {
                 };
                 vmsplice_mappings.push(VmsplicePayload::new(Arc::downgrade(mm), vmsplice_payload));
 
-                address += length;
+                address = (address + length)?;
             }
         }
 
@@ -1981,7 +1983,7 @@ impl MemoryManagerState {
             // Don't grow a read-only GROWSDOWN mapping for a write fault, it won't work.
             return Ok(false);
         }
-        let low_addr = addr - (addr.ptr() as u64 % *PAGE_SIZE);
+        let low_addr = (addr - (addr.ptr() as u64 % *PAGE_SIZE))?;
         let high_addr = mapping_low_addr;
         let length = high_addr
             .ptr()
@@ -2033,7 +2035,7 @@ impl MemoryManagerState {
         for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
             let next_offset = bytes_read + len;
             self.read_mapping_memory(
-                addr + bytes_read,
+                (addr + bytes_read)?,
                 mapping,
                 &mut bytes[bytes_read..next_offset],
             )?;
@@ -2095,7 +2097,7 @@ impl MemoryManagerState {
             let next_offset = bytes_read + len;
             if self
                 .read_mapping_memory(
-                    addr + bytes_read,
+                    (addr + bytes_read)?,
                     mapping,
                     &mut bytes[bytes_read..next_offset],
                 )
@@ -2147,7 +2149,7 @@ impl MemoryManagerState {
         for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
             let next_offset = bytes_written + len;
             self.write_mapping_memory(
-                addr + bytes_written,
+                (addr + bytes_written)?,
                 mapping,
                 &bytes[bytes_written..next_offset],
             )?;
@@ -2196,7 +2198,7 @@ impl MemoryManagerState {
             let next_offset = bytes_written + len;
             if self
                 .write_mapping_memory(
-                    addr + bytes_written,
+                    (addr + bytes_written)?,
                     mapping,
                     &bytes[bytes_written..next_offset],
                 )
@@ -2219,7 +2221,7 @@ impl MemoryManagerState {
         let mut bytes_written = 0;
         for (mapping, len) in self.get_contiguous_mappings_at(addr, length)? {
             let next_offset = bytes_written + len;
-            if self.zero_mapping(addr + bytes_written, mapping, len).is_err() {
+            if self.zero_mapping((addr + bytes_written)?, mapping, len).is_err() {
                 break;
             }
             bytes_written = next_offset;
@@ -3248,7 +3250,13 @@ impl MemoryManager {
             Some(brk) => brk,
         };
 
-        if addr < brk.base || addr > brk.base + rlimit_data {
+        let Ok(last_address) = brk.base + rlimit_data else {
+            // The requested program break is out-of-range. We're supposed to simply
+            // return the current program break.
+            return Ok(brk.current);
+        };
+
+        if addr < brk.base || addr > last_address {
             // The requested program break is out-of-range. We're supposed to simply
             // return the current program break.
             return Ok(brk.current);
@@ -3313,8 +3321,12 @@ impl MemoryManager {
             // If there was previously at least one page of program break then we can
             // extend that mapping, rather than making a new allocation.
             let existing = if old_end > brk_base {
-                let last_page = old_end - *PAGE_SIZE;
-                state.mappings.get(last_page).filter(|(_, m)| m.name() == &MappingName::Heap)
+                match old_end - *PAGE_SIZE {
+                    Ok(addr) => {
+                        state.mappings.get(addr).filter(|(_, m)| m.name() == &MappingName::Heap)
+                    }
+                    Err(_) => None,
+                }
             } else {
                 None
             };
@@ -4069,7 +4081,7 @@ impl MemoryManager {
         let state = self.state.read();
 
         if let Some(range) = state.mappings.last_range() {
-            if range.end - buffer_size >= addr {
+            if (range.end - buffer_size)? >= addr {
                 return Ok(());
             }
         }
@@ -4575,37 +4587,43 @@ mod tests {
         assert_eq!(get_range(base_addr), None);
 
         // Growing it by a single byte results in that page becoming mapped.
-        let addr0 = mm.set_brk(&current_task, base_addr + 1u64).expect("failed to grow brk");
+        let addr0 =
+            mm.set_brk(&current_task, (base_addr + 1u64).unwrap()).expect("failed to grow brk");
         assert!(addr0 > base_addr);
         let (range0, _) = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range0.start, base_addr);
-        assert_eq!(range0.end, base_addr + *PAGE_SIZE);
+        assert_eq!(range0.end, (base_addr + *PAGE_SIZE).unwrap());
 
         // Grow the program break by another byte, which won't be enough to cause additional pages to be mapped.
-        let addr1 = mm.set_brk(&current_task, base_addr + 2u64).expect("failed to grow brk");
-        assert_eq!(addr1, base_addr + 2u64);
+        let addr1 =
+            mm.set_brk(&current_task, (base_addr + 2u64).unwrap()).expect("failed to grow brk");
+        assert_eq!(addr1, (base_addr + 2u64).unwrap());
         let (range1, _) = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range1.start, range0.start);
         assert_eq!(range1.end, range0.end);
 
         // Grow the program break by a non-trival amount and observe the larger mapping.
-        let addr2 = mm.set_brk(&current_task, base_addr + 24893u64).expect("failed to grow brk");
-        assert_eq!(addr2, base_addr + 24893u64);
+        let addr2 =
+            mm.set_brk(&current_task, (base_addr + 24893u64).unwrap()).expect("failed to grow brk");
+        assert_eq!(addr2, (base_addr + 24893u64).unwrap());
         let (range2, _) = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range2.start, base_addr);
         assert_eq!(range2.end, addr2.round_up(*PAGE_SIZE).unwrap());
 
         // Shrink the program break and observe the smaller mapping.
-        let addr3 = mm.set_brk(&current_task, base_addr + 14832u64).expect("failed to shrink brk");
-        assert_eq!(addr3, base_addr + 14832u64);
+        let addr3 = mm
+            .set_brk(&current_task, (base_addr + 14832u64).unwrap())
+            .expect("failed to shrink brk");
+        assert_eq!(addr3, (base_addr + 14832u64).unwrap());
         let (range3, _) = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range3.start, base_addr);
         assert_eq!(range3.end, addr3.round_up(*PAGE_SIZE).unwrap());
 
         // Shrink the program break close to zero and observe the smaller mapping.
-        let addr4 =
-            mm.set_brk(&current_task, base_addr + 3u64).expect("failed to drastically shrink brk");
-        assert_eq!(addr4, base_addr + 3u64);
+        let addr4 = mm
+            .set_brk(&current_task, (base_addr + 3u64).unwrap())
+            .expect("failed to drastically shrink brk");
+        assert_eq!(addr4, (base_addr + 3u64).unwrap());
         let (range4, _) = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range4.start, base_addr);
         assert_eq!(range4.end, addr4.round_up(*PAGE_SIZE).unwrap());
@@ -4633,7 +4651,9 @@ mod tests {
         assert!(brk_addr > UserAddress::default());
 
         // Allocate a single page of BRK space, so that the break base address is mapped.
-        let _ = mm.set_brk(&current_task, brk_addr + 1u64).expect("failed to grow program break");
+        let _ = mm
+            .set_brk(&current_task, (brk_addr + 1u64).unwrap())
+            .expect("failed to grow program break");
         assert!(has(brk_addr));
 
         let mapped_addr =
@@ -4661,10 +4681,10 @@ mod tests {
 
         // Create four one-page mappings with a hole between the third one and the fourth one.
         let page_size = *PAGE_SIZE as usize;
-        let addr_a = mm.base_addr + 10 * page_size;
-        let addr_b = mm.base_addr + 11 * page_size;
-        let addr_c = mm.base_addr + 12 * page_size;
-        let addr_d = mm.base_addr + 14 * page_size;
+        let addr_a = (mm.base_addr + 10 * page_size).unwrap();
+        let addr_b = (mm.base_addr + 11 * page_size).unwrap();
+        let addr_c = (mm.base_addr + 12 * page_size).unwrap();
+        let addr_d = (mm.base_addr + 14 * page_size).unwrap();
         assert_eq!(map_memory(&mut locked, &current_task, addr_a, *PAGE_SIZE), addr_a);
         assert_eq!(map_memory(&mut locked, &current_task, addr_b, *PAGE_SIZE), addr_b);
         assert_eq!(map_memory(&mut locked, &current_task, addr_c, *PAGE_SIZE), addr_c);
@@ -4673,9 +4693,12 @@ mod tests {
         {
             let mm_state = mm.state.read();
             // Verify that requesting an unmapped address returns an empty iterator.
-            assert_equal(mm_state.get_contiguous_mappings_at(addr_a - 100u64, 50).unwrap(), vec![]);
             assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_a - 100u64, 200).unwrap(),
+                mm_state.get_contiguous_mappings_at((addr_a - 100u64).unwrap(), 50).unwrap(),
+                vec![],
+            );
+            assert_equal(
+                mm_state.get_contiguous_mappings_at((addr_a - 100u64).unwrap(), 200).unwrap(),
                 vec![],
             );
 
@@ -4692,7 +4715,7 @@ mod tests {
             );
             assert_eq!(
                 mm_state
-                    .get_contiguous_mappings_at(mm_state.max_address() + 1u64, 0)
+                    .get_contiguous_mappings_at((mm_state.max_address() + 1u64).unwrap(), 0)
                     .err()
                     .unwrap(),
                 errno!(EFAULT)
@@ -4774,22 +4797,31 @@ mod tests {
                 vec![(map_a, page_size / 2)],
             );
             assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_a + page_size / 2, page_size / 2).unwrap(),
+                mm_state
+                    .get_contiguous_mappings_at((addr_a + page_size / 2).unwrap(), page_size / 2)
+                    .unwrap(),
                 vec![(map_a, page_size / 2)],
             );
             assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_a + page_size / 4, page_size / 8).unwrap(),
+                mm_state
+                    .get_contiguous_mappings_at((addr_a + page_size / 4).unwrap(), page_size / 8)
+                    .unwrap(),
                 vec![(map_a, page_size / 8)],
             );
 
             // Verify result when requesting a range spanning more than one mapping.
             assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_a + page_size / 2, page_size).unwrap(),
+                mm_state
+                    .get_contiguous_mappings_at((addr_a + page_size / 2).unwrap(), page_size)
+                    .unwrap(),
                 vec![(map_a, page_size / 2), (map_b, page_size / 2)],
             );
             assert_equal(
                 mm_state
-                    .get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 3 / 2)
+                    .get_contiguous_mappings_at(
+                        (addr_a + page_size / 2).unwrap(),
+                        page_size * 3 / 2,
+                    )
                     .unwrap(),
                 vec![(map_a, page_size / 2), (map_b, page_size)],
             );
@@ -4798,12 +4830,17 @@ mod tests {
                 vec![(map_a, page_size), (map_b, page_size / 2)],
             );
             assert_equal(
-                mm_state.get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 2).unwrap(),
+                mm_state
+                    .get_contiguous_mappings_at((addr_a + page_size / 2).unwrap(), page_size * 2)
+                    .unwrap(),
                 vec![(map_a, page_size / 2), (map_b, page_size), (map_c, page_size / 2)],
             );
             assert_equal(
                 mm_state
-                    .get_contiguous_mappings_at(addr_b + page_size / 2, page_size * 3 / 2)
+                    .get_contiguous_mappings_at(
+                        (addr_b + page_size / 2).unwrap(),
+                        page_size * 3 / 2,
+                    )
                     .unwrap(),
                 vec![(map_b, page_size / 2), (map_c, page_size)],
             );
@@ -4811,7 +4848,7 @@ mod tests {
             // Verify that results stop if there is a hole.
             assert_equal(
                 mm_state
-                    .get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 10)
+                    .get_contiguous_mappings_at((addr_a + page_size / 2).unwrap(), page_size * 10)
                     .unwrap(),
                 vec![(map_a, page_size / 2), (map_b, page_size), (map_c, page_size)],
             );
@@ -4832,11 +4869,11 @@ mod tests {
 
         // Map two contiguous pages at fixed addresses, but backed by distinct mappings.
         let page_size = *PAGE_SIZE;
-        let addr = mm.base_addr + 10 * page_size;
+        let addr = (mm.base_addr + 10 * page_size).unwrap();
         assert_eq!(map_memory(&mut locked, &current_task, addr, page_size), addr);
         assert_eq!(
-            map_memory(&mut locked, &current_task, addr + page_size, page_size),
-            addr + page_size
+            map_memory(&mut locked, &current_task, (addr + page_size).unwrap(), page_size),
+            (addr + page_size).unwrap()
         );
         #[cfg(feature = "alternate_anon_allocs")]
         assert_eq!(mm.get_mapping_count(), 1);
@@ -4844,7 +4881,7 @@ mod tests {
         assert_eq!(mm.get_mapping_count(), 2);
 
         // Write a pattern crossing our two mappings.
-        let test_addr = addr + page_size / 2;
+        let test_addr = (addr + page_size / 2).unwrap();
         let data: Vec<u8> = (0..page_size).map(|i| (i % 256) as u8).collect();
         ma.write_memory(test_addr, &data).expect("failed to write test data");
 
@@ -4864,15 +4901,15 @@ mod tests {
         let buf = vec![0u8; page_size as usize];
 
         // Verify that accessing data that is only partially mapped is an error.
-        let partial_addr_before = addr - page_size / 2;
+        let partial_addr_before = (addr - page_size / 2).unwrap();
         assert_eq!(ma.write_memory(partial_addr_before, &buf), error!(EFAULT));
         assert_eq!(ma.read_memory_to_vec(partial_addr_before, buf.len()), error!(EFAULT));
-        let partial_addr_after = addr + page_size / 2;
+        let partial_addr_after = (addr + page_size / 2).unwrap();
         assert_eq!(ma.write_memory(partial_addr_after, &buf), error!(EFAULT));
         assert_eq!(ma.read_memory_to_vec(partial_addr_after, buf.len()), error!(EFAULT));
 
         // Verify that accessing unmapped memory is an error.
-        let unmapped_addr = addr - 10 * page_size;
+        let unmapped_addr = (addr - 10 * page_size).unwrap();
         assert_eq!(ma.write_memory(unmapped_addr, &buf), error!(EFAULT));
         assert_eq!(ma.read_memory_to_vec(unmapped_addr, buf.len()), error!(EFAULT));
 
@@ -4889,7 +4926,7 @@ mod tests {
 
         let page_size = *PAGE_SIZE;
         let max_size = 4 * page_size as usize;
-        let addr = mm.base_addr + 10 * page_size;
+        let addr = (mm.base_addr + 10 * page_size).unwrap();
 
         assert_eq!(map_memory(&mut locked, &current_task, addr, max_size as u64), addr);
 
@@ -4919,12 +4956,13 @@ mod tests {
 
         let page_size = *PAGE_SIZE;
         let max_size = 2 * page_size as usize;
-        let addr = mm.base_addr + 10 * page_size;
+        let addr = (mm.base_addr + 10 * page_size).unwrap();
 
         // Map a page at a fixed address and write an unterminated string at the end of it.
         assert_eq!(map_memory(&mut locked, &current_task, addr, page_size), addr);
         let test_str = b"foo!";
-        let test_addr = addr + page_size - test_str.len();
+        let test_addr =
+            addr.checked_add(page_size as usize).unwrap().checked_sub(test_str.len()).unwrap();
         ma.write_memory(test_addr, test_str).expect("failed to write test string");
 
         // Expect error if the string is not terminated.
@@ -4934,7 +4972,7 @@ mod tests {
         );
 
         // Expect success if the string is terminated.
-        ma.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
+        ma.write_memory((addr + (page_size - 1)).unwrap(), b"\0").expect("failed to write nul");
         assert_eq!(
             ma.read_c_string_to_vec(UserCString::new(&current_task, test_addr), max_size).unwrap(),
             "foo"
@@ -4942,13 +4980,14 @@ mod tests {
 
         // Expect success if the string spans over two mappings.
         assert_eq!(
-            map_memory(&mut locked, &current_task, addr + page_size, page_size),
-            addr + page_size
+            map_memory(&mut locked, &current_task, (addr + page_size).unwrap(), page_size),
+            (addr + page_size).unwrap()
         );
         // TODO: Adjacent private anonymous mappings are collapsed. To test this case this test needs to
         // provide a backing for the second mapping.
         // assert_eq!(mm.get_mapping_count(), 2);
-        ma.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
+        ma.write_memory((addr + (page_size - 1)).unwrap(), b"bar\0")
+            .expect("failed to write extra chars");
         assert_eq!(
             ma.read_c_string_to_vec(UserCString::new(&current_task, test_addr), max_size).unwrap(),
             "foobar",
@@ -5040,12 +5079,12 @@ mod tests {
         // We can't just use `spare_capacity_mut` because `Vec::with_capacity`
         // returns a `Vec` with _at least_ the requested capacity.
         let buf = &mut buf.spare_capacity_mut()[..buf_cap];
-        let addr = mm.base_addr + 10 * page_size;
+        let addr = (mm.base_addr + 10 * page_size).unwrap();
 
         // Map a page at a fixed address and write an unterminated string at the end of it.
         assert_eq!(map_memory(&mut locked, &current_task, addr, page_size), addr);
         let test_str = b"foo!";
-        let test_addr = addr + page_size - test_str.len();
+        let test_addr = (addr + (page_size - test_str.len() as u64)).unwrap();
         ma.write_memory(test_addr, test_str).expect("failed to write test string");
 
         // Expect error if the string is not terminated.
@@ -5055,7 +5094,7 @@ mod tests {
         );
 
         // Expect success if the string is terminated.
-        ma.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
+        ma.write_memory((addr + (page_size - 1)).unwrap(), b"\0").expect("failed to write nul");
         assert_eq!(
             ma.read_c_string(UserCString::new(&current_task, test_addr), buf).unwrap(),
             "foo"
@@ -5063,13 +5102,14 @@ mod tests {
 
         // Expect success if the string spans over two mappings.
         assert_eq!(
-            map_memory(&mut locked, &current_task, addr + page_size, page_size),
-            addr + page_size
+            map_memory(&mut locked, &current_task, (addr + page_size).unwrap(), page_size),
+            (addr + page_size).unwrap()
         );
         // TODO: To be multiple mappings we need to provide a file backing for the next page or the
         // mappings will be collapsed.
         //assert_eq!(mm.get_mapping_count(), 2);
-        ma.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
+        ma.write_memory((addr + (page_size - 1)).unwrap(), b"bar\0")
+            .expect("failed to write extra chars");
         assert_eq!(
             ma.read_c_string(UserCString::new(&current_task, test_addr), buf).unwrap(),
             "foobar"
@@ -5235,7 +5275,8 @@ mod tests {
         let page_count = 10;
 
         let page_size = *PAGE_SIZE as usize;
-        let addr = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE) + page_count * page_size;
+        let addr =
+            (UserAddress::from_ptr(RESTRICTED_ASPACE_BASE) + page_count * page_size).unwrap();
         assert_eq!(
             map_memory_with_flags(
                 &mut locked,
@@ -5272,7 +5313,8 @@ mod tests {
 
         let addr = mm.state.read().find_next_unused_range(3 * *PAGE_SIZE as usize).unwrap();
         let addr = map_memory(&mut locked, &current_task, addr, *PAGE_SIZE);
-        let _ = map_memory(&mut locked, &current_task, addr + 2 * *PAGE_SIZE, *PAGE_SIZE);
+        let _ =
+            map_memory(&mut locked, &current_task, (addr + 2 * *PAGE_SIZE).unwrap(), *PAGE_SIZE);
 
         let mut released_mappings = vec![];
         let unmap_result =
@@ -5293,7 +5335,7 @@ mod tests {
         let state = mm.state.read();
         let (range, mapping) = state.mappings.get(addr).expect("mapping");
         assert_eq!(range.start, addr);
-        assert_eq!(range.end, addr + (*PAGE_SIZE * 2));
+        assert_eq!(range.end, (addr + (*PAGE_SIZE * 2)).unwrap());
         #[cfg(feature = "alternate_anon_allocs")]
         let _ = mapping;
         #[cfg(not(feature = "alternate_anon_allocs"))]
@@ -5318,15 +5360,16 @@ mod tests {
             assert!(state.mappings.get(addr).is_none());
 
             // The second page should be a new child COW memory object.
-            let (range, mapping) = state.mappings.get(addr + *PAGE_SIZE).expect("second page");
-            assert_eq!(range.start, addr + *PAGE_SIZE);
-            assert_eq!(range.end, addr + *PAGE_SIZE * 2);
+            let (range, mapping) =
+                state.mappings.get((addr + *PAGE_SIZE).unwrap()).expect("second page");
+            assert_eq!(range.start, (addr + *PAGE_SIZE).unwrap());
+            assert_eq!(range.end, (addr + *PAGE_SIZE * 2).unwrap());
             #[cfg(feature = "alternate_anon_allocs")]
             let _ = mapping;
             #[cfg(not(feature = "alternate_anon_allocs"))]
             match mapping.backing() {
                 MappingBacking::Memory(backing) => {
-                    assert_eq!(backing.base(), addr + *PAGE_SIZE);
+                    assert_eq!(backing.base(), (addr + *PAGE_SIZE).unwrap());
                     assert_eq!(backing.memory_offset(), 0);
                     assert_eq!(backing.memory().get_size(), *PAGE_SIZE);
                     assert_ne!(original_memory.get_koid(), backing.memory().get_koid());
@@ -5347,7 +5390,7 @@ mod tests {
         let state = mm.state.read();
         let (range, mapping) = state.mappings.get(addr).expect("mapping");
         assert_eq!(range.start, addr);
-        assert_eq!(range.end, addr + (*PAGE_SIZE * 2));
+        assert_eq!(range.end, (addr + (*PAGE_SIZE * 2)).unwrap());
         #[cfg(feature = "alternate_anon_allocs")]
         let _ = mapping;
         #[cfg(not(feature = "alternate_anon_allocs"))]
@@ -5363,18 +5406,18 @@ mod tests {
         };
         std::mem::drop(state);
 
-        assert_eq!(mm.unmap(addr + *PAGE_SIZE, *PAGE_SIZE as usize), Ok(()));
+        assert_eq!(mm.unmap((addr + *PAGE_SIZE).unwrap(), *PAGE_SIZE as usize), Ok(()));
 
         {
             let state = mm.state.read();
 
             // The second page should be unmapped.
-            assert!(state.mappings.get(addr + *PAGE_SIZE).is_none());
+            assert!(state.mappings.get((addr + *PAGE_SIZE).unwrap()).is_none());
 
             // The first page's memory object should be the same as the original, only shrunk.
             let (range, mapping) = state.mappings.get(addr).expect("first page");
             assert_eq!(range.start, addr);
-            assert_eq!(range.end, addr + *PAGE_SIZE);
+            assert_eq!(range.end, (addr + *PAGE_SIZE).unwrap());
             #[cfg(feature = "alternate_anon_allocs")]
             let _ = mapping;
             #[cfg(not(feature = "alternate_anon_allocs"))]
@@ -5409,17 +5452,17 @@ mod tests {
         let addr2 = map_memory_with_flags(
             &mut locked,
             &current_task,
-            addr_reserve + *PAGE_SIZE,
+            (addr_reserve + *PAGE_SIZE).unwrap(),
             *PAGE_SIZE,
             MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED,
         );
         let state = mm.state.read();
         let (range1, _) = state.mappings.get(addr1).expect("mapping");
         assert_eq!(range1.start, addr1);
-        assert_eq!(range1.end, addr1 + *PAGE_SIZE);
+        assert_eq!(range1.end, (addr1 + *PAGE_SIZE).unwrap());
         let (range2, mapping2) = state.mappings.get(addr2).expect("mapping");
         assert_eq!(range2.start, addr2);
-        assert_eq!(range2.end, addr2 + *PAGE_SIZE);
+        assert_eq!(range2.end, (addr2 + *PAGE_SIZE).unwrap());
         #[cfg(feature = "alternate_anon_allocs")]
         let _ = mapping2;
         #[cfg(not(feature = "alternate_anon_allocs"))]
@@ -5445,7 +5488,7 @@ mod tests {
         // The second page should remain unchanged.
         let (range2, mapping2) = state.mappings.get(addr2).expect("second page");
         assert_eq!(range2.start, addr2);
-        assert_eq!(range2.end, addr2 + *PAGE_SIZE);
+        assert_eq!(range2.end, (addr2 + *PAGE_SIZE).unwrap());
         #[cfg(feature = "alternate_anon_allocs")]
         let _ = mapping2;
         #[cfg(not(feature = "alternate_anon_allocs"))]
@@ -5472,7 +5515,7 @@ mod tests {
         let state = mm.state.read();
         let (range, mapping) = state.mappings.get(addr).expect("mapping");
         assert_eq!(range.start, addr);
-        assert_eq!(range.end, addr + (*PAGE_SIZE * 3));
+        assert_eq!(range.end, (addr + (*PAGE_SIZE * 3)).unwrap());
         #[cfg(feature = "alternate_anon_allocs")]
         let _ = mapping;
         #[cfg(not(feature = "alternate_anon_allocs"))]
@@ -5488,17 +5531,17 @@ mod tests {
         };
         std::mem::drop(state);
 
-        assert_eq!(mm.unmap(addr + *PAGE_SIZE, *PAGE_SIZE as usize), Ok(()));
+        assert_eq!(mm.unmap((addr + *PAGE_SIZE).unwrap(), *PAGE_SIZE as usize), Ok(()));
 
         {
             let state = mm.state.read();
 
             // The middle page should be unmapped.
-            assert!(state.mappings.get(addr + *PAGE_SIZE).is_none());
+            assert!(state.mappings.get((addr + *PAGE_SIZE).unwrap()).is_none());
 
             let (range, mapping) = state.mappings.get(addr).expect("first page");
             assert_eq!(range.start, addr);
-            assert_eq!(range.end, addr + *PAGE_SIZE);
+            assert_eq!(range.end, (addr + *PAGE_SIZE).unwrap());
             #[cfg(feature = "alternate_anon_allocs")]
             let _ = mapping;
             #[cfg(not(feature = "alternate_anon_allocs"))]
@@ -5512,16 +5555,17 @@ mod tests {
                 }
             }
 
-            let (range, mapping) = state.mappings.get(addr + *PAGE_SIZE * 2).expect("last page");
-            assert_eq!(range.start, addr + *PAGE_SIZE * 2);
-            assert_eq!(range.end, addr + *PAGE_SIZE * 3);
+            let (range, mapping) =
+                state.mappings.get((addr + *PAGE_SIZE * 2).unwrap()).expect("last page");
+            assert_eq!(range.start, (addr + *PAGE_SIZE * 2).unwrap());
+            assert_eq!(range.end, (addr + *PAGE_SIZE * 3).unwrap());
             #[cfg(feature = "alternate_anon_allocs")]
             let _ = mapping;
             #[cfg(not(feature = "alternate_anon_allocs"))]
             // The last page should be a new child COW memory object.
             match &mapping.backing() {
                 MappingBacking::Memory(backing) => {
-                    assert_eq!(backing.base(), addr + *PAGE_SIZE * 2);
+                    assert_eq!(backing.base(), (addr + *PAGE_SIZE * 2).unwrap());
                     assert_eq!(backing.memory_offset(), 0);
                     assert_eq!(backing.memory().get_size(), *PAGE_SIZE);
                     assert_ne!(original_memory.get_koid(), backing.memory().get_koid());
@@ -5616,7 +5660,8 @@ mod tests {
 
         let addr = mm.state.read().find_next_unused_range(2 * *PAGE_SIZE as usize).unwrap();
         let addr = map_memory(&mut locked, &current_task, addr, *PAGE_SIZE);
-        let second_map = map_memory(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE);
+        let second_map =
+            map_memory(&mut locked, &current_task, (addr + *PAGE_SIZE).unwrap(), *PAGE_SIZE);
 
         let bytes = vec![0xf; (*PAGE_SIZE * 2) as usize];
         assert!(ma.write_memory(addr, &bytes).is_ok());
@@ -5716,7 +5761,7 @@ mod tests {
 
         let addr = map_memory_growsdown(&mut locked, &current_task, *PAGE_SIZE) - *PAGE_SIZE;
 
-        assert_matches!(mm.extend_growsdown_mapping_to_address(addr, false), Ok(true));
+        assert_matches!(mm.extend_growsdown_mapping_to_address(addr.unwrap(), false), Ok(true));
 
         // Should see two mappings
         assert_eq!(mm.get_mapping_count(), 2);
@@ -5729,7 +5774,7 @@ mod tests {
 
         let addr = map_memory_growsdown(&mut locked, &current_task, *PAGE_SIZE) + *PAGE_SIZE;
 
-        assert_matches!(mm.extend_growsdown_mapping_to_address(addr, false), Ok(false));
+        assert_matches!(mm.extend_growsdown_mapping_to_address(addr.unwrap(), false), Ok(false));
     }
 
     #[::fuchsia::test]
@@ -5742,7 +5787,7 @@ mod tests {
         mm.protect(mapped_addr, *PAGE_SIZE as usize, ProtectionFlags::READ).unwrap();
 
         assert_matches!(
-            mm.extend_growsdown_mapping_to_address(mapped_addr - *PAGE_SIZE, true),
+            mm.extend_growsdown_mapping_to_address((mapped_addr - *PAGE_SIZE).unwrap(), true),
             Ok(false)
         );
 
@@ -5878,12 +5923,12 @@ mod tests {
         let second_mapping_addr = map_memory_with_flags(
             &mut locked,
             &current_task,
-            first_mapping_addr + *PAGE_SIZE,
+            (first_mapping_addr + *PAGE_SIZE).unwrap(),
             *PAGE_SIZE,
             MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS,
         );
 
-        assert_eq!(first_mapping_addr + *PAGE_SIZE, second_mapping_addr);
+        assert_eq!((first_mapping_addr + *PAGE_SIZE).unwrap(), second_mapping_addr);
 
         sys_prctl(
             &mut locked,
@@ -5920,7 +5965,7 @@ mod tests {
         let mapping_addr =
             map_memory(&mut locked, &current_task, UserAddress::default(), 2 * *PAGE_SIZE);
 
-        let second_page = mapping_addr + *PAGE_SIZE;
+        let second_page = (mapping_addr + *PAGE_SIZE).unwrap();
         current_task.mm().unwrap().unmap(second_page, *PAGE_SIZE as usize).unwrap();
 
         // This should fail with ENOMEM since it extends past the end of the mapping into unmapped memory.
@@ -5958,7 +6003,7 @@ mod tests {
         let mapping_addr =
             map_memory(&mut locked, &current_task, UserAddress::default(), 2 * *PAGE_SIZE);
 
-        let second_page = mapping_addr + *PAGE_SIZE;
+        let second_page = (mapping_addr + *PAGE_SIZE).unwrap();
         current_task.mm().unwrap().unmap(mapping_addr, *PAGE_SIZE as usize).unwrap();
 
         // This should fail with ENOMEM since the start of the range is in unmapped memory.
@@ -6003,7 +6048,7 @@ mod tests {
                 &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
-                (mapping_addr + *PAGE_SIZE).ptr() as u64,
+                (mapping_addr + *PAGE_SIZE).unwrap().ptr() as u64,
                 *PAGE_SIZE,
                 name_addr.ptr() as u64,
             ),
@@ -6017,10 +6062,11 @@ mod tests {
             let (_, mapping) = state.mappings.get(mapping_addr).unwrap();
             assert_eq!(mapping.name(), &MappingName::None);
 
-            let (_, mapping) = state.mappings.get(mapping_addr + *PAGE_SIZE).unwrap();
+            let (_, mapping) = state.mappings.get((mapping_addr + *PAGE_SIZE).unwrap()).unwrap();
             assert_eq!(mapping.name(), &MappingName::Vma("foo".into()));
 
-            let (_, mapping) = state.mappings.get(mapping_addr + 2 * *PAGE_SIZE).unwrap();
+            let (_, mapping) =
+                state.mappings.get((mapping_addr + (2 * *PAGE_SIZE)).unwrap()).unwrap();
             assert_eq!(mapping.name(), &MappingName::None);
         }
     }

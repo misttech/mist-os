@@ -1000,7 +1000,7 @@ pub fn default_ioctl(
         }
         FS_IOC_ADD_ENCRYPTION_KEY => {
             let fscrypt_add_key_ref = UserRef::<fscrypt_add_key_arg>::from(arg);
-            let key_ref_addr = fscrypt_add_key_ref.next().addr();
+            let key_ref_addr = fscrypt_add_key_ref.next()?.addr();
             let mut fscrypt_add_key_arg = current_task.read_object(fscrypt_add_key_ref.clone())?;
             if fscrypt_add_key_arg.key_id != 0 {
                 track_stub!(TODO("https://fxbug.dev/375649227"), "non-zero key ids");

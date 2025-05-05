@@ -520,7 +520,7 @@ impl<'a> UserMemoryWriter<'a> {
         let bytes_written = self.mm.write_memory(self.current_addr, data).unwrap();
         assert_eq!(bytes_written, data.len());
         let start_addr = self.current_addr;
-        self.current_addr += bytes_written;
+        self.current_addr = (self.current_addr + bytes_written).unwrap();
         start_addr
     }
 

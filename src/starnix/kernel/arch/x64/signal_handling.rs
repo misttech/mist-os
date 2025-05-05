@@ -289,7 +289,8 @@ mod tests {
         current_task.thread_state.registers.r8 = SYSCALL_ARGS.4;
         current_task.thread_state.registers.r9 = SYSCALL_ARGS.5;
         current_task.thread_state.registers.orig_rax = SYSCALL_NUMBER;
-        current_task.thread_state.registers.rip = (SYSCALL_INSTRUCTION_ADDRESS + 2u64).ptr() as u64;
+        current_task.thread_state.registers.rip =
+            (SYSCALL_INSTRUCTION_ADDRESS + 2u64).unwrap().ptr() as u64;
 
         // Queue the signal that interrupted the syscall.
         current_task.write().enqueue_signal(SignalInfo::new(
@@ -370,7 +371,8 @@ mod tests {
         current_task.thread_state.registers.r8 = SYSCALL_ARGS.4;
         current_task.thread_state.registers.r9 = SYSCALL_ARGS.5;
         current_task.thread_state.registers.orig_rax = SYSCALL_NUMBER;
-        current_task.thread_state.registers.rip = (SYSCALL_INSTRUCTION_ADDRESS + 2u64).ptr() as u64;
+        current_task.thread_state.registers.rip =
+            (SYSCALL_INSTRUCTION_ADDRESS + 2u64).unwrap().ptr() as u64;
 
         // Queue the signal that interrupted the syscall.
         current_task.write().enqueue_signal(SignalInfo::new(
@@ -401,7 +403,7 @@ mod tests {
         current_task.thread_state.registers.r9 = SYSCALL2_ARGS.5;
         current_task.thread_state.registers.orig_rax = SYSCALL2_NUMBER;
         current_task.thread_state.registers.rip =
-            (SYSCALL2_INSTRUCTION_ADDRESS + 2u64).ptr() as u64;
+            (SYSCALL2_INSTRUCTION_ADDRESS + 2u64).unwrap().ptr() as u64;
 
         // Queue the signal that interrupted the syscall.
         current_task.write().enqueue_signal(SignalInfo::new(
@@ -495,7 +497,8 @@ mod tests {
         current_task.thread_state.registers.r8 = SYSCALL_ARGS.4;
         current_task.thread_state.registers.r9 = SYSCALL_ARGS.5;
         current_task.thread_state.registers.orig_rax = SYSCALL_NUMBER;
-        current_task.thread_state.registers.rip = (SYSCALL_INSTRUCTION_ADDRESS + 2u64).ptr() as u64;
+        current_task.thread_state.registers.rip =
+            (SYSCALL_INSTRUCTION_ADDRESS + 2u64).unwrap().ptr() as u64;
 
         // Queue the signal that interrupted the syscall.
         current_task.write().enqueue_signal(SignalInfo::new(
@@ -528,7 +531,7 @@ mod tests {
         assert_eq!(current_task.thread_state.registers.rax, EINTR.return_value());
         assert_eq!(
             current_task.thread_state.registers.rip,
-            (SYSCALL_INSTRUCTION_ADDRESS + 2u64).ptr() as u64
+            (SYSCALL_INSTRUCTION_ADDRESS + 2u64).unwrap().ptr() as u64
         );
     }
 
@@ -559,7 +562,8 @@ mod tests {
                 FileWriteGuardRef(None),
             )
             .expect("failed to map stack VMO");
-        current_task.thread_state.registers.rsp = (stack_base + (STACK_SIZE - 8)).ptr() as u64;
+        let stack_address = (stack_base + (STACK_SIZE - 8)).expect("OOB memory access.");
+        current_task.thread_state.registers.rsp = stack_address.ptr() as u64;
 
         (kernel, current_task, locked)
     }

@@ -186,7 +186,7 @@ fn read_c_string_vector(
             return error!(E2BIG);
         }
         vector.push(cstring);
-        user_current = user_current.next();
+        user_current = user_current.next()?;
     }
     Ok((vector, vec_size))
 }
@@ -2022,7 +2022,7 @@ mod tests {
 
         let mapped_address =
             map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
-        let name_addr = mapped_address + 128u64;
+        let name_addr = (mapped_address + 128u64).unwrap();
         let name = "test-name\0";
         current_task.write_memory(name_addr, name.as_bytes()).expect("failed to write name");
         sys_prctl(
@@ -2040,7 +2040,7 @@ mod tests {
             current_task
                 .mm()
                 .unwrap()
-                .get_mapping_name(mapped_address + 24u64)
+                .get_mapping_name((mapped_address + 24u64).unwrap())
                 .expect("failed to get address")
         );
 
@@ -2048,7 +2048,7 @@ mod tests {
             .expect("failed to unmap memory");
         assert_eq!(
             error!(EFAULT),
-            current_task.mm().unwrap().get_mapping_name(mapped_address + 24u64)
+            current_task.mm().unwrap().get_mapping_name((mapped_address + 24u64).unwrap())
         );
     }
 
@@ -2436,7 +2436,7 @@ mod tests {
             .write_multi_arch_ptr(argv_addr.addr(), arg_usercstr)
             .expect("failed to write UserCString");
         current_task
-            .write_multi_arch_ptr(argv_addr.next().addr(), null_usercstr)
+            .write_multi_arch_ptr(argv_addr.next().unwrap().addr(), null_usercstr)
             .expect("failed to write UserCString");
 
         // The arguments size limit should include the null terminator.

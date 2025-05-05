@@ -101,7 +101,7 @@ impl<'a> BaseDirentSink<'a> {
         if self.actual + buffer.len() > self.user_capacity {
             return error!(ENOSPC);
         }
-        self.current_task.write_memory(self.user_buffer + self.actual, buffer)?;
+        self.current_task.write_memory((self.user_buffer + self.actual)?, buffer)?;
         self.actual += buffer.len();
         *self.offset = offset;
         Ok(())

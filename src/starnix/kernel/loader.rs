@@ -86,14 +86,14 @@ fn populate_initial_stack(
 
     let argv_end = stack_pointer;
     for arg in argv.iter().rev() {
-        stack_pointer -= arg.as_bytes_with_nul().len();
+        stack_pointer = (stack_pointer - arg.as_bytes_with_nul().len())?;
         write_stack(arg.as_bytes_with_nul(), stack_pointer)?;
     }
     let argv_start = stack_pointer;
 
     let environ_end = stack_pointer;
     for env in environ.iter().rev() {
-        stack_pointer -= env.as_bytes_with_nul().len();
+        stack_pointer = (stack_pointer - env.as_bytes_with_nul().len())?;
         write_stack(env.as_bytes_with_nul(), stack_pointer)?;
     }
 
@@ -101,13 +101,13 @@ fn populate_initial_stack(
     let environ_start = stack_pointer;
 
     // Write the path used with execve.
-    stack_pointer -= path.to_bytes_with_nul().len();
+    stack_pointer = (stack_pointer - path.to_bytes_with_nul().len())?;
     let execfn_addr = stack_pointer;
     write_stack(path.to_bytes_with_nul(), execfn_addr)?;
 
     let mut random_seed = [0; RANDOM_SEED_BYTES];
     zx::cprng_draw(&mut random_seed);
-    stack_pointer -= random_seed.len();
+    stack_pointer = (stack_pointer - random_seed.len())?;
     let random_seed_addr = stack_pointer;
     write_stack(&random_seed, random_seed_addr)?;
 
@@ -115,7 +115,7 @@ fn populate_initial_stack(
     #[cfg(feature = "arch32")]
     if arch_width.is_arch32() {
         let platform = b"v7l\0";
-        stack_pointer -= platform.len();
+        stack_pointer = (stack_pointer - platform.len())?;
         let platform_addr = stack_pointer;
         write_stack(platform, platform_addr)?;
         // Write the platform to the stack too
@@ -156,14 +156,14 @@ fn populate_initial_stack(
     let mut next_arg_addr = argv_start;
     for arg in argv {
         extend_vec(&mut main_data, &next_arg_addr.ptr().to_ne_bytes(), arch_width);
-        next_arg_addr += arg.as_bytes_with_nul().len();
+        next_arg_addr = (next_arg_addr + arg.as_bytes_with_nul().len())?;
     }
     extend_vec(&mut main_data, &ZERO, arch_width);
     // environ
     let mut next_env_addr = environ_start;
     for env in environ {
         extend_vec(&mut main_data, &next_env_addr.ptr().to_ne_bytes(), arch_width);
-        next_env_addr += env.as_bytes_with_nul().len();
+        next_env_addr = (next_env_addr + env.as_bytes_with_nul().len())?;
     }
     extend_vec(&mut main_data, &ZERO, arch_width);
     // auxv
@@ -175,11 +175,11 @@ fn populate_initial_stack(
     let auxv_end_offset = main_data.len();
 
     // Time to push.
-    stack_pointer -= main_data.len();
-    stack_pointer -= stack_pointer.ptr() % 16;
+    stack_pointer = (stack_pointer - main_data.len())?;
+    stack_pointer = (stack_pointer - stack_pointer.ptr() % 16)?;
     write_stack(main_data.as_slice(), stack_pointer)?;
-    let auxv_start = stack_pointer + auxv_start_offset;
-    let auxv_end = stack_pointer + auxv_end_offset;
+    let auxv_start = (stack_pointer + auxv_start_offset)?;
+    let auxv_end = (stack_pointer + auxv_end_offset)?;
 
     Ok(StackResult {
         stack_pointer,
@@ -694,7 +694,7 @@ pub fn load_executable(
 
     // Overwrite the second part of the vvar mapping with starnix's vvar.
     let vvar_map_result = mm.map_memory(
-        DesiredAddress::FixedOverwrite(time_values_map_result + time_values_size),
+        DesiredAddress::FixedOverwrite((time_values_map_result + time_values_size)?),
         vvar_memory,
         0,
         vvar_size as usize,
@@ -707,7 +707,7 @@ pub fn load_executable(
 
     // Overwrite the third part of the vvar mapping to contain the vDSO clone.
     let vdso_base = mm.map_memory(
-        DesiredAddress::FixedOverwrite(vvar_map_result + vvar_size),
+        DesiredAddress::FixedOverwrite((vvar_map_result + vvar_size)?),
         vdso_executable,
         0,
         vdso_size as usize,
@@ -756,7 +756,7 @@ pub fn load_executable(
     let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
     let stack_base = mm.map_stack(stack_size, prot_flags)?;
 
-    let stack = stack_base + (stack_size - 8);
+    let stack = (stack_base + (stack_size - 8))?;
 
     let stack = populate_initial_stack(
         current_task.deref(),
@@ -782,8 +782,8 @@ pub fn load_executable(
 
     let ptr_size: usize =
         if main_elf.arch_width.is_arch32() { size_of::<u32>() } else { size_of::<*const u8>() };
-    let envp =
-        stack.stack_pointer + ((resolved_elf.argv.len() + 1 /* argc */ + 1/* NULL */) * ptr_size);
+    let envp = (stack.stack_pointer
+        + ((resolved_elf.argv.len() + 1 /* argc */ + 1/* NULL */) * ptr_size))?;
     Ok(ThreadStartInfo {
         entry,
         stack: stack.stack_pointer,
@@ -859,7 +859,7 @@ mod tests {
     #[::fuchsia::test]
     fn test_trivial_initial_stack() {
         let stack_vmo = StackVmo(zx::Vmo::create(0x4000).expect("VMO creation should succeed."));
-        let original_stack_start_addr = TEST_STACK_ADDR + 0x1000u64;
+        let original_stack_start_addr = (TEST_STACK_ADDR + 0x1000u64).expect("OOB memory access.");
 
         let path = CString::new(&b""[..]).unwrap();
         let argv = &vec![];
@@ -898,7 +898,10 @@ mod tests {
             payload_size += 16 - (payload_size % 16);
         }
 
-        assert_eq!(stack_start_addr, original_stack_start_addr - payload_size);
+        assert_eq!(
+            stack_start_addr,
+            (original_stack_start_addr - payload_size).expect("OOB memory access.")
+        );
     }
 
     fn exec_hello_starnix(

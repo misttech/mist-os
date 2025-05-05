@@ -1240,7 +1240,7 @@ pub fn ptrace_getregset(
                     current_task.write_multi_arch_object(reg_ptr, val as u64)?;
                 }
                 i += reg_ptr.size_of_object();
-                reg_ptr = reg_ptr.next();
+                reg_ptr = reg_ptr.next()?;
             }
             Ok(())
         }
