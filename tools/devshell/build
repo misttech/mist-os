@@ -95,10 +95,10 @@ label, such as '//some/toolchain:target'.
 EOF
 }
 
-function count-ninja-log-lines {
+function get-ninja-log-timestamp {
   NINJA_LOG_FILE="${FUCHSIA_BUILD_DIR}/.ninja_log"
   if [[ -f "${NINJA_LOG_FILE}" ]]; then
-    wc -l <"${NINJA_LOG_FILE}" 2>/dev/null
+    stat -c "%Y" "${NINJA_LOG_FILE}"
   else
     echo -1
   fi
@@ -356,13 +356,12 @@ function main {
     rm -f "${last_build_success_stamp}"
   fi
 
-  local -i target_count=0
+  local -i is_no_op=0
   local -i is_clean_build=0
-  local -i ninja_log_line_count_before
-  ninja_log_line_count_before="$(count-ninja-log-lines)"
-  if (( ninja_log_line_count_before < 0 )); then
+  local -i ninja_log_timestamp_before
+  ninja_log_timestamp_before="$(get-ninja-log-timestamp)"
+  if (( ninja_log_timestamp_before < 0 )); then
     is_clean_build=1
-    ninja_log_line_count_before=0
   fi
 
   if [ -n "${fint_params_path}" ]; then
@@ -471,16 +470,20 @@ job_count: "$concurrency"
   fi
 
   status=$?
-  local -i ninja_log_line_count_after
-  ninja_log_line_count_after="$(count-ninja-log-lines)"
-  target_count="$(( ninja_log_line_count_after - ninja_log_line_count_before ))"
+  local -i ninja_log_timestamp_after
+  ninja_log_timestamp_after="$(get-ninja-log-timestamp)"
+  if [[ "${ninja_log_timestamp_before}" == "${ninja_log_timestamp_after}" ]]; then
+    is_no_op=1
+  fi
+
+  "${PREBUILT_PYTHON3}" "$FUCHSIA_DIR/tools/devshell/contrib/lib/count-ninja-actions.py" --validate-ninja-log-version || exit $?
 
   if [[ "${status}" == 0 && -n "${run_ninja_build}" ]]; then
     touch "${last_build_success_stamp}"
   fi
 
   declare -r end_time="${EPOCHREALTIME/./}"
-  track-build-event "${start_time}" "${end_time}" "${status}" "${ninja_switches[*]}" "${switches[*]}" "${fuchsia_targets[*]}" "${FUCHSIA_BUILD_DIR}" "${target_count}" "${is_clean_build}"&
+  track-build-event "${start_time}" "${end_time}" "${status}" "${ninja_switches[*]}" "${switches[*]}" "${fuchsia_targets[*]}" "${FUCHSIA_BUILD_DIR}" "${is_no_op}" "${is_clean_build}"&
   exit-with-message
 }
 
