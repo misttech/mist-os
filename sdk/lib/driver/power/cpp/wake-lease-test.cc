@@ -305,11 +305,11 @@ TEST_F(WakeLeaseTest, TestManagedWakeLeaseWhenResumedThenSuspend) {
   server_loop.JoinThreads();
 }
 
-// Verifies that a SharedWakeLeaseProvider and SharedWakeLease
+// Verifies that a WakeLeaseProvider and WakeLease
 // manage underlying resources as expected including that new
-// SharedWakeLeases are created when appropriate and the underlying
+// WakeLeases are created when appropriate and the underlying
 // WakeLease object is preserved.
-TEST_F(WakeLeaseTest, SharedWakeLeaseProviderTest) {
+TEST_F(WakeLeaseTest, WakeLeaseProviderTest) {
   async::Loop server_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   server_loop.StartThread("server-loop");
 
@@ -338,36 +338,36 @@ TEST_F(WakeLeaseTest, SharedWakeLeaseProviderTest) {
 
     // Tell the client to do its work.
     async::PostTask(client_loop.dispatcher(), [&client_loop, client = std::move(client)]() mutable {
-      std::shared_ptr<fdf_power::SharedWakeLeaseProvider> operation_provider =
-          std::make_shared<fdf_power::SharedWakeLeaseProvider>(
+      std::shared_ptr<fdf_power::WakeLeaseProvider> operation_provider =
+          std::make_shared<fdf_power::WakeLeaseProvider>(
               client_loop.dispatcher(), "test-operation",
               fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>(std::move(client)));
 
-      std::shared_ptr<fdf_power::SharedWakeLease> op1 = operation_provider->StartOperation();
-      std::shared_ptr<fdf_power::SharedWakeLease> op2 = operation_provider->StartOperation();
+      std::shared_ptr<fdf_power::WakeLease> op1 = operation_provider->StartOperation();
+      std::shared_ptr<fdf_power::WakeLease> op2 = operation_provider->StartOperation();
 
       EXPECT_EQ(op1, op2);
 
-      // Get a raw pointer to the current SharedWakeLease to check
+      // Get a raw pointer to the current WakeLease to check
       // against a different pointer later which will help us prove we dropped
-      // the SharedWakeLease after all strong pointers to it were
+      // the WakeLease after all strong pointers to it were
       // dropped.
-      fdf_power::SharedWakeLease* old_addr = op1.get();
+      fdf_power::WakeLease* old_addr = op1.get();
       std::shared_ptr<fdf_power::TimeoutWakeLease> first_lease = op1->GetWakeLease();
       op1.reset();
       op2.reset();
 
       // It should be that we currently have no system wake lease since there
-      // are no valid SharedWakeLeases.
+      // are no valid WakeLeases.
       EXPECT_TRUE(first_lease->GetWakeLeaseCopy().is_error());
 
       // Start a new operation, which should create a new
-      // SharedWakeLease.
-      std::shared_ptr<fdf_power::SharedWakeLease> op3 = operation_provider->StartOperation();
+      // WakeLease.
+      std::shared_ptr<fdf_power::WakeLease> op3 = operation_provider->StartOperation();
       EXPECT_NE(old_addr, op3.get());
 
       // The fdf_power::WakeLease should be the same, even though the
-      // SharedWakeLease changed.
+      // WakeLease changed.
       std::shared_ptr<fdf_power::TimeoutWakeLease> second_lease = op3->GetWakeLease();
       EXPECT_EQ(first_lease, second_lease);
 

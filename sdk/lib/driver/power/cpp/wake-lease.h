@@ -108,8 +108,8 @@ class TimeoutWakeLease : public fidl::WireServer<fuchsia_power_system::ActivityG
 };
 
 // This is probably not the implementation you're looking for, consider using
-// `SharedWakeLeaseProvider`. `ManualWakeLease` may be appropriate if
-// `SharedWakeLeaseProvider` does not fit your needs.
+// `WakeLeaseProvider`. `ManualWakeLease` may be appropriate if
+// `WakeLeaseProvider` does not fit your needs.
 //
 // ManualWakeLease can be used to prevent the system from suspending. After a
 // call to `Start()` returns the system will keep running until after `End()`
@@ -147,78 +147,78 @@ class ManualWakeLease {
   TimeoutWakeLease fdf_lease_;
 };
 
-// `SharedWakeLease` wraps a WakeLease. When `SharedWakeLease`
+// `WakeLease` wraps a WakeLease. When `WakeLease`
 // destructs, the underlying system wake lease, if any currently held, is
 // dropped.
-class SharedWakeLease {
+class WakeLease {
  public:
-  explicit SharedWakeLease(const std::shared_ptr<TimeoutWakeLease>& lease) : lease_(lease) {}
+  explicit WakeLease(const std::shared_ptr<TimeoutWakeLease>& lease) : lease_(lease) {}
   zx::result<zx::eventpair> GetDuplicateLeaseHandle() { return lease_->GetWakeLeaseCopy(); }
   // Intended for testing, gets a shared pointer to the wrapped
-  // fdf_power::WakeLease object.
+  // fdf_power::TimeoutWakeLease object.
   std::shared_ptr<TimeoutWakeLease> GetWakeLease() { return lease_; }
-  ~SharedWakeLease() { zx::result<zx::eventpair> obsolete_lease = lease_->TakeWakeLease(); }
+  ~WakeLease() { zx::result<zx::eventpair> obsolete_lease = lease_->TakeWakeLease(); }
 
  private:
   std::shared_ptr<TimeoutWakeLease> lease_;
 };
 
-// This class is **not** threadsafe! `SharedWakeLeaseProvider` and
-// `SharedWakeLease` pointers returned from `StartOperation` must be used
+// This class is **not** threadsafe! `WakeLeaseProvider` and
+// `WakeLease` pointers returned from `StartOperation` must be used
 // on the same thread!
 //
-// Provides shared pointers to `SharedWakeLeases` which are effectively
+// Provides shared pointers to `WakeLeases` which are effectively
 // fdf_power::WakeLease objects. This provides RAII semantics to manage the
 // lifecycle of the underlying wake lease such that for a given
-// `SharedWakeLeaseProvider` there is _at_ _most_ one WakeLease in
+// `WakeLeaseProvider` there is _at_ _most_ one WakeLease in
 // existence at any moment. It is worth noting that WakeLease only acquires a
 // wake lease from the system if the system starts to suspend while the
 // WakeLease is held.
 //
-// Using `SharedWakeLeaseProvider` can have performance advantages over
+// Using `WakeLeaseProvider` can have performance advantages over
 // using a WakeLease directly because the provider monitors system state
 // over its lifetime, allowing it to avoid certain operations vs a series of
 // shorter-lived `WakeLease` instances which would each only observe system
 // state while they exist.
 //
-// The main difference between the shared pointer to a `SharedWakeLease`
-// from `SharedWakeLeaseProvider` and an `ManualWakeLease` is that with
-// `SharedWakeLease` we get long-lived system state monitoring and
+// The main difference between the shared pointer to a `WakeLease`
+// from `WakeLeaseProvider` and an `ManualWakeLease` is that with
+// `WakeLease` we get long-lived system state monitoring and
 // ergonomic RAII management of the actual lease. With `ManualWakeLease` you
 // can get long-lived system state monitoring with `End` calls and sacrifice
 // RAII ergonomics **or** get RAII ergonomics, but lose system state knowledge
 // after the `ManualWakeLease` is destroyed.
-class SharedWakeLeaseProvider {
+class WakeLeaseProvider {
  public:
-  SharedWakeLeaseProvider(async_dispatcher_t* dispatcher, std::string_view name,
-                          fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag,
-                          inspect::Node* parent_node = nullptr, bool log = false)
+  WakeLeaseProvider(async_dispatcher_t* dispatcher, std::string_view name,
+                    fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag,
+                    inspect::Node* parent_node = nullptr, bool log = false)
       : fdf_lease_(std::make_shared<TimeoutWakeLease>(dispatcher, name, std::move(sag), parent_node,
                                                       log)) {}
-  std::shared_ptr<SharedWakeLease> StartOperation() {
-    // SharedWakeLeaseProvider works by holding and owning a
-    // fdf_power::WakeLease and creating, but not owning, a SharedWakeLease.
-    // The provider vends pointers to the SharedWakeLease, if it exists,
-    // otherwise creating it. When the SharedWakeLease destructs, it drops the
+  std::shared_ptr<WakeLease> StartOperation() {
+    // WakeLeaseProvider works by holding and owning a
+    // fdf_power::WakeLease and creating, but not owning, a WakeLease.
+    // The provider vends pointers to the WakeLease, if it exists,
+    // otherwise creating it. When the WakeLease destructs, it drops the
     // actual wake lease held by the fdf_power::WakeLease that it wraps.
 
-    // If we currently hold a SharedWakeLease, return a pointer to it,
+    // If we currently hold a WakeLease, return a pointer to it,
     // otherwise create a new one with a reference to the wake lease we hold.
-    std::shared_ptr<SharedWakeLease> op = atomic_op_.lock();
+    std::shared_ptr<WakeLease> op = atomic_op_.lock();
     if (!op) {
-      // If we don't have a SharedWakeLease, call HandleInterrupt on the
-      // WakeLease so that it is "active". Any previous SharedWakeLease
+      // If we don't have a WakeLease, call HandleInterrupt on the
+      // WakeLease so that it is "active". Any previous WakeLease
       // that destructed would have retrieved and dropped the actual wake lease
       // from the WakeLease object.
       fdf_lease_->HandleInterrupt(zx::duration::infinite());
-      op = std::make_shared<SharedWakeLease>(fdf_lease_);
+      op = std::make_shared<WakeLease>(fdf_lease_);
       atomic_op_ = op;
     }
     return op;
   }
 
  private:
-  std::weak_ptr<SharedWakeLease> atomic_op_;
+  std::weak_ptr<WakeLease> atomic_op_;
   std::shared_ptr<TimeoutWakeLease> fdf_lease_;
 };
 
