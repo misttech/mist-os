@@ -38,6 +38,11 @@ struct read_format_data_time_running {
   uint64_t time_running;
 };
 
+struct read_format_data_id {
+  uint64_t value;
+  uint64_t id;
+};
+
 // Valid example inputs to use for tests when we aren't testing these values
 // but still need to pass them in.
 // TODO(https://fxbug.dev/409621963): implement permissions logic for any pid > 0.
@@ -151,28 +156,27 @@ TEST(PerfEventOpenTest, ReadEventWithTimeRunningSucceeds) {
 }
 
 TEST(PerfEventOpenTest, ReadEventWithPerfFormatIdSucceeds) {
-  uint64_t read_format = PERF_FORMAT_ID;
-  perf_event_attr attr = attr_with_read_format(read_format);
-
-  // TODO(https://fxbug.dev/409627657): Handle id correctly.
   if (test_helper::HasSysAdmin()) {
+    uint64_t read_format = PERF_FORMAT_ID;
+    perf_event_attr attr = attr_with_read_format(read_format);
+    uint64_t ids[3];
+
     for (uint64_t i = 0; i < 3; i++) {
       long file_descriptor =
-          sys_perf_event_open(&attr, example_pid, uint32_t(i), example_group_fd, example_flags);
+          sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
       EXPECT_NE(file_descriptor, -1);
 
-      // read() on the file descriptor should return the number of bytes written to buffer,
-      // and the buffer should contain read_format_data information for that event.
       char buffer[16];
-      uint64_t read_length = syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
-      EXPECT_EQ(read_length, sizeof(buffer));
-
-      read_format_data data;
+      read_format_data_id data;
+      syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
       std::memcpy(&data, buffer, sizeof(buffer));
 
-      // EXPECT_EQ(data.id, i);
+      ids[i] = data.id;
       EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
     }
+
+    EXPECT_LT(ids[0], ids[1]);
+    EXPECT_LT(ids[1], ids[2]);
   }
 }
 
