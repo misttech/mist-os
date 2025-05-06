@@ -25,6 +25,7 @@ _tools = [
   "//src/developer/ffx/plugins/scrutiny",
   "//src/developer/ffx/plugins/session",
   "//src/developer/ffx/plugins/setui",
+  "//src/developer/ffx/plugins/speedtest",
   "//src/developer/ffx/plugins/test",
   "//src/developer/ffx/plugins/trace",
   "//src/developer/ffx/plugins/wlan",
