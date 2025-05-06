@@ -13,9 +13,10 @@
 edition = "2021"
 rust-version = "1.56"
 name = "ref-cast"
-version = "1.0.23"
+version = "1.0.24"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 build = "build.rs"
+autolib = false
 autobins = false
 autoexamples = false
 autotests = false
@@ -32,13 +33,21 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/dtolnay/ref-cast"
 
 [package.metadata.docs.rs]
-rustdoc-args = ["--generate-link-to-definition"]
+rustdoc-args = [
+    "--generate-link-to-definition",
+    "--extern-html-root-url=core=https://doc.rust-lang.org",
+    "--extern-html-root-url=alloc=https://doc.rust-lang.org",
+    "--extern-html-root-url=std=https://doc.rust-lang.org",
+]
 targets = ["x86_64-unknown-linux-gnu"]
 
 [lib]
 name = "ref_cast"
 path = "src/lib.rs"
-doc-scrape-examples = false
+
+[[test]]
+name = "compiletest"
+path = "tests/compiletest.rs"
 
 [[test]]
 name = "test_custom"
@@ -48,12 +57,8 @@ path = "tests/test_custom.rs"
 name = "test_trivial"
 path = "tests/test_trivial.rs"
 
-[[test]]
-name = "compiletest"
-path = "tests/compiletest.rs"
-
 [dependencies.ref-cast-impl]
-version = "=1.0.23"
+version = "=1.0.24"
 
 [dev-dependencies.ref-cast-test-suite]
 version = "0"

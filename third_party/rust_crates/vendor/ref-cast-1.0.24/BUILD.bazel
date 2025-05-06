@@ -23,7 +23,7 @@ package_info(
     name = "package_info",
     package_name = "ref-cast",
     package_url = "https://github.com/dtolnay/ref-cast",
-    package_version = "1.0.23",
+    package_version = "1.0.24",
 )
 
 license(
@@ -56,7 +56,7 @@ rust_library(
     crate_root = "src/lib.rs",
     edition = "2021",
     proc_macro_deps = [
-        "//third_party/rust_crates/vendor/ref-cast-impl-1.0.23:ref_cast_impl",
+        "//third_party/rust_crates/vendor/ref-cast-impl-1.0.24:ref_cast_impl",
     ],
     rustc_flags = [
         "--cap-lints=allow",
@@ -74,9 +74,9 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "1.0.23",
+    version = "1.0.24",
     deps = [
-        "//third_party/rust_crates/vendor/ref-cast-1.0.23:build_script_build",
+        "//third_party/rust_crates/vendor/ref-cast-1.0.24:build_script_build",
     ],
 )
 
@@ -125,7 +125,7 @@ cargo_build_script(
         "noclippy",
         "norustfmt",
     ],
-    version = "1.0.23",
+    version = "1.0.24",
     visibility = ["//visibility:private"],
 )
 

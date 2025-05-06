@@ -52,7 +52,7 @@
 //! forced to be borrowed from the type being indexed. So something like the
 //! following is not going to work.
 //!
-//! [`Index`]: https://doc.rust-lang.org/std/ops/trait.Index.html
+//! [`Index`]: core::ops::Index
 //!
 //! ```
 //! # const MAP_WIDTH: usize = 4;
@@ -135,7 +135,7 @@
 //! }
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/ref-cast/1.0.23")]
+#![doc(html_root_url = "https://docs.rs/ref-cast/1.0.24")]
 #![no_std]
 #![allow(
     clippy::extra_unused_type_parameters,

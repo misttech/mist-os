@@ -22,7 +22,7 @@ package_info(
     name = "package_info",
     package_name = "ref-cast-impl",
     package_url = "https://github.com/dtolnay/ref-cast",
-    package_version = "1.0.23",
+    package_version = "1.0.24",
 )
 
 license(
@@ -70,7 +70,7 @@ rust_proc_macro(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "1.0.23",
+    version = "1.0.24",
     deps = [
         "//third_party/rust_crates/vendor/proc-macro2-1.0.94:proc_macro2",
         "//third_party/rust_crates/vendor/quote-1.0.38:quote",
