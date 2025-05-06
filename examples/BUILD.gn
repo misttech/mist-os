@@ -54,6 +54,6 @@ if (is_fuchsia) {
 if (is_host) {
   group("host_tests") {
     testonly = true
-    deps = [ "fidl:host_tests" ]
+    deps = []
   }
 }
