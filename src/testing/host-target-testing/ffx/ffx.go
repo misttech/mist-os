@@ -50,7 +50,10 @@ func (f *FFXTool) IsolateDir() IsolateDir {
 }
 
 func (f *FFXTool) StopDaemon(ctx context.Context) error {
-	args := []string{"daemon", "stop", "--wait"}
+	// TODO(https://fxbug.dev/415899721): We put a time
+	// limit because the command fails when run inside an nsjail.
+	// Remove when bug is fixed.
+	args := []string{"daemon", "stop", "-t", "4000"}
 	_, err := f.runFFXCmd(ctx, args...)
 	return err
 }

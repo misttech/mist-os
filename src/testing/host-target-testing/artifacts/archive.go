@@ -77,6 +77,7 @@ func (a *Archive) list(ctx context.Context, buildID string) ([]string, error) {
 	if err != nil {
 		if len(stderr) != 0 {
 			fmt.Printf("artifacts output: \n%s", stdout)
+			fmt.Printf("artifacts stderr: \n%s", stderr)
 			return nil, fmt.Errorf("artifacts failed: %w: %s", err, string(stderr))
 		}
 		return nil, fmt.Errorf("artifacts failed: %w", err)
