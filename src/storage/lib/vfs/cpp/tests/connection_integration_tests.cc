@@ -452,7 +452,7 @@ TEST_F(ConnectionTest, ValidateRightsReadonly) {
     ASSERT_EQ(fidl::WireCall(root.client)
                   ->Open(fidl::StringView("file_or_dir"),
                          fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolFile |
-                             fio::Flags::kPermWrite,
+                             fio::Flags::kPermWriteBytes,
                          {}, fc->server.TakeChannel())
                   .status(),
               ZX_OK);

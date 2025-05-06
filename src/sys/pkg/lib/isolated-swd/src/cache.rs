@@ -74,7 +74,7 @@ pub(crate) mod for_tests {
                         svc_dir
                             .open(
                                 ".",
-                                fio::Flags::PERM_READ,
+                                fio::PERM_READABLE,
                                 &fio::Options::default(),
                                 server_end.into_channel(),
                             )
@@ -84,7 +84,7 @@ pub(crate) mod for_tests {
                         svc_dir
                             .open(
                                 ".",
-                                fio::Flags::PERM_READ,
+                                fio::PERM_READABLE,
                                 &fio::Options::default(),
                                 server_end.into_channel(),
                             )

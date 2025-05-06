@@ -157,7 +157,7 @@ zx_status_t Device::InitFailed(zx_status_t status, const char* note) {
   return status;
 }
 
-constexpr auto kOpenFlags = fuchsia_io::Flags::kPermRead | fuchsia_io::Flags::kProtocolFile;
+constexpr auto kOpenFlags = fuchsia_io::Flags::kPermReadBytes | fuchsia_io::Flags::kProtocolFile;
 
 zx_handle_t Device::MapFirmware(const char* name, uintptr_t* fw_addr, size_t* fw_size) {
   zx_handle_t vmo = ZX_HANDLE_INVALID;

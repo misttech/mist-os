@@ -130,13 +130,13 @@ mod tests {
                     panic!("successfully opened when expected failure, could describe: {:?}", d)
                 }
             }
-            if flags.intersects(fio::Flags::PERM_READ) {
+            if flags.intersects(fio::Flags::PERM_READ_BYTES) {
                 assert_eq!(
                     file_name,
                     file::read_to_string(&file_proxy).await.expect("failed to read file")
                 );
             }
-            if flags.intersects(fio::Flags::PERM_WRITE) {
+            if flags.intersects(fio::Flags::PERM_WRITE_BYTES) {
                 let _: u64 = file_proxy
                     .write(b"write_only")
                     .await

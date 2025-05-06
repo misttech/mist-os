@@ -140,7 +140,7 @@ async fn open_remote_directory_test() {
 
     dir.open_node::<fio::DirectoryMarker>(
         remote_name,
-        fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_READ | fio::Flags::PERM_WRITE,
+        fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE,
         None,
     )
     .await
@@ -168,7 +168,7 @@ async fn open_remote_file_test() {
     let remote_dir_proxy = dir
         .open_node::<fio::DirectoryMarker>(
             remote_name,
-            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_READ,
+            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE,
             None,
         )
         .await
@@ -177,7 +177,7 @@ async fn open_remote_file_test() {
     remote_dir_proxy
         .open_node::<fio::NodeMarker>(
             TEST_FILE,
-            fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_READ,
+            fio::Flags::PROTOCOL_FILE | fio::PERM_READABLE,
             None,
         )
         .await
@@ -186,7 +186,7 @@ async fn open_remote_file_test() {
     // Test opening file directly though local directory by crossing remote automatically.
     dir.open_node::<fio::NodeMarker>(
         [remote_name, "/", TEST_FILE].join("").as_str(),
-        fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_READ,
+        fio::Flags::PROTOCOL_FILE | fio::PERM_READABLE,
         None,
     )
     .await
@@ -227,7 +227,7 @@ async fn open_remote_directory_right_escalation_test() {
         .open_node::<fio::NodeMarker>(
             mount_point,
             fio::Flags::PROTOCOL_DIRECTORY
-                | fio::Flags::PERM_READ
+                | fio::PERM_READABLE
                 | fio::Flags::PERM_INHERIT_WRITE
                 | fio::Flags::PERM_INHERIT_EXECUTE,
             None,

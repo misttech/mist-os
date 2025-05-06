@@ -40,7 +40,8 @@ TEST(NamespaceTest, CreateAndConnect) {
     server_end = std::move(object.TakeChannel());
   });
 
-  auto client_end = ns->Open<fuchsia_io::File>("/pkg/path-exists", fuchsia_io::Flags::kPermRead);
+  auto client_end =
+      ns->Open<fuchsia_io::File>("/pkg/path-exists", fuchsia_io::Flags::kPermReadBytes);
   EXPECT_TRUE(client_end.is_ok());
   loop.RunUntilIdle();
   zx_info_handle_basic_t client_info = {}, server_info = {};

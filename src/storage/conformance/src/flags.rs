@@ -237,15 +237,17 @@ mod tests {
         // We should get 0, R, W, X, RW, RX, WX, RWX (8 in total).
         const EXPECTED_COMBINATIONS: [fio::Flags; 8] = [
             fio::Flags::empty(),
-            fio::Flags::PERM_READ,
-            fio::Flags::PERM_WRITE,
+            fio::Flags::PERM_READ_BYTES,
+            fio::Flags::PERM_WRITE_BYTES,
             fio::Flags::PERM_EXECUTE,
-            fio::Flags::empty().union(fio::Flags::PERM_READ).union(fio::Flags::PERM_WRITE),
-            fio::Flags::empty().union(fio::Flags::PERM_READ).union(fio::Flags::PERM_EXECUTE),
-            fio::Flags::empty().union(fio::Flags::PERM_WRITE).union(fio::Flags::PERM_EXECUTE),
             fio::Flags::empty()
-                .union(fio::Flags::PERM_READ)
-                .union(fio::Flags::PERM_WRITE)
+                .union(fio::Flags::PERM_READ_BYTES)
+                .union(fio::Flags::PERM_WRITE_BYTES),
+            fio::Flags::empty().union(fio::Flags::PERM_READ_BYTES).union(fio::Flags::PERM_EXECUTE),
+            fio::Flags::empty().union(fio::Flags::PERM_WRITE_BYTES).union(fio::Flags::PERM_EXECUTE),
+            fio::Flags::empty()
+                .union(fio::Flags::PERM_READ_BYTES)
+                .union(fio::Flags::PERM_WRITE_BYTES)
                 .union(fio::Flags::PERM_EXECUTE),
         ];
 
@@ -253,7 +255,7 @@ mod tests {
         let rights = Rights::new(TEST_RIGHTS);
         assert_eq!(
             rights.all_flags(),
-            fio::Flags::PERM_READ | fio::Flags::PERM_WRITE | fio::Flags::PERM_EXECUTE
+            fio::Flags::PERM_READ_BYTES | fio::Flags::PERM_WRITE_BYTES | fio::Flags::PERM_EXECUTE
         );
 
         // Test that all possible combinations are generated correctly.
@@ -266,12 +268,14 @@ mod tests {
         // Test that combinations including READABLE are generated correctly.
         // We should get R, RW, RX, and RWX (4 in total).
         const EXPECTED_READABLE_COMBOS: [fio::Flags; 4] = [
-            fio::Flags::PERM_READ,
-            fio::Flags::empty().union(fio::Flags::PERM_READ).union(fio::Flags::PERM_WRITE),
-            fio::Flags::empty().union(fio::Flags::PERM_READ).union(fio::Flags::PERM_EXECUTE),
+            fio::Flags::PERM_READ_BYTES,
             fio::Flags::empty()
-                .union(fio::Flags::PERM_READ)
-                .union(fio::Flags::PERM_WRITE)
+                .union(fio::Flags::PERM_READ_BYTES)
+                .union(fio::Flags::PERM_WRITE_BYTES),
+            fio::Flags::empty().union(fio::Flags::PERM_READ_BYTES).union(fio::Flags::PERM_EXECUTE),
+            fio::Flags::empty()
+                .union(fio::Flags::PERM_READ_BYTES)
+                .union(fio::Flags::PERM_WRITE_BYTES)
                 .union(fio::Flags::PERM_EXECUTE),
         ];
         let readable_combos = rights.combinations_containing(fio::Rights::READ_BYTES);
@@ -284,9 +288,9 @@ mod tests {
         // We should get 0, W, X, and WX (4 in total).
         const EXPECTED_NONREADABLE_COMBOS: [fio::Flags; 4] = [
             fio::Flags::empty(),
-            fio::Flags::PERM_WRITE,
+            fio::Flags::PERM_WRITE_BYTES,
             fio::Flags::PERM_EXECUTE,
-            fio::Flags::empty().union(fio::Flags::PERM_WRITE).union(fio::Flags::PERM_EXECUTE),
+            fio::Flags::empty().union(fio::Flags::PERM_WRITE_BYTES).union(fio::Flags::PERM_EXECUTE),
         ];
         let nonreadable_combos = rights.combinations_without(fio::Rights::READ_BYTES);
         assert_eq!(nonreadable_combos.len(), EXPECTED_NONREADABLE_COMBOS.len());

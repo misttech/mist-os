@@ -426,7 +426,7 @@ async fn open_rights() {
     let dir = harness.get_directory(vec![file(TEST_FILE, CONTENT.to_vec())], fio::PERM_READABLE);
     // Should fail to open the file if the rights exceed those allowed by the directory.
     let status = dir
-        .open_node::<fio::NodeMarker>(&TEST_FILE, fio::Flags::PERM_WRITE, None)
+        .open_node::<fio::NodeMarker>(&TEST_FILE, fio::PERM_WRITABLE, None)
         .await
         .expect_err("open should fail if rights exceed those of the parent connection");
     assert_eq!(status, zx::Status::ACCESS_DENIED);
@@ -445,7 +445,7 @@ async fn open_rights() {
     let proxy = dir
         .open_node::<fio::FileMarker>(
             &TEST_FILE,
-            fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_GET_ATTRIBUTES | fio::Flags::PERM_READ,
+            fio::Flags::PROTOCOL_FILE | fio::PERM_READABLE,
             None,
         )
         .await
@@ -666,7 +666,7 @@ async fn open_file_append() {
     let proxy = dir
         .open_node::<fio::FileMarker>(
             "file",
-            fio::Flags::PERM_READ | fio::Flags::PERM_WRITE | fio::Flags::FILE_APPEND,
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::FILE_APPEND,
             None,
         )
         .await
@@ -713,7 +713,7 @@ async fn open_file_truncate() {
     let proxy = dir
         .open_node::<fio::FileMarker>(
             "file",
-            fio::Flags::PERM_READ | fio::Flags::PERM_WRITE | fio::Flags::FILE_TRUNCATE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::FILE_TRUNCATE,
             None,
         )
         .await
@@ -811,7 +811,7 @@ async fn open_dir_inherit_rights() {
         .open_node::<fio::DirectoryMarker>(
             ".",
             fio::Flags::PROTOCOL_DIRECTORY
-                | fio::Flags::PERM_READ
+                | fio::Flags::PERM_READ_BYTES
                 | fio::Flags::PERM_INHERIT_WRITE
                 | fio::Flags::PERM_INHERIT_EXECUTE,
             None,
@@ -826,7 +826,7 @@ async fn open_dir_inherit_rights() {
     let inherited_flags = fio::Flags::from_bits_truncate(fio::INHERITED_WRITE_PERMISSIONS.bits());
     assert_eq!(
         proxy.get_flags().await.expect("get_flags failed").map_err(zx::Status::from_raw),
-        Ok(fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_READ | inherited_flags),
+        Ok(fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_READ_BYTES | inherited_flags),
     );
 }
 

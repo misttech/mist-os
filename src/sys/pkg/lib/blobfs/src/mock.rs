@@ -38,7 +38,9 @@ impl Mock {
             })) => {
                 assert_eq!(path, merkle.to_string());
                 assert!(flags.contains(fio::PERM_READABLE));
-                assert!(!flags.intersects(fio::Flags::PERM_WRITE | fio::Flags::FLAG_MAYBE_CREATE));
+                assert!(
+                    !flags.intersects(fio::Flags::PERM_WRITE_BYTES | fio::Flags::FLAG_MAYBE_CREATE)
+                );
 
                 let stream =
                     fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(object))
@@ -169,9 +171,8 @@ impl Mock {
                     control_handle: _,
                 })) => {
                     assert!(flags.contains(fio::PERM_READABLE));
-                    assert!(
-                        !flags.intersects(fio::Flags::PERM_WRITE | fio::Flags::FLAG_MAYBE_CREATE)
-                    );
+                    assert!(!flags
+                        .intersects(fio::Flags::PERM_WRITE_BYTES | fio::Flags::FLAG_MAYBE_CREATE));
                     let path: Hash = path.parse().unwrap();
 
                     let stream =

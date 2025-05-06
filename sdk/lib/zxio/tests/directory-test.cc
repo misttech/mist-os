@@ -38,7 +38,7 @@ class TestDirectoryServer : public zxio_tests::TestDirectoryServerBase {
 
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) final {
     constexpr fio::Flags kExpectedFlags =
-        fio::Flags::kPermRead | fio::Flags::kFlagSendRepresentation;
+        fio::Flags::kPermReadBytes | fio::Flags::kFlagSendRepresentation;
     if (request->flags != kExpectedFlags) {
       ADD_FAILURE() << "unexpected flags for Open request: " << std::showbase << std::hex
                     << static_cast<zxio_open_flags_t>(request->flags) << " vs " << std::showbase
@@ -189,7 +189,7 @@ TEST_F(Directory, Attr) {
 }
 
 TEST_F(Directory, Open) {
-  fio::Flags flags = fio::Flags::kPermRead;
+  fio::Flags flags = fio::Flags::kPermReadBytes;
   zxio_node_attributes_t attrs = {};
   attrs.has.protocols = true;
   const zxio_open_options_t options{.inout_attr = &attrs};
@@ -217,7 +217,7 @@ TEST_F(Directory, Open) {
 }
 
 TEST_F(Directory, OpenCreateAttrs) {
-  fio::Flags flags = fio::Flags::kPermRead;
+  fio::Flags flags = fio::Flags::kPermReadBytes;
   zxio_node_attributes_t attrs = {};
   attrs.modification_time = 1234;
   attrs.has.modification_time = true;
@@ -234,7 +234,7 @@ TEST_F(Directory, OpenCreateAttrs) {
 
 TEST_F(Directory, OpenNoOptions) {
   // Should succeed to call zxio_open3 with options not provided.
-  fio::Flags flags = fio::Flags::kPermRead;
+  fio::Flags flags = fio::Flags::kPermReadBytes;
   zxio_storage_t file_storage;
   ASSERT_OK(zxio_open(directory(), kTestPath.data(), kTestPath.length(),
                       static_cast<zxio_open_flags_t>(flags), nullptr, &file_storage));

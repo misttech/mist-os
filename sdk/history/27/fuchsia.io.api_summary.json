@@ -1334,18 +1334,13 @@
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_MODIFY",
+        "name": "fuchsia.io/Flags.PERM_MODIFY_DIRECTORY",
         "value": "256"
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_READ",
+        "name": "fuchsia.io/Flags.PERM_READ_BYTES",
         "value": "2"
-    },
-    {
-        "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_SET_ATTRIBUTES",
-        "value": "32"
     },
     {
         "kind": "bits/member",
@@ -1354,7 +1349,12 @@
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_WRITE",
+        "name": "fuchsia.io/Flags.PERM_UPDATE_ATTRIBUTES",
+        "value": "32"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_WRITE_BYTES",
         "value": "4"
     },
     {

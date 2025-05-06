@@ -177,7 +177,7 @@ async fn clone_file() {
     let file = dir
         .open_node::<fio::FileMarker>(
             &TEST_FILE,
-            fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_GET_ATTRIBUTES | fio::Flags::PERM_READ,
+            fio::Flags::PROTOCOL_FILE | fio::PERM_READABLE,
             None,
         )
         .await

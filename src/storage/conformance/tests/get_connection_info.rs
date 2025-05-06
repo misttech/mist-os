@@ -67,10 +67,10 @@ async fn get_connection_info_file_with_directory_rights() {
     let harness = TestHarness::new().await;
 
     const MUTABLE_FILE_ALLOWED_RIGHT_FLAGS: fio::Flags = fio::Flags::empty()
-        .union(fio::Flags::PERM_WRITE)
-        .union(fio::Flags::PERM_MODIFY)
+        .union(fio::Flags::PERM_WRITE_BYTES)
+        .union(fio::Flags::PERM_MODIFY_DIRECTORY)
         .union(fio::Flags::PERM_EXECUTE)
-        .union(fio::Flags::PERM_SET_ATTRIBUTES);
+        .union(fio::Flags::PERM_UPDATE_ATTRIBUTES);
 
     const FILE_ALLOWED_RIGHTS: fio::Operations = fio::Operations::empty()
         .union(fio::Operations::GET_ATTRIBUTES)

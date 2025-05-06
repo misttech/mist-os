@@ -621,11 +621,11 @@ impl FsNodeOps for RemoteNode {
                     name,
                     fio::Flags::FLAG_MUST_CREATE
                         | fio::Flags::PROTOCOL_FILE
-                        | fio::Flags::PERM_READ
-                        | fio::Flags::PERM_WRITE
+                        | fio::Flags::PERM_READ_BYTES
+                        | fio::Flags::PERM_WRITE_BYTES
                         | fio::Flags::PERM_GET_ATTRIBUTES
-                        | fio::Flags::PERM_SET_ATTRIBUTES
-                        | fio::Flags::PERM_MODIFY,
+                        | fio::Flags::PERM_UPDATE_ATTRIBUTES
+                        | fio::Flags::PERM_MODIFY_DIRECTORY,
                     ZxioOpenOptions::new(
                         Some(&mut attrs),
                         Some(zxio_node_attributes_t {

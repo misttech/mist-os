@@ -1324,7 +1324,7 @@ mod tests {
 
         let scope = ExecutionScope::new();
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-        let flags = fio::Flags::PERM_READ
+        let flags = fio::PERM_READABLE
             | fio::Flags::FLAG_MUST_CREATE
             | fio::Flags::FLAG_SEND_REPRESENTATION;
         ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|request| {

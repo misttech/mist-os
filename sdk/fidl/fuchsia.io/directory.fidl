@@ -17,12 +17,15 @@ const DIRECTORY_PROTOCOL_NAME string = "fuchsia.io/Directory";
 
 /// Flags used to specify how a node should be opened. Note that ranges of bits are reserved
 /// for specific use cases:
-///  * Bits  1-16: Permission flags `PERM_*` (e.g. [`Flags.PERM_READ`]).
+///  * Bits  1-16: Permission flags `PERM_*` (e.g. [`Flags.PERM_READ_BYTES`]).
 ///  * Bits 17-32: POSIX compatibile `O_*` flags (e.g. [`Flags.FILE_TRUNCATE`] or `O_TRUNC`).
 ///  * Bits 33-64: Fuchsia-specific flags.
 type Flags = flexible bits : uint64 {
     //
     // Permissions
+    //
+    // *NOTE*: Prefer using the [`PERM_READABLE`], [`PERM_WRITABLE`], and [`PERM_EXECUTABLE`]
+    // constants instead of specifying individual permission flags.
     //
     // Permissions can only be granted if the current connection has them. If a permission is
     // requested but not available, the request will fail with `ZX_ERR_ACCESS_DENIED`.
@@ -33,27 +36,27 @@ type Flags = flexible bits : uint64 {
     /// Allows opening child nodes with [`PROTOCOL_SERVICE`].
     PERM_CONNECT = 0x0001;
     /// Read byte contents of a file.
-    PERM_READ = 0x0002;
+    PERM_READ_BYTES = 0x0002;
     /// Write byte contents to a file.
-    PERM_WRITE = 0x0004;
+    PERM_WRITE_BYTES = 0x0004;
     /// Execute byte contents of a file.
     PERM_EXECUTE = 0x0008;
     /// Get/query attributes of a node.
     PERM_GET_ATTRIBUTES = 0x0010;
     /// Set/update attributes of a node.
-    PERM_SET_ATTRIBUTES = 0x0020;
+    PERM_UPDATE_ATTRIBUTES = 0x0020;
     /// Enumerate (list) directory entries.
     PERM_ENUMERATE = 0x0040;
     /// Allow opening a child node with a node protocol. Must be specified with PERM_ENUMERATE
     /// otherwise requests will fail with `ZX_ERR_INVALID_ARGS`.
     PERM_TRAVERSE = 0x0080;
-    /// Modify directory entries (create/rename/link/unlink). Must be specified with PERM_ENUMERATE
-    /// otherwise requests will fail with `ZX_ERR_INVALID_ARGS`.
-    PERM_MODIFY = 0x0100;
-    /// Inherit write permissions when available (PERM_WRITE, PERM_SET_ATTRIBUTES, PERM_MODIFY,
-    /// PERM_ENUMERATE). Servers must ensure this flag is removed if the parent connection lacks any
-    /// of these rights. See [`INHERITED_WRITE_PERMISSIONS`] for the exact set of permissions that
-    /// will be inherited.
+    /// Modify directory entries (create/rename/link/unlink). Must be specified with
+    /// PERM_ENUMERATE otherwise requests will fail with `ZX_ERR_INVALID_ARGS`.
+    PERM_MODIFY_DIRECTORY = 0x0100;
+    /// Inherit write permissions when available (PERM_WRITE_BYTES, PERM_UPDATE_ATTRIBUTES,
+    /// PERM_MODIFY_DIRECTORY, /// PERM_ENUMERATE). Servers must ensure this flag is removed
+    /// if the parent connection lacks any of these rights. See [`INHERITED_WRITE_PERMISSIONS`]
+    /// for the exact set of permissions that will be inherited.
     PERM_INHERIT_WRITE = 0x2000;
     /// Inherit execute permission when available (PERM_EXECUTE).
     /// Servers must ensure this flag is removed if the parent connection lacks PERM_EXECUTE.
@@ -134,7 +137,7 @@ const MASK_PERMISSION_FLAGS uint64 = 0x000000000000FFFF;
 const MASK_POSIX_FLAGS uint64 = 0x00000000FFFFFFFF;
 
 const MASK_KNOWN_PERMISSIONS Flags
-        = Flags.PERM_READ | Flags.PERM_WRITE | Flags.PERM_EXECUTE | Flags.PERM_SET_ATTRIBUTES | Flags.PERM_ENUMERATE | Flags.PERM_MODIFY | Flags.PERM_CONNECT | Flags.PERM_GET_ATTRIBUTES | Flags.PERM_TRAVERSE | Flags.PERM_INHERIT_WRITE | Flags.PERM_INHERIT_EXECUTE;
+        = Flags.PERM_READ_BYTES | Flags.PERM_WRITE_BYTES | Flags.PERM_EXECUTE | Flags.PERM_UPDATE_ATTRIBUTES | Flags.PERM_ENUMERATE | Flags.PERM_MODIFY_DIRECTORY | Flags.PERM_CONNECT | Flags.PERM_GET_ATTRIBUTES | Flags.PERM_TRAVERSE | Flags.PERM_INHERIT_WRITE | Flags.PERM_INHERIT_EXECUTE;
 
 const MASK_KNOWN_PROTOCOLS Flags
         = Flags.PROTOCOL_DIRECTORY | Flags.PROTOCOL_FILE | Flags.PROTOCOL_NODE | Flags.PROTOCOL_SYMLINK | Flags.PROTOCOL_SERVICE;
@@ -147,11 +150,11 @@ const INHERITED_WRITE_PERMISSIONS Operations
 
 /// Set of permissions that are expected when opening a node as readable.
 const PERM_READABLE Flags
-        = Flags.PERM_CONNECT | Flags.PERM_ENUMERATE | Flags.PERM_TRAVERSE | Flags.PERM_READ | Flags.PERM_GET_ATTRIBUTES;
+        = Flags.PERM_CONNECT | Flags.PERM_ENUMERATE | Flags.PERM_TRAVERSE | Flags.PERM_READ_BYTES | Flags.PERM_GET_ATTRIBUTES;
 
 /// Set of permissions that are expected when opening a node as writable.
 const PERM_WRITABLE Flags
-        = Flags.PERM_CONNECT | Flags.PERM_ENUMERATE | Flags.PERM_TRAVERSE | Flags.PERM_WRITE | Flags.PERM_MODIFY | Flags.PERM_SET_ATTRIBUTES;
+        = Flags.PERM_CONNECT | Flags.PERM_ENUMERATE | Flags.PERM_TRAVERSE | Flags.PERM_WRITE_BYTES | Flags.PERM_MODIFY_DIRECTORY | Flags.PERM_UPDATE_ATTRIBUTES;
 
 /// Set of permissions that are expected when opening a node as executable.
 const PERM_EXECUTABLE Flags

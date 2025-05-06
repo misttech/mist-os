@@ -115,7 +115,7 @@ zx_status_t Transferable::FlagsSetDeprecated(uint32_t flags) { return ZX_OK; }
 zx_status_t Transferable::FlagsGet(uint64_t* out_flags) {
   // By default a transferable is readable and writeable.
   constexpr fuchsia_io::wire::Flags kFlags =
-      fuchsia_io::wire::Flags::kPermRead | fuchsia_io::wire::Flags::kPermWrite;
+      fuchsia_io::wire::Flags::kPermReadBytes | fuchsia_io::wire::Flags::kPermWriteBytes;
   *out_flags = uint64_t{kFlags};
   return ZX_OK;
 }

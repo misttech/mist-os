@@ -159,10 +159,10 @@ class Vmo : public HasIo {
     ZX_ASSERT(info.type == ZX_OBJ_TYPE_VMO);
     fuchsia_io::wire::Flags flags{};
     if (info.rights & ZX_RIGHT_READ) {
-      flags |= fuchsia_io::wire::Flags::kPermRead;
+      flags |= fuchsia_io::wire::Flags::kPermReadBytes;
     }
     if (info.rights & ZX_RIGHT_WRITE) {
-      flags |= fuchsia_io::wire::Flags::kPermWrite;
+      flags |= fuchsia_io::wire::Flags::kPermWriteBytes;
     }
     if (info.rights & ZX_RIGHT_EXECUTE) {
       flags |= fuchsia_io::wire::Flags::kPermExecute;

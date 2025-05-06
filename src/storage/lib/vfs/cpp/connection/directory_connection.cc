@@ -39,7 +39,7 @@ constexpr zx::result<std::tuple<fio::Rights, fio::Rights>> ValidateRequestRights
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
   // If the request attempts to truncate a file, it must also request write permissions.
-  if ((flags & fio::Flags::kFileTruncate) && !(flags & fio::Flags::kPermWrite)) {
+  if ((flags & fio::Flags::kFileTruncate) && !(flags & fio::Flags::kPermWriteBytes)) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   fio::Rights requested_rights = internal::FlagsToRights(flags);

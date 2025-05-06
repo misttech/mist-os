@@ -48,7 +48,7 @@ using fpromise::result;
 namespace {
 
 constexpr auto kOpenFlags =
-    fio::Flags::kPermRead | fio::Flags::kPermExecute | fio::Flags::kProtocolFile;
+    fio::Flags::kPermReadBytes | fio::Flags::kPermExecute | fio::Flags::kProtocolFile;
 constexpr auto kVmoFlags =
     fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute | fio::wire::VmoFlags::kPrivateClone;
 

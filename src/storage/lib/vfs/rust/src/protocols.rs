@@ -408,7 +408,8 @@ impl ToFileOptions for fio::Flags {
         }
 
         // Verify prohibited flags and disallow invalid flag combinations.
-        if self.contains(fio::Flags::FILE_TRUNCATE) && !self.contains(fio::Flags::PERM_WRITE) {
+        if self.contains(fio::Flags::FILE_TRUNCATE) && !self.contains(fio::Flags::PERM_WRITE_BYTES)
+        {
             return Err(Status::INVALID_ARGS);
         }
 

@@ -16,21 +16,21 @@ namespace fio = fuchsia_io;
 static_assert(static_cast<uint64_t>(fio::Rights::kConnect) ==
               static_cast<uint64_t>(fio::Flags::kPermConnect));
 static_assert(static_cast<uint64_t>(fio::Rights::kReadBytes) ==
-              static_cast<uint64_t>(fio::Flags::kPermRead));
+              static_cast<uint64_t>(fio::Flags::kPermReadBytes));
 static_assert(static_cast<uint64_t>(fio::Rights::kWriteBytes) ==
-              static_cast<uint64_t>(fio::Flags::kPermWrite));
+              static_cast<uint64_t>(fio::Flags::kPermWriteBytes));
 static_assert(static_cast<uint64_t>(fio::Rights::kExecute) ==
               static_cast<uint64_t>(fio::Flags::kPermExecute));
 static_assert(static_cast<uint64_t>(fio::Rights::kGetAttributes) ==
               static_cast<uint64_t>(fio::Flags::kPermGetAttributes));
 static_assert(static_cast<uint64_t>(fio::Rights::kUpdateAttributes) ==
-              static_cast<uint64_t>(fio::Flags::kPermSetAttributes));
+              static_cast<uint64_t>(fio::Flags::kPermUpdateAttributes));
 static_assert(static_cast<uint64_t>(fio::Rights::kEnumerate) ==
               static_cast<uint64_t>(fio::Flags::kPermEnumerate));
 static_assert(static_cast<uint64_t>(fio::Rights::kTraverse) ==
               static_cast<uint64_t>(fio::Flags::kPermTraverse));
 static_assert(static_cast<uint64_t>(fio::Rights::kModifyDirectory) ==
-              static_cast<uint64_t>(fio::Flags::kPermModify));
+              static_cast<uint64_t>(fio::Flags::kPermModifyDirectory));
 
 namespace fs {
 

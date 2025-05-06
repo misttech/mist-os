@@ -889,7 +889,7 @@ mod tests {
                 root_zxio
                     .open(
                         "foo",
-                        fio::Flags::PERM_READ | fio::Flags::PERM_WRITE,
+                        fio::PERM_READABLE | fio::PERM_WRITABLE,
                         ZxioOpenOptions::default()
                     )
                     .expect_err("open3 passed unexpectedly"),
@@ -899,8 +899,8 @@ mod tests {
                 .open(
                     "foo",
                     fio::Flags::PROTOCOL_FILE
-                        | fio::Flags::PERM_READ
-                        | fio::Flags::PERM_WRITE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
                         | fio::Flags::FLAG_MUST_CREATE,
                     ZxioOpenOptions::default(),
                 )
@@ -912,8 +912,8 @@ mod tests {
                     .open(
                         "bar/baz",
                         fio::Flags::PROTOCOL_DIRECTORY
-                            | fio::Flags::PERM_READ
-                            | fio::Flags::PERM_WRITE
+                            | fio::PERM_READABLE
+                            | fio::PERM_WRITABLE
                             | fio::Flags::FLAG_MUST_CREATE,
                         ZxioOpenOptions::default()
                     )
@@ -924,8 +924,8 @@ mod tests {
                 .open(
                     "bar",
                     fio::Flags::PROTOCOL_DIRECTORY
-                        | fio::Flags::PERM_READ
-                        | fio::Flags::PERM_WRITE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
                         | fio::Flags::FLAG_MUST_CREATE,
                     ZxioOpenOptions::default(),
                 )
@@ -934,8 +934,8 @@ mod tests {
                 .open(
                     "bar/baz",
                     fio::Flags::PROTOCOL_DIRECTORY
-                        | fio::Flags::PERM_READ
-                        | fio::Flags::PERM_WRITE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
                         | fio::Flags::FLAG_MUST_CREATE,
                     ZxioOpenOptions::default(),
                 )

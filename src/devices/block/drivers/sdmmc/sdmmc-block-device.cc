@@ -57,7 +57,7 @@ zx::result<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion> GetBufferRegion(zx_h
 zx::result<fuchsia_hardware_power::ComponentPowerConfiguration> GetAllPowerConfigs(
     const fdf::Namespace& ns) {
   zx::result open_result =
-      ns.Open<fuchsia_io::File>("/pkg/data/power_config.fidl", fuchsia_io::Flags::kPermRead);
+      ns.Open<fuchsia_io::File>("/pkg/data/power_config.fidl", fuchsia_io::Flags::kPermReadBytes);
   if (!open_result.is_ok() || !open_result->is_valid()) {
     return zx::error(ZX_ERR_INTERNAL);
   }

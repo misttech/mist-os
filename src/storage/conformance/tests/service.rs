@@ -116,7 +116,7 @@ async fn open_service_with_other_flags_should_fail() {
 
     // No need to test for all flag possibilities; just test some flags.
     for (flags, expected_error) in [
-        (fio::Flags::PERM_READ, Status::INVALID_ARGS),
+        (fio::Flags::PERM_READ_BYTES, Status::INVALID_ARGS),
         (fio::Flags::PERM_TRAVERSE, Status::INVALID_ARGS),
         (fio::Flags::FLAG_SEND_REPRESENTATION, Status::INVALID_ARGS),
         (fio::Flags::PERM_GET_ATTRIBUTES, Status::INVALID_ARGS),

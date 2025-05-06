@@ -141,7 +141,7 @@ fn remote_dir_direct_connection() {
 
         // Test open3.
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_READ;
+        let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE;
         ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
             .handle(|request| server.open(scope, Path::dot(), flags, request));
         expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
@@ -179,7 +179,7 @@ fn remote_dir_direct_connection_dir_contents() {
 
         // Test open3.
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
-        let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_READ;
+        let flags = fio::Flags::PROTOCOL_FILE | fio::PERM_READABLE;
         ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
             .handle(|request| server.open(scope, path, flags, request));
         assert_read!(proxy, "a content");

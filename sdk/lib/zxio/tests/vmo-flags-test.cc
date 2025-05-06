@@ -40,8 +40,8 @@ TEST(VmoTest, FlagsGetReadWrite) {
   uint64_t raw_flags{};
   ASSERT_STATUS(ZX_OK, zxio_flags_get(io, &raw_flags));
   fuchsia_io::wire::Flags flags{raw_flags};
-  EXPECT_TRUE(flags & fuchsia_io::wire ::Flags::kPermRead);
-  EXPECT_TRUE(flags & fuchsia_io::wire ::Flags::kPermWrite);
+  EXPECT_TRUE(flags & fuchsia_io::wire ::Flags::kPermReadBytes);
+  EXPECT_TRUE(flags & fuchsia_io::wire ::Flags::kPermWriteBytes);
   EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermExecute);
 
   uint32_t deprecated_raw_flags{};
@@ -75,8 +75,8 @@ TEST(VmoTest, FlagsGetReadOnly) {
   uint64_t raw_flags{};
   ASSERT_STATUS(ZX_OK, zxio_flags_get(io, &raw_flags));
   fuchsia_io::wire::Flags flags{raw_flags};
-  EXPECT_TRUE(flags & fuchsia_io::wire ::Flags::kPermRead);
-  EXPECT_FALSE(flags & fuchsia_io::wire ::Flags::kPermWrite);
+  EXPECT_TRUE(flags & fuchsia_io::wire ::Flags::kPermReadBytes);
+  EXPECT_FALSE(flags & fuchsia_io::wire ::Flags::kPermWriteBytes);
   EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermExecute);
 
   uint32_t deprecated_raw_flags{};
@@ -117,8 +117,8 @@ TEST(VmoTest, FlagsGetReadExec) {
   uint64_t raw_flags{};
   ASSERT_STATUS(ZX_OK, zxio_flags_get(exec_io, &raw_flags));
   fuchsia_io::wire::Flags flags{raw_flags};
-  EXPECT_TRUE(flags & fuchsia_io::wire ::Flags::kPermRead);
-  EXPECT_FALSE(flags & fuchsia_io::wire ::Flags::kPermWrite);
+  EXPECT_TRUE(flags & fuchsia_io::wire ::Flags::kPermReadBytes);
+  EXPECT_FALSE(flags & fuchsia_io::wire ::Flags::kPermWriteBytes);
   EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermExecute);
 
   uint32_t deprecated_raw_flags{};

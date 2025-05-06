@@ -1014,10 +1014,10 @@ mod tests {
                     panic!("successfully opened when expected failure, could describe: {:?}", d)
                 }
             }
-            if flags.intersects(fio::Flags::PERM_READ) {
+            if flags.intersects(fio::Flags::PERM_READ_BYTES) {
                 assert_eq!(crate::file::read_to_string(&file).await.unwrap(), file_name);
             }
-            if flags.intersects(fio::Flags::PERM_WRITE) {
+            if flags.intersects(fio::Flags::PERM_WRITE_BYTES) {
                 let _ = file.seek(fio::SeekOrigin::Start, 0).await.expect("Seek failed!");
                 let _: u64 = file
                     .write(file_name.as_bytes())
@@ -1032,10 +1032,10 @@ mod tests {
 
             match open_file(&example_dir_proxy, file_name, flags).await {
                 Ok(file) if should_succeed => {
-                    if flags.intersects(fio::Flags::PERM_READ) {
+                    if flags.intersects(fio::Flags::PERM_READ_BYTES) {
                         assert_eq!(crate::file::read_to_string(&file).await.unwrap(), file_name);
                     }
-                    if flags.intersects(fio::Flags::PERM_WRITE) {
+                    if flags.intersects(fio::Flags::PERM_WRITE_BYTES) {
                         let _ = file.seek(fio::SeekOrigin::Start, 0).await.expect("Seek failed!");
                         let _: u64 = file
                             .write(file_name.as_bytes())
