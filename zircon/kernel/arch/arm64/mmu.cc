@@ -869,8 +869,10 @@ void ArmArchVmAspace::FlushAsid() const {
   __UNREACHABLE;
 }
 
+using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
+
 ktl::pair<zx_status_t, uint> ArmArchVmAspace::UnmapPageTable(
-    VirtualAddressCursor& cursor, EnlargeOperation enlarge, CheckForEmptyPt pt_check,
+    VirtualAddressCursor& cursor, ArchUnmapOptions enlarge, CheckForEmptyPt pt_check,
     const uint index_shift, volatile pte_t* page_table, ConsistencyManager& cm, Reclaim reclaim) {
   const vaddr_t block_size = 1UL << index_shift;
   const uint num_entries = (1u << (page_size_shift_ - 3));
@@ -892,14 +894,14 @@ ktl::pair<zx_status_t, uint> ArmArchVmAspace::UnmapPageTable(
         (!IS_ALIGNED(cursor.vaddr_rel(), block_size) || cursor.size() < block_size)) {
       // Splitting a large page may perform break-before-make, and during that window we will have
       // temporarily unmapped beyond our range, so make sure we are permitted to do that.
-      if (!allow_bbm && enlarge != EnlargeOperation::Yes) {
+      if (!allow_bbm && !(enlarge & ArchUnmapOptions::Enlarge)) {
         return {ZX_ERR_NOT_SUPPORTED, unmapped};
       }
       zx_status_t s = SplitLargePage(cursor.vaddr(), index_shift, index, page_table, cm);
       if (unlikely(s != ZX_OK)) {
         // If split fails, just unmap the whole thing, and let a
         // subsequent page fault clean it up.
-        if (enlarge == EnlargeOperation::No) {
+        if (enlarge == ArchUnmapOptions::None) {
           return {s, unmapped};
         }
         // We must unmap here, and not in the normal block below, so that we can use SkipEntry
@@ -1117,7 +1119,7 @@ ktl::pair<zx_status_t, uint> ArmArchVmAspace::MapPageTable(pte_t attrs, bool ro,
 }
 
 zx_status_t ArmArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in,
-                                              size_t size_in, pte_t attrs, EnlargeOperation enlarge,
+                                              size_t size_in, pte_t attrs, ArchUnmapOptions enlarge,
                                               const uint index_shift, volatile pte_t* page_table,
                                               ConsistencyManager& cm) {
   vaddr_t vaddr = vaddr_in;
@@ -1147,7 +1149,7 @@ zx_status_t ArmArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_re
         chunk_size != block_size) {
       // Splitting a large page may perform break-before-make, and during that window we will have
       // temporarily unmapped beyond our range, so make sure that is permitted.
-      if (!allow_bbm && enlarge != EnlargeOperation::Yes) {
+      if (!allow_bbm && !(enlarge & ArchUnmapOptions::Enlarge)) {
         return ZX_ERR_NOT_SUPPORTED;
       }
       zx_status_t s = SplitLargePage(vaddr, index_shift, index, page_table, cm);
@@ -1273,7 +1275,7 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
           DEBUG_ASSERT(result);
         }
         auto [result, lower_unmapped] =
-            UnmapPageTable(unmap_cursor, EnlargeOperation::No, CheckForEmptyPt::No,
+            UnmapPageTable(unmap_cursor, ArchUnmapOptions::None, CheckForEmptyPt::No,
                            index_shift - (page_size_shift_ - 3), next_page_table, cm, Reclaim::Yes);
         ASSERT(result == ZX_OK);
         if (!lower_page) {
@@ -1384,7 +1386,7 @@ void ArmArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel_in,
 }
 
 zx_status_t ArmArchVmAspace::ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs,
-                                          EnlargeOperation enlarge, vaddr_t vaddr_base,
+                                          ArchUnmapOptions enlarge, vaddr_t vaddr_base,
                                           ConsistencyManager& cm) {
   vaddr_t vaddr_rel = vaddr - vaddr_base;
   vaddr_t vaddr_rel_max = 1UL << top_size_shift_;
@@ -1487,7 +1489,7 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
       VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
       if (unmap_cursor.size() > 0) {
         auto [unmap_status, unmapped] =
-            UnmapPageTable(unmap_cursor, EnlargeOperation::No, CheckForEmptyPt::Yes,
+            UnmapPageTable(unmap_cursor, ArchUnmapOptions::None, CheckForEmptyPt::Yes,
                            top_index_shift_, tt_virt_, cm, Reclaim::No);
         DEBUG_ASSERT(unmap_status == ZX_OK);
         tt_page_->mmu.num_mappings -= unmapped;
@@ -1572,7 +1574,7 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
       VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
       if (unmap_cursor.size() > 0) {
         auto [unmap_status, unmapped] =
-            UnmapPageTable(unmap_cursor, EnlargeOperation::No, CheckForEmptyPt::Yes,
+            UnmapPageTable(unmap_cursor, ArchUnmapOptions::None, CheckForEmptyPt::Yes,
                            top_index_shift_, tt_virt_, cm, Reclaim::No);
         DEBUG_ASSERT(unmap_status == ZX_OK);
         tt_page_->mmu.num_mappings -= unmapped;
@@ -1598,7 +1600,7 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
   return ZX_OK;
 }
 
-zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
+zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
                                    size_t* unmapped) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
@@ -1639,7 +1641,7 @@ zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOperation
 }
 
 zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
-                                     EnlargeOperation enlarge) {
+                                     ArchUnmapOptions enlarge) {
   canary_.Assert();
 
   if (!IsValidVaddr(vaddr)) {
@@ -1659,7 +1661,7 @@ zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags
   // safely perform protections and instead upgrade any protect to a complete unmap, therefore
   // causing a regular translation fault that we can handle to repopulate the correct mapping.
   if (type_ == ArmAspaceType::kGuest) {
-    return Unmap(vaddr, count, EnlargeOperation::Yes, nullptr);
+    return Unmap(vaddr, count, ArchUnmapOptions::Enlarge, nullptr);
   }
 
   Guard<CriticalMutex> a{&lock_};

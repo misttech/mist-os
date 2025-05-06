@@ -221,7 +221,7 @@ zx::result<DirectPhysicalAspace> DirectPhysicalAspace::Create() {
 DirectPhysicalAspace::~DirectPhysicalAspace() {
   if (physical_aspace_ != nullptr) {
     zx_status_t status = physical_aspace_->arch_aspace().Unmap(
-        0, kNumPhysmapPages, ArchVmAspace::EnlargeOperation::Yes, nullptr);
+        0, kNumPhysmapPages, ArchVmAspaceInterface::ArchUnmapOptions::Enlarge, nullptr);
     DEBUG_ASSERT(status == ZX_OK);
     physical_aspace_->Destroy();
   }

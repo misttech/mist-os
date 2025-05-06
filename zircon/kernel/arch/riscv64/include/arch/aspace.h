@@ -56,7 +56,7 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count, uint mmu_flags,
                             size_t* mapped) override;
 
-  zx_status_t Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
+  zx_status_t Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
                     size_t* unmapped) override;
   // riscv does not document any restrictions on manipulating page tables such that duplicate TLB
   // entries could exist, as long as sfence.vma gets called, so unmap is safe to split large pages
@@ -64,7 +64,7 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   bool UnmapOnlyEnlargeOnOom() const override { return true; }
 
   zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
-                      EnlargeOperation enlarge) override;
+                      ArchUnmapOptions enlarge) override;
 
   zx_status_t Query(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) override;
 
@@ -123,7 +123,7 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
                            ConsistencyManager& cm) TA_REQ(lock_);
 
   zx::result<size_t> UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t size,
-                                    EnlargeOperation enlarge, uint level,
+                                    ArchUnmapOptions enlarge, uint level,
                                     volatile pte_t* page_table, ConsistencyManager& cm)
       TA_REQ(lock_);
 
@@ -149,7 +149,7 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t SplitLargePage(vaddr_t vaddr, uint level, vaddr_t pt_index,
                              volatile pte_t* page_table, ConsistencyManager& cm) TA_REQ(lock_);
 
-  zx::result<size_t> UnmapPages(vaddr_t vaddr, size_t size, EnlargeOperation enlarge,
+  zx::result<size_t> UnmapPages(vaddr_t vaddr, size_t size, ArchUnmapOptions enlarge,
                                 ConsistencyManager& cm) TA_REQ(lock_);
 
   zx_status_t ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs) TA_REQ(lock_);

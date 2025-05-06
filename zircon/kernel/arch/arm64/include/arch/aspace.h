@@ -55,7 +55,9 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count, uint mmu_flags,
                             size_t* mapped) override;
 
-  zx_status_t Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
+  using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
+
+  zx_status_t Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
                     size_t* unmapped) override;
 
   // ARM states that we must perform a break-before-make when changing the block size used by the
@@ -64,7 +66,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   bool UnmapOnlyEnlargeOnOom() const override { return false; }
 
   zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
-                      EnlargeOperation enlarge) override;
+                      ArchUnmapOptions enlarge) override;
 
   zx_status_t Query(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) override;
 
@@ -129,13 +131,13 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   // regardless of the error value, the num_mappings field in the page must be updated by the
   // caller.
   ktl::pair<zx_status_t, uint> UnmapPageTable(VirtualAddressCursor& cursor,
-                                              EnlargeOperation enlarge, CheckForEmptyPt pt_check,
+                                              ArchUnmapOptions enlarge, CheckForEmptyPt pt_check,
                                               uint index_shift, volatile pte_t* page_table,
                                               ConsistencyManager& cm, Reclaim reclaim)
       TA_REQ(lock_);
 
   zx_status_t ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, size_t size_in, pte_t attrs,
-                               EnlargeOperation enlarge, uint index_shift,
+                               ArchUnmapOptions enlarge, uint index_shift,
                                volatile pte_t* page_table, ConsistencyManager& cm) TA_REQ(lock_);
 
   size_t HarvestAccessedPageTable(size_t* entry_limit, vaddr_t vaddr_in, vaddr_t vaddr_rel_in,
@@ -158,7 +160,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
 
   pte_t MmuParamsFromFlags(uint mmu_flags);
 
-  zx_status_t ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs, EnlargeOperation enlarge,
+  zx_status_t ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs, ArchUnmapOptions enlarge,
                            vaddr_t vaddr_base, ConsistencyManager& cm) TA_REQ(lock_);
   zx_status_t QueryLocked(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) TA_REQ(lock_);
 

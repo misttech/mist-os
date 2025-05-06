@@ -284,10 +284,13 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   // TODO(https://fxbug.dev/42054461): Rationalize usage of `is_user` and `is_guest_physical`.
   bool is_guest_physical() const { return type_ == Type::GuestPhysical; }
 
+  bool can_enlarge_arch_unmap() const { return is_user() || is_guest_physical(); }
+
+  using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
+
   // Encodes the idea that we can always unmap from user aspaces.
-  ArchVmAspace::EnlargeOperation EnlargeArchUnmap() const {
-    return is_user() || is_guest_physical() ? ArchVmAspace::EnlargeOperation::Yes
-                                            : ArchVmAspace::EnlargeOperation::No;
+  ArchUnmapOptions EnlargeArchUnmap() const {
+    return can_enlarge_arch_unmap() ? ArchUnmapOptions::Enlarge : ArchUnmapOptions::None;
   }
 
   fbl::RefPtr<VmAddressRegion> RootVmarLocked() TA_REQ(lock_);

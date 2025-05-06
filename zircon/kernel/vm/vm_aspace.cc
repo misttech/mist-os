@@ -787,7 +787,7 @@ void VmAspace::DropUserPageTables() {
   if (!is_user())
     return;
   Guard<CriticalMutex> guard{&lock_};
-  arch_aspace().Unmap(base(), size() / PAGE_SIZE, ArchVmAspace::EnlargeOperation::Yes, nullptr);
+  arch_aspace().Unmap(base(), size() / PAGE_SIZE, ArchUnmapOptions::Enlarge, nullptr);
 }
 
 bool VmAspace::IntersectsVdsoCodeLocked(vaddr_t base, size_t size) const {

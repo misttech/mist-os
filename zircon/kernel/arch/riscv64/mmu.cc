@@ -666,8 +666,10 @@ void Riscv64ArchVmAspace::FlushAsid() const {
   }
 }
 
+using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
+
 zx::result<size_t> Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel,
-                                                       size_t size, EnlargeOperation enlarge,
+                                                       size_t size, ArchUnmapOptions enlarge,
                                                        uint level, volatile pte_t* page_table,
                                                        ConsistencyManager& cm) {
   const vaddr_t block_size = page_size_per_level(level);
@@ -691,7 +693,7 @@ zx::result<size_t> Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t va
       // If the split failed then we just fall through and unmap the entire large page.
       if (likely(status == ZX_OK)) {
         pte = page_table[index];
-      } else if (enlarge == EnlargeOperation::No) {
+      } else if (enlarge == ArchUnmapOptions::None) {
         return zx::error_result(status);
       }
     }
@@ -1059,7 +1061,7 @@ void Riscv64ArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel
 }
 
 zx::result<size_t> Riscv64ArchVmAspace::UnmapPages(vaddr_t vaddr, size_t size,
-                                                   EnlargeOperation enlarge,
+                                                   ArchUnmapOptions enlarge,
                                                    ConsistencyManager& cm) {
   LOCAL_KTRACE("mmu unmap", (vaddr & ~PAGE_MASK) | ((size >> PAGE_SIZE_SHIFT) & PAGE_MASK));
   uint level = RISCV64_MMU_PT_LEVELS - 1;
@@ -1119,7 +1121,7 @@ zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, siz
   if (result != ZX_OK) {
     if (cursor.vaddr() > vaddr) {
       zx::result<size_t> unmap_result =
-          UnmapPages(vaddr, cursor.vaddr() - vaddr, EnlargeOperation::No, cm);
+          UnmapPages(vaddr, cursor.vaddr() - vaddr, ArchUnmapOptions::None, cm);
       ASSERT(unmap_result.is_ok());
     }
     return result;
@@ -1184,7 +1186,7 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
     if (result != ZX_OK) {
       if (cursor.vaddr() > vaddr) {
         zx::result<size_t> unmap_result =
-            UnmapPages(vaddr, cursor.vaddr() - vaddr, EnlargeOperation::No, cm);
+            UnmapPages(vaddr, cursor.vaddr() - vaddr, ArchUnmapOptions::None, cm);
         ASSERT(unmap_result.is_ok());
       }
       return result;
@@ -1201,7 +1203,7 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
   return ZX_OK;
 }
 
-zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
+zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
                                        size_t* unmapped) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
@@ -1233,7 +1235,7 @@ zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOpera
 }
 
 zx_status_t Riscv64ArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
-                                         EnlargeOperation enlarge) {
+                                         ArchUnmapOptions enlarge) {
   canary_.Assert();
 
   if (!IsValidVaddr(vaddr)) {

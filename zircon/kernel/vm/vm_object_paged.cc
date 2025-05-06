@@ -494,8 +494,8 @@ zx_status_t VmObjectPaged::CreateFromWiredPages(const void* data, size_t size, b
       // unmap it from the kernel
       // NOTE: this means the image can no longer be referenced from original pointer
       status = VmAspace::kernel_aspace()->arch_aspace().Unmap(
-          reinterpret_cast<vaddr_t>(data), size / PAGE_SIZE, ArchVmAspace::EnlargeOperation::No,
-          nullptr);
+          reinterpret_cast<vaddr_t>(data), size / PAGE_SIZE,
+          ArchVmAspaceInterface::ArchUnmapOptions::None, nullptr);
       ASSERT(status == ZX_OK);
     }
     if (!exclusive) {

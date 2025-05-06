@@ -202,6 +202,8 @@ zx_status_t VmMapping::Protect(vaddr_t base, size_t size, uint new_arch_mmu_flag
   return ProtectLocked(base, size, new_arch_mmu_flags);
 }
 
+using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
+
 // static
 zx_status_t VmMapping::ProtectOrUnmap(const fbl::RefPtr<VmAspace>& aspace, vaddr_t base,
                                       size_t size, uint new_arch_mmu_flags) {
@@ -212,13 +214,12 @@ zx_status_t VmMapping::ProtectOrUnmap(const fbl::RefPtr<VmAspace>& aspace, vaddr
   // If not removing all permissions do the protect, otherwise skip straight to unmapping the entire
   // region.
   if ((new_arch_mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK) != 0) {
-    zx_status_t status = aspace->arch_aspace().Protect(base, size / PAGE_SIZE, new_arch_mmu_flags,
-                                                       aspace->EnlargeArchUnmap()
-                                                           ? ArchVmAspace::EnlargeOperation::Yes
-                                                           : ArchVmAspace::EnlargeOperation::No);
+    zx_status_t status = aspace->arch_aspace().Protect(
+        base, size / PAGE_SIZE, new_arch_mmu_flags,
+        aspace->can_enlarge_arch_unmap() ? ArchUnmapOptions::Enlarge : ArchUnmapOptions::None);
     // If the unmap failed and we are allowed to unmap extra portions of the aspace then fall
     // through and unmap, otherwise return with whatever the status is.
-    if (likely(status == ZX_OK) || !aspace->EnlargeArchUnmap()) {
+    if (likely(status == ZX_OK) || !aspace->can_enlarge_arch_unmap()) {
       return status;
     }
   }

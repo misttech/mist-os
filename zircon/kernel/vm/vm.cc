@@ -260,7 +260,7 @@ static int cmd_vm(int argc, const cmd_args* argv, uint32_t) {
     // Strictly only attempt to unmap exactly what the user requested, they can deal with any
     // failure that might result.
     auto err = VmAspace::kernel_aspace()->arch_aspace().Unmap(
-        argv[2].u, (uint)argv[3].u, ArchVmAspace::EnlargeOperation::No, &unmapped);
+        argv[2].u, (uint)argv[3].u, ArchVmAspaceInterface::ArchUnmapOptions::None, &unmapped);
     printf("arch_mmu_unmap returns %d, unmapped %zu\n", err, unmapped);
   } else {
     printf("unknown command\n");

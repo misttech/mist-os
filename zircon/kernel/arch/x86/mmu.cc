@@ -923,7 +923,7 @@ zx_status_t X86ArchVmAspace::Destroy() {
   return ZX_OK;
 }
 
-zx_status_t X86ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
+zx_status_t X86ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
                                    size_t* unmapped) {
   DEBUG_ASSERT(!pt_->IsUnified());
   if (!IsValidVaddr(vaddr))
@@ -957,7 +957,7 @@ zx_status_t X86ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
 }
 
 zx_status_t X86ArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
-                                     EnlargeOperation enlarge) {
+                                     ArchUnmapOptions enlarge) {
   DEBUG_ASSERT(!pt_->IsUnified());
   if (!IsValidVaddr(vaddr))
     return ZX_ERR_INVALID_ARGS;

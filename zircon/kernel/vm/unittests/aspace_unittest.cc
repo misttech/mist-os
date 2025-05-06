@@ -1920,6 +1920,8 @@ static bool vm_mapping_page_fault_range_test() {
   END_TEST;
 }
 
+using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
+
 static bool arch_noncontiguous_map() {
   BEGIN_TEST;
 
@@ -1988,7 +1990,7 @@ static bool arch_noncontiguous_map() {
     // The partial failures did not create any new entries, so only entries
     // created by the first map should be unmapped.
     mapped = 0u;  // `Unmap` doesn't set `unmapped` when it fails.
-    status = aspace.Unmap(base, ktl::size(phys), ArchVmAspace::EnlargeOperation::Yes, &mapped);
+    status = aspace.Unmap(base, ktl::size(phys), ArchUnmapOptions::Enlarge, &mapped);
     ASSERT_EQ(ZX_OK, status, "failed unmap\n");
     EXPECT_EQ(ktl::size(phys), mapped, "weird unmap\n");
 
@@ -2102,8 +2104,7 @@ static bool arch_noncontiguous_map_with_upgrade() {
 
     // Unmap any remaining entries
     mapped = 0u;  // `Unmap` doesn't set `unmapped` when it fails.
-    status =
-        aspace.Unmap(window_base, MAP_WINDOW_SIZE, ArchVmAspace::EnlargeOperation::Yes, &mapped);
+    status = aspace.Unmap(window_base, MAP_WINDOW_SIZE, ArchUnmapOptions::Enlarge, &mapped);
     ASSERT_EQ(ZX_OK, status, "failed unmap\n");
     EXPECT_EQ(MAP_WINDOW_SIZE, mapped, "weird unmap\n");
 
@@ -2143,7 +2144,7 @@ static bool arch_vm_aspace_protect_split_pages() {
   ArchVmAspace aspace(0, USER_ASPACE_SIZE, 0);
   ASSERT_OK(aspace.Init());
   auto cleanup = fit::defer([&]() {
-    aspace.Unmap(0, USER_ASPACE_SIZE / PAGE_SIZE, ArchVmAspace::EnlargeOperation::Yes, nullptr);
+    aspace.Unmap(0, USER_ASPACE_SIZE / PAGE_SIZE, ArchUnmapOptions::Enlarge, nullptr);
     aspace.Destroy();
   });
 
@@ -2158,7 +2159,7 @@ static bool arch_vm_aspace_protect_split_pages() {
   constexpr vaddr_t kProtectedRange = kRegionSize / 2 - PAGE_SIZE;
   constexpr size_t kProtectedPages = 2;
   ASSERT_OK(aspace.Protect(kProtectedRange, /*count=*/kProtectedPages, kReadWrite,
-                           ArchVmAspace::EnlargeOperation::Yes));
+                           ArchUnmapOptions::Enlarge));
 
   // Ensure the pages inside the range changed.
   EXPECT_EQ(get_vaddr_flags(&aspace, kProtectedRange), kReadWrite);
@@ -2194,7 +2195,7 @@ static bool arch_vm_aspace_protect_split_pages_out_of_memory() {
   ArchVmAspace aspace(0, USER_ASPACE_SIZE, 0, allocator);
   ASSERT_OK(aspace.Init());
   auto cleanup = fit::defer([&]() {
-    aspace.Unmap(0, USER_ASPACE_SIZE / PAGE_SIZE, ArchVmAspace::EnlargeOperation::Yes, nullptr);
+    aspace.Unmap(0, USER_ASPACE_SIZE / PAGE_SIZE, ArchUnmapOptions::Enlarge, nullptr);
     aspace.Destroy();
   });
 
@@ -2211,7 +2212,7 @@ static bool arch_vm_aspace_protect_split_pages_out_of_memory() {
   constexpr vaddr_t kProtectedRange = kRegionSize / 2 - PAGE_SIZE;
   constexpr size_t kProtectedSize = 2 * PAGE_SIZE;
   zx_status_t status =
-      aspace.Protect(kProtectedRange, /*count=*/2, kReadWrite, ArchVmAspace::EnlargeOperation::Yes);
+      aspace.Protect(kProtectedRange, /*count=*/2, kReadWrite, ArchUnmapOptions::Enlarge);
   EXPECT_EQ(status, ZX_ERR_NO_MEMORY);
 
   // The pages surrounding our protect range should still be mapped.

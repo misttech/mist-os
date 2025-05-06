@@ -124,14 +124,15 @@ class ArchVmAspaceInterface {
                           ExistingEntryAction existing_action, size_t* mapped) = 0;
 
   // Unmap the given virtual address range.
-  // EnlargeOperation controls whether the unmap region can be extended to be larger, or if only the
-  // exact region may be unmapped. The unmap region might be extended, even if only temporarily, if
-  // large pages need to be split.
-  enum EnlargeOperation : bool {
-    Yes = true,
-    No = false,
+  // ArchUnmapOptions::Enlarge controls whether the unmap region can be extended to be larger, or if
+  // only the exact region may be unmapped. The unmap region might be extended, even if only
+  // temporarily, if large pages need to be split.
+  enum class ArchUnmapOptions : uint8_t {
+    None = 0,
+    Enlarge = (1u << 0),
   };
-  virtual zx_status_t Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
+
+  virtual zx_status_t Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
                             size_t* unmapped) = 0;
 
   // Returns whether or not an unmap might need to enlarge an operation for reasons other than being
@@ -145,11 +146,11 @@ class ArchVmAspaceInterface {
   // a large page and the next level page table allocation fails. In
   // this case, mappings in the input range may be a mix of the old and
   // new flags.
-  // EnlargeOperation controls whether the a larger range than requested is permitted to experience
+  // ArchUnmapOptions controls whether the a larger range than requested is permitted to experience
   // a temporary permissions change. A temporary change may be required if a break-before-make style
   // unmap -> remap of the large page is required.
   virtual zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
-                              EnlargeOperation enlarge) = 0;
+                              ArchUnmapOptions enlarge) = 0;
 
   virtual zx_status_t Query(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) = 0;
 
@@ -221,5 +222,7 @@ class ArchVmICacheConsistencyManagerInterface {
   // This is automatically called on destruction.
   virtual void Finish() = 0;
 };
+
+FBL_ENABLE_ENUM_BITS(ArchVmAspaceInterface::ArchUnmapOptions)
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_ARCH_VM_ASPACE_H_
