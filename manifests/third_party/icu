@@ -7,7 +7,7 @@
              path="third_party/icu/default"
              remote="https://chromium.googlesource.com/chromium/deps/icu"
              gerrithost="https://chromium-review.googlesource.com"
-             revision="c66dd67fc7f3a9270ad30ceb2a342cb5fdb0dc42"/>
+             revision="b929596baebf0ab4ac7ec07f38365db4c50a559d"/>
     <!-- The ICU library to use for "latest" Fuchsia builds -->
     <project name="chromium/deps/icu@latest"
              gitsubmoduleof="fuchsia"
