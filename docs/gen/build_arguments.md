@@ -1042,12 +1042,12 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.hwasan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.hwasan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
@@ -8273,7 +8273,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_assert/BUILD.gn:27
+From //third_party/pigweed/src/pw_assert/BUILD.gn:26
 
 ### pw_assert_LITE_BACKEND
 
@@ -8400,7 +8400,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_bluetooth/BUILD.gn:30
+From //third_party/pigweed/src/pw_bluetooth/BUILD.gn:29
 
 ### pw_build_COLORIZE_OUTPUT
 
@@ -8780,31 +8780,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_containers/BUILD.gn:30
-
-### pw_docgen_BUILD_DOCS
-
-Whether or not the current target should build docs.
-
-**Current value (from the default):** `false`
-
-From //third_party/pigweed/src/pw_docgen/docs.gni:22
-
-### pw_docgen_GOOGLE_ANALYTICS_ID
-
-Set to enable Google Analytics tracking of generated docs.
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_docgen/docs.gni:25
-
-### pw_docgen_THREADS
-
-Set to define the number of parallel threads to use during the Sphinx build.
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_docgen/docs.gni:28
+From //third_party/pigweed/src/pw_containers/BUILD.gn:29
 
 ### pw_env_setup_CIPD_BAZEL
 
@@ -9042,7 +9018,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_log/BUILD.gn:29
+From //third_party/pigweed/src/pw_log/BUILD.gn:28
 
 ### pw_log_GLOG_ADAPTER_CONFIG
 
@@ -9051,7 +9027,7 @@ glog adapter portion of this module.
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_log/BUILD.gn:33
+From //third_party/pigweed/src/pw_log/BUILD.gn:32
 
 ### pw_module_docs
 
@@ -9085,7 +9061,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_preprocessor/BUILD.gn:26
+From //third_party/pigweed/src/pw_preprocessor/BUILD.gn:25
 
 ### pw_protobuf_compiler_GENERATE_LEGACY_ENUM_SNAKE_CASE_NAMES
 
@@ -9254,7 +9230,7 @@ pw_span_ENABLE_ASSERTS.
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_span:span_asserts"`
 
-From //third_party/pigweed/src/pw_span/BUILD.gn:38
+From //third_party/pigweed/src/pw_span/BUILD.gn:37
 
 ### pw_span_ENABLE_ASSERTS
 
@@ -9265,7 +9241,7 @@ pw_span. It's recommended to enable this for debug builds if possible.
 
 **Current value (from the default):** `false`
 
-From //third_party/pigweed/src/pw_span/BUILD.gn:28
+From //third_party/pigweed/src/pw_span/BUILD.gn:27
 
 ### pw_status_CONFIG
 
@@ -9275,7 +9251,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_status/BUILD.gn:26
+From //third_party/pigweed/src/pw_status/BUILD.gn:25
 
 ### pw_string_CONFIG
 
@@ -9285,7 +9261,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_string/BUILD.gn:27
+From //third_party/pigweed/src/pw_string/BUILD.gn:26
 
 ### pw_sync_BINARY_SEMAPHORE_BACKEND
 
@@ -9794,7 +9770,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_unit_test/BUILD.gn:29
+From //third_party/pigweed/src/pw_unit_test/BUILD.gn:28
 
 ### pw_unit_test_EXECUTABLE_TARGET_TYPE
 
