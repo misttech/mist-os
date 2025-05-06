@@ -35,6 +35,20 @@ mod test;
 
 use crate::power_manager::PowerManager;
 use anyhow::Error;
+use fidl_fuchsia_process_lifecycle as flifecycle;
+use futures::stream::StreamExt;
+use futures::FutureExt;
+
+async fn run_stop_watcher(mut stream: flifecycle::LifecycleRequestStream) {
+    let Some(Ok(request)) = stream.next().await else {
+        return std::future::pending::<()>().await;
+    };
+    match request {
+        flifecycle::LifecycleRequest::Stop { .. } => {
+            return;
+        }
+    }
+}
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
@@ -46,8 +60,23 @@ async fn main() -> Result<(), Error> {
     // Set up the PowerManager
     let mut pm = PowerManager::new();
 
-    // This future should never complete
-    let result = pm.run().await;
-    log::error!("Unexpected exit with result: {:?}", result);
-    result
+    let lifecycle =
+        fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleType::Lifecycle.into())
+            .expect("Expected to have a lifecycle startup handle.");
+    let lifecycle = fidl::endpoints::ServerEnd::<flifecycle::LifecycleMarker>::new(
+        zx::Channel::from(lifecycle),
+    );
+    let lifecycle_stream = lifecycle.into_stream();
+
+    futures::select! {
+        result = pm.run().fuse() => {
+            // This future should never complete
+            log::error!("Unexpected exit with result: {:?}", result);
+            result
+        },
+        () = run_stop_watcher(lifecycle_stream).fuse() => {
+            log::info!("Recieved stop request, exiting gracefully");
+            Ok(())
+        },
+    }
 }

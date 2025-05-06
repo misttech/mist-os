@@ -7,5 +7,6 @@
         runner: "elf",
         binary: "bin/power_manager",
         main_process_critical: "true",
+        lifecycle: { stop_event: "notify" },
     },
 }
