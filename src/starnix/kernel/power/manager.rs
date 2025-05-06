@@ -276,17 +276,25 @@ impl SuspendResumeManager {
                         .as_ref()
                         .map(|reasons| format!("Abort: {}", reasons.join(" ")));
                 });
-                self.lock().inspect_node.add_entry(|node| {
-                    node.record_int(fobs::SUSPEND_FAILED_AT, wake_time.into_nanos());
-                    if let Some(names) = wake_lock_names {
-                        let names_array =
-                            node.create_string_array(fobs::ACTIVE_WAKE_LOCK_NAMES, names.len());
-                        for (i, name) in names.iter().enumerate() {
-                            names_array.set(i, name);
+                {
+                    let mut state = self.lock();
+                    let active_epolls_count = state.active_epolls.len();
+                    state.inspect_node.add_entry(|node| {
+                        node.record_int(fobs::SUSPEND_FAILED_AT, wake_time.into_nanos());
+                        if let Some(names) = wake_lock_names {
+                            node.record_uint(
+                                fobs::ACTIVE_EPOLLS_COUNT,
+                                active_epolls_count.try_into().unwrap_or_default(),
+                            );
+                            let names_array =
+                                node.create_string_array(fobs::ACTIVE_WAKE_LOCK_NAMES, names.len());
+                            for (i, name) in names.iter().enumerate() {
+                                names_array.set(i, name);
+                            }
+                            node.record(names_array);
                         }
-                        node.record(names_array);
-                    }
-                });
+                    });
+                }
                 fuchsia_trace::instant!(
                     c"power",
                     c"suspend_container:error",

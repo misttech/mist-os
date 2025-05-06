@@ -169,3 +169,7 @@ const RESUME_CALLBACK_PHASE_END_AT string = "resume_callbacks_ended_at_ns";
 /// The name of current active wake locks, usually recorded if we attempted
 /// to suspend, but failed because there were active wake locks.
 const ACTIVE_WAKE_LOCK_NAMES string = "active_wake_lock_names";
+
+/// The number of current active epolls, usually recorded if we attempted
+/// to suspend, but failed because there were active epolls.
+const ACTIVE_EPOLLS_COUNT string = "active_epolls_count";
