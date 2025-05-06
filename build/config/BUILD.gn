@@ -882,6 +882,10 @@ config("default_warnings") {
     # TODO(https://fxbug.dev/376323001): Disable "-Wnontrivial-memaccess" until
     # all instances are fixed.
     ":Wno-nontrivial-memaccess",
+
+    # TODO(https://fxbug.dev/415133536): Disable "-Wunterminated-string-initialization"
+    # until all instances are fixed.
+    ":Wno-unterminated-string-initialization",
   ]
 }
 
@@ -1655,6 +1659,15 @@ config("Wno-nontrivial-memaccess") {
   if (!is_gcc) {
     cflags = [ "-Wno-nontrivial-memaccess" ]
   }
+}
+
+# TODO(https://fxbug.dev/415133536): Disable "-Wunterminated-string-initialization"
+# until all instances are fixed.
+config("Wno-unterminated-string-initialization") {
+  cflags = [
+    "-Wno-unknown-warning-option",
+    "-Wno-unterminated-string-initialization",
+  ]
 }
 
 config("Wsystem-headers") {
