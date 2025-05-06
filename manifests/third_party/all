@@ -362,7 +362,7 @@
              gitsubmoduleof="fuchsia"
              path="third_party/llvm-libc/src"
              remote="https://llvm.googlesource.com/llvm-project/libc"
-             revision="b9461b8732b357894d56e259d41d95d2d2a95e61"/>
+             revision="e6ebb832da642075a1acac7632b2e76946f310b1"/>
     <project name="third_party/lz4"
              gitsubmoduleof="fuchsia"
              path="third_party/lz4"
