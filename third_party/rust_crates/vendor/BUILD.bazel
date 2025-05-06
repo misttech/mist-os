@@ -775,18 +775,6 @@ alias(
 )
 
 alias(
-    name = "easy-parallel-3.1.0",
-    actual = "//third_party/rust_crates/vendor/easy-parallel-3.1.0:easy_parallel",
-    tags = ["manual"],
-)
-
-alias(
-    name = "easy-parallel",
-    actual = "//third_party/rust_crates/vendor/easy-parallel-3.1.0:easy_parallel",
-    tags = ["manual"],
-)
-
-alias(
     name = "ecb-0.1.2",
     actual = "//third_party/rust_crates/vendor/ecb-0.1.2:ecb",
     tags = ["manual"],

@@ -499,7 +499,6 @@ _NORMAL_DEPENDENCIES = {
             "async-fs": Label("//third_party/rust_crates/vendor/async-fs-1.6.0:async_fs"),
             "cargo_metadata": Label("//third_party/rust_crates/vendor/cargo_metadata-0.18.1:cargo_metadata"),
             "crossterm": Label("//third_party/rust_crates/vendor/crossterm-0.19.0:crossterm"),
-            "easy-parallel": Label("//third_party/rust_crates/vendor/easy-parallel-3.1.0:easy_parallel"),
             "fs_extra": Label("//third_party/rust_crates/vendor/fs_extra-1.2.0:fs_extra"),
             "fuse3": Label("//third_party/rust_crates/vendor/fuse3-0.6.1:fuse3"),
             "home": Label("//third_party/rust_crates/vendor/home-0.5.9:home"),

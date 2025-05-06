@@ -1181,12 +1181,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c7a8fb8a9fbf66c1f703fe16184d10ca0ee9d23be5b4436400408ba54a95005"
 
 [[package]]
-name = "easy-parallel"
-version = "3.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1dd4afd79212583ff429b913ad6605242ed7eec277e950b1438f300748f948f4"
-
-[[package]]
 name = "ecb"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1520,7 +1514,6 @@ dependencies = [
  "digest",
  "downcast-rs",
  "dyn-clone",
- "easy-parallel",
  "ecb",
  "ecdsa",
  "either",

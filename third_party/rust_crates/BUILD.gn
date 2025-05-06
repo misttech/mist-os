@@ -271,12 +271,6 @@ group("dyn-clone") {
   public_deps = [ ":dyn-clone-v1_0_19" ]
 }
 
-if (!(current_os == "fuchsia")) {
-  group("easy-parallel") {
-    public_deps = [ ":easy-parallel-v3_1_0" ]
-  }
-}
-
 group("ecb") {
   public_deps = [ ":ecb-v0_1_2" ]
 }
@@ -5387,36 +5381,6 @@ rust_library("dyn-clone-v1_0_19") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":dyn-clone-v1_0_19.license" ]
-}
-
-license("easy-parallel-v3_1_0.license") {
-  public_package_name = "easy_parallel"
-  license_files = [
-    "//third_party/rust_crates/vendor/easy-parallel-3.1.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/easy-parallel-3.1.0/LICENSE-MIT",
-  ]
-}
-
-rust_library("easy-parallel-v3_1_0") {
-  crate_name = "easy_parallel"
-  crate_root = "//third_party/rust_crates/vendor/easy-parallel-3.1.0/src/lib.rs"
-  output_name = "easy_parallel-87f77231f1b1949b"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=87f77231f1b1949b",
-    "-Cextra-filename=-87f77231f1b1949b",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":easy-parallel-v3_1_0.license" ]
 }
 
 license("ecb-v0_1_2.license") {

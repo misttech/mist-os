@@ -309,7 +309,6 @@ async-executor = "1.5.0"
 async-fs = "1.6.0"
 cargo_metadata = "0.18.1"
 crossterm = "0.19"
-easy-parallel = "3.1"
 fs_extra = "1.2.0"
 fuse3 = { version = "0.6.1", features = ["tokio-runtime", "unprivileged"] }
 home = "0.5.9"
