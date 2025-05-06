@@ -5,10 +5,17 @@
 mod format;
 
 use crate::format::{MetadataGeometry, METADATA_GEOMETRY_RESERVED_SIZE, PARTITION_RESERVED_BYTES};
-use anyhow::{ensure, Error};
+use anyhow::{anyhow, ensure, Error};
 use storage_device::fake_device::FakeDevice;
 use storage_device::Device;
 use zerocopy::FromBytes;
+
+fn round_up_to_alignment(x: u32, alignment: u32) -> Result<u32, Error> {
+    ensure!(alignment.count_ones() == 1, "alignment should be a power of 2");
+    alignment
+        .checked_mul(x.div_ceil(alignment))
+        .ok_or(anyhow!("overflow occurred when rounding up to nearest alignment"))
+}
 
 pub struct SuperParser {
     metadata_geometry: MetadataGeometry,
@@ -23,16 +30,17 @@ impl SuperParser {
     }
 
     async fn load_metadata_geometry(device: &FakeDevice) -> Result<MetadataGeometry, Error> {
-        // Reads must be block aligned.
+        let buffer_len =
+            round_up_to_alignment(METADATA_GEOMETRY_RESERVED_SIZE, device.block_size())?;
+        let mut buffer = device.allocate_buffer(buffer_len as usize).await;
         ensure!(
-            METADATA_GEOMETRY_RESERVED_SIZE % device.block_size() == 0,
-            "Metadata geometry is not a multiple of device block size."
+            PARTITION_RESERVED_BYTES % device.block_size() == 0,
+            "Read offsets must be block aligned."
         );
-        let mut buffer = device.allocate_buffer(METADATA_GEOMETRY_RESERVED_SIZE as usize).await;
         device.read(PARTITION_RESERVED_BYTES as u64, buffer.as_mut()).await?;
-        let full_geometry_buffer = &buffer.as_slice();
+        let full_buffer = buffer.as_slice();
         let (metadata_geometry, _remainder) =
-            MetadataGeometry::read_from_prefix(full_geometry_buffer).unwrap();
+            MetadataGeometry::read_from_prefix(full_buffer).unwrap();
         metadata_geometry.validate()?;
         Ok(metadata_geometry)
     }
