@@ -49,7 +49,7 @@ pub fn send_standard_signal(task: &Task, siginfo: SignalInfo) {
     debug_assert!(!siginfo.signal.is_real_time());
     let state = task.write();
     send_signal_prio(task, state, siginfo.into(), SignalPriority::Last, false)
-        .expect("send_signal(SignalPriority::First) is not expected to fail for standard signals.")
+        .expect("send_signal(SignalPriority::Last) is not expected to fail for standard signals.")
 }
 
 pub fn send_signal(task: &Task, siginfo: SignalInfo) -> Result<(), Errno> {
