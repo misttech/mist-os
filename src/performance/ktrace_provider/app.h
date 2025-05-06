@@ -16,6 +16,12 @@
 #include "src/performance/ktrace_provider/device_reader.h"
 #include "src/performance/ktrace_provider/log_importer.h"
 
+#ifdef EXPERIMENTAL_KTRACE_STREAMING_ENABLED
+constexpr bool kKernelStreamingSupport = EXPERIMENTAL_KTRACE_STREAMING_ENABLED;
+#else
+constexpr bool kKernelStreamingSupport = false;
+#endif
+
 namespace ktrace_provider {
 
 std::vector<trace::KnownCategory> GetKnownCategories();
@@ -28,11 +34,20 @@ struct DrainContext {
         context(context),
         poll_period(poll_period) {}
 
+  // We have a buffer allocated as part of the struct which we don't want to copy or move.
+  DrainContext(const DrainContext& other) = delete;
+  DrainContext& operator=(const DrainContext& other) = delete;
+  DrainContext(DrainContext&& other) = delete;
+  DrainContext& operator=(DrainContext&& other) = delete;
+
   static std::unique_ptr<DrainContext> Create(const zx::resource& tracing_resource,
                                               zx::duration poll_period) {
-    auto context = trace_acquire_prolonged_context();
-    if (context == nullptr) {
-      return nullptr;
+    trace_prolonged_context_t* context = nullptr;
+    if constexpr (!kKernelStreamingSupport) {
+      context = trace_acquire_prolonged_context();
+      if (context == nullptr) {
+        return nullptr;
+      }
     }
     zx::resource cloned_resource;
     zx_status_t res = tracing_resource.duplicate(ZX_RIGHT_SAME_RIGHTS, &cloned_resource);
@@ -43,7 +58,11 @@ struct DrainContext {
                                           std::move(cloned_resource), poll_period);
   }
 
-  ~DrainContext() { trace_release_prolonged_context(context); }
+  ~DrainContext() {
+    if (context != nullptr) {
+      trace_release_prolonged_context(context);
+    }
+  }
   zx::time start;
   DeviceReader reader;
   trace_prolonged_context_t* context;

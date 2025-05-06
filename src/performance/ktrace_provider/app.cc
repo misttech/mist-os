@@ -21,12 +21,6 @@
 
 #include "src/performance/ktrace_provider/device_reader.h"
 
-#ifdef EXPERIMENTAL_KTRACE_STREAMING_ENABLED
-constexpr bool kKernelStreamingSupport = EXPERIMENTAL_KTRACE_STREAMING_ENABLED;
-#else
-constexpr bool kKernelStreamingSupport = false;
-#endif
-
 namespace ktrace_provider {
 namespace {
 
@@ -240,6 +234,11 @@ zx::result<> App::UpdateState() {
 
   if (current_group_mask_ != group_mask) {
     trace_context_t* ctx = trace_acquire_context();
+    auto d = fit::defer([ctx]() {
+      if (ctx != nullptr) {
+        trace_release_context(ctx);
+      }
+    });
 
     if (zx::result res = StopKTrace(); res.is_error()) {
       return res.take_error();
@@ -248,10 +247,6 @@ zx::result<> App::UpdateState() {
             StartKTrace(group_mask, trace_context_get_buffering_mode(ctx), retain_current_data);
         res.is_error()) {
       return res.take_error();
-    }
-
-    if (ctx != nullptr) {
-      trace_release_context(ctx);
     }
   }
 
@@ -319,7 +314,11 @@ void DrainBuffer(std::unique_ptr<DrainContext> drain_context) {
   }
 
   trace_context_t* buffer_context = trace_acquire_context();
-  auto d = fit::defer([buffer_context]() { trace_release_context(buffer_context); });
+  auto d = fit::defer([buffer_context]() {
+    if (buffer_context != nullptr) {
+      trace_release_context(buffer_context);
+    }
+  });
   for (std::optional<uint64_t> fxt_header = drain_context->reader.PeekNextHeader();
        fxt_header.has_value(); fxt_header = drain_context->reader.PeekNextHeader()) {
     size_t record_size_bytes = fxt::RecordFields::RecordSize::Get<size_t>(*fxt_header) * 8;
