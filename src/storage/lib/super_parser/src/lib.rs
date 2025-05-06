@@ -4,8 +4,11 @@
 
 mod format;
 
-use crate::format::{MetadataGeometry, METADATA_GEOMETRY_RESERVED_SIZE, PARTITION_RESERVED_BYTES};
+use crate::format::{
+    MetadataGeometry, MetadataHeader, METADATA_GEOMETRY_RESERVED_SIZE, PARTITION_RESERVED_BYTES,
+};
 use anyhow::{anyhow, ensure, Error};
+use sha2::Digest;
 use storage_device::fake_device::FakeDevice;
 use storage_device::Device;
 use zerocopy::FromBytes;
@@ -19,17 +22,33 @@ fn round_up_to_alignment(x: u32, alignment: u32) -> Result<u32, Error> {
 
 pub struct SuperParser {
     metadata_geometry: MetadataGeometry,
-    // TODO(https://fxbug.dev/404952286): parse Metadata header
+    metadata_header: MetadataHeader,
+    // TODO(https://fxbug.dev/404952286): parse partitions, extents, groups, and block devices.
 }
 
 impl SuperParser {
     pub async fn open_device(device: FakeDevice) -> Result<Self, Error> {
-        let metadata_geometry = Self::load_metadata_geometry(&device).await.unwrap();
-        let this = Self { metadata_geometry };
+        let metadata_geometry = Self::parse_metadata_geometry(&device).await.unwrap();
+        let metadata_header = Self::parse_metadata_header(&device).await.unwrap();
+
+        // Now that we have more information on the tables, validate table-specific fields.
+        ensure!(
+            metadata_header.tables_size <= metadata_geometry.metadata_max_size,
+            "Invalid tables size."
+        );
+        // Read tables to verify `table_checksum` in metadata_header.
+        let computed_tables_checksum =
+            Self::compute_tables_checksum(&device, &metadata_header).await.unwrap();
+        ensure!(
+            computed_tables_checksum == metadata_header.tables_checksum,
+            "Invalid metadata tables checksum"
+        );
+
+        let this = Self { metadata_geometry, metadata_header };
         Ok(this)
     }
 
-    async fn load_metadata_geometry(device: &FakeDevice) -> Result<MetadataGeometry, Error> {
+    async fn parse_metadata_geometry(device: &FakeDevice) -> Result<MetadataGeometry, Error> {
         let buffer_len =
             round_up_to_alignment(METADATA_GEOMETRY_RESERVED_SIZE, device.block_size())?;
         let mut buffer = device.allocate_buffer(buffer_len as usize).await;
@@ -43,6 +62,45 @@ impl SuperParser {
             MetadataGeometry::read_from_prefix(full_buffer).unwrap();
         metadata_geometry.validate()?;
         Ok(metadata_geometry)
+    }
+
+    async fn parse_metadata_header(device: &FakeDevice) -> Result<MetadataHeader, Error> {
+        // Reads must be block aligned.
+        let metadata_header_offset = PARTITION_RESERVED_BYTES + 2 * METADATA_GEOMETRY_RESERVED_SIZE;
+        ensure!(metadata_header_offset % device.block_size() == 0, "Reads must be block aligned.");
+        let buffer_len = round_up_to_alignment(
+            std::mem::size_of::<MetadataHeader>() as u32,
+            device.block_size(),
+        )?;
+        let mut buffer = device.allocate_buffer(buffer_len as usize).await;
+        device.read(metadata_header_offset as u64, buffer.as_mut()).await?;
+
+        let full_buffer = buffer.as_slice();
+        let (mut metadata_header, _remainder) =
+            MetadataHeader::read_from_prefix(full_buffer).unwrap();
+        // Validation will also check if the header is an older version, and if so, will zero the
+        // fields in `MetadataHeader` that did not exist in the older version.
+        metadata_header.validate()?;
+        Ok(metadata_header)
+    }
+
+    async fn compute_tables_checksum(
+        device: &FakeDevice,
+        metadata_header: &MetadataHeader,
+    ) -> Result<[u8; 32], Error> {
+        // Reads should be block aligned. The start of the tables may not be block aligned, however,
+        // the start of the metadata header should be. Note that a backup metadata geometry is
+        // stored right after the initial metadata geometry.
+        let metadata_header_offset = PARTITION_RESERVED_BYTES + 2 * METADATA_GEOMETRY_RESERVED_SIZE;
+        ensure!(metadata_header_offset % device.block_size() == 0, "Reads must be block aligned.");
+        let header_and_tables_size = metadata_header.header_size + metadata_header.tables_size;
+        let buffer_len = round_up_to_alignment(header_and_tables_size, device.block_size())?;
+        let mut buffer = device.allocate_buffer(buffer_len as usize).await;
+        device.read(metadata_header_offset as u64, buffer.as_mut()).await?;
+
+        let tables_bytes = &buffer.as_slice()
+            [metadata_header.header_size as usize..header_and_tables_size as usize];
+        Ok(sha2::Sha256::digest(tables_bytes).into())
     }
 }
 #[cfg(test)]
@@ -58,7 +116,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_parsing_metadata_geometry() {
+    async fn test_parsing_metadata() {
         let golden = std::path::Path::new("/pkg/data/simple_super.img.zstd");
         let device = open_image(golden);
 
@@ -68,5 +126,8 @@ mod tests {
         let metadata_slot_count = super_partition.metadata_geometry.metadata_slot_count;
         assert_eq!(max_size, 65536);
         assert_eq!(metadata_slot_count, 1);
+
+        let num_partition_entries = super_partition.metadata_header.partitions.num_entries;
+        assert_eq!(num_partition_entries, 2);
     }
 }
