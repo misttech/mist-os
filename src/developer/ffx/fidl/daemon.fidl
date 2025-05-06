@@ -29,6 +29,9 @@ type DaemonError = strict enum {
     /// while the daaemon is actively shutting down, and should be extremely
     /// rare.
     BAD_PROTOCOL_REGISTER_STATE = 12;
+    /// Similar to timeout, but this is reached when awaiting for a device
+    /// to shut down.
+    SHUTDOWN_TIMEOUT = 13;
 };
 
 @discoverable

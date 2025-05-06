@@ -333,9 +333,17 @@ async fn wait_for_device_inner(
     };
     futures_lite::FutureExt::or(knock_fut, async {
         timer.await;
-        Err(ffx_command_error::Error::User(
-            FfxTargetError::DaemonError { err: DaemonError::Timeout, target: target_spec }.into(),
-        ))
+        Err(ffx_command_error::Error::User(match behavior {
+            WaitFor::DeviceOnline => {
+                FfxTargetError::DaemonError { err: DaemonError::Timeout, target: target_spec }
+                    .into()
+            }
+            WaitFor::DeviceOffline => FfxTargetError::DaemonError {
+                err: DaemonError::ShutdownTimeout,
+                target: target_spec,
+            }
+            .into(),
+        }))
     })
     .await
 }
@@ -868,6 +876,32 @@ mod test {
         )
         .await;
         assert!(res.is_ok(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn wait_for_device_timeout_on_shutdown() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().returning(|_, _| Box::pin(pending()));
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(5)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOffline,
+        )
+        .await;
+        // This step is essential for converting the error properly. Otherwise converting it to top
+        // level anyhow error will lost context and turn the error into a string, making
+        // downcasting infeasible.
+        let anyhow_err: anyhow::Error =
+            res.unwrap_err().source().expect("should have an anyhow error source");
+        let FfxTargetError::DaemonError { err, .. } =
+            anyhow_err.downcast_ref::<FfxTargetError>().expect("expected target error")
+        else {
+            panic!("Received unexpected error: {anyhow_err:?}");
+        };
+        assert!(matches!(err, DaemonError::ShutdownTimeout));
     }
 
     #[fuchsia::test]

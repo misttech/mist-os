@@ -27,6 +27,7 @@ pub enum FfxTargetError {
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", match .err {
             DaemonError::Timeout => format!("Timeout attempting to reach target {}", target_string(.target)),
+            DaemonError::ShutdownTimeout => format!("Timeout waiting for device to shutdown. Device {} is still responsive.", target_string(.target)),
             DaemonError::TargetCacheEmpty => format!("No devices found."),
             DaemonError::TargetAmbiguous => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific target query.", target_string(.target)),
             DaemonError::TargetNotFound => format!("Target {} was not found.", target_string(.target)),
