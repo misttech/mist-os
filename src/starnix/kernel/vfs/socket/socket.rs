@@ -574,6 +574,7 @@ impl Socket {
             Ok(if duration == zx::MonotonicDuration::default() { None } else { Some(duration) })
         };
 
+        security::check_socket_setsockopt_access(current_task, self, level, optname)?;
         match level {
             SOL_SOCKET => match optname {
                 SO_RCVTIMEO => self.state.lock().receive_timeout = read_timeval()?,
@@ -610,6 +611,7 @@ impl Socket {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut locked = locked.cast_locked::<FileOpsCore>();
+        security::check_socket_getsockopt_access(current_task, self, level, optname)?;
         let value = match level {
             SOL_SOCKET => match optname {
                 SO_TYPE => self.socket_type.as_raw().to_ne_bytes().to_vec(),
@@ -1115,7 +1117,7 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        security::check_socket_listen_access(current_task, self)?;
+        security::check_socket_listen_access(current_task, self, backlog)?;
         let max_connections =
             current_task.kernel().system_limits.socket.max_connections.load(Ordering::Relaxed);
         let backlog = std::cmp::min(backlog, max_connections);

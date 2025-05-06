@@ -276,6 +276,7 @@ pub(in crate::security) fn check_socket_listen_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     socket: &Socket,
+    _backlog: i32,
 ) -> Result<(), Errno> {
     let Some(socket_node) = socket.fs_node() else {
         track_stub!(
@@ -297,6 +298,68 @@ pub(in crate::security) fn check_socket_listen_access(
         current_sid,
         &socket_node,
         CommonSocketPermission::Listen.for_class(socket_class),
+        current_task.into(),
+    )
+}
+
+/// Checks that `current_task` has permission to get socket options on `socket`.
+pub(in crate::security) fn check_socket_getsockopt_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    socket: &Socket,
+    _level: u32,
+    _optname: u32,
+) -> Result<(), Errno> {
+    let Some(socket_node) = socket.fs_node() else {
+        track_stub!(
+            TODO("https://fxbug.dev/414583985"),
+            "check_socket_getsockopt_access without FsNode"
+        );
+        return Ok(());
+    };
+    let current_sid = current_task.security_state.lock().current_sid;
+    let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
+        panic!("check_socket_getsockopt_access called for non-Socket class")
+    };
+
+    todo_has_socket_permission(
+        TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_getsockopt checks."),
+        &security_server.as_permission_check(),
+        current_task.kernel(),
+        current_sid,
+        &socket_node,
+        CommonSocketPermission::GetOpt.for_class(socket_class),
+        current_task.into(),
+    )
+}
+
+/// Checks that `current_task` has permission to set socket options on `socket`.
+pub(in crate::security) fn check_socket_setsockopt_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    socket: &Socket,
+    _level: u32,
+    _optname: u32,
+) -> Result<(), Errno> {
+    let Some(socket_node) = socket.fs_node() else {
+        track_stub!(
+            TODO("https://fxbug.dev/414583985"),
+            "check_socket_setsockopt_access without FsNode"
+        );
+        return Ok(());
+    };
+    let current_sid = current_task.security_state.lock().current_sid;
+    let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
+        panic!("check_socket_setsockopt_access called for non-Socket class")
+    };
+
+    todo_has_socket_permission(
+        TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_setsockopt checks."),
+        &security_server.as_permission_check(),
+        current_task.kernel(),
+        current_sid,
+        &socket_node,
+        CommonSocketPermission::SetOpt.for_class(socket_class),
         current_task.into(),
     )
 }

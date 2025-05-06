@@ -769,10 +769,14 @@ common_permission_enum! {
         Bind("bind"),
         /// Permission to initiate a connection.
         Connect("connect"),
+        /// Permission to get socket options.
+        GetOpt("getopt"),
         /// Permission to listen for connections.
         Listen("listen"),
         /// Permission to send datagrams to the socket.
         SendTo("sendto"),
+        /// Permission to set socket options.
+        SetOpt("setopt"),
         /// Permission to terminate connection.
         Shutdown("shutdown"),
         // keep-sorted end

@@ -945,10 +945,56 @@ pub fn check_socket_connect_access(
 pub fn check_socket_listen_access(
     current_task: &CurrentTask,
     socket: &Socket,
+    backlog: i32,
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_socket_listen_access");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::socket::check_socket_listen_access(&security_server, current_task, socket)
+        selinux_hooks::socket::check_socket_listen_access(
+            &security_server,
+            current_task,
+            socket,
+            backlog,
+        )
+    })
+}
+
+/// Checks if the `current_task` is allowed to get socket options on `socket`.
+/// Corresponds to the `socket_getsockopt()` LSM hook.
+pub fn check_socket_getsockopt_access(
+    current_task: &CurrentTask,
+    socket: &Socket,
+    level: u32,
+    optname: u32,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_getsockopt_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_getsockopt_access(
+            &security_server,
+            current_task,
+            socket,
+            level,
+            optname,
+        )
+    })
+}
+
+/// Checks if the `current_task` is allowed to set socket options on `socket`.
+/// Corresponds to the `socket_getsockopt()` LSM hook.
+pub fn check_socket_setsockopt_access(
+    current_task: &CurrentTask,
+    socket: &Socket,
+    level: u32,
+    optname: u32,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_setsockopt_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_setsockopt_access(
+            &security_server,
+            current_task,
+            socket,
+            level,
+            optname,
+        )
     })
 }
 
