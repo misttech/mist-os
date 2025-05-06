@@ -34,7 +34,7 @@ them on CI/CQ is somewhat difficult now because of the dependency on
 `scipy`, so for now the tests must be run manually, with:
 
 ```sh
-fuchsia-vendored-python src/testing/perfcompare/perfcompare_test.py
+python3 src/testing/perfcompare/perfcompare_test.py
 ```
 
 ## Example: Running perf tests locally and comparing results
@@ -58,7 +58,7 @@ git checkout BEFORE_VERSION
 fx set terminal.x64 --with //bundles/buildbot/terminal
 fx build
 fx update
-python src/testing/perfcompare/perfcompare.py run_local \
+python3 src/testing/perfcompare/perfcompare.py run_local \
   --boots=5 \
   --iter_cmd='fx test --e2e rust_inspect_benchmarks_test' \
   --iter_file='out/test_out/*/*.fuchsiaperf.json' \
@@ -72,7 +72,7 @@ results dataset in a different directory, `perf_results_after`:
 git checkout AFTER_VERSION
 fx build
 fx update
-fuchsia-vendored-python src/testing/perfcompare/perfcompare.py run_local \
+python3 src/testing/perfcompare/perfcompare.py run_local \
   --boots=5 \
   --iter_cmd='fx test --e2e rust_inspect_benchmarks_test' \
   --iter_file='out/test_out/*/*.fuchsiaperf.json' \
@@ -86,5 +86,5 @@ which prints a table showing the "before" and "after" results side by
 side:
 
 ```sh
-fuchsia-vendored-python src/testing/perfcompare/perfcompare.py compare_perf perf_results_before perf_results_after
+python3 src/testing/perfcompare/perfcompare.py compare_perf perf_results_before perf_results_after
 ```
