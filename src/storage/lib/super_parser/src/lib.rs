@@ -33,6 +33,7 @@ impl SuperParser {
         let full_geometry_buffer = &buffer.as_slice();
         let (metadata_geometry, _remainder) =
             MetadataGeometry::read_from_prefix(full_geometry_buffer).unwrap();
+        metadata_geometry.validate()?;
         Ok(metadata_geometry)
     }
 }

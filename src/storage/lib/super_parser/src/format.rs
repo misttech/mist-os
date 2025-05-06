@@ -19,7 +19,7 @@ pub const METADATA_GEOMETRY_RESERVED_SIZE: u32 = 4096;
 pub struct MetadataGeometry {
     /// Magic number. Should be METADATA_GEOMETRY_MAGIC.
     pub magic: u32,
-    /// Size of the metadata geometry size in bytes. Should be 4096 bytes.
+    /// Size of the metadata geometry size in bytes.
     pub struct_size: u32,
     /// SHA256 checksum of this struct, with this field set to 0.
     pub checksum: [u8; 32],
@@ -44,7 +44,7 @@ impl MetadataGeometry {
     pub fn validate(&self) -> Result<(), Error> {
         ensure!(self.magic == METADATA_GEOMETRY_MAGIC, "Invalid metadata geometry magic.");
         ensure!(
-            self.struct_size == METADATA_GEOMETRY_RESERVED_SIZE,
+            self.struct_size == std::mem::size_of::<MetadataGeometry>() as u32,
             "Invalid metadata geometry struct size."
         );
         ensure!(self.checksum == self.compute_checksum(), "Invalid metadata geometry checksum.");
@@ -67,7 +67,7 @@ mod tests {
 
     const VALID_METADATA_GEOMETRY_BEFORE_COMPUTING_CHECKSUM: MetadataGeometry = MetadataGeometry {
         magic: METADATA_GEOMETRY_MAGIC,
-        struct_size: METADATA_GEOMETRY_RESERVED_SIZE,
+        struct_size: std::mem::size_of::<MetadataGeometry>() as u32,
         checksum: [0; 32],
         metadata_max_size: 6 * SECTOR_SIZE,
         metadata_slot_count: 2,
