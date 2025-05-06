@@ -267,7 +267,7 @@ func execute(
 	}
 
 	var finalError error
-	if err := runAndOutputTests(ctx, tests, testerForTest, outputs, outDir); err != nil {
+	if err := runAndOutputTests(ctx, tests, testerForTest, outputs, outDir, fuchsiaTester); err != nil {
 		finalError = err
 	}
 
@@ -381,6 +381,7 @@ func runAndOutputTests(
 	testerForTest func(testsharder.Test) (Tester, *[]runtests.DataSinkReference, error),
 	outputs *TestOutputs,
 	globalOutDir string,
+	fuchsiaTester Tester,
 ) error {
 	// Since only a single goroutine writes to and reads from the queue it would
 	// be more appropriate to use a true Queue data structure, but we'd need to
@@ -403,8 +404,8 @@ func runAndOutputTests(
 	againstDevice := (os.Getenv(botanistconstants.NodenameEnvKey) != targets.DefaultEmulatorNodename &&
 		os.Getenv(botanistconstants.NodenameEnvKey) != "")
 	for len(testQueue) > 0 {
-		if shouldRunHealthCheck {
-			if err := runHealthCheck(ctx); err != nil {
+		if shouldRunHealthCheck && fuchsiaTester != nil {
+			if err := runHealthCheck(ctx, fuchsiaTester); err != nil {
 				// Device is in a bad state and cannot run any more tests,
 				// so fail and return early.
 				return fmt.Errorf("failed to run health check: %w", err)
@@ -491,37 +492,27 @@ func retryOnConnectionFailure(ctx context.Context, t Tester, execFunc func() err
 	}, nil)
 }
 
-func runHealthCheck(ctx context.Context) error {
-	cmd := []string{
-		os.Getenv(constants.DMCPathEnvKey),
-		"health-check",
-		os.Getenv(botanistconstants.NodenameEnvKey),
+func runHealthCheck(ctx context.Context, t Tester) error {
+	if err := t.Reconnect(ctx); err == nil {
+		return nil
 	}
 	r := &subprocess.Runner{Env: os.Environ()}
-	state, err := getState(ctx, r, cmd)
-	if err != nil {
-		return fmt.Errorf("failed to get dms state: %w", err)
+	if err := setPowerState(ctx, r, "cycle"); err != nil {
+		return fmt.Errorf("failed to power cycle target: %w", err)
 	}
-	if state != "fuchsia" {
-		return fmt.Errorf("got dms state: %s", state)
-	}
-	return nil
+	return t.Reconnect(ctx)
 }
 
-func getState(ctx context.Context, r *subprocess.Runner, cmd []string) (string, error) {
-	var output bytes.Buffer
-	if err := r.Run(ctx, cmd, subprocess.RunOptions{Stdout: &output}); err != nil {
-		return "", fmt.Errorf("failed to run health check: %w", err)
+func setPowerState(ctx context.Context, r *subprocess.Runner, state string) error {
+	cmd := []string{
+		os.Getenv(constants.DMCPathEnvKey),
+		"set-power-state",
+		"--nodename",
+		os.Getenv(botanistconstants.NodenameEnvKey),
+		"--state",
+		state,
 	}
-	logger.Debugf(ctx, output.String())
-	var jsonOutput []map[string]string
-	if err := json.Unmarshal(output.Bytes(), &jsonOutput); err != nil {
-		return "", err
-	}
-	if len(jsonOutput) != 1 {
-		return "", fmt.Errorf("expected status for one device, got %v", jsonOutput)
-	}
-	return jsonOutput[0]["dms_state"], nil
+	return r.Run(ctx, cmd, subprocess.RunOptions{})
 }
 
 // shouldKeepGoing returns whether we should schedule another run of the test.
