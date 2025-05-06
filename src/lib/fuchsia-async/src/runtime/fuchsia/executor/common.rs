@@ -13,11 +13,11 @@ use zx::BootDuration;
 
 use std::any::Any;
 use std::cell::{Cell, RefCell};
+use std::fmt;
 use std::future::Future;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::Context;
-use std::{fmt, u64, usize};
 
 pub(crate) const TASK_READY_WAKEUP_ID: u64 = u64::MAX - 1;
 
@@ -405,9 +405,9 @@ impl Executor {
     /// patterns in fuchsia-async that may come to change:
     ///
     /// - Executor vends strong references to itself and those references are *stored* by most
-    /// receiver implementations (as opposed to reached out on TLS every time).
+    ///   receiver implementations (as opposed to reached out on TLS every time).
     /// - Fuchsia-async objects return zx::Status on wait calls, there isn't an appropriate and
-    /// easy to understand error to return when polling on an extinct executor.
+    ///   easy to understand error to return when polling on an extinct executor.
     /// - All receivers are implemented in this crate and well-known.
     ///
     /// [1]: https://docs.rs/tokio/1.5.0/tokio/runtime/struct.Runtime.html#method.enter
@@ -426,7 +426,7 @@ impl Executor {
         root_scope.drop_all_tasks();
 
         // Drop all of the uncompleted tasks
-        while let Some(_) = self.ready_tasks.pop() {}
+        while self.ready_tasks.pop().is_some() {}
 
         // Unregister the timer receivers so that we can perform the check below.
         self.receivers.lock().remove(self.monotonic_timers.port_key());
@@ -701,7 +701,7 @@ impl EHandle {
 
     #[inline(always)]
     pub(crate) fn inner(&self) -> &Arc<Executor> {
-        &self.root_scope.executor()
+        self.root_scope.executor()
     }
 
     pub(crate) fn deregister_receiver(&self, key: u64) {

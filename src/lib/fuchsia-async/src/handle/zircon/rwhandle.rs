@@ -331,7 +331,7 @@ mod tests {
         // Clear optimistic readable state
         assert!(rx_rw_handle.need_readable(&mut noop_ctx).is_pending());
         // Starting state: the channel is not closed (because we haven't closed it yet)
-        assert_eq!(rx_rw_handle.is_closed(), false);
+        assert!(!rx_rw_handle.is_closed());
         // we will never set readable, so this should be Pending until we close
         assert_eq!(rx_rw_handle.poll_readable(&mut noop_ctx), Poll::Pending);
 
@@ -340,7 +340,7 @@ mod tests {
         // Implementation note: the cached state will not be updated yet
         assert_eq!(rx_rw_handle.poll_readable(&mut noop_ctx), Poll::Pending);
         // But is_closed should return true immediately
-        assert_eq!(rx_rw_handle.is_closed(), true);
+        assert!(rx_rw_handle.is_closed());
         // Still not updated, and won't be until we let the executor process port packets
         assert_eq!(rx_rw_handle.poll_readable(&mut noop_ctx), Poll::Pending);
         // So we do
@@ -351,6 +351,6 @@ mod tests {
             Poll::Ready(Ok(ReadableState::MaybeReadableAndClosed))
         );
         // And is_closed should still be true, of course.
-        assert_eq!(rx_rw_handle.is_closed(), true);
+        assert!(rx_rw_handle.is_closed());
     }
 }

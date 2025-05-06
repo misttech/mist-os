@@ -11,7 +11,7 @@ pub struct UdpSocket(AsyncUdpSocket);
 
 impl UdpSocket {
     pub fn bind(addr: &SocketAddr) -> Result<UdpSocket> {
-        Ok(UdpSocket::from_socket(StdUdpSocket::bind(addr)?)?)
+        UdpSocket::from_socket(StdUdpSocket::bind(addr)?)
     }
 
     pub fn from_socket(socket: StdUdpSocket) -> Result<UdpSocket> {

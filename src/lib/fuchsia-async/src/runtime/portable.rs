@@ -244,6 +244,12 @@ pub mod executor {
     /// (as the underlying executor is not yet capable of this).
     pub struct LocalExecutor(Rc<LocalSet>);
 
+    impl Default for LocalExecutor {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl LocalExecutor {
         /// Create a new executor.
         pub fn new() -> Self {
@@ -283,6 +289,12 @@ pub mod executor {
     /// (as the underlying executor is not yet capable of this).
     pub struct TestExecutor {
         executor: LocalExecutor,
+    }
+
+    impl Default for TestExecutor {
+        fn default() -> Self {
+            Self::new()
+        }
     }
 
     impl TestExecutor {
@@ -355,7 +367,7 @@ pub mod timer {
 
     impl From<crate::MonotonicInstant> for Timer {
         fn from(instant: crate::MonotonicInstant) -> Self {
-            Timer { inner: None, deadline: instant.into() }
+            Timer { inner: None, deadline: instant }
         }
     }
 

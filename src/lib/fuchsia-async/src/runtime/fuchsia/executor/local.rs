@@ -39,6 +39,12 @@ impl fmt::Debug for LocalExecutor {
     }
 }
 
+impl Default for LocalExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LocalExecutor {
     /// Create a new single-threaded executor running with actual time.
     pub fn new() -> Self {
@@ -136,6 +142,12 @@ impl Drop for LocalExecutor {
 pub struct TestExecutor {
     /// LocalExecutor used under the hood, since most of the logic is shared.
     local: LocalExecutor,
+}
+
+impl Default for TestExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TestExecutor {
@@ -399,7 +411,7 @@ struct UntilStalledData {
 fn with_data<R>(f: impl Fn(&mut UntilStalledData) -> R) -> R {
     const MESSAGE: &str = "poll_until_stalled only works if the executor is being run \
                            with TestExecutor::run_until_stalled";
-    f(&mut EHandle::local()
+    f(EHandle::local()
         .inner()
         .owner_data
         .lock()
@@ -417,6 +429,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures::StreamExt;
     use std::cell::{Cell, RefCell};
+    use std::rc::Rc;
     use std::task::Waker;
     use zx::{self as zx, AsHandleRef};
 
@@ -427,8 +440,8 @@ mod tests {
     // Runs a future that suspends and returns after being resumed.
     #[test]
     fn stepwise_two_steps() {
-        let fut_step = Arc::new(Cell::new(0));
-        let fut_waker: Arc<RefCell<Option<Waker>>> = Arc::new(RefCell::new(None));
+        let fut_step = Rc::new(Cell::new(0));
+        let fut_waker: Rc<RefCell<Option<Waker>>> = Rc::new(RefCell::new(None));
         let fut_waker_clone = fut_waker.clone();
         let fut_step_clone = fut_step.clone();
         let fut_fn = move |cx: &mut Context<'_>| {
@@ -508,7 +521,7 @@ mod tests {
         // The timer in `spawned_fut` should fire first, then the
         // timer in `main_fut`.
         assert_eq!(executor.run_until_stalled(&mut main_fut), Poll::Ready(()));
-        assert_eq!(spawned_fut_completed.load(Ordering::SeqCst), true);
+        assert!(spawned_fut_completed.load(Ordering::SeqCst));
     }
 
     #[test]
@@ -538,9 +551,8 @@ mod tests {
             });
         });
         assert!(executor.run_until_stalled(&mut main_fut).is_ready());
-        assert_eq!(
-            dropped.load(Ordering::SeqCst),
-            false,
+        assert!(
+            !dropped.load(Ordering::SeqCst),
             "executor dropped pending task before destruction"
         );
 
@@ -549,9 +561,8 @@ mod tests {
         drop(executor);
         let dropped = Arc::get_mut(&mut dropped)
             .expect("someone else is unexpectedly still holding on to a reference");
-        assert_eq!(
+        assert!(
             dropped.load(Ordering::SeqCst),
-            true,
             "executor did not drop pending task during destruction"
         );
     }
@@ -695,7 +706,7 @@ mod tests {
                     // Interval timer, fires periodically.
                     let mut fired = 0;
                     let mut interval = pin!(Interval::new(zx::MonotonicDuration::from_seconds(1)));
-                    while let Some(_) = interval.next().await {
+                    while interval.next().await.is_some() {
                         fired += 1;
                         if fired == 3 {
                             break;

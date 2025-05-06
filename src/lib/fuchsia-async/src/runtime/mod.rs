@@ -93,6 +93,7 @@ impl WakeupTime for zx::BootDuration {
 }
 
 impl DurationExt for std::time::Duration {
+    #[allow(clippy::useless_conversion)] // Conversion is optionally needed on Fuchsia.
     fn after_now(self) -> MonotonicInstant {
         MonotonicInstant::now() + self.into()
     }
@@ -281,10 +282,10 @@ mod task_tests {
             let (_tx_start, rx_start) = oneshot::channel::<()>();
             let (tx_done, rx_done) = oneshot::channel();
             // Start and immediately cancel the task (by dropping it).
-            let _ = Task::spawn(async move {
+            drop(Task::spawn(async move {
                 rx_start.await.unwrap();
                 tx_done.send(()).unwrap();
-            });
+            }));
             // we should see an error on receive
             rx_done.await.expect_err("done should not be sent");
         })

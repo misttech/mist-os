@@ -27,6 +27,12 @@ pub struct Scope {
     inner: ScopeHandle,
 }
 
+impl Default for Scope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Scope {
     /// Returns a new scope that is a child of the root scope of the executor.
     pub fn new() -> Self {
@@ -201,7 +207,7 @@ impl ScopeHandle {
         let mut wakers = Vec::new();
         {
             let mut state = self.inner.state.lock();
-            for (_, (_, waker)) in &mut state.all_tasks {
+            for (_, waker) in state.all_tasks.values_mut() {
                 wakers.extend(waker.take());
             }
         }
@@ -281,7 +287,7 @@ mod tests {
                 assert!(futures::poll!(&mut on_no_tasks).is_pending());
             }
 
-            let _ = task2.abort();
+            drop(task2.abort());
 
             let on_no_tasks2 = pin!(scope.on_no_tasks());
             let on_no_tasks3 = pin!(scope.on_no_tasks());

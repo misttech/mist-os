@@ -45,7 +45,6 @@ impl UdpSocket {
     pub fn from_socket(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         let socket: socket2::Socket = socket.into();
         socket.set_nonblocking(true)?;
-        let socket = socket.into();
         let evented_fd = unsafe { EventedFd::new(socket)? };
         Ok(UdpSocket(DatagramSocket(evented_fd)))
     }

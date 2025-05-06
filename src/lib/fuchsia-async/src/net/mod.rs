@@ -54,7 +54,7 @@ mod udp_tests {
         let mut exec = TestExecutor::new();
 
         let fut = async move {
-            let socket_addr = std::net::SocketAddr::new(addr.into(), 0);
+            let socket_addr = std::net::SocketAddr::new(addr, 0);
             let client_socket =
                 UdpSocket::bind(&socket_addr).expect("could not create client socket");
             let server_socket =

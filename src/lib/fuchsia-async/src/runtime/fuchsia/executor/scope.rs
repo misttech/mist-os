@@ -77,6 +77,12 @@ pub struct Scope {
     // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
 }
 
+impl Default for Scope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Scope {
     /// Create a new scope.
     ///
@@ -277,7 +283,7 @@ impl Deref for Scope {
 
 impl Borrow<ScopeHandle> for Scope {
     fn borrow(&self) -> &ScopeHandle {
-        &*self
+        self
     }
 }
 
@@ -401,7 +407,7 @@ impl ScopeHandle {
                 executor: self.inner.executor.clone(),
                 state: Condition::new(ScopeState::new_child(
                     self.clone(),
-                    &*state,
+                    &state,
                     JoinResults::default().into(),
                 )),
                 name,
@@ -641,7 +647,7 @@ impl<R: Send + 'static> ScopeStream<R> {
                     executor: handle.executor().clone(),
                     state: Condition::new(ScopeState::new_child(
                         handle.clone(),
-                        &*state,
+                        &state,
                         Box::new(ResultsStream { inner: Arc::clone(&stream) }),
                     )),
                     name,
@@ -708,7 +714,7 @@ impl<R> Deref for ScopeStream<R> {
 
 impl<R> Borrow<ScopeHandle> for ScopeStream<R> {
     fn borrow(&self) -> &ScopeHandle {
-        &*self
+        self
     }
 }
 
@@ -1417,7 +1423,7 @@ impl Borrow<PtrKey> for WeakScopeHandle {
 
 impl PartialEq for PtrKey {
     fn eq(&self, other: &Self) -> bool {
-        self as *const _ == other as *const _
+        std::ptr::eq(self, other)
     }
 }
 
@@ -1610,7 +1616,10 @@ mod tests {
 
         fn as_future(self: &Arc<Self>) -> impl Future<Output = ()> {
             let this = Arc::clone(self);
-            async move { (&*this).await }
+            #[allow(clippy::redundant_async_block)] // Allow returning `&*this` out of this fn.
+            async move {
+                (&*this).await
+            }
         }
     }
 
@@ -1739,7 +1748,7 @@ mod tests {
         let mut join = pin!(scope.join().fuse());
         let _ = executor.run_until_stalled(&mut join);
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(1));
-        let _ = task2.abort();
+        drop(task2.abort());
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
     }
 
@@ -2136,7 +2145,7 @@ mod tests {
 
         assert!(executor.run_until_stalled(&mut on_no_tasks).is_pending());
 
-        let _ = task2.abort();
+        drop(task2.abort());
 
         let on_no_tasks2 = pin!(scope.on_no_tasks());
         let on_no_tasks3 = pin!(scope.on_no_tasks());
@@ -2247,10 +2256,10 @@ mod tests {
             // First, just drop the task.
             {
                 let ref_count = ref_count.clone();
-                let _ = Task::spawn(async move {
+                drop(Task::spawn(async move {
                     let _ref_count = ref_count;
                     let _: () = std::future::pending().await;
-                });
+                }));
             }
 
             while Arc::strong_count(&ref_count) != 1 {
@@ -2477,11 +2486,11 @@ mod tests {
     fn test_scope_stream_collect() {
         let mut executor = SendExecutor::new(2);
         executor.run(async move {
-            let stream: ScopeStream<_> = (0..10).into_iter().map(|i| async move { i }).collect();
+            let stream: ScopeStream<_> = (0..10).map(|i| async move { i }).collect();
             assert_eq!(stream.collect::<HashSet<u32>>().await, HashSet::from_iter(0..10));
 
             let stream: ScopeStream<_> =
-                (0..10).into_iter().map(|i| SpawnableFuture::new(async move { i })).collect();
+                (0..10).map(|i| SpawnableFuture::new(async move { i })).collect();
             assert_eq!(stream.collect::<HashSet<u32>>().await, HashSet::from_iter(0..10));
         });
     }
@@ -2594,7 +2603,8 @@ mod tests {
         let handle = scope.to_handle();
         let mut join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Pending);
-        let _: Join<_> = handle.cancel();
+        let cancel: Join<_> = handle.cancel();
+        drop(cancel);
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
     }
 

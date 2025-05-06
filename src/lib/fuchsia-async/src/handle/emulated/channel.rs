@@ -108,6 +108,7 @@ impl Channel {
     ///
     /// It is important to remember to check the `Ok(_)` result for potential errors, like
     /// `PEER_CLOSED`, for example.
+    #[allow(clippy::type_complexity)]
     pub fn read_raw(
         &self,
         cx: &mut Context<'_>,
@@ -234,13 +235,13 @@ mod test {
 
             let mut rx = b.recv_msg(&mut buf);
             assert_eq!(Pin::new(&mut rx).poll(&mut cx), std::task::Poll::Pending);
-            a.write(&[1, 2, 3], &mut vec![]).unwrap();
+            a.write(&[1, 2, 3], &mut []).unwrap();
             rx.await.unwrap();
             assert_eq!(buf.bytes(), &[1, 2, 3]);
 
             let mut rx = a.recv_msg(&mut buf);
             assert!(Pin::new(&mut rx).poll(&mut cx).is_pending());
-            b.write(&[1, 2, 3], &mut vec![]).unwrap();
+            b.write(&[1, 2, 3], &mut []).unwrap();
             rx.await.unwrap();
             assert_eq!(buf.bytes(), &[1, 2, 3]);
         })
@@ -257,7 +258,7 @@ mod test {
 
             let mut rx = b.recv_etc_msg(&mut buf);
             assert_eq!(Pin::new(&mut rx).poll(&mut cx), std::task::Poll::Pending);
-            a.write_etc(&[1, 2, 3], &mut vec![]).unwrap();
+            a.write_etc(&[1, 2, 3], &mut []).unwrap();
             rx.await.unwrap();
             assert_eq!(buf.bytes(), &[1, 2, 3]);
 
@@ -266,7 +267,7 @@ mod test {
             let (c, _) = Channel::create();
             b.write_etc(
                 &[1, 2, 3],
-                &mut vec![HandleDisposition {
+                &mut [HandleDisposition {
                     handle_op: HandleOp::Move(c.into()),
                     object_type: ObjectType::CHANNEL,
                     rights: Rights::TRANSFER | Rights::WRITE,

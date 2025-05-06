@@ -285,6 +285,7 @@ mod tests {
         // no executor in the off-thread, so spawning fails
         SendExecutor::new(2).run(async move {
             unblock(|| {
+                #[allow(clippy::let_underscore_future)]
                 let _ = Task::spawn(async {});
             })
             .await;
@@ -300,14 +301,14 @@ mod tests {
             // Once we return from this await, that switch should have been dropped.
             unblock(move || {
                 let lock = sets_bool_true_on_drop.value.lock().unwrap();
-                assert_eq!(*lock, false);
+                assert!(!*lock);
             })
             .await;
 
             // Switch moved into the future should have been dropped at this point.
             // The value of the boolean should now be true.
             let lock = value.lock().unwrap();
-            assert_eq!(*lock, true);
+            assert!(*lock);
         });
     }
 }

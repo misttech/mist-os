@@ -213,14 +213,10 @@ impl Config {
             for _ in 1..threads {
                 join_handles.push(s.spawn(&f));
             }
-            let result = f();
-            if result.is_err() {
-                return result;
-            }
+            f()?;
             for h in join_handles {
-                match h.join() {
-                    Ok(result @ Err(_)) => return result,
-                    _ => {}
+                if let Ok(result @ Err(_)) = h.join() {
+                    return result;
                 }
             }
             Ok(())

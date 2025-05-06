@@ -15,6 +15,7 @@ use futures::ready;
 use futures::task::{AtomicWaker, Context};
 use zx::{self as zx, AsHandleRef};
 
+use std::convert::{AsMut, AsRef};
 use std::io::{Read, Write};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::pin::Pin;
@@ -111,6 +112,26 @@ impl<T: fmt::Debug> fmt::Debug for EventedFd<T> {
     }
 }
 
+impl<T> AsRef<T> for EventedFd<T>
+where
+    T: AsRawFd,
+{
+    // Returns a reference to the underlying IO object.
+    fn as_ref(&self) -> &T {
+        &self.inner
+    }
+}
+
+impl<T> AsMut<T> for EventedFd<T>
+where
+    T: AsRawFd,
+{
+    // Returns a mutable reference to the underlying IO object.
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
+}
+
 impl<T> EventedFd<T>
 where
     T: AsRawFd,
@@ -174,16 +195,6 @@ where
             self.need_write(cx);
             Poll::Pending
         }
-    }
-
-    // Returns a reference to the underlying IO object.
-    pub fn as_ref(&self) -> &T {
-        &self.inner
-    }
-
-    // Returns a mutable reference to the underlying IO object.
-    pub fn as_mut(&mut self) -> &mut T {
-        &mut self.inner
     }
 
     /// Arranges for the current task to receive a notification when a "readable"
@@ -257,14 +268,14 @@ impl<T: AsRawFd + Read> AsyncRead for EventedFd<T> {
         buf: &mut [u8],
     ) -> Poll<Result<usize, io::Error>> {
         ready!(EventedFd::poll_readable(&*self, cx))?;
-        let res = (&mut *self).as_mut().read(buf);
+        let res = (*self).as_mut().read(buf);
         if let Err(e) = &res {
             if e.kind() == io::ErrorKind::WouldBlock {
                 self.need_read(cx);
                 return Poll::Pending;
             }
         }
-        Poll::Ready(res.map_err(Into::into))
+        Poll::Ready(res)
     }
 
     // TODO: override poll_vectored_read and call readv on the underlying handle
@@ -277,14 +288,14 @@ impl<T: AsRawFd + Write> AsyncWrite for EventedFd<T> {
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
         ready!(EventedFd::poll_writable(&*self, cx))?;
-        let res = (&mut *self).as_mut().write(buf);
+        let res = (*self).as_mut().write(buf);
         if let Err(e) = &res {
             if e.kind() == io::ErrorKind::WouldBlock {
                 self.need_write(cx);
                 return Poll::Pending;
             }
         }
-        Poll::Ready(res.map_err(Into::into))
+        Poll::Ready(res)
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
@@ -298,7 +309,7 @@ impl<T: AsRawFd + Write> AsyncWrite for EventedFd<T> {
     // TODO: override poll_vectored_write and call writev on the underlying handle
 }
 
-impl<'a, T> AsyncRead for &'a EventedFd<T>
+impl<T> AsyncRead for &EventedFd<T>
 where
     T: AsRawFd,
     for<'b> &'b T: Read,
@@ -308,19 +319,19 @@ where
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<Result<usize, io::Error>> {
-        ready!(EventedFd::poll_readable(&*self, cx))?;
-        let res = (&*self).as_ref().read(buf);
+        ready!(EventedFd::poll_readable(*self, cx))?;
+        let res = (*self).as_ref().read(buf);
         if let Err(e) = &res {
             if e.kind() == io::ErrorKind::WouldBlock {
                 self.need_read(cx);
                 return Poll::Pending;
             }
         }
-        Poll::Ready(res.map_err(Into::into))
+        Poll::Ready(res)
     }
 }
 
-impl<'a, T> AsyncWrite for &'a EventedFd<T>
+impl<T> AsyncWrite for &EventedFd<T>
 where
     T: AsRawFd,
     for<'b> &'b T: Write,
@@ -330,15 +341,15 @@ where
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
-        ready!(EventedFd::poll_writable(&*self, cx))?;
-        let res = (&*self).as_ref().write(buf);
+        ready!(EventedFd::poll_writable(*self, cx))?;
+        let res = (*self).as_ref().write(buf);
         if let Err(e) = &res {
             if e.kind() == io::ErrorKind::WouldBlock {
                 self.need_write(cx);
                 return Poll::Pending;
             }
         }
-        Poll::Ready(res.map_err(Into::into))
+        Poll::Ready(res)
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {

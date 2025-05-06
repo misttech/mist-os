@@ -477,7 +477,7 @@ impl<T: TimeInterface> Timers<T> {
     pub fn wake_next_timer(&self) -> Option<T> {
         let (nanos, waker) = {
             let mut inner = self.inner.lock();
-            let Some(timer) = inner.timers.pop() else { return None };
+            let timer = inner.timers.pop()?;
             // SAFETY: `inner` is locked.
             let nanos = unsafe { timer.nanos() };
             (nanos, timer.into_waker(&mut inner))
@@ -507,7 +507,7 @@ impl<T: TimeInterface> Timers<T> {
             .lock()
             .timers
             .peek()
-            .map_or(false, |state| unsafe { state.nanos() } <= now.into_nanos())
+            .is_some_and(|state| unsafe { state.nanos() } <= now.into_nanos())
         {
             self.timer.signal_handle(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
         }

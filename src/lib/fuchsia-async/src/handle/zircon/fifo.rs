@@ -457,7 +457,7 @@ mod tests {
         let (mut tx, mut rx) = (Fifo::from_fifo(tx), Fifo::from_fifo(rx));
 
         let write_fut = async {
-            tx.async_io().1.write_entries(&elements[..]).await.expect("failed write entries");
+            tx.async_io().1.write_entries(elements).await.expect("failed write entries");
         };
         let read_fut = async {
             // Use a larger buffer to show partial reads.
@@ -469,7 +469,7 @@ mod tests {
                 .await
                 .expect("failed to read entries");
             assert_eq!(count, elements.len());
-            assert_eq!(&buffer[..count], &elements[..]);
+            assert_eq!(&buffer[..count], elements);
         };
         let ((), ()) = exec.run_singlethreaded(futures::future::join(write_fut, read_fut));
     }
@@ -483,7 +483,7 @@ mod tests {
         let (mut tx, mut rx) = (Fifo::from_fifo(tx), Fifo::from_fifo(rx));
 
         let write_fut = async {
-            tx.async_io().1.write_entries(&elements[..]).await.expect("failed write entries");
+            tx.async_io().1.write_entries(elements).await.expect("failed write entries");
         };
         let read_fut = async {
             let (mut reader, _) = rx.async_io();
@@ -527,7 +527,7 @@ mod tests {
         let (mut tx, mut rx) = (Fifo::from_fifo(tx), Fifo::from_fifo(rx));
 
         let write_fut = async {
-            tx.async_io().1.write_entries(&elements[..]).await.expect("failed write entries");
+            tx.async_io().1.write_entries(elements).await.expect("failed write entries");
         };
         let read_fut = async {
             // Use a larger buffer to show partial reads.

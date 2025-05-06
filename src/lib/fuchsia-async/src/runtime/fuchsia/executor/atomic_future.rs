@@ -19,12 +19,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 /// A lock-free thread-safe future.
-
+//
 // The debugger knows the layout so that async backtraces work, so if this changes the debugger
 // might need to be changed too.
 //
 // This is `repr(C)` so that we can cast between `NonNull<Meta>` and `NonNull<AtomicFuture<F>>`.
-
+//
 // LINT.IfChange
 #[repr(C)]
 struct AtomicFuture<F: Future> {
@@ -195,7 +195,7 @@ impl<F: Future> AtomicFuture<F> {
 }
 
 /// State Bits
-
+//
 // Exclusive access is gained by clearing this bit.
 const INACTIVE: usize = 1 << 63;
 
@@ -299,7 +299,7 @@ impl<'a> AtomicFutureHandle<'a> {
 
     /// Returns the associated scope.
     pub fn scope(&self) -> &ScopeHandle {
-        &self.meta().scope()
+        self.meta().scope()
     }
 
     /// Attempt to poll the underlying future.
