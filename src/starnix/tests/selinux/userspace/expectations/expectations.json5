@@ -23,6 +23,10 @@
 
                 // TODO: https://fxbug.dev/364569703 - Implement correct SO_PEERSEC for socketpair() sockets.
                 "SocketPeerSecTest.SocketPairUnixStream",
+
+                // TODO: https://fxbug.dev/377912777 - Fix `fs_use_task` not to apply type transitions.
+                "PipeTest.BeforePolicyReceivesKernelContext",
+                "PipeTest.LabeledFromTask",
             ],
         },
     ],

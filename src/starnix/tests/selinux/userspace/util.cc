@@ -65,19 +65,37 @@ fit::result<int> WriteTaskAttr(std::string_view attr_name, std::string_view cont
 }
 
 ScopedTaskAttrResetter ScopedTaskAttrResetter::SetTaskAttr(std::string_view attr_name,
-                                                           std::string_view context) {
-  return ScopedTaskAttrResetter(attr_name, context);
+                                                           std::string_view new_value) {
+  auto old_value = ReadTaskAttr(attr_name);
+  if (old_value.is_error()) {
+    ADD_FAILURE() << "Saving task attr " << attr_name
+                  << " error:" << strerror(old_value.error_value());
+    return ScopedTaskAttrResetter("", "");
+  }
+  auto write_result = WriteTaskAttr(attr_name, new_value);
+  if (write_result.is_error()) {
+    ADD_FAILURE() << "Setting attr " << attr_name << " to \"" << new_value
+                  << "\" error:" << strerror(old_value.error_value());
+    return ScopedTaskAttrResetter("", "");
+  }
+  return ScopedTaskAttrResetter(attr_name, old_value.value());
 }
 
 ScopedTaskAttrResetter::ScopedTaskAttrResetter(std::string_view attr_name,
-                                               std::string_view context) {
-  EXPECT_EQ(WriteTaskAttr(attr_name, context), fit::ok());
+                                               std::string_view old_value) {
   attr_name_ = std::string(attr_name);
-  context_ = std::string(context);
+  old_value_ = std::string(old_value);
 }
 
 ScopedTaskAttrResetter::~ScopedTaskAttrResetter() {
-  EXPECT_EQ(WriteTaskAttr(attr_name_, "\n"), fit::ok());
+  if (attr_name_ == "") {
+    return;
+  }
+  auto to_write = old_value_.empty() ? std::string(1, 0) : old_value_;
+  auto result = WriteTaskAttr(attr_name_, to_write);
+  if (result.is_error()) {
+    ADD_FAILURE() << "Restoring task attr " << attr_name_ << " to \"" << old_value_ << "\"";
+  }
 }
 
 fit::result<int, std::string> GetLabel(int fd) {

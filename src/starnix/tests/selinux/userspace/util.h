@@ -82,17 +82,18 @@ class ScopedEnforcement {
   std::string previous_state_;
 };
 
-/// Sets the specified security attribute for the current task while in scope, then clears its
-/// value.
 class ScopedTaskAttrResetter {
  public:
-  static ScopedTaskAttrResetter SetTaskAttr(std::string_view attr_name, std::string_view context);
+  /// Sets the specified security attribute for the current task while in scope, and restores its
+  /// previous value when deleted.  Callers should asssign the returned value and
+  /// `ASSERT_TRUE(is_ok())`.
+  static ScopedTaskAttrResetter SetTaskAttr(std::string_view attr_name, std::string_view new_value);
   ~ScopedTaskAttrResetter();
 
  private:
-  explicit ScopedTaskAttrResetter(std::string_view attr_name, std::string_view context);
+  explicit ScopedTaskAttrResetter(std::string_view attr_name, std::string_view old_value);
   std::string attr_name_;
-  std::string context_;
+  std::string old_value_;
 };
 
 MATCHER_P(IsOk, expected_value, std::string("fit::result<> is fit::ok(") + expected_value + ")") {
