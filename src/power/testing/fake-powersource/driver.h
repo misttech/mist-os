@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_POWER_FAKE_POWERSOURCE_DRIVER_H_
-#define SRC_POWER_FAKE_POWERSOURCE_DRIVER_H_
+#ifndef SRC_POWER_TESTING_FAKE_POWERSOURCE_DRIVER_H_
+#define SRC_POWER_TESTING_FAKE_POWERSOURCE_DRIVER_H_
 
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
@@ -80,4 +80,4 @@ class Driver : public fdf::DriverBase {
 
 }  // namespace fake_powersource
 
-#endif  // SRC_POWER_FAKE_POWERSOURCE_DRIVER_H_
+#endif  // SRC_POWER_TESTING_FAKE_POWERSOURCE_DRIVER_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_POWER_FAKE_POWERSOURCE_POWER_SOURCE_STATE_H_
-#define SRC_POWER_FAKE_POWERSOURCE_POWER_SOURCE_STATE_H_
+#ifndef SRC_POWER_TESTING_FAKE_POWERSOURCE_POWER_SOURCE_STATE_H_
+#define SRC_POWER_TESTING_FAKE_POWERSOURCE_POWER_SOURCE_STATE_H_
 
 #include <fidl/fuchsia.hardware.powersource/cpp/fidl.h>
 
@@ -60,4 +60,4 @@ class PowerSourceState {
 
 }  // namespace fake_powersource
 
-#endif  // SRC_POWER_FAKE_POWERSOURCE_POWER_SOURCE_STATE_H_
+#endif  // SRC_POWER_TESTING_FAKE_POWERSOURCE_POWER_SOURCE_STATE_H_

@@ -546,7 +546,7 @@ assembly_input_bundle("xhci_driver") {
 assembly_input_bundle("fake_battery_driver") {
   base_driver_packages = [
     {
-      package_target = "//src/power/fake-powersource:fake-battery"
+      package_target = "//src/power/testing/fake-powersource:fake-battery"
       driver_components = [ "meta/fake_battery.cm" ]
     },
   ]
@@ -554,14 +554,15 @@ assembly_input_bundle("fake_battery_driver") {
 
 # AIB for the fake-powersensor driver
 assembly_input_bundle("fake_power_sensor") {
-  base_packages = [ "//src/power/fake-powersensor:fake_power_sensor_package" ]
+  base_packages =
+      [ "//src/power/testing/fake-powersensor:fake_power_sensor_package" ]
   compiled_packages = [
     {
       name = "core"
       components = [
         {
           component_name = "core"
-          shards = [ "//src/power/fake-powersensor/meta/fake-power-sensor.core_shard.cml" ]
+          shards = [ "//src/power/testing/fake-powersensor/meta/fake-power-sensor.core_shard.cml" ]
         },
       ]
     },
@@ -4345,14 +4346,14 @@ assembly_input_bundle("battery_manager") {
 #
 assembly_input_bundle("topology_test_daemon") {
   testonly = true
-  base_packages = [ "//src/power/topology-test-daemon:package" ]
+  base_packages = [ "//src/power/testing/topology-test-daemon:package" ]
   compiled_packages = [
     {
       name = "core"
       components = [
         {
           component_name = "core"
-          shards = [ "//src/power/topology-test-daemon/meta/topology-test-daemon.core_shard.cml" ]
+          shards = [ "//src/power/testing/topology-test-daemon/meta/topology-test-daemon.core_shard.cml" ]
         },
       ]
     },

@@ -19,7 +19,7 @@ rustc_test("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
     "//src/power/broker:component",
-    "//src/power/topology-test-daemon:component",
+    "//src/power/testing/topology-test-daemon:component",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:log",
   ]
