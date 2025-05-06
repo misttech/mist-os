@@ -9,7 +9,7 @@ import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 import("//src/lib/testing/sharding/fuchsia_sharded_test_package.gni")
 
-tests = [
+non_sharded_tests = [
   {
     label = "debug"
   },
@@ -34,6 +34,7 @@ tests = [
   {
     label = "routes-admin"
     err_logs = true
+    log_less = true
   },
 ]
 
@@ -44,7 +45,7 @@ if (target_cpu != "riscv64") {
             "tcp",
             "udp",
           ]) {
-    tests += [
+    non_sharded_tests += [
       {
         label = "${filter_deprecated_test}-filter-deprecated"
         expect = "${filter_deprecated_test}"
@@ -58,11 +59,23 @@ _common_test_package_deps = [
   # netemul-sandbox is used to create hermetic test realms.
   "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
 
-  # netstack3 is under test.
-  "//src/connectivity/network/netstack3:component-debug",
-
   # some tests run the DHCP client along with the hermetic netstack.
   "//src/connectivity/network/dhcpv4/client/bindings:component",
+
+  # the expectation-comparer is used to support pass/fail/skip expectations.
+  "//src/lib/testing/expectation:expectation_comparer",
+]
+
+_non_log_less_package_deps = [
+  # netstack3 is under test.
+  "//src/connectivity/network/netstack3:component-debug",
+]
+
+_log_less_package_deps = [
+  # :component-debug-less-logs is used instead of :component-debug to avoid
+  # forcing DEBUG logs to be included, which are too verbose and cause some
+  # longer suites to time out.
+  "//src/connectivity/network/netstack3:component-debug-less-logs",
 ]
 
 # RISC-V on Fuchsia does not support Golang.
@@ -71,11 +84,9 @@ if (target_cpu != "riscv64") {
       [ "//src/connectivity/network/netstack:component-debug" ]
 }
 
-all_test_packages = []
-_package_deps = _common_test_package_deps +
-                [ "//src/lib/testing/expectation:expectation_comparer" ]
+all_non_sharded_test_packages = []
 
-foreach(test, tests) {
+foreach(test, non_sharded_tests) {
   _err_logs = false
   if (defined(test.err_logs)) {
     _err_logs = test.err_logs
@@ -90,6 +101,14 @@ foreach(test, tests) {
   _component_dep = _label
   if (defined(test.dep)) {
     _component_dep = test.dep
+  }
+
+  _package_deps = []
+  _package_deps += _common_test_package_deps
+  if (defined(test.log_less) && test.log_less) {
+    _package_deps += _log_less_package_deps
+  } else {
+    _package_deps += _non_log_less_package_deps
   }
 
   if (!_err_logs) {
@@ -108,7 +127,7 @@ foreach(test, tests) {
       deps = _package_deps
     }
 
-    all_test_packages += [ ":${_package_label}" ]
+    all_non_sharded_test_packages += [ ":${_package_label}" ]
   } else {
     fuchsia_test_component(_component_label) {
       component_name = _name
@@ -135,7 +154,7 @@ foreach(test, tests) {
         }
       }
     }
-    all_test_packages += [
+    all_non_sharded_test_packages += [
       ":${_no_err_logs_package_name}",
       ":${_with_err_logs_package_name}",
     ]
@@ -147,10 +166,7 @@ fuchsia_sharded_test_package("netstack-filter-fidl-tests") {
     {
       name = "netstack-filter-fidl-test"
       manifest = "meta/netstack-filter-fidl-test.cml"
-      deps = _common_test_package_deps + [
-               "filter",
-               "//src/lib/testing/expectation:expectation_comparer",
-             ]
+      deps = _common_test_package_deps + _log_less_package_deps + [ "filter" ]
       expectations = "expectations/filter.json5"
       num_shards = 15
 
@@ -166,5 +182,5 @@ fuchsia_sharded_test_package("netstack-filter-fidl-tests") {
 
 group("tests") {
   testonly = true
-  deps = all_test_packages + [ ":netstack-filter-fidl-tests" ]
+  deps = all_non_sharded_test_packages + [ ":netstack-filter-fidl-tests" ]
 }

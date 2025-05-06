@@ -96,6 +96,7 @@ tests = [
     label = "multicast-forwarding"
     err_logs = true
     long = true
+    log_less = true
   },
 ]
 
@@ -107,8 +108,17 @@ common_package_deps = [
   "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
 
   # netstack3 is commonly under test.
-  "//src/connectivity/network/netstack3:component-debug",
   "//src/connectivity/network/netstack3:component-for-tests",
+]
+
+non_log_less_package_deps =
+    [ "//src/connectivity/network/netstack3:component-debug" ]
+
+log_less_package_deps = [
+  # :component-debug-less-logs is used instead of :component-debug to avoid
+  # forcing DEBUG logs to be included, which are too verbose and cause some
+  # longer suites to time out.
+  "//src/connectivity/network/netstack3:component-debug-less-logs",
 ]
 
 # RISC-V on Fuchsia does not support Golang.
@@ -142,6 +152,11 @@ foreach(test, tests) {
   _package_deps += common_package_deps
   if (defined(test.package_deps)) {
     _package_deps += test.package_deps
+  }
+  if (defined(test.log_less) && test.log_less) {
+    _package_deps += log_less_package_deps
+  } else {
+    _package_deps += non_log_less_package_deps
   }
   _subpackages = []
   if (defined(test.subpackages)) {

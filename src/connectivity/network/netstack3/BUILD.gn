@@ -322,6 +322,15 @@ ns3_test_component("component-debug") {
   deps = [ ":bin-instrumented" ]
 }
 
+# A stand-in for :component-debug to use for tests that need to avoid logging as
+# verbosely to avoid timing out in infra.
+ns3_test_component("component-debug-less-logs") {
+  component_name = "netstack3-debug"
+  manifest = "meta/netstack3_debug.cml"
+  config_values_source = "config/test.json5"
+  deps = [ ":bin-instrumented" ]
+}
+
 # Component with debugging instrumentation enabled and opaque IIDs disabled for
 # convenience in conformance testing.
 ns3_test_component("component-conformance") {
