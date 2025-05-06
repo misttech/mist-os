@@ -352,8 +352,6 @@ void arm64_cpu_early_init() {
 
   __arm_wsr64("mdscr_el1", MSDCR_EL1_INITIAL_VALUE);
   __isb(ARM_MB_SY);
-
-  arch_enable_fiqs();
 }
 
 }  // anonymous namespace
