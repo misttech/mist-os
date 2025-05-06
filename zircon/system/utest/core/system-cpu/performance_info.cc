@@ -222,6 +222,22 @@ TEST(SystemCpu, SetPerformanceInfoArgumentValidation) {
     EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, status);
   }
 
+  // Test clamped perf scale -> ZX_OK.
+  {
+    zx_cpu_performance_info_t info[] = {{0, {1, 1}}};
+    const zx_status_t status =
+        zx_system_set_performance_info(resource->get(), ZX_CPU_PERF_SCALE, &info, std::size(info));
+    EXPECT_EQ(ZX_OK, status);
+  }
+
+  // Test clamped perf scale -> ZX_OK.
+  {
+    zx_cpu_performance_info_t info[] = {{0, {2, 0}}};
+    const zx_status_t status =
+        zx_system_set_performance_info(resource->get(), ZX_CPU_PERF_SCALE, &info, std::size(info));
+    EXPECT_EQ(ZX_OK, status);
+  }
+
   // Test invalid sort order -> ZX_ERR_INVALID_ARGS.
   if (const zx::result cpu_count = GetCpuCount(); cpu_count.is_ok() && *cpu_count >= 2) {
     zx_cpu_performance_info_t info[] = {{0, {1, 0}}, {0, {1, 0}}};
