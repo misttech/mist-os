@@ -67,3 +67,13 @@ ffx_plugin("ffx_list") {
     "test_data/target_formatter_simple_formatter_with_default_golden",
   ]
 }
+
+group("list") {
+  public_deps = [ ":ffx_list" ]
+}
+
+group("tests") {
+  testonly = true
+
+  deps = [ ":ffx_list_tests($host_toolchain)" ]
+}

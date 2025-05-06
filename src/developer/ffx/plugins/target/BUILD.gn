@@ -60,6 +60,9 @@ group("tests") {
 if (is_host) {
   group("host_tests") {
     testonly = true
-    deps = [ "ssh:host_tests" ]
+    deps = [
+      "list:tests",
+      "ssh:host_tests",
+    ]
   }
 }
