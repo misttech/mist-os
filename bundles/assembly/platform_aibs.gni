@@ -186,6 +186,7 @@ user_platform_aib_names =
       "networking_basic",
       "networking_basic_packages",
       "networking_basic_packages_gub",
+      "mdns",
 
       # The minimal feature-set-level
       "common_standard",

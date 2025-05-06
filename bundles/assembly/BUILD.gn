@@ -1734,6 +1734,10 @@ assembly_input_bundle("bootstrap_realm_vsock_development_access") {
   ]
 }
 
+assembly_input_bundle("mdns") {
+  base_packages = [ "//src/connectivity/network/mdns/service:mdns" ]
+}
+
 assembly_input_bundle("mdns_fuchsia_device_wired_service") {
   config_data_labels =
       [ "//src/connectivity/network/mdns/service:mdns_fuchsia_udp_config" ]
@@ -1907,9 +1911,6 @@ assembly_input_bundle("common_standard") {
 
     # Activity
     "//src/sys/activity",
-
-    # Connectivity
-    "//src/connectivity/network/mdns/service:mdns",
 
     # Memory pressure monitoring
     "//src/developer/memory/pressure_signaler",

@@ -166,6 +166,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm_development_access",
                     "core_realm_development_access_eng",
                     "core_realm_eng",
+                    "mdns",
                 ]
             }
             (FeatureSetLevel::Utility, BuildType::UserDebug) => {
@@ -179,6 +180,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm_development_access",
                     "core_realm_development_access_userdebug",
                     "core_realm_user_and_userdebug",
+                    "mdns",
                 ]
             }
             (FeatureSetLevel::Utility, BuildType::User) => {
@@ -208,6 +210,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "standard_userdebug_and_eng",
                     "testing_support",
                     "tracing",
+                    "mdns",
                 ]
             }
             (FeatureSetLevel::Standard, BuildType::UserDebug) => {
@@ -224,6 +227,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "common_standard",
                     "standard_userdebug",
                     "standard_userdebug_and_eng",
+                    "mdns",
                 ]
             }
             (FeatureSetLevel::Standard, BuildType::User) => {
@@ -234,6 +238,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm",
                     "core_realm_user_and_userdebug",
                     "common_standard",
+                    "mdns",
                 ]
             }
         } {
