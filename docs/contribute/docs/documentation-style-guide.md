@@ -82,11 +82,6 @@ In the Fuchsia documentation you can link to three types of contents:
 * Source code - Link to source code files that exist within the Fuchsia source
   tree. These links can link to any file extension, but these files must exist
   in the source tree. For example, `/sdk/lib/fdio/fdio.cc`.
-
-  Note: If linking to a specific line number or making use of a search query,
-  use the full link to the file. For example,
-  [https://cs.opensource.google/fuchsia/fuchsia/+/main:docs/README.md;l=17](https://cs.opensource.google/fuchsia/fuchsia/+/main:docs/README.md;l=17).
-
 * Reference documentation - Links to auto-generated Fuchsia reference
   documentation.
   * Most of the Fuchsia reference documentation doesn't exist in
