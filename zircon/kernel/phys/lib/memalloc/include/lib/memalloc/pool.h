@@ -89,6 +89,11 @@ class Pool {
   using BookkeepingAddressToPointer =
       fit::inline_function<std::byte*(uint64_t addr, uint64_t size)>;
 
+  // A user-prescribed callback to make the address ranges the Pool uses
+  // 'accessible': this includes the memory that the Pool itself uses for
+  // bookkeeping, as well as any allocations.
+  using AccessCallback = fit::inline_function<void(uint64_t addr, uint64_t size)>;
+
   // The size of a chunk of free RAM reserved for internal Pool bookkeeping.
   // The value is ultimately arbitrary, but is chosen with the expectation that
   // it is sufficiently large to avoid fragmentation of the available memory in
@@ -161,6 +166,13 @@ class Pool {
 
   // Returns the number of tracked, normalized ranges.
   size_t size() const { return num_ranges_; }
+
+  // Sets an allocation callback (see AccessCallback for more details). This
+  // may be called before Init().
+  void set_access_callback(AccessCallback access_callback) {
+    ZX_ASSERT(access_callback);
+    access_callback_ = std::move(access_callback);
+  }
 
   // Returns an iterator pointing to the tracked, normalized range containing
   // the provided address if one exists, or else end().
@@ -344,6 +356,8 @@ class Pool {
   BookkeepingAddressToPointer bookkeeping_pointer_ = [](uint64_t addr, uint64_t size) {
     return reinterpret_cast<std::byte*>(addr);
   };
+
+  AccessCallback access_callback_ = [](uint64_t addr, uint64_t size) {};
 
   // The list of unused nodes. We avoid the term "free" to disambiguate from
   // "free memory", which is unrelated to this list. The nodes stored within

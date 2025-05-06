@@ -101,6 +101,9 @@ fit::result<fit::failed> Pool::Init(std::span<internal::RangeIterationContext> s
     return fit::failed();
   }
 
+  // Make the prospective bookkeeping region accessible before any access.
+  access_callback_(*bookkeeping_addr, bookkeeping_size);
+
   // Convert our bookkeeping space before actual use, and zero out the mapped
   // area to be able to recast as Nodes in the valid, initial fbl linked list
   // node state. `[0, bookkeeping.size() - scratch_size)` of that space will
@@ -196,6 +199,8 @@ fit::result<fit::failed, uint64_t> Pool::Allocate(Type type, uint64_t size, uint
     auto it = std::move(result).value();
     Coalesce(it);
   }
+
+  access_callback_(addr, size);
   return fit::ok(addr);
 }
 
@@ -740,6 +745,9 @@ void Pool::TryToEnsureTwoBookkeepingNodes() {
   } else {
     addr = std::move(result).value();
   }
+
+  // Make the prospective bookkeeping region accessible before any access.
+  access_callback_(addr, kBookkeepingChunkSize);
 
   std::byte* ptr = bookkeeping_pointer_(addr, kBookkeepingChunkSize);
   ZX_ASSERT(ptr);

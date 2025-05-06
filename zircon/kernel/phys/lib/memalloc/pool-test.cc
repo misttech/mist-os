@@ -706,6 +706,45 @@ TEST(MemallocPoolTests, DefaultAllocationBounds) {
   }
 }
 
+TEST(MemallocPoolTests, AccessCallback) {
+  Range ranges[] = {
+      // free RAM: [0, 100*kChunkSize)
+      {
+          .addr = 0,
+          .size = 100 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  struct Accessed {
+    uint64_t addr, size;
+  };
+  std::vector<Accessed> accessed;
+  PoolContext ctx;
+  ctx.pool.set_access_callback(
+      [&accessed](uint64_t addr, uint64_t size) { accessed.push_back({addr, size}); });
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+
+  ASSERT_TRUE(!accessed.empty());
+  EXPECT_EQ(1u, accessed.size());
+  EXPECT_EQ(accessed[0].addr, 0u);
+  EXPECT_EQ(accessed[0].size, kChunkSize);
+
+  ASSERT_NO_FATAL_FAILURE(
+      TestPoolAllocation(ctx.pool, Type::kPoolTestPayload, 10 * kChunkSize, kDefaultAlignment));
+
+  ASSERT_GT(accessed.size(), 1u);
+  EXPECT_EQ(2u, accessed.size());
+  EXPECT_EQ(accessed[1].addr, kChunkSize);
+  EXPECT_EQ(accessed[1].size, 10 * kChunkSize);
+
+  ctx.pool.set_access_callback([](uint64_t addr, uint64_t size) {});
+  ASSERT_NO_FATAL_FAILURE(
+      TestPoolAllocation(ctx.pool, Type::kPoolTestPayload, 10 * kChunkSize, kDefaultAlignment));
+  EXPECT_EQ(2u, accessed.size());
+}
+
 TEST(MemallocPoolTests, NoResourcesAllocation) {
   PoolContext ctx;
   Range ranges[] = {
