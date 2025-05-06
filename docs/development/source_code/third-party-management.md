@@ -125,87 +125,60 @@ is WIP, and contributions are welcome.
 To migrate legacy third-party repositories to this layout, follow these
 steps:
 
+1. Update the manifest.
 
-1. Move Fuchsia-specific `BUILD.gn` files to
-   [`//build/secondary`][build-secondary].
-
-   1. Copy `BUILD.gn` files from `//third_party/<name>` to
-      `//build/secondary/third_party/<name>`. If there is more than one
-      `BUILD.gn` file, maintain the same subtree under `//build/secondary`.
-   1. In the copied `BUILD.gn` files, update references to paths to third-party
-      files in the form of `//third_party/<name>/` to the form of
-      `//third_party/<name>/src/`.
-   1. Copy `OWNERS` from `//third_party/<name>` to `//build/secondary/<name>`,
-      or create it if it does not exist. Review the `OWNERS` file to ensure that
-      it follows the [best practices][owners-best-practices].
-   1. Copy `README.fuchsia` from `//third_party/<name>` to
-      `//build/secondary/<name>`. Review the contents of this file and ensure
-      that the metadata is correct. In uncommon cases there are modifications
-      made to third-party code in third-party repositories, and such changes are
-      listed in `README.fuchsia`. Local modifications will often require you to
-      make special accommodations that are not covered in this guide.
-   1. Review `//third_party/<name>` for any other first party `.gni` files and
-      move those to `//build/secondary/<name>` as well.
-   1. Update `//build/secondary/third_party/<name>/BUILD.gn` (and other files
-      containing source paths such as `.gni` files) to use the new source
-      location `//third_party/<name>/src`. This requires updating all sources,
-      including directory paths and more.
-
-   Example: [https://fxrev.dev/622785](https://fxrev.dev/622785)
-
-   Note: CQ won't catch errors in this change (for example, typos in paths)
-   because the secondary build files are not yet active. You can validate that
-   your `BUILD.gn` files are correct by staging the next commit (update the
-   integration manifest), running `jiri update -local-manifest`, then building
-   (such as with `fx build`).
-
-1. Update the integration manifest.
-
-   Note: This step can only be performed in Google's internal repositories at the
-   moment.
-
-   Replace `path` (not `name`) of the existing third-party project at
-   `//third_party/<name>` with `//third_party/<name>/src`, while keeping the
-   revision unchanged. With this change merged, the Fuchsia build will switch to
-   using the `BUILD.gn` files from the previous step.
-
-   Example: [http://tqr/457911](http://tqr/457911)
-
-1. Move Fuchsia-specific files added in step 1 to `//third_party/<name>`.
-
-   Now that third-party code is nested under `//third_party/<name>/src` and
-   `//third_party/<name>` is part of [`fuchsia.git`][fuchsia-git], you can undo
-   the transitional step 1.
-
-   1. Wait for the integration manifest change to merge and roll, then run
-      `jiri update`. Or stage the integration manifest change from the previous
-      step in your local checkout, then run `jiri update -local-manifest`.
-
-   1. Move `BUILD.gn` and other Fuchsia-specific files from
-      `//build/secondary/<name>` to `//third_party/<name>`.
+   1. Replace `path` (not `name`) of the existing third-party project at
+      `//third_party/<name>` with `//third_party/<name>/src`, while keeping the
+      revision unchanged.
 
    1. Update [`//.gitignore`][gitignore] so that `//third_party/<name>` is
       tracked but `//third_party/<name>/src` is not tracked.
 
-   Example: [https://fxrev.dev/622789](https://fxrev.dev/622789)
+   Then run `jiri update -local-manifest-project=fuchsia` which will move the
+   project to its new location in your local checkout.
+
+1. Move Fuchsia-specific `BUILD.gn` files into fuchsia.git.
+
+   1. Copy `BUILD.gn` files from `//third_party/<name>/src` into
+      `//third_party/<name>` (now part of fuchsia.git).
+   1. In the copied `BUILD.gn` files, update references to paths to third-party
+      files in the form of `//third_party/<name>/` to the form of
+      `//third_party/<name>/src/`.
+   1. Copy `OWNERS` from `//third_party/<name>/src` to `//third_party/<name>`,
+      or create it if it does not exist. Review the `OWNERS` file to ensure that
+      it follows the [best practices][owners-best-practices].
+   1. Copy `README.fuchsia` from `//third_party/<name>/src` to
+      `//third_party/<name>`. Review the contents of this file and ensure
+      that the metadata is correct. In uncommon cases there are modifications
+      made to third-party code in third-party repositories, and such changes are
+      listed in `README.fuchsia`. Local modifications will often require you to
+      make special accommodations that are not covered in this guide.
+   1. Review `//third_party/<name>/src` for any other first party `.gni` files and
+      move those to `//third_party/<name>` as well.
+   1. Update `//third_party/<name>/BUILD.gn` (and other files containing source
+      paths such as `.gni` files) to use the new source location
+      `//third_party/<name>/src`. This requires updating all sources, including
+      directory paths and more.
 
 1. Turn `//third_party/<name>/src` into a mirror.
 
-   Note: This step can only be performed in Google's internal repositories at the
-   moment.
-
    Change `//third_party/<name>/src` to track upstream such that it only has
    upstream changes in its `git log`. You can do this by updating the
-   integration manifest to reference an upstream commit hash.
+   manifest to reference an upstream commit hash.
 
    Example: [http://tqr/427570](http://tqr/427570)
+
+1. Commit and push your changes. All of these changes can be done in a single CL.
+
+You can validate the changes locally by running
+`jiri update -local-manifest-project=fuchsia`, then building (such as with
+`fx build`).
 
 ## Additional reading
 
 - [Fuchsia open source licensing policies][oss-licensing]
 - [Source code layout][source-layout]
 
-[build-secondary]: /build/secondary/
 [fuchsia-git]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main
 [gitignore]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/.gitignore
 [golibs]: /third_party/golibs/
