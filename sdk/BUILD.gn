@@ -207,13 +207,6 @@ final_fuchsia_idk_for_cpus_and_levels("final_fuchsia_idk.exported") {
   output_name = "fuchsia_idk"
   target_cpus = idk_buildable_cpus
   api_levels = idk_buildable_api_levels
-
-  # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
-  # are too slow to enable this setting, and therefore the mac IDK won't have
-  # per-api-level prebuilts.
-  if (host_os == "mac") {
-    api_levels = []
-  }
 }
 
 idk_archive("final_fuchsia_idk.archive") {
@@ -286,13 +279,6 @@ if (!is_host) {
     output_name = "fuchsia_idk_head_only"
     target_cpus = [ target_cpu ]
     api_levels = []  # `PLATFORM` artifacts will be used as `HEAD`
-
-    # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
-    # are too slow to enable this setting, and therefore the mac IDK won't have
-    # per-api-level prebuilts.
-    if (host_os == "mac") {
-      api_levels = []
-    }
   }
 
   # Generates an exported "final" SDK that only supports the target CPU
