@@ -7395,7 +7395,7 @@ VmCowPages::DeferredOps::DeferredOps(VmCowPages* self) : self_(self) {
       source = current.locked_or(self_).page_source_;
     }
     DEBUG_ASSERT(source);
-    page_source_lock_.emplace(source->paged_vmo_lock());
+    page_source_lock_.emplace(source->paged_vmo_lock(), ktl::move(source));
   }
 }
 

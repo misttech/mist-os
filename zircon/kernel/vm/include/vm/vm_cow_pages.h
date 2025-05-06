@@ -2138,7 +2138,12 @@ class VmCowPages::DeferredOps {
   // page source has parent VMOs whose contents is able to change, and if we had parallelism
   // between multiple mutating operations with range change updates user space would be able to see
   // inconsistent views of memory.
-  ktl::optional<Guard<Mutex>> page_source_lock_;
+  // In addition to the lock itself, held via its Guard, we also hold a RefPtr to the PageSource
+  // itself. During the lifetime of the DeferredOps it is possible for the self vmo to become
+  // detached from the rest of the vmo tree, and for the remainder of the tree, including the root
+  // node with the page source to be destroyed. Holding a RefPtr to the page source of the mutex we
+  // are holding therefore prevents a use-after-free of the guard.
+  ktl::optional<ktl::pair<Guard<Mutex>, fbl::RefPtr<PageSource>>> page_source_lock_;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_COW_PAGES_H_
