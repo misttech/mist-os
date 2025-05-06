@@ -244,7 +244,7 @@ impl Executor {
         let packet = zx::Packet::from_user_packet(id, 0 /* status??? */, up);
         if let Err(e) = self.port.queue(&packet) {
             // TODO: logging
-            eprintln!("Failed to queue notify in port: {:?}", e);
+            eprintln!("Failed to queue notify in port: {e:?}");
         }
     }
 
@@ -532,7 +532,7 @@ impl Executor {
                         }
                     }
                     Err(status) => {
-                        panic!("Error calling port wait: {:?}", status);
+                        panic!("Error calling port wait: {status:?}");
                     }
                 }
             };
