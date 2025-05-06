@@ -68,12 +68,6 @@ group("async-channel") {
 }
 
 if (!(current_os == "fuchsia")) {
-  group("async-executor") {
-    public_deps = [ ":async-executor-v1_5_0" ]
-  }
-}
-
-if (!(current_os == "fuchsia")) {
   group("async-fs") {
     public_deps = [ ":async-fs-v1_6_0" ]
   }
@@ -2045,43 +2039,6 @@ rust_library("async-channel-v1_8_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":async-channel-v1_8_0.license" ]
-}
-
-license("async-executor-v1_5_0.license") {
-  public_package_name = "async_executor"
-  license_files = [
-    "//third_party/rust_crates/vendor/async-executor-1.5.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/async-executor-1.5.0/LICENSE-MIT",
-  ]
-}
-
-rust_library("async-executor-v1_5_0") {
-  crate_name = "async_executor"
-  crate_root =
-      "//third_party/rust_crates/vendor/async-executor-1.5.0/src/lib.rs"
-  output_name = "async_executor-124118651f47136"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":async-lock-v2_6_0" ]
-  deps += [ ":async-task-v4_0_3" ]
-  deps += [ ":concurrent-queue-v2_5_0" ]
-  deps += [ ":fastrand-v1_4_0" ]
-  deps += [ ":futures-lite-v1_11_3" ]
-  deps += [ ":slab-v0_4_9" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=124118651f47136",
-    "-Cextra-filename=-124118651f47136",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":async-executor-v1_5_0.license" ]
 }
 
 license("async-fs-v1_6_0.license") {

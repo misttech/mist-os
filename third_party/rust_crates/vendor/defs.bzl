@@ -495,7 +495,6 @@ _NORMAL_DEPENDENCIES = {
         },
         "cfg(not(target_os = \"fuchsia\"))": {
             "askama": Label("//third_party/rust_crates/vendor/askama-0.12.1:askama"),
-            "async-executor": Label("//third_party/rust_crates/vendor/async-executor-1.5.0:async_executor"),
             "async-fs": Label("//third_party/rust_crates/vendor/async-fs-1.6.0:async_fs"),
             "cargo_metadata": Label("//third_party/rust_crates/vendor/cargo_metadata-0.18.1:cargo_metadata"),
             "crossterm": Label("//third_party/rust_crates/vendor/crossterm-0.19.0:crossterm"),

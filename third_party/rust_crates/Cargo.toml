@@ -305,7 +305,6 @@ zeroize = "1.8.1"
 [target.'cfg(not(target_os = "fuchsia"))'.dependencies]
 # keep-sorted start
 askama = { version = "0.12.1", default-features = false, features = ["config"] }
-async-executor = "1.5.0"
 async-fs = "1.6.0"
 cargo_metadata = "0.18.1"
 crossterm = "0.19"

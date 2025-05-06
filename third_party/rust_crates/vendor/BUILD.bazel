@@ -199,18 +199,6 @@ alias(
 )
 
 alias(
-    name = "async-executor-1.5.0",
-    actual = "//third_party/rust_crates/vendor/async-executor-1.5.0:async_executor",
-    tags = ["manual"],
-)
-
-alias(
-    name = "async-executor",
-    actual = "//third_party/rust_crates/vendor/async-executor-1.5.0:async_executor",
-    tags = ["manual"],
-)
-
-alias(
     name = "async-fs-1.6.0",
     actual = "//third_party/rust_crates/vendor/async-fs-1.6.0:async_fs",
     tags = ["manual"],
