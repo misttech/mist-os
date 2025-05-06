@@ -51,7 +51,7 @@ PHYS_SINGLETHREAD uint64_t HandleExpectedException(uint64_t vector, const char* 
 
 }  // namespace
 
-int TestMain(void* zbi, arch::EarlyTicks ticks) {
+int TestMain(void* bootloader_data, ktl::optional<EarlyBootZbi> zbi, arch::EarlyTicks ticks) {
   MainSymbolize symbolize("phys-exception-test");
   symbolize.ContextAlways();
 

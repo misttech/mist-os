@@ -139,7 +139,7 @@ efi_status EfiMain(efi_handle image_handle, efi_system_table* systab) {
     printf("%s: Cannot open EFI_LOADED_IMAGE_PROTOCOL: %#zx\n", ProgramName(), image.error_value());
   }
 
-  ArchSetUp(nullptr);
+  ArchSetUp({});
 
   // Allocate heap copies of the argument strings converted to UTF8.
   // These will never be freed.
@@ -163,7 +163,8 @@ efi_status EfiMain(efi_handle image_handle, efi_system_table* systab) {
 
 void ArchPanicReset() { EfiExit(EFI_ABORTED); }
 
-void InitMemory(void* bootloader_data, AddressSpace* aspace) {}
+void InitMemory(const void* bootloader_data, ktl::optional<EarlyBootZbi> zbi,
+                AddressSpace* aspace) {}
 
 bool EfiLaunchedFromShell() {
   // A shell-launched application is spec'd to have the parameters protocol

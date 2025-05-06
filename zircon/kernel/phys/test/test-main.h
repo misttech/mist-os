@@ -9,9 +9,16 @@
 
 #include <lib/arch/ticks.h>
 
+#include <ktl/variant.h>
 #include <phys/main.h>
 #include <phys/symbolize.h>
 
-int TestMain(void*, arch::EarlyTicks) PHYS_SINGLETHREAD;
+class AddressSpace;
+
+// Just like InitMemory(), takes a pointer to the bootloader-provided data and
+// additionally an early boot appropriate representation of the ZBI in the case
+// of ZBI booting
+int TestMain(void* bootloader_data, ktl::optional<EarlyBootZbi> zbi,
+             arch::EarlyTicks) PHYS_SINGLETHREAD;
 
 #endif  // ZIRCON_KERNEL_PHYS_TEST_TEST_MAIN_H_

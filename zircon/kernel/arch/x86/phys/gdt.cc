@@ -540,7 +540,7 @@ void SetUpIdt() {
 // that needs to go there. But the pointer variable needs to exist.
 ArchPhysInfo* gArchPhysInfo;
 
-void ArchSetUp(void* zbi) {
+void ArchSetUp(ktl::optional<EarlyBootZbi> zbi) {
   gStandardSegments.Load();
   SetUpIdt();
 }

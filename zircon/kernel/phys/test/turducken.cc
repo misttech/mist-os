@@ -202,14 +202,14 @@ void TurduckenTestBase::Boot() {
   boot.Boot();
 }
 
-int TestMain(void* zbi, arch::EarlyTicks entry_ticks) {
+int TestMain(void* zbi_ptr, ktl::optional<EarlyBootZbi> zbi, arch::EarlyTicks entry_ticks) {
   MainSymbolize symbolize(kTestName);
   symbolize.ContextAlways();
 
   AddressSpace aspace;
-  InitMemory(zbi, &aspace);
+  InitMemory(zbi_ptr, ktl::move(zbi), &aspace);
 
-  TurduckenTest test(zbi, entry_ticks);
+  TurduckenTest test(zbi_ptr, entry_ticks);
   test.LogCmdLineArguments();
 
   // Check if we should boot the next kernel item, after

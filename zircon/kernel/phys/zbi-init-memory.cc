@@ -20,10 +20,8 @@
 
 #include <ktl/enforce.h>
 
-void ZbiInitMemory(void* zbi, ktl::span<zbi_mem_range_t> mem_config,
+void ZbiInitMemory(const void* zbi_ptr, EarlyBootZbi zbi, ktl::span<zbi_mem_range_t> mem_config,
                    ktl::optional<memalloc::Range> extra_special_range, AddressSpace* aspace) {
-  zbitl::ByteView zbi_storage = zbitl::StorageFromRawHeader(static_cast<zbi_header_t*>(zbi));
-
   uint64_t phys_start = reinterpret_cast<uint64_t>(PHYS_LOAD_ADDRESS);
   uint64_t phys_end = reinterpret_cast<uint64_t>(_end);
   memalloc::Range special_memory_ranges[3] = {
@@ -33,8 +31,8 @@ void ZbiInitMemory(void* zbi, ktl::span<zbi_mem_range_t> mem_config,
           .type = memalloc::Type::kPhysKernel,
       },
       {
-          .addr = reinterpret_cast<uint64_t>(zbi_storage.data()),
-          .size = zbi_storage.size_bytes(),
+          .addr = reinterpret_cast<uint64_t>(zbi_ptr),
+          .size = zbi.size_bytes(),
           .type = memalloc::Type::kDataZbi,
       },
   };

@@ -26,7 +26,7 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   ApplyRelocations();
 
   AddressSpace aspace;
-  InitMemory(flat_devicetree_blob, &aspace);
+  InitMemory(flat_devicetree_blob, {}, &aspace);
   MainSymbolize symbolize(kShimName);
 
   // At this point UART should be available, and we should just encode.

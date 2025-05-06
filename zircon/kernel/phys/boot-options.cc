@@ -21,32 +21,30 @@
 
 #include <ktl/enforce.h>
 
-void SetBootOptions(BootOptions& boot_opts, zbitl::ByteView zbi, ktl::string_view legacy_cmdline) {
+void SetBootOptions(BootOptions& boot_opts, EarlyBootZbi zbi, ktl::string_view legacy_cmdline) {
   {
     // Select UART configuration from a UART driver item in the ZBI.
-    zbitl::View view(zbi);
-
-    for (auto [header, payload] : view) {
+    for (auto [header, payload] : zbi) {
       if (ktl::optional config = uart::all::Config<>::Match(*header, payload.data())) {
         boot_opts.serial = *config;
       }
     }
-    view.ignore_error();
+    zbi.ignore_error();
 
     // Select UART configuration from cmdline item in the ZBI.
-    for (auto [header, payload] : view) {
+    for (auto [header, payload] : zbi) {
       if (header->type == ZBI_TYPE_CMDLINE) {
         boot_opts.SetMany({reinterpret_cast<const char*>(payload.data()), payload.size()});
       }
     }
-    view.ignore_error();
+    zbi.ignore_error();
   }
 
   // At last the bootloader provided arguments trumps everything.
   boot_opts.SetMany(legacy_cmdline);
 }
 
-void SetBootOptionsWithoutEntropy(BootOptions& boot_opts, zbitl::ByteView zbi,
+void SetBootOptionsWithoutEntropy(BootOptions& boot_opts, EarlyBootZbi zbi,
                                   ktl::string_view legacy_cmdline) {
   SetBootOptions(boot_opts, zbi, legacy_cmdline);
   // Restore the entropy bits.

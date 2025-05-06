@@ -14,11 +14,11 @@
 #include "legacy-boot.h"
 #include "test-main.h"
 
-int TestMain(void* ptr, arch::EarlyTicks) {
+int TestMain(void* bootloader_data, ktl::optional<EarlyBootZbi> zbi, arch::EarlyTicks) {
   MainSymbolize symbolize("paging-test");
 
   AddressSpace aspace;
-  InitMemory(ptr, &aspace);
+  InitMemory(bootloader_data, ktl::move(zbi), &aspace);
 
   static volatile int datum = 17;
   ZX_ASSERT(datum == 17);

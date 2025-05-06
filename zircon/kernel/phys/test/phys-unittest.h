@@ -26,11 +26,11 @@
 // Helper that generates a unique string of all input names joined by comma.
 #define TEST_NAME_GEN(Args...) #Args
 
-#define TEST_SUITES(program_name, ...)                           \
-  int TestMain(void*, arch::EarlyTicks) {                        \
-    MainSymbolize symbolize(program_name);                       \
-    printf("\nRunning unit tests in physical memory...\n");      \
-    return Run(TEST_NAME_GEN(__VA_ARGS__), __VA_ARGS__) ? 0 : 1; \
+#define TEST_SUITES(program_name, ...)                                                     \
+  int TestMain(void* bootloader_data, ktl::optional<EarlyBootZbi> zbi, arch::EarlyTicks) { \
+    MainSymbolize symbolize(program_name);                                                 \
+    printf("\nRunning unit tests in physical memory...\n");                                \
+    return Run(TEST_NAME_GEN(__VA_ARGS__), __VA_ARGS__) ? 0 : 1;                           \
   }
 
 // For simplification |test_names| is the joining of all __VA_ARGS__ with a special token that

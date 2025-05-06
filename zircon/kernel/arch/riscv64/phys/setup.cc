@@ -25,7 +25,7 @@ __CONSTINIT ArchPhysInfo gArchPhysInfoStorage;
 
 ArchPhysInfo* gArchPhysInfo;
 
-void ArchSetUp(void* zbi_ptr) {
+void ArchSetUp(ktl::optional<EarlyBootZbi> zbi) {
   gArchPhysInfo = &gArchPhysInfoStorage;
 
   arch::RiscvStvec::Get()
@@ -34,12 +34,10 @@ void ArchSetUp(void* zbi_ptr) {
       .set_mode(arch::RiscvStvec::Mode::kDirect)
       .Write();
 
-  if (zbi_ptr) {
-    zbitl::View zbi(zbitl::StorageFromRawHeader(reinterpret_cast<const zbi_header_t*>(zbi_ptr)));
-
+  if (zbi) {
     zbitl::CpuTopologyTable topology;
     ktl::span<const char> strtab;
-    for (auto it = zbi.begin(); it != zbi.end(); ++it) {
+    for (auto it = zbi->begin(); it != zbi->end(); ++it) {
       auto [header, payload] = *it;
       switch (header->type) {
         case ZBI_TYPE_CPU_TOPOLOGY: {
@@ -63,7 +61,7 @@ void ArchSetUp(void* zbi_ptr) {
           break;
       }
     }
-    zbi.ignore_error();
+    zbi->ignore_error();
 
     if (strtab.empty()) {
       printf(

@@ -256,12 +256,15 @@ if (toolchain_environment == "kernel.phys" ||
   # Transitive dependencies for the <phys/main.h> header.
   static_library("main") {
     public = [
+      "include/phys/early-boot.h",
       "include/phys/exception.h",
       "include/phys/main.h",
       "include/phys/stack.h",
     ]
 
     public_deps = [
+      ":early-boot",
+
       # "main.h" has #include <lib/arch/ticks.h>.
       "//zircon/kernel/lib/arch",
 
@@ -275,6 +278,17 @@ if (toolchain_environment == "kernel.phys" ||
       sources = [ "self-relocation.cc" ]
       deps = [ "//src/lib/elfldltl" ]
     }
+  }
+
+  source_set("early-boot") {
+    public = [ "include/phys/early-boot.h" ]
+
+    public_deps = [
+      # "early-boot.h" has #include <lib/zbitl/view.h>
+      "//src/lib/zbitl:headers",
+    ]
+
+    public_configs = [ ":includes" ]
   }
 
   source_set("address-space.header") {
@@ -384,7 +398,11 @@ if (toolchain_environment == "kernel.phys" ||
 
     sources = [ "boot-options.cc" ]
 
-    public_deps = [ "//zircon/kernel/lib/ktl" ]
+    public_deps = [
+      # boot-options.h has #include "main.h"
+      ":main",
+      "//zircon/kernel/lib/ktl",
+    ]
 
     deps = [
       "//src/lib/zbitl",

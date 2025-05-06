@@ -26,14 +26,14 @@
 // protocol with an old-style fixed entry point address.  The kernel it loads
 // must be in the new uniform format.
 
-void ZbiMain(void* zbi, arch::EarlyTicks boot_ticks) {
+void ZbiMain(void* zbi_ptr, EarlyBootZbi zbi, arch::EarlyTicks boot_ticks) {
   MainSymbolize symbolize("zbi-boot-shim");
 
   AddressSpace aspace;
-  InitMemory(zbi, &aspace);
+  InitMemory(zbi_ptr, ktl::move(zbi), &aspace);
 
   BootZbi::InputZbi input_zbi_view(
-      zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi)));
+      zbitl::StorageFromRawHeader(static_cast<zbi_header_t*>(zbi_ptr)));
 
   BootZbi boot;
   if (auto result = boot.Init(input_zbi_view); result.is_error()) {

@@ -16,6 +16,8 @@
 #include <ktl/optional.h>
 #include <ktl/span.h>
 
+#include "early-boot.h"
+
 // This is private to each arch/$cpu/phys directory.  The pointer is
 // initialized in ArchSetUp, so it can be used anywhere after earliest startup.
 struct ArchPhysInfo;
@@ -51,7 +53,7 @@ extern "C" [[noreturn]] void PhysMain(void*, arch::EarlyTicks) PHYS_SINGLETHREAD
 // In ZBI executables, PhysMain is defined to set up the console on stdout and
 // then hand off to ZbiMain.  So ZbiMain is the main entry point that a ZBI
 // executable defines.  It can use printf (and stdout generally) freely.
-[[noreturn]] void ZbiMain(void* zbi, arch::EarlyTicks) PHYS_SINGLETHREAD;
+[[noreturn]] void ZbiMain(void* zbi_ptr, EarlyBootZbi zbi, arch::EarlyTicks) PHYS_SINGLETHREAD;
 
 // These are defined by the linker script and give the bounds of the memory
 // image, i.e. the load image plus the reserve_memory_size (bss).
@@ -69,18 +71,35 @@ void ApplyRelocations();
 // depending on the particular phys environment.  This panics if no memory is
 // found for the allocator.
 //
+// In the case of ZBI booting, an EarlyBootZbi should additionally be provided
+// - and consumed - as well for safe iteration if caches were left disabled on
+// boot. If caches were left disabled, they are re-enabled in this routine.
+//
 // Further, if an address space object is provided, it will be used to install
 // an identity-mapped virtual address space via ArchSetUpAddressSpace().
-void InitMemory(void* bootloader_data, AddressSpace* aspace = nullptr);
+void InitMemory(const void* bootloader_data, ktl::optional<EarlyBootZbi> zbi,
+                AddressSpace* aspace = nullptr);
+
+// TODO(https://fxbug.dev/408020980): Remove once internal boot shims start
+// calling the previous overload.
+inline void InitMemory(const void* bootloader_data, AddressSpace* aspace = nullptr) {
+  InitMemory(bootloader_data, {}, aspace);
+}
 
 // This does most of the InitMemory() work for ZBI executables, where
 // InitMemory() calls it with the ZBI_TYPE_MEM_CONFIG payload from the ZBI.
-void ZbiInitMemory(void* zbi, ktl::span<zbi_mem_range_t> mem_config,
+void ZbiInitMemory(const void* zbi_ptr, EarlyBootZbi zbi, ktl::span<zbi_mem_range_t> mem_config,
                    ktl::optional<memalloc::Range> extra_special_range = {},
                    AddressSpace* aspace = nullptr);
 
-// Perform any architecture-specific set-up.
-void ArchSetUp(void* zbi);
+void ArchSetUp(ktl::optional<EarlyBootZbi> zbi);
+
+// TODO(https://fxbug.dev/408020980): Remove once internal boot shims start
+// calling the previous overload.
+inline void ArchSetUp(const void* zbi_ptr) {
+  ZX_ASSERT(!zbi_ptr);
+  ArchSetUp(ktl::nullopt);
+}
 
 // Try to reboot or shut down the machine in a panic situation.
 [[noreturn]] void ArchPanicReset();

@@ -114,14 +114,14 @@ int TestMultiplyByFactorPatching(code_patching::PatcherWithGlobalCacheConsistenc
 
 }  // namespace
 
-int TestMain(void* zbi_ptr, arch::EarlyTicks) {
+int TestMain(void* zbi_ptr, ktl::optional<EarlyBootZbi> early_zbi, arch::EarlyTicks) {
   MainSymbolize symbolize("code-patching-test");
 
   // Initialize memory for allocation/free.
   AddressSpace aspace;
-  InitMemory(zbi_ptr, &aspace);
+  InitMemory(zbi_ptr, ktl::move(early_zbi), &aspace);
 
-  zbitl::View zbi(zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi_ptr)));
+  zbitl::View zbi{zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi_ptr))};
 
   // Search for a payload of type ZBI_TYPE_STORAGE_KERNEL
   auto zbi_it = zbi.find(ZBI_TYPE_STORAGE_KERNEL);

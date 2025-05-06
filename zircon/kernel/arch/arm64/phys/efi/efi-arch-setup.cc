@@ -6,4 +6,4 @@
 
 #include <phys/main.h>
 
-void ArchSetUp(void* zbi) {}
+void ArchSetUp(ktl::optional<EarlyBootZbi> zbi) {}

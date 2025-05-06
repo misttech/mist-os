@@ -16,7 +16,7 @@
 
 #include <ktl/enforce.h>
 
-void PhysMain(void* zbi, arch::EarlyTicks ticks) {
+void PhysMain(void* zbi_ptr, arch::EarlyTicks ticks) {
   // Apply any relocations required to ourself.
   ApplyRelocations();
 
@@ -35,8 +35,10 @@ void PhysMain(void* zbi, arch::EarlyTicks ticks) {
   // `uart::all::Config` as we work to remove `uart()` accessor.
   boot_options.serial = uart::all::GetConfig(ktl::move(GetUartDriver()).TakeUart());
 
+  EarlyBootZbi zbi{zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi_ptr))};
+
   // Obtain proper UART configuration from ZBI, both cmdline items and uart driver items.
-  SetBootOptions(boot_options, zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi)));
+  SetBootOptions(boot_options, zbi);
 
   // Configure the selected UART.
   //
@@ -49,5 +51,5 @@ void PhysMain(void* zbi, arch::EarlyTicks ticks) {
   ArchSetUp(zbi);
 
   // Call the real entry point now that it can use printf!  It does not return.
-  ZbiMain(zbi, ticks);
+  ZbiMain(zbi_ptr, zbi, ticks);
 }

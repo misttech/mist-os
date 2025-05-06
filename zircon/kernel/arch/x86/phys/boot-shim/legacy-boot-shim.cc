@@ -38,7 +38,7 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
 
   // This also fills in gLegacyBoot.
   AddressSpace aspace;
-  InitMemory(ptr, &aspace);
+  InitMemory(ptr, {}, &aspace);
 
   const ktl::span ramdisk = ktl::as_bytes(gLegacyBoot.ramdisk);
   gLegacyBoot.uart_config = UartFromZbi(LegacyBootShim::InputZbi(ramdisk), gLegacyBoot.uart_config);

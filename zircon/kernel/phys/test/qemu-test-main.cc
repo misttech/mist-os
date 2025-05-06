@@ -30,14 +30,14 @@ void PhysMain(void* bootloader_data, arch::EarlyTicks ticks) {
   boot_opts.serial = uart::qemu::kConfig;
   gBootOptions = &boot_opts;
 
-  ArchSetUp(nullptr);
+  ArchSetUp({});
 
   // Early boot may have filled the screen with logs. Add a newline to
   // terminate any previous line, and another newline to leave a blank.
   printf("\n\n");
 
   // Run the test.
-  int status = TestMain(bootloader_data, ticks);
+  int status = TestMain(bootloader_data, {}, ticks);
   if (status == 0) {
     printf("\n*** Test succeeded ***\n%s\n\n", BOOT_TEST_SUCCESS_STRING);
   } else {

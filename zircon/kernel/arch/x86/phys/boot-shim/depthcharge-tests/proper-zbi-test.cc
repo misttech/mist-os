@@ -18,15 +18,15 @@
 #include "test-main.h"
 
 // Checks that the |zbi| handed from depthcharge multiboot shim are proper.
-int TestMain(void* zbi, arch::EarlyTicks ticks) {
+int TestMain(void* bootloader_data, ktl::optional<EarlyBootZbi> zbi, arch::EarlyTicks ticks) {
   MainSymbolize symbolize("depthcharge-proper-zbi-test");
-  zbitl::View<zbitl::ByteView> zbi_view{
-      zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi))};
+
+  ZX_DEBUG_ASSERT(zbi);
 
   int i = 0;
   int buggy_item_index_1 = 0;
   int buggy_item_index_2 = 0;
-  for (const auto& [header, payload] : zbi_view) {
+  for (const auto& [header, payload] : *zbi) {
     switch (header->type) {
       case arch::kZbiBootKernelType:
         ZX_ASSERT(i == 0);
@@ -49,6 +49,6 @@ int TestMain(void* zbi, arch::EarlyTicks ticks) {
                 buggy_item_index_1, i - 2);
   ZX_ASSERT_MSG(buggy_item_index_2 == i - 1, "buggy item(--entry=$04foozbarz) at %d expected at %d",
                 buggy_item_index_2, i - 1);
-  ZX_ASSERT(zbi_view.take_error().is_ok());
+  ZX_ASSERT(zbi->take_error().is_ok());
   return 0;
 }

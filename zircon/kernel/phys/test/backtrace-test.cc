@@ -110,10 +110,11 @@ ptrdiff_t PHYS_SINGLETHREAD CheckAsmMacros() {
 
 }  // namespace
 
-[[gnu::noinline]] int TestMain(void* zbi, arch::EarlyTicks) {
+[[gnu::noinline]] int TestMain(void* bootloader_data, ktl::optional<EarlyBootZbi> zbi,
+                               arch::EarlyTicks) {
   MainSymbolize symbolize("backtrace-test");
 
-  if (zbi && static_cast<zbi_header_t*>(zbi)->type == ZBI_TYPE_CONTAINER) {
+  if (zbi) {
     ZX_ASSERT(Foo() == 4);  // _start -> PhysMain -> ZbiMain -> TestMain -> Foo -> Otter...
     ZX_ASSERT(CheckAsmMacros() ==
               5);  // _start -> PhysMain -> ZbiMain -> TestMain -> CallerWithAsmPrologue -> Otter...

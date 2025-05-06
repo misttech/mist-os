@@ -38,8 +38,12 @@ constexpr size_t kDevicetreeMaxMemoryRanges = 512;
 
 }  // namespace
 
-void InitMemory(void* dtb, AddressSpace* aspace) {
+void InitMemory(const void* dtb, ktl::optional<EarlyBootZbi> zbi, AddressSpace* aspace) {
   static std::array<memalloc::Range, kDevicetreeMaxMemoryRanges> range_storage;
+
+  // A devicetree-based boot shim should not have a ZBI encoding boot state at
+  // this point.
+  ZX_DEBUG_ASSERT(!zbi);
 
   devicetree::ByteView fdt_blob(static_cast<const uint8_t*>(dtb),
                                 std::numeric_limits<uintptr_t>::max());
@@ -128,7 +132,8 @@ void InitMemory(void* dtb, AddressSpace* aspace) {
   // TODO(https://fxbug.dev/397523685): Match operation returns a config and matcher stores a config
   // instead of a driver object.
   boot_options.serial = chosen.uart_config().value_or(GetUartDriver().config());
-  SetBootOptionsWithoutEntropy(boot_options, chosen.zbi(), chosen.cmdline().value_or(""));
+  SetBootOptionsWithoutEntropy(boot_options, EarlyBootZbi{chosen.zbi()},
+                               chosen.cmdline().value_or(""));
   SetUartConsole(boot_options.serial);
 
   Allocation::Init(ranges, special_ranges);

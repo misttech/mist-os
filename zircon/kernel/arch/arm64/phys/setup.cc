@@ -79,10 +79,9 @@ constexpr auto ResumeSpEl1 = ResumeSpElx<SpSameEl, SpBadEl, SpBadEl>;
 constexpr auto ResumeSpEl2 = ResumeSpElx<arch::ArmSpEl1, SpSameEl, SpBadEl>;
 constexpr auto ResumeSpEl3 = ResumeSpElx<arch::ArmSpEl1, arch::ArmSpEl2, SpSameEl>;
 
-const zbi_dcfg_arm_psci_driver_t* FindPsciConfig(void* zbi_ptr) {
+const zbi_dcfg_arm_psci_driver_t* FindPsciConfig(EarlyBootZbi zbi) {
   const zbi_dcfg_arm_psci_driver_t* cfg = nullptr;
 
-  zbitl::View zbi(zbitl::StorageFromRawHeader(static_cast<zbi_header_t*>(zbi_ptr)));
   for (auto [header, payload] : zbi) {
     if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_ARM_PSCI &&
         payload.size() >= sizeof(*cfg)) {
@@ -101,14 +100,14 @@ ArchPhysInfo gArchPhysInfoStorage;
 
 ArchPhysInfo* gArchPhysInfo;
 
-void ArchSetUp(void* zbi) {
+void ArchSetUp(ktl::optional<EarlyBootZbi> zbi) {
   gArchPhysInfo = &gArchPhysInfoStorage;
 
   // Hereafter any machine exceptions should be handled.
   ArmSetVbar(phys_exception);
 
   if (zbi) {
-    ArmPsciSetup(FindPsciConfig(zbi));
+    ArmPsciSetup(FindPsciConfig(*zbi));
   }
 }
 

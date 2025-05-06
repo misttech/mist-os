@@ -28,7 +28,7 @@ PHYS_SINGLETHREAD int main(int argc, char** argv) {
   }
 
   // Run the test.
-  int status = TestMain(nullptr, gEfiEntryTicks);
+  int status = TestMain(nullptr, {}, gEfiEntryTicks);
   if (status == 0) {
     printf("\n*** Test succeeded ***\n%s\n\n", BOOT_TEST_SUCCESS_STRING);
   } else {
