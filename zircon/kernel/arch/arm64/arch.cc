@@ -62,9 +62,6 @@ constexpr uint64_t PMCR_EL0_LONG_COUNTER_BIT = 1 << 6;
 // Performance Monitors User Enable Regiser, EL0.
 constexpr uint64_t PMUSERENR_EL0_ENABLE = 1 << 0;  // Enable EL0 access to cycle counter.
 
-// Used to hold up the boot sequence on secondary CPUs until signaled by the primary.
-ktl::atomic<bool> secondaries_released;
-
 // Whether or not to allow access to the PCT (physical counter) from EL0, in
 // addition to allowing access to the VCT (virtual counter).  This decision
 // needs to be programmed into each CPU's copy of the CNTKCTL_EL1 register
@@ -394,12 +391,6 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
   secondaries_to_init = cmdline_max_cpus - 1;
 
   lk_init_secondary_cpus(secondaries_to_init);
-
-  LTRACEF("releasing %u secondary cpus\n", secondaries_to_init);
-  secondaries_released.store(true);
-
-  // Flush the signaling variable since the secondary cpus may have not yet enabled their caches.
-  arch_clean_cache_range((vaddr_t)&secondaries_released, sizeof(secondaries_released));
 }
 
 void arch_late_init_percpu(void) {
@@ -460,7 +451,6 @@ void arch_enter_uspace(iframe_t* iframe) {
 }
 
 void arm64_allow_pct_in_el0() {
-  ASSERT(secondaries_released.load() == false);
   allow_pct_in_el0.store(true, ktl::memory_order_relaxed);
   SetupCntkctlEl1();
 }
@@ -470,11 +460,6 @@ extern "C" void arm64_secondary_entry();
 
 extern "C" void arm64_secondary_entry() {
   arm64_cpu_early_init();
-
-  // Wait until the primary has finished setting things up.
-  while (!secondaries_released.load()) {
-    arch::Yield();
-  }
 
   cpu_num_t cpu = arch_curr_cpu_num();
   _init_thread[cpu - 1].SecondaryCpuInitEarly();
