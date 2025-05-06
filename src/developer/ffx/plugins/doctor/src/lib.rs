@@ -278,7 +278,7 @@ impl FfxMain for DoctorTool {
 pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     context: EnvironmentContext,
 
-    cmd: DoctorCommand,
+    mut cmd: DoctorCommand,
     show_tool: Option<ShowToolWrapper>,
     mut writer: W,
 ) -> Result<()> {
@@ -293,6 +293,10 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     let mut log_root = None;
     let mut output_dir = None;
     let mut record = cmd.record;
+    // Force-enable verbose mode if `record` is enabled.
+    if record {
+        cmd.verbose = true;
+    }
     match context.get("log.enabled") {
         Ok(enabled) => {
             let enabled: bool = enabled;
@@ -2239,7 +2243,7 @@ mod test {
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_single_try_no_daemon_running_no_targets_with_default_target() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -2305,7 +2309,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_single_try_daemon_running_no_targets() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -2378,7 +2382,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_single_try_daemon_running_connection_error() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -2444,7 +2448,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_single_try_daemon_running_no_targets_default_target_empty() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -2517,7 +2521,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_two_tries_daemon_running_list_fails() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -2590,7 +2594,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_two_tries_no_daemon_running_echo_timeout() {
         let (tx, rx) = oneshot::channel::<()>();
 
@@ -2739,7 +2743,7 @@ mod test {
         return ledger;
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_finds_target_connects_to_rcs_with_ssh_error_verbose() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -2793,7 +2797,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ssh_connection_refused_recommends_tunnel() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
 
@@ -2808,7 +2812,7 @@ mod test {
         ));
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ssh_permission_denied_recommends_repave() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
 
@@ -2825,7 +2829,7 @@ mod test {
         ));
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_finds_target_connects_to_rcs_verbose() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -2883,7 +2887,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_finds_target_connects_to_rcs_normal() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -2916,7 +2920,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_finds_target_with_filter() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -3000,7 +3004,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_invalid_filter_finds_no_targets() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -3077,7 +3081,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_single_try_daemon_running_restart_daemon() {
         let fake = FakeDaemonManager::new(
             vec![false],
@@ -3114,7 +3118,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_single_try_daemon_running_restart_daemon_pid_error() {
         let fake = FakeDaemonManager::new(
             vec![false],
@@ -3154,7 +3158,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_single_try_daemon_running_no_targets_record_enabled() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -3319,7 +3323,7 @@ mod test {
         fake.assert_no_leftover_calls().await;
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_record_mode_missing_log_root_fails() {
         let temp = tempdir().unwrap();
         let root = temp.path().to_path_buf();
@@ -3328,7 +3332,7 @@ mod test {
         missing_field_test(fake_recorder, params).await;
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_record_mode_missing_output_dir_fails() {
         let temp = tempdir().unwrap();
         let root = temp.path().to_path_buf();
@@ -3376,7 +3380,7 @@ mod test {
         return ledger;
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_finds_target_with_missing_nodename_verbose() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -3433,7 +3437,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_finds_target_with_missing_nodename_normal() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -3467,7 +3471,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_fastboot_target() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -3543,7 +3547,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_single_try_daemon_running_different_api_level() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         setup_ssh_keys(&test_env).await.expect("setting up ssh test keys");
@@ -3617,7 +3621,7 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_missing_ssh_keys() {
         let test_env = ffx_config::test_init().await.expect("Setting up test environment");
         let pub_key = test_env.isolate_root.path().join("test_authorized_keys");
