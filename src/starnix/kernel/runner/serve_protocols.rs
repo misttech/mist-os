@@ -11,7 +11,6 @@ use fuchsia_async::{
 };
 use futures::channel::oneshot;
 use futures::{AsyncReadExt, AsyncWriteExt, Future, StreamExt, TryStreamExt};
-use starnix_core::device::framebuffer::Framebuffer;
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::devpts::create_main_and_replica;
 use starnix_core::fs::fuchsia::create_fuchsia_pipe;
@@ -21,6 +20,7 @@ use starnix_core::vfs::file_server::serve_file_at;
 use starnix_core::vfs::socket::VsockSocket;
 use starnix_core::vfs::{FdFlags, FileHandle};
 use starnix_logging::{log_error, log_warn};
+use starnix_modules_framebuffer::Framebuffer;
 use starnix_sync::{Locked, Unlocked};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::open_flags::OpenFlags;

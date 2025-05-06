@@ -2,15 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::framebuffer_server::{init_viewport_scene, start_presentation_loop, FramebufferServer};
-use crate::device::kobject::DeviceMetadata;
-use crate::device::{DeviceMode, DeviceOps};
-use crate::fs::sysfs::DeviceDirectory;
-use crate::mm::memory::MemoryObject;
-use crate::mm::MemoryAccessorExt;
-use crate::task::{CurrentTask, Kernel};
-use crate::vfs::{fileops_impl_memory, fileops_impl_noop_sync, FileObject, FileOps, FsNode};
+#![recursion_limit = "512"]
+
+mod server;
+
+use crate::server::{init_viewport_scene, start_presentation_loop, FramebufferServer};
 use fuchsia_component::client::connect_to_protocol_sync;
+use starnix_core::device::kobject::DeviceMetadata;
+use starnix_core::device::{DeviceMode, DeviceOps};
+use starnix_core::fs::sysfs::DeviceDirectory;
+use starnix_core::mm::memory::MemoryObject;
+use starnix_core::mm::MemoryAccessorExt;
+use starnix_core::task::{CurrentTask, Kernel};
+use starnix_core::vfs::{fileops_impl_memory, fileops_impl_noop_sync, FileObject, FileOps, FsNode};
 use starnix_logging::{log_info, log_warn};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -86,7 +90,7 @@ impl Framebuffer {
             DeviceMetadata::new("fb0".into(), DeviceType::FB0, DeviceMode::Char),
             graphics_class,
             DeviceDirectory::new,
-            framebuffer.clone(),
+            FramebufferDevice { framebuffer: framebuffer.clone() },
         );
 
         Ok(framebuffer)
@@ -216,7 +220,12 @@ impl Framebuffer {
     }
 }
 
-impl DeviceOps for Arc<Framebuffer> {
+#[derive(Clone)]
+struct FramebufferDevice {
+    framebuffer: Arc<Framebuffer>,
+}
+
+impl DeviceOps for FramebufferDevice {
     fn open(
         &self,
         _locked: &mut Locked<'_, DeviceOpen>,
@@ -229,11 +238,11 @@ impl DeviceOps for Arc<Framebuffer> {
             return error!(ENODEV);
         }
         node.update_info(|info| {
-            info.size = self.memory_len();
-            info.blocks = self.memory_size() / info.blksize;
+            info.size = self.framebuffer.memory_len();
+            info.blocks = self.framebuffer.memory_size() / info.blksize;
             Ok(())
         })?;
-        Ok(Box::new(Arc::clone(self)))
+        Ok(Box::new(Arc::clone(&self.framebuffer)))
     }
 }
 

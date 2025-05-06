@@ -10,8 +10,6 @@
 //! To display the `Framebuffer` as its view, a component must add the `framebuffer` feature to its
 //! `.cml`.
 
-use crate::mm::memory::MemoryObject;
-use crate::task::Kernel;
 use anyhow::anyhow;
 use fidl::endpoints::{create_proxy, create_request_stream};
 use fidl::HandleBased;
@@ -27,6 +25,8 @@ use fuchsia_scenic::flatland::ViewCreationTokenPair;
 use fuchsia_scenic::BufferCollectionTokenPair;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::{FutureExt, StreamExt};
+use starnix_core::mm::memory::MemoryObject;
+use starnix_core::task::Kernel;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::log_error;
 use starnix_sync::Mutex;
