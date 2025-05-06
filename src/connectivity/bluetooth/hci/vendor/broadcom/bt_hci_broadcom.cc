@@ -136,6 +136,7 @@ void BtHciBroadcom::GetFeatures(GetFeaturesCompleter::Sync& completer) {
   fidl::Arena arena;
   auto builder = fhbt::wire::VendorFeatures::Builder(arena);
   builder.acl_priority_command(true);
+  builder.android_vendor_extensions(fhbt::wire::AndroidVendorSupport::Builder(arena).Build());
   completer.Reply(builder.Build());
 }
 
