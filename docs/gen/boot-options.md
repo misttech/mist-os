@@ -641,7 +641,7 @@ the system will reboot by default if the kernel crashes or panics.
 If the kernel crashes and the system reboots, the log from the kernel panic will
 appear at `/boot/log/last-panic.txt`, suitable for viewing, downloading, etc.
 
-> Please attach your `last-panic.txt` and `zircon.elf` files to any kernel
+> Please attach your `last-panic.txt` and `physzircon` files to any kernel
 > panic bugs you file.
 
 If there's a `last-panic.txt`, that indicates that this is the first successful
