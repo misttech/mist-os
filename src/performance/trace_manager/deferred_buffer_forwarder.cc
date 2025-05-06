@@ -7,23 +7,39 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/fields.h>
 
+#include <filesystem>
+#include <format>
+
 namespace tracing {
 
 namespace {
-const char* kTraceFile = "/traces/trace.fxt";
+const char* kTraceDir = "/traces";
+}
+
+DeferredBufferForwarder::DeferredBufferForwarder(zx::socket destination)
+    : BufferForwarder(std::move(destination)) {
+  // In the event where trace_manager was killed while copying a trace, we might have an old file
+  // laying around. Remove them just in case.
+  std::filesystem::path dir_path = kTraceDir;  // Current directory
+  for (auto& p : std::filesystem::directory_iterator(dir_path)) {
+    std::filesystem::remove(p);
+  }
+  std::chrono::time_point now = std::chrono::system_clock::now();
+  std::string fname = std::format("trace_{}.fxt", now.time_since_epoch().count());
+  buffer_file_ = dir_path / fname;
 }
 
 DeferredBufferForwarder::~DeferredBufferForwarder() {
   Flush();
-  std::remove(kTraceFile);
+  std::filesystem::remove(buffer_file_);
 }
 TransferStatus DeferredBufferForwarder::Flush() {
   if (flushed_) {
     return TransferStatus::kComplete;
   }
-  FILE* f = fopen(kTraceFile, "r");
+  FILE* f = fopen(buffer_file_.c_str(), "r");
   if (f == nullptr) {
-    FX_LOGS(ERROR) << "Failed to open trace file: " << kTraceFile << " for read!";
+    FX_LOGS(ERROR) << "Failed to open trace file: " << buffer_file_ << " for read!";
     return TransferStatus::kWriteError;
   }
 
@@ -68,9 +84,9 @@ TransferStatus DeferredBufferForwarder::Flush() {
 }
 
 TransferStatus DeferredBufferForwarder::WriteBuffer(cpp20::span<const uint8_t> data) const {
-  FILE* f = fopen(kTraceFile, "a+");
+  FILE* f = fopen(buffer_file_.c_str(), "a+");
   if (f == nullptr) {
-    FX_LOGS(ERROR) << "Failed to open trace file for write: " << kTraceFile;
+    FX_LOGS(ERROR) << "Failed to open trace file for write: " << buffer_file_;
     return TransferStatus::kWriteError;
   }
   while (!data.empty()) {

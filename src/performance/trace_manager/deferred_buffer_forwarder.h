@@ -7,6 +7,7 @@
 #include <lib/stdcompat/span.h>
 #include <lib/zx/socket.h>
 
+#include <filesystem>
 #include <utility>
 
 #include "src/performance/trace_manager/buffer_forwarder.h"
@@ -17,8 +18,7 @@ namespace tracing {
 // the resulting socked
 class DeferredBufferForwarder : public BufferForwarder {
  public:
-  explicit DeferredBufferForwarder(zx::socket destination)
-      : BufferForwarder(std::move(destination)) {}
+  explicit DeferredBufferForwarder(zx::socket destination);
 
   TransferStatus Flush() override;
 
@@ -35,6 +35,9 @@ class DeferredBufferForwarder : public BufferForwarder {
   // during the transfer.
   TransferStatus WriteBuffer(cpp20::span<const uint8_t> data) const override;
   bool flushed_{false};
+
+ private:
+  std::filesystem::path buffer_file_;
 };
 }  // namespace tracing
 
