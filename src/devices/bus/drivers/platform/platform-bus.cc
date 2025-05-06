@@ -106,11 +106,11 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddProtoco
   }
 
   fhpb::Service::InstanceHandler handler({
-      .platform_bus = bus->bindings().CreateHandler(bus, fdf::Dispatcher::GetCurrent()->get(),
+      .platform_bus = bus->bindings().CreateHandler(bus, bus->driver_dispatcher()->get(),
                                                     fidl::kIgnoreBindingClosure),
-      .iommu = bus->iommu_bindings().CreateHandler(bus, fdf::Dispatcher::GetCurrent()->get(),
+      .iommu = bus->iommu_bindings().CreateHandler(bus, bus->driver_dispatcher()->get(),
                                                    fidl::kIgnoreBindingClosure),
-      .firmware = bus->fw_bindings().CreateHandler(bus, fdf::Dispatcher::GetCurrent()->get(),
+      .firmware = bus->fw_bindings().CreateHandler(bus, bus->driver_dispatcher()->get(),
                                                    fidl::kIgnoreBindingClosure),
   });
 
@@ -119,17 +119,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddProtoco
     return result.take_error();
   }
 
-  result = bus->outgoing()->AddService<fuchsia_sysinfo::Service>(
-      fuchsia_sysinfo::Service::InstanceHandler({
-          .device = bus->sysinfo_bindings().CreateHandler(
-              bus, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
-      }));
-  if (result.is_error()) {
-    return result.take_error();
-  }
-
   std::array offers = {fdf::MakeOffer2<fhpb::Service>(name),
-                       fdf::MakeOffer2<fuchsia_sysinfo::Service>(name),
                        fdf::MakeOffer2<fuchsia_driver_compat::Service>(name)};
 
   return fdf::AddChild(parent, bus->logger(), name, props, offers);
@@ -505,6 +495,20 @@ void PlatformBus::GetFirmware(GetFirmwareRequestView request, fdf::Arena& arena,
   completer.buffer(arena).ReplySuccess(ret);
 }
 
+void PlatformBus::GetInterruptInfo(GetInterruptInfoRequest& request,
+                                   GetInterruptInfoCompleter::Sync& completer) {
+  auto iter = std::find_if(devices_.begin(), devices_.end(), [&request](auto& device) {
+    return device->HasInterruptVector(request.interrupt_vector());
+  });
+  if (iter != devices_.end()) {
+    auto* device = iter->get();
+    completer.Reply(zx::ok(
+        fhpb::InterruptAttributorGetInterruptInfoResponse(device->name(), device->node_token())));
+  } else {
+    completer.Reply(zx::error(ZX_ERR_NOT_FOUND));
+  }
+}
+
 void PlatformBus::handle_unknown_method(fidl::UnknownMethodMetadata<fhpb::PlatformBus> metadata,
                                         fidl::UnknownMethodCompleter::Sync& completer) {
   fdf::warn("PlatformBus received unknown method with ordinal: {}", metadata.method_ordinal);
@@ -719,6 +723,20 @@ zx::result<> PlatformBus::Start() {
   }
 
   suspend_enabled_ = config.suspend_enabled();
+
+  zx::result result = outgoing()->AddService<fhpb::ObservabilityService>(
+      fhpb::ObservabilityService::InstanceHandler({
+          .interrupt =
+              interrupt_bindings().CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
+      }));
+  ZX_ASSERT(result.is_ok());
+
+  result =
+      outgoing()->AddService<fuchsia_sysinfo::Service>(fuchsia_sysinfo::Service::InstanceHandler({
+          .device =
+              sysinfo_bindings().CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
+      }));
+  ZX_ASSERT(result.is_ok());
 
   return zx::ok();
 }

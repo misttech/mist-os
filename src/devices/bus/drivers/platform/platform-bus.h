@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
+#include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -33,12 +34,14 @@ class PlatformBus : public fdf::DriverBase,
                     public fdf::WireServer<fuchsia_hardware_platform_bus::PlatformBus>,
                     public fdf::WireServer<fuchsia_hardware_platform_bus::Iommu>,
                     public fdf::WireServer<fuchsia_hardware_platform_bus::Firmware>,
+                    public fidl::Server<fuchsia_hardware_platform_bus::InterruptAttributor>,
                     public fidl::WireServer<fuchsia_sysinfo::SysInfo> {
  public:
   PlatformBus(fdf::DriverStartArgs start_args,
               fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
   using fdf::DriverBase::dispatcher;
+  using fdf::DriverBase::driver_dispatcher;
   using fdf::DriverBase::outgoing;
 
   zx::result<> Start() override;
@@ -69,6 +72,10 @@ class PlatformBus : public fdf::DriverBase,
   // fuchsia.hardware.platform.bus.Firmware implementation.
   void GetFirmware(GetFirmwareRequestView request, fdf::Arena& arena,
                    GetFirmwareCompleter::Sync& completer) override;
+
+  // InterruptAttributor protocol implementation.
+  void GetInterruptInfo(GetInterruptInfoRequest& request,
+                        GetInterruptInfoCompleter::Sync& completer) override;
 
   // SysInfo protocol implementation.
   void GetBoardName(GetBoardNameCompleter::Sync& completer) override;
@@ -105,6 +112,11 @@ class PlatformBus : public fdf::DriverBase,
 
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::Firmware>& fw_bindings() {
     return fw_bindings_;
+  }
+
+  fidl::ServerBindingGroup<fuchsia_hardware_platform_bus::InterruptAttributor>&
+  interrupt_bindings() {
+    return interrupt_bindings_;
   }
 
   fidl::ServerBindingGroup<fuchsia_sysinfo::SysInfo>& sysinfo_bindings() {
@@ -155,6 +167,7 @@ class PlatformBus : public fdf::DriverBase,
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::PlatformBus> bindings_;
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::Iommu> iommu_bindings_;
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::Firmware> fw_bindings_;
+  fidl::ServerBindingGroup<fuchsia_hardware_platform_bus::InterruptAttributor> interrupt_bindings_;
   fidl::ServerBindingGroup<fuchsia_sysinfo::SysInfo> sysinfo_bindings_;
 
   bool suspend_enabled_ = false;

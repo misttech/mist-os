@@ -109,8 +109,9 @@ fpromise::promise<inspect::Inspector> PlatformDevice::InspectNodeCallback() cons
   inspect::Inspector inspector;
   auto interrupt_vectors =
       inspector.GetRoot().CreateUintArray("interrupt_vectors", interrupt_vectors_.size());
-  for (size_t i = 0; i < interrupt_vectors_.size(); ++i) {
-    interrupt_vectors.Set(i, interrupt_vectors_[i]);
+  size_t i = 0;
+  for (const auto& vector : interrupt_vectors_) {
+    interrupt_vectors.Set(i++, vector);
   }
   inspector.emplace(std::move(interrupt_vectors));
   return fpromise::make_result_promise(fpromise::ok(std::move(inspector)));
@@ -193,7 +194,7 @@ zx::result<zx::interrupt> PlatformDevice::GetInterrupt(uint32_t index, uint32_t 
     fdf::error("zx_interrupt_create failed {}", zx_status_get_string(status));
     return zx::error(status);
   }
-  interrupt_vectors_.emplace_back(vector);
+  interrupt_vectors_.insert(vector);
   return zx::ok(std::move(out_irq));
 }
 

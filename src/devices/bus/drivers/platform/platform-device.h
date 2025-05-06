@@ -37,6 +37,7 @@ class PlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_device:
   explicit PlatformDevice(PlatformBus* bus, inspect::Node inspect_node,
                           fuchsia_hardware_platform_bus::Node node);
 
+  const std::string& name() const { return name_; }
   uint32_t vid() const { return vid_; }
   uint32_t pid() const { return pid_; }
   uint32_t did() const { return did_; }
@@ -108,6 +109,17 @@ class PlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_device:
   void handle_unknown_event(
       fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
 
+  bool HasInterruptVector(uint32_t vector) const { return interrupt_vectors_.contains(vector); }
+
+  zx::event node_token() const {
+    if (node_token_.has_value()) {
+      zx::event duplicate;
+      ZX_ASSERT(node_token_->duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate) == ZX_OK);
+      return duplicate;
+    }
+    return zx::event();
+  }
+
  private:
   // Allows for `std::string_view`'s to be used when searching an unordered map that uses
   // `std::string` as its key.
@@ -141,7 +153,7 @@ class PlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_device:
   // must be above `inspector_`. This is to ensure that `interrupt_vectors_` is
   // not destructed before `inspector_` is destructed. When `inspector_`
   // destructs, it executes a callback that references `interrupt_vectors_`.
-  std::vector<uint32_t> interrupt_vectors_;
+  std::unordered_set<uint32_t> interrupt_vectors_;
 
   // When the node is bound, a node_token_ representing the driver component which bound to the node
   // is generated. This can be used to for introspection.
