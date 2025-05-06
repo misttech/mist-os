@@ -55,7 +55,7 @@ class PmmNode {
 
   vm_page_t* PaddrToPage(paddr_t addr) TA_NO_THREAD_SAFETY_ANALYSIS;
 
-  static constexpr int kIndexZeroBits = 4;
+  static constexpr int kIndexZeroBits = 5;
   static constexpr uint32_t kIndexReserved0 = 0xffffff00;
 
   // Returns compressed representation a page_t*, with the following characteristics:

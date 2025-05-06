@@ -67,7 +67,7 @@ class VmPageOrMarker {
     // kAlignBits represents the number of low bits in a reference that must be zero so they can be
     // used for internal metadata. This is declared here for convenience, and is asserted to be in
     // sync with the private VmPageOrMarker::kTypeBits.
-    static constexpr int kAlignBits = 2;
+    static constexpr int kAlignBits = 3;
     // kExtraBits is used for bookkeeping on certain page providers, namely compressed storage.
     static constexpr int kExtraBits = 2;
     // Ensure the pmm page-to-index has enough zero bits.
@@ -224,7 +224,7 @@ class VmPageOrMarker {
   class ZeroRange {
    public:
     // This is the same as kIntervalBits. Equality is asserted later where kIntervalBits is defined.
-    static constexpr int kAlignBits = 6;
+    static constexpr int kAlignBits = 7;
 
     explicit constexpr ZeroRange(uint32_t val) : value_(val) {
       DEBUG_ASSERT((value_ & BIT_MASK32(kAlignBits)) == 0);
@@ -342,11 +342,11 @@ class VmPageOrMarker {
   // The low 2 bits of raw_ are reserved to select the type, any other data has to fit into the
   // remaining high bits. Note that there is no explicit Empty type, rather a PageType with a zero
   // pointer is used to represent Empty.
-  static constexpr uint32_t kTypeBits = 2;
-  static constexpr uint32_t kPageType = 0b00;
-  static constexpr uint32_t kZeroMarkerType = 0b01;
-  static constexpr uint32_t kReferenceType = 0b10;
-  static constexpr uint32_t kIntervalType = 0b11;
+  static constexpr uint32_t kTypeBits = 3;
+  static constexpr uint32_t kPageType = 0b000;
+  static constexpr uint32_t kZeroMarkerType = 0b001;
+  static constexpr uint32_t kReferenceType = 0b010;
+  static constexpr uint32_t kIntervalType = 0b011;
 
   // Ensure the reference values have alignment such the type bits can be set without overlapping
   // actual ref being stored. Unlike the page type, which does not allow the 0 value to be stored, a
