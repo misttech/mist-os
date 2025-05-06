@@ -69,7 +69,7 @@ created by the same device driver.
 A side-effect of `device_add()` is that the newly created device will be added
 to the global Device Filesystem maintained by the Device Coordinator. If the
 device has not implemented an `init()` hook, the device will be immediately
-accessible through opening its node in devfs.
+accessible.
 
 The `init()` hook is invoked following `device_add()`. This is useful for
 drivers that have to do extended initialization or probing and do not want

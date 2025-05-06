@@ -30,7 +30,7 @@ special conditions or edge cases that may apply to your driver.
 
   - [Use the DFv2 service discovery][use-service-discovery]
   - [Update component manifests of other drivers][update-component-manifests]
-  - [Expose a devfs node from the DFv2 driver][expose-devfs]
+  - [Advertise a service from the DFv2 driver][driver-communication]
   - [Use dispatchers][use-dispatchers]
   - [Use the DFv2 inspect][use-dfv2-inspect]
   - ([Optional) Implement your own load_firmware method][implement-firmware]
@@ -49,7 +49,7 @@ special conditions or edge cases that may apply to your driver.
 [update-other-services-to-dfv2]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/update-other-services-to-dfv2.md
 [use-service-discovery]: update-other-services-to-dfv2.md#use-the-dfv2-service-discovery
 [update-component-manifests]: update-other-services-to-dfv2.md#update-component-manifests-of-other-drivers
-[expose-devfs]: update-other-services-to-dfv2.md#expose-a-devfs-node-from-the-dfv2-driver
+[driver-communication]: /docs/concepts/drivers/driver_communication.md
 [use-dispatchers]: update-other-services-to-dfv2.md#use-dispatchers
 [use-dfv2-inspect]: update-other-services-to-dfv2.md#use-the-dfv2-inspect
 [implement-firmware]: update-other-services-to-dfv2.md#implement-your-own-load-firmware-method

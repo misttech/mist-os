@@ -295,7 +295,6 @@ components in this collection:
     *   `data`: Emulated persistent storage backed by `/tmp`
     *   `cache`: Emulated cache storage backed by `/tmp`
 *   [Directory capabilities][capability-directory]
-    *   `/dev`: Device driver `devfs` provided by Driver Manager
     *   `/boot`: Read-only `bootfs` provided by Component Manager
 
 The `ffx-laboratory` is a [`transient`][manifest-collections] collection.

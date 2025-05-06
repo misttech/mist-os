@@ -20,11 +20,14 @@ loading drivers and managing devices on all platforms. This is one of the initia
 on device bootup. It finds driver packages in pre-configured paths, tries to match a
 driver for every device by running the driver's bind rules, and manages the device lifecycle.
 It hosts a virtual filesystem named as Device Filesystem (`devfs`), that provides
-uniform access to all devices from userspace services/components external to the drivers. `devfs`
-is mounted under `/dev` and contains virtual files that eventually route to interfaces
-implemented by the devices.
+a deprecated method of driver access to non-driver components. New drivers
+do not use `devfs`, and instead [use services directly][driver-communication].
 
 ## Driver host
 
 Driver host is a binary that is launched by driver manager to host one or more drivers. It
 facilitates sandboxing of drivers.
+
+<!-- Reference links -->
+<!-- Other Docs -->
+[driver-communication]: /docs/concepts/drivers/driver_communication.md
