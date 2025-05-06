@@ -416,9 +416,20 @@ TransferStatus Tracee::TransferRecords() const {
 
   if (header->wrapped_count() > 0) {
     int buffer_number = get_buffer_number(header->wrapped_count() - 1);
-    if (auto transfer_status = write_rolling_chunk(buffer_number);
-        transfer_status != TransferStatus::kComplete) {
-      return transfer_status;
+    if (buffering_mode_ != fuchsia::tracing::BufferingMode::STREAMING) {
+      // In non streaming modes, we haven't transferred any data yet, so we always need to transfer
+      // the non active buffer
+      if (auto transfer_status = write_rolling_chunk(buffer_number);
+          transfer_status != TransferStatus::kComplete) {
+        return transfer_status;
+      }
+    } else if (last_wrapped_count_ < header->wrapped_count() - 1) {
+      // Otherwise, in streaming mode, only write the previous buffer if our local record indicates
+      // that we haven't transferred this version of it yet.
+      if (auto transfer_status = write_rolling_chunk(buffer_number);
+          transfer_status != TransferStatus::kComplete) {
+        return transfer_status;
+      }
     }
   }
   int buffer_number = get_buffer_number(header->wrapped_count());
