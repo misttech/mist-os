@@ -4,7 +4,6 @@
 
 use crate::bpf::attachments::EbpfAttachments;
 use crate::container_namespace::ContainerNamespace;
-use crate::device::android::bootloader_message_store::AndroidBootloaderMessageStore;
 use crate::device::binder::BinderDevice;
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
 use crate::device::{DeviceMode, DeviceRegistry};
@@ -186,12 +185,6 @@ pub struct Kernel {
 
     /// The registry of block devices backed by a remote fuchsia.io file.
     pub remote_block_device_registry: Arc<RemoteBlockDeviceRegistry>,
-
-    /// If a remote block device named "misc" is created, keep track of it; this is used by Android
-    /// to pass boot parameters to the bootloader.  Since Starnix is acting as a de-facto bootloader
-    /// for Android, we need to be able to peek into these messages.
-    /// Note that this might never be initialized (if the "misc" device never gets registered).
-    pub bootloader_message_store: OnceLock<AndroidBootloaderMessageStore>,
 
     /// The binder driver registered for this container, indexed by their device type.
     pub binders: RwLock<BTreeMap<DeviceType, BinderDevice>>,
@@ -418,7 +411,6 @@ impl Kernel {
             device_registry: Default::default(),
             container_namespace,
             remote_block_device_registry: Default::default(),
-            bootloader_message_store: OnceLock::new(),
             binders: Default::default(),
             iptables,
             shared_futexes: FutexTable::<SharedFutexKey>::default(),

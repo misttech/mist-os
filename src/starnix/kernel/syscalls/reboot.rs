@@ -20,7 +20,9 @@ use starnix_uapi::{
 };
 use {fidl_fuchsia_hardware_power_statecontrol as fpower, fidl_fuchsia_recovery as frecovery};
 
-use crate::device::android::bootloader_message_store::BootloaderMessage;
+use crate::device::android::bootloader_message_store::{
+    AndroidBootloaderMessageStore, BootloaderMessage,
+};
 use crate::mm::MemoryAccessorExt;
 use crate::security;
 use crate::task::{CurrentTask, Kernel};
@@ -124,7 +126,9 @@ pub fn sys_reboot(
             } else if reboot_args.contains(&&b"recovery"[..]) {
                 // Read the bootloader message from the misc partition to determine whether the
                 // device is rebooting to perform an FDR.
-                if let Some(store) = current_task.kernel().bootloader_message_store.get() {
+                if let Some(store) =
+                    current_task.kernel().expando.peek::<AndroidBootloaderMessageStore>()
+                {
                     match store.read_bootloader_message() {
                         Ok(BootloaderMessage::BootRecovery(args)) => {
                             if args.iter().any(|arg| arg == "--wipe_data") {
