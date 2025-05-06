@@ -44,6 +44,5 @@ void PhysMain(void* bootloader_data, arch::EarlyTicks ticks) {
     printf("\n*** Test FAILED: status %d ***\n\n", status);
   }
 
-  // No way to shut down.
-  abort();
+  ArchPanicReset();
 }
