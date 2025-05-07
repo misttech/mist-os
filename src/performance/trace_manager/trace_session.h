@@ -73,9 +73,9 @@ class TraceSession {
   //
   // |abort_handler| is invoked whenever the session encounters
   // unrecoverable errors that render the session dead.
-  TraceSession(async::Executor& executor, zx::socket destination,
+  TraceSession(async::Executor& executor, std::shared_ptr<BufferForwarder> destination,
                std::vector<std::string> categories, size_t buffer_size_megabytes,
-               fuchsia::tracing::BufferingMode buffering_mode, DataForwarding forwarding_mode,
+               fuchsia::tracing::BufferingMode buffering_mode,
                TraceProviderSpecMap&& provider_specs, zx::duration start_timeout,
                zx::duration stop_timeout, controller::FxtVersion fxt_version,
                fit::closure abort_handler, AlertCallback alert_callback);

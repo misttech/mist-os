@@ -336,10 +336,15 @@ pub async fn trace(
             }
             let expanded_categories =
                 ffx_trace::expand_categories(&context, opts.categories.clone()).await?;
+            let defer_transfer = match opts.buffering_mode {
+                BufferingMode::Oneshot | BufferingMode::Circular => false,
+                BufferingMode::Streaming => true,
+            };
             let trace_config = TraceConfig {
                 buffer_size_megabytes_hint: Some(opts.buffer_size),
                 categories: Some(opts.categories),
                 buffering_mode: Some(opts.buffering_mode),
+                defer_transfer: Some(defer_transfer),
                 ..ffx_trace::map_categories_to_providers(&expanded_categories)
             };
             let output = canonical_path(opts.output)?;

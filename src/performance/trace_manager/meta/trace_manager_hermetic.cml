@@ -20,6 +20,15 @@
             ],
         },
     ],
+    use: [
+        {
+            storage: "data",
+            path: "/traces",
+        },
+        {
+            protocol: [ "fuchsia.sysinfo.SysInfo" ],
+        },
+    ],
     expose: [
         {
             protocol: "fuchsia.tracing.controller.Controller",

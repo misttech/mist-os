@@ -17,18 +17,15 @@
 
 namespace tracing {
 
-TraceSession::TraceSession(async::Executor& executor, zx::socket destination,
+TraceSession::TraceSession(async::Executor& executor, std::shared_ptr<BufferForwarder> destination,
                            std::vector<std::string> enabled_categories,
                            size_t buffer_size_megabytes,
                            fuchsia::tracing::BufferingMode buffering_mode,
-                           DataForwarding forwarding_mode, TraceProviderSpecMap&& provider_specs,
-                           zx::duration start_timeout, zx::duration stop_timeout,
-                           controller::FxtVersion fxt_version, fit::closure abort_handler,
-                           AlertCallback alert_callback)
+                           TraceProviderSpecMap&& provider_specs, zx::duration start_timeout,
+                           zx::duration stop_timeout, controller::FxtVersion fxt_version,
+                           fit::closure abort_handler, AlertCallback alert_callback)
     : executor_(executor),
-      buffer_forwarder_(forwarding_mode == DataForwarding::kEager
-                            ? std::make_shared<BufferForwarder>(std::move(destination))
-                            : std::make_shared<DeferredBufferForwarder>(std::move(destination))),
+      buffer_forwarder_(std::move(destination)),
       enabled_categories_(std::move(enabled_categories)),
       buffer_size_megabytes_(buffer_size_megabytes),
       buffering_mode_(buffering_mode),

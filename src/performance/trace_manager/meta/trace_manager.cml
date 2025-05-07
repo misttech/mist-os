@@ -47,6 +47,10 @@
             storage: "data",
             path: "/traces",
         },
+        {
+            protocol: [ "fuchsia.sysinfo.SysInfo" ],
+            availability: "optional",
+        },
     ],
     offer: [
         {
