@@ -27,6 +27,9 @@
                 // TODO: https://fxbug.dev/377912777 - Fix `fs_use_task` not to apply type transitions.
                 "PipeTest.BeforePolicyReceivesKernelContext",
                 "PipeTest.LabeledFromTask",
+
+                // TODO: https://fxbug.dev/416040663 - Fix FIFOs to be labeled like other files.
+                "FifoTest.LabeledFromFilesystem",
             ],
         },
     ],
