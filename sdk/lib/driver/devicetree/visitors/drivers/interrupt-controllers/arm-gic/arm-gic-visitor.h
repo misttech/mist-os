@@ -27,9 +27,10 @@ class ArmGicVisitor : public fdf_devicetree::DriverVisitor {
                                std::vector<fdf_devicetree::PropertyValue>& interrupts,
                                const std::vector<fdf_devicetree::PropertyValue>& interrupt_names);
 
-  zx::result<> ParseInterrupt(fdf_devicetree::Node& child, fdf_devicetree::ReferenceNode& parent,
-                              fdf_devicetree::PropertyCells interrupt_cells,
-                              std::optional<std::string> interrupt_name);
+  static zx::result<> ParseInterrupt(fdf_devicetree::Node& child,
+                                     fdf_devicetree::ReferenceNode& parent,
+                                     fdf_devicetree::PropertyCells interrupt_cells,
+                                     std::optional<std::string> interrupt_name);
 
   fdf_devicetree::InterruptParser interrupt_parser_;
 };

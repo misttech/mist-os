@@ -209,7 +209,6 @@ zx::result<> ArmGicVisitor::ParseInterrupt(fdf_devicetree::Node& child,
     return mode.take_error();
   }
 
-  std::optional<std::string> name = std::nullopt;
   fuchsia_hardware_platform_bus::Irq irq = {{
       .irq = interrupt.irq(),
       .mode = *mode,
