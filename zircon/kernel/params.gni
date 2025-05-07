@@ -127,7 +127,7 @@ declare_args() {
   experimental_ktrace_streaming_enabled = false
 
   # Use fine grained (per VMO) locks instead of a single lock for the entire clone hierarchy.
-  vmo_fine_grained_locking = false
+  vmo_fine_grained_locking = true
 }
 
 declare_args() {
