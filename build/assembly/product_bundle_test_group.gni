@@ -54,9 +54,16 @@ template("product_bundle_test_group") {
     assert(false)
   }
 
-  # The tests are treated as host-tests, therefore we only add the metadata if
-  # we are evaluating in the host toolchain.
+  # The test_spec should always be generate in the default toolchain even if
+  # these are e2e (host) tests, because we want to avoid accidentally creating
+  # two test specs for the same test.
   if (is_host) {
+    group(target_name) {
+      testonly = true
+      not_needed(invoker, "*")
+      public_deps = [ ":${target_name}($default_toolchain)" ]
+    }
+  } else {
     _product_bundle_name = target_name
     if (defined(invoker.product_bundle_name)) {
       _product_bundle_name = invoker.product_bundle_name
@@ -86,19 +93,6 @@ template("product_bundle_test_group") {
             tests_json = rebase_path(_tests_json, root_build_dir)
           },
         ]
-      }
-    }
-  } else {
-    not_needed(invoker,
-               [
-                 "environments",
-                 "product_bundle_name",
-               ])
-    group(target_name) {
-      testonly = true
-      public_deps = invoker.tests
-      metadata = {
-        tests_barrier = []
       }
     }
   }
