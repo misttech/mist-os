@@ -62,20 +62,16 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             (SerialMode::NoOutput, &BuildType::User) => {
                 builder.kernel_arg(KernelArg::Serial("none".to_string()))
             }
-            (SerialMode::NoOutput, &BuildType::UserDebug | &BuildType::Eng) => {}
-            (SerialMode::Legacy, &BuildType::UserDebug | &BuildType::User) => {
-                println!("Serial cannot be enabled on user or userdebug builds. Not enabling.");
-            }
             (SerialMode::Legacy, &BuildType::Eng) => {
                 builder.platform_bundle("kernel_serial_legacy")
             }
+            (SerialMode::NoOutput, &BuildType::UserDebug | &BuildType::Eng) => {}
+            (SerialMode::Legacy, &BuildType::UserDebug | &BuildType::User) => {}
         }
 
         if let Some(serial) = &context.board_info.kernel.serial {
             if context.build_type == &BuildType::Eng {
                 builder.kernel_arg(KernelArg::Serial(serial.to_string()));
-            } else {
-                println!("'kernel.serial' can only be enabled in 'eng' builds. Not enabling.")
             }
         }
 
