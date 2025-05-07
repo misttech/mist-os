@@ -313,12 +313,12 @@ struct PartitionsArgs {
     depfile: Option<Utf8PathBuf>,
 }
 
+/// Arguments to extract a package from an assembly product config container.
 #[derive(FromArgs)]
 #[argh(subcommand, name = "product-package")]
 #[allow(dead_code)]
-/// Arguments to extract a package from an assembly product config container.
 struct ExtractProductPackageArgs {
-    /// the input product config with absolute paths.
+    /// the input product config container directory.
     #[argh(option)]
     config: Utf8PathBuf,
 

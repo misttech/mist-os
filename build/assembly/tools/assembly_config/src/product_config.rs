@@ -4,11 +4,11 @@
 
 use crate::{common, ExtractProductPackageArgs, HybridProductArgs, ProductArgs};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use assembly_config_schema::AssemblyConfig;
 use assembly_container::AssemblyContainer;
 use camino::Utf8PathBuf;
-use fuchsia_pkg::PackageManifest;
+use fuchsia_pkg::{PackageBuilder, PackageManifest};
 
 pub fn new(args: &ProductArgs) -> Result<()> {
     let mut config = AssemblyConfig::from_config_path(&args.config)?;
@@ -47,7 +47,26 @@ pub fn hybrid(args: &HybridProductArgs) -> Result<()> {
     Ok(())
 }
 
-pub fn extract_package(_: &ExtractProductPackageArgs) -> Result<()> {
+pub fn extract_package(args: &ExtractProductPackageArgs) -> Result<()> {
+    let mut config = AssemblyConfig::from_dir(&args.config)?;
+
+    if let Some(package_manifest_path) = find_package_in_product(&mut config, &args.package_name) {
+        let manifest =
+            PackageManifest::try_load_from(&package_manifest_path).with_context(|| {
+                format!("Loading package manifest to extract: {}", &package_manifest_path)
+            })?;
+        let mut builder = PackageBuilder::from_manifest(manifest, &args.outdir)
+            .with_context(|| format!("Loading package to extract: {}", &args.package_name))?;
+
+        let metafar_path = args.outdir.join("meta.far");
+        builder.manifest_path(args.output_package_manifest.clone());
+        builder
+            .build(&args.outdir, &metafar_path)
+            .with_context(|| format!("Writing out extracted package: {}", &args.package_name))?;
+    } else {
+        anyhow::bail!("Could not find package to extract: {}", &args.package_name);
+    }
+
     Ok(())
 }
 
@@ -68,10 +87,14 @@ fn find_package_in_product<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fuchsia_pkg::PackageName;
     use std::fs;
     use std::fs::File;
     use std::io::Write;
     use tempfile::{tempdir, NamedTempFile};
+    use version_history::AbiRevision;
+
+    const FAKE_ABI_REVISION: AbiRevision = AbiRevision::from_u64(0x5836508c2defac54);
 
     fn create_tmp_file(content: String) -> (NamedTempFile, Utf8PathBuf) {
         let file = NamedTempFile::new().unwrap();
@@ -140,5 +163,60 @@ mod tests {
         let config = AssemblyConfig::from_dir(product_path).unwrap();
         let expected = "unversioned".to_string();
         assert_eq!(expected, config.product.release_version.unwrap());
+    }
+
+    #[test]
+    fn test_extract_package() {
+        let tmp_dir = tempdir().unwrap();
+        let tmp_path = Utf8PathBuf::from_path_buf(tmp_dir.path().to_path_buf()).unwrap();
+        let product_path = tmp_path.join("my_product");
+        fs::create_dir(&product_path).unwrap();
+
+        let packages_path = product_path.join("packages");
+        fs::create_dir(&packages_path).unwrap();
+
+        let gendir = tmp_path.join("gendir");
+        fs::create_dir(&gendir).unwrap();
+
+        let test_package_path = packages_path.join("test");
+        let mut builder = PackageBuilder::new("test", FAKE_ABI_REVISION);
+        builder.add_contents_as_blob("some/file", "foobar", &gendir).unwrap();
+        builder.manifest_path(test_package_path);
+        let metafar_path = packages_path.join("meta.far");
+        builder.build(&packages_path, &metafar_path).unwrap();
+
+        let config_path = product_path.join("product_configuration.json");
+        let config_file = File::create(&config_path).unwrap();
+        let config_value = serde_json::json!({
+            "platform": {
+                "build_type": "eng",
+            },
+            "product": {
+                "packages": {
+                    "base": {
+                       "test" : {
+                         "manifest": "packages/test"
+                       },
+                    },
+                },
+            },
+        });
+        serde_json::to_writer(&config_file, &config_value).unwrap();
+
+        let outdir_path = tmp_path.join("outdir");
+        let output_package_manifest_path = tmp_path.join("manifest.json");
+
+        let args = ExtractProductPackageArgs {
+            config: product_path,
+            package_name: "test".into(),
+            outdir: outdir_path,
+            output_package_manifest: output_package_manifest_path.clone(),
+            depfile: None,
+        };
+        extract_package(&args).unwrap();
+        let extracted_package = PackageManifest::try_load_from(&output_package_manifest_path)
+            .expect("Package manifest loaded");
+
+        assert_eq!(extracted_package.name(), &"test".parse::<PackageName>().unwrap());
     }
 }
