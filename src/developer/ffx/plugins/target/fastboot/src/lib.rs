@@ -22,13 +22,12 @@ use futures::try_join;
 use schemars::JsonSchema;
 use serde::Serialize;
 use sparse::reader::SparseReader;
-use sparse::{build_sparse_files, unsparse};
+use sparse::{build_sparse_files, resparse_sparse_img};
 use std::fs::File;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use target_holders::TargetInfoHolder;
-use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 
@@ -186,34 +185,29 @@ where
 
             let mut file_handle =
                 File::open(&cmd.file).map_err(|e| anyhow!(e)).map_err(fho::Error::from)?;
-            let file_to_sparse = match SparseReader::is_sparse_file(&mut file_handle) {
+
+            let sparse_files = match SparseReader::is_sparse_file(&mut file_handle) {
                 Ok(true) => {
-                    // First unsparse it to a temporary file
-                    let (mut unsparsed_file, unsparsed_temp_path) =
-                        NamedTempFile::new_in(std::env::temp_dir().as_path())
-                            .map_err(|e| anyhow!(e))
-                            .map_err(fho::Error::from)?
-                            .into_parts();
-                    unsparse(&mut file_handle, &mut unsparsed_file)?;
-                    // Now build sparse filees
-                    unsparsed_temp_path.keep().map_err(|e| anyhow!(e)).map_err(fho::Error::from)?
+                    log::debug!("Is already a sparse file. Building Reader");
+                    let mut reader = SparseReader::new(file_handle)?;
+                    log::debug!("Building sparse image");
+                    resparse_sparse_img(&mut reader, &cmd.out_dir, download_size)?
                 }
-                Err(_) | Ok(false) => cmd.file.clone(),
+                Err(_) | Ok(false) => {
+                    log::debug!(
+                        "About to build sparse files for: {:?}, and put them in: {:?}",
+                        cmd.file,
+                        cmd.out_dir
+                    );
+
+                    let filename = cmd.file.to_str().unwrap();
+                    let files =
+                        build_sparse_files(filename, filename, &cmd.out_dir, download_size)?;
+                    files
+                }
             };
 
-            log::debug!(
-                "About to build sparse files for: {:?}, and put them in: {:?}",
-                file_to_sparse,
-                cmd.out_dir
-            );
-
-            let files = build_sparse_files(
-                "test",
-                file_to_sparse.to_str().unwrap(),
-                &cmd.out_dir,
-                download_size,
-            )?;
-            for (i, file) in files.into_iter().enumerate() {
+            for (i, file) in sparse_files.into_iter().enumerate() {
                 let out_path = cmd.out_dir.join(format!("{}-tmp.simg", i));
                 file.persist(&out_path).map_err(|e| anyhow!(e)).map_err(fho::Error::from)?;
                 log::debug!("Keeping file: {:?}", out_path);

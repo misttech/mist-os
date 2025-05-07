@@ -9,7 +9,8 @@ pub mod builder;
 mod format;
 pub mod reader;
 
-use crate::format::{ChunkHeader, SparseHeader};
+use crate::format::{ChunkHeader, SparseHeader, CHUNK_HEADER_SIZE, SPARSE_HEADER_SIZE};
+use crate::reader::SparseReader;
 use anyhow::{bail, ensure, Context, Result};
 use core::fmt;
 use serde::de::DeserializeOwned;
@@ -79,18 +80,18 @@ enum Chunk {
     /// `Raw` represents a set of blocks to be written to disk as-is.
     /// `start` is the offset in the expanded image at which the Raw section starts.
     /// `start` and `size` are in bytes, but must be block-aligned.
-    Raw { start: u64, size: u32 },
+    Raw { start: u64, size: u64 },
     /// `Fill` represents a Chunk that has the `value` repeated enough to fill `size` bytes.
     /// `start` is the offset in the expanded image at which the Fill section starts.
     /// `start` and `size` are in bytes, but must be block-aligned.
-    Fill { start: u64, size: u32, value: u32 },
+    Fill { start: u64, size: u64, value: u32 },
     /// `DontCare` represents a set of blocks that need to be "offset" by the
     /// image recipient.  If an image needs to be broken up into two sparse images, and we flash n
     /// bytes for Sparse Image 1, Sparse Image 2 needs to start with a DontCareChunk with
     /// (n/blocksize) blocks as its "size" property.
     /// `start` is the offset in the expanded image at which the DontCare section starts.
     /// `start` and `size` are in bytes, but must be block-aligned.
-    DontCare { start: u64, size: u32 },
+    DontCare { start: u64, size: u64 },
     /// `Crc32Chunk` is used as a checksum of a given set of Chunks for a SparseImage.  This is not
     /// required and unused in most implementations of the Sparse Image format. The type is included
     /// for completeness. It has 4 bytes of CRC32 checksum as describable in a u32.
@@ -113,13 +114,13 @@ impl Chunk {
             .checked_mul(block_size)
             .context("Chunk size * block size can not be larger than 2^32")?;
         match header.chunk_type {
-            format::CHUNK_TYPE_RAW => Ok(Self::Raw { start: offset, size }),
+            format::CHUNK_TYPE_RAW => Ok(Self::Raw { start: offset, size: size.into() }),
             format::CHUNK_TYPE_FILL => {
                 let value: u32 =
                     deserialize_from(reader).context("Failed to deserialize fill value")?;
-                Ok(Self::Fill { start: offset, size, value })
+                Ok(Self::Fill { start: offset, size: size.into(), value })
             }
-            format::CHUNK_TYPE_DONT_CARE => Ok(Self::DontCare { start: offset, size }),
+            format::CHUNK_TYPE_DONT_CARE => Ok(Self::DontCare { start: offset, size: size.into() }),
             format::CHUNK_TYPE_CRC32 => {
                 let checksum: u32 =
                     deserialize_from(reader).context("Failed to deserialize checksum")?;
@@ -131,7 +132,7 @@ impl Chunk {
     }
 
     fn valid(&self, block_size: u32) -> bool {
-        self.output_size() % block_size == 0
+        self.output_size() % (block_size as u64) == 0
     }
 
     /// Returns the offset into the logical image the chunk refers to, or None if the chunk has no
@@ -146,7 +147,7 @@ impl Chunk {
     }
 
     /// Return number of bytes the chunk expands to when written to the partition.
-    fn output_size(&self) -> u32 {
+    fn output_size(&self) -> u64 {
         match self {
             Self::Raw { size, .. } => *size,
             Self::Fill { size, .. } => *size,
@@ -157,7 +158,7 @@ impl Chunk {
 
     /// Return number of blocks the chunk expands to when written to the partition.
     fn output_blocks(&self, block_size: u32) -> u32 {
-        self.output_size().div_ceil(block_size)
+        self.output_size().div_ceil(block_size as u64) as u32
     }
 
     /// `chunk_type` returns the integer flag to represent the type of chunk
@@ -172,11 +173,15 @@ impl Chunk {
     }
 
     /// `chunk_data_len` returns the length of the chunk's header plus the
-    /// length of the data when serialized
+    /// length of the data when serialized.
+    ///
+    /// This gets included in the sparse header and is encoded as a u32.
+    /// But while we are tracking the offsets and total sizes we need it to be
+    /// a u64 to help keep track of files that are greater than 4 GiB
     fn chunk_data_len(&self) -> u32 {
         let header_size = format::CHUNK_HEADER_SIZE;
         let data_size = match self {
-            Self::Raw { size, .. } => *size,
+            Self::Raw { size, .. } => *size as u32,
             Self::Fill { .. } => std::mem::size_of::<u32>() as u32,
             Self::DontCare { .. } => 0,
             Self::Crc32 { .. } => std::mem::size_of::<u32>() as u32,
@@ -413,7 +418,7 @@ fn resparse(
     // File length already starts with a header for the SparseFile as
     // well as the size of a potential DontCare and Crc32 Chunk
     let sunk_file_length = format::SPARSE_HEADER_SIZE as u64
-        + Chunk::DontCare { start: 0, size: BLK_SIZE }.chunk_data_len() as u64
+        + Chunk::DontCare { start: 0, size: BLK_SIZE.into() }.chunk_data_len() as u64
         + Chunk::Crc32 { checksum: 2345 }.chunk_data_len() as u64;
 
     let mut chunk_pos = 0;
@@ -429,7 +434,7 @@ fn resparse(
             // If we already have some chunks... add a DontCare block to
             // move the pointer
             log::trace!("Adding a DontCare chunk offset: {}", chunk_pos);
-            let dont_care = Chunk::DontCare { start: 0, size: output_offset.try_into().unwrap() };
+            let dont_care = Chunk::DontCare { start: 0, size: output_offset };
             chunks.push(dont_care);
         }
 
@@ -452,10 +457,8 @@ fn resparse(
                         // warning if a sparse file does not have the same number of output blocks
                         // as declared in the header.
                         let remainder_size = sparse_file.total_bytes() - output_offset;
-                        let dont_care = Chunk::DontCare {
-                            start: output_offset,
-                            size: remainder_size.try_into().unwrap(),
-                        };
+                        let dont_care =
+                            Chunk::DontCare { start: output_offset, size: remainder_size };
                         chunks.push(dont_care);
                         break;
                     }
@@ -483,6 +486,62 @@ fn resparse(
         log::trace!("resparse: Adding new SparseFile: {}", resparsed);
         ret.push(resparsed);
     }
+
+    Ok(ret)
+}
+
+/// Takes a provided `reader` and generates a set of temporary files in `dir`
+/// in the Sparse image format. With the provided `max_download_size`
+/// constraining file size.
+///
+/// # Arguments
+///
+/// * `reader` - The Sparse Reader of a Sparse File
+/// * `dir` - Path to the directory to write the Sparse file(s).
+/// * `max_download_size` - Maximum size that can be downloaded by the device.
+pub fn resparse_sparse_img<R: Read + std::io::Seek>(
+    reader: &mut SparseReader<R>,
+    dir: &Path,
+    max_download_size: u64,
+) -> Result<Vec<TempPath>> {
+    log::debug!("Building writer from Reader");
+    let mut chunks = vec![];
+    // The sparse image we are reading from has a header and a chunk
+    // in it already. we need to have the offset reflect that.
+    let header_sunk = SPARSE_HEADER_SIZE as u64;
+    let mut raw_chunks_encountered = 0;
+    for (chunk, offset) in reader.chunks() {
+        log::info!("resparse_sparse_img. Processing chunk: {} with offset: {:#?}", chunk, offset);
+        if chunk.chunk_type() == format::CHUNK_TYPE_RAW {
+            raw_chunks_encountered += 1;
+            // This is a raw chunk. We'll split it up into blocks
+            let blks = chunk.output_blocks(BLK_SIZE);
+            log::trace!("resparse_sparse_image: splitting RAW chunk into {} chunks", blks);
+            let sunk: u64 = header_sunk + (raw_chunks_encountered * CHUNK_HEADER_SIZE) as u64;
+            for i in 0..blks {
+                let start: u64 = offset.unwrap_or(0) + (BLK_SIZE * i) as u64 - sunk;
+                log::debug!("resparse_sparse_img: adding RAW chunk at start: {}", start);
+                chunks.push(Chunk::Raw { start, size: BLK_SIZE.into() })
+            }
+        } else {
+            chunks.push(chunk.clone());
+        }
+    }
+    let sparse_file = SparseFileWriter::new(chunks);
+
+    let mut ret = Vec::<TempPath>::new();
+    log::debug!("Resparsing sparse file");
+    for re_sparsed_file in resparse(sparse_file, max_download_size)? {
+        let (file, temp_path) = NamedTempFile::new_in(dir)?.into_parts();
+        let mut file_create = File::from(file);
+
+        log::debug!("Writing resparsed {} to disk", re_sparsed_file);
+        re_sparsed_file.write(reader, &mut file_create)?;
+
+        ret.push(temp_path);
+    }
+
+    log::debug!("Finished building sparse files");
 
     Ok(ret)
 }
@@ -517,6 +576,7 @@ pub fn build_sparse_files(
     // Preallocate vector to avoid reallocations as it grows.
     let mut chunks =
         Vec::<Chunk>::with_capacity((in_file.metadata()?.len() as usize / BLK_SIZE as usize) + 1);
+
     let mut buf = [0u8; BLK_SIZE as usize];
     loop {
         let read = in_file.read(&mut buf)?;
@@ -525,6 +585,7 @@ pub fn build_sparse_files(
         }
 
         let is_fill = buf.chunks(4).collect::<Vec<&[u8]>>().windows(2).all(|w| w[0] == w[1]);
+
         if is_fill {
             // The Android Sparse Image Format specifies that a fill block
             // is a four-byte u32 repeated to fill BLK_SIZE. Here we use
@@ -550,7 +611,7 @@ pub fn build_sparse_files(
                 // skip the last bit of the file which is zeroed out from the previous
                 // raw buffer
                 let skip_end =
-                    Chunk::DontCare { start: (total_read + read) as u64, size: BLK_SIZE };
+                    Chunk::DontCare { start: (total_read + read) as u64, size: BLK_SIZE.into() };
                 chunks.push(skip_end);
             }
         }
@@ -613,7 +674,7 @@ mod test {
     fn test_fill_into_bytes() {
         let mut dest = Cursor::new(Vec::<u8>::new());
 
-        let fill_chunk = Chunk::Fill { start: 0, size: 5 * BLK_SIZE, value: 365 };
+        let fill_chunk = Chunk::Fill { start: 0, size: (5 * BLK_SIZE).into(), value: 365 };
         fill_chunk.write(NO_SOURCE, &mut dest, BLK_SIZE).unwrap();
         assert_eq!(dest.into_inner(), [194, 202, 0, 0, 5, 0, 0, 0, 16, 0, 0, 0, 109, 1, 0, 0]);
     }
@@ -625,7 +686,7 @@ mod test {
 
         let mut source = Cursor::new(Vec::<u8>::from(&b"12345"[..]));
         let mut sparse = Cursor::new(Vec::<u8>::new());
-        let chunk = Chunk::Raw { start: 0, size: BLK_SIZE };
+        let chunk = Chunk::Raw { start: 0, size: BLK_SIZE.into() };
 
         chunk.write(Some(&mut source), &mut sparse, BLK_SIZE).unwrap();
         let buf = sparse.into_inner();
@@ -637,7 +698,7 @@ mod test {
     #[test]
     fn test_dont_care_into_bytes() {
         let mut dest = Cursor::new(Vec::<u8>::new());
-        let chunk = Chunk::DontCare { start: 0, size: 5 * BLK_SIZE };
+        let chunk = Chunk::DontCare { start: 0, size: (5 * BLK_SIZE).into() };
 
         chunk.write(NO_SOURCE, &mut dest, BLK_SIZE).unwrap();
         assert_eq!(dest.into_inner(), [195, 202, 0, 0, 5, 0, 0, 0, 12, 0, 0, 0]);
@@ -775,7 +836,7 @@ mod test {
             let mut init_vec = Vec::<Chunk>::new();
             init_vec.push(Chunk::Fill { start: 0, size: 4096, value: 1 });
             let mut res = init_vec.clone();
-            add_sparse_chunk(&mut res, Chunk::Fill { start: 0, size: u32::MAX - 4095, value: 1 })
+            add_sparse_chunk(&mut res, Chunk::Fill { start: 0, size: u64::MAX - 4095, value: 1 })
                 .unwrap();
             assert_ne!(res, init_vec);
             assert_eq!(2, res.len());
@@ -783,7 +844,7 @@ mod test {
                 res,
                 [
                     Chunk::Fill { start: 0, size: 4096, value: 1 },
-                    Chunk::Fill { start: 0, size: u32::MAX - 4095, value: 1 }
+                    Chunk::Fill { start: 0, size: u64::MAX - 4095, value: 1 }
                 ]
             );
         }
@@ -822,14 +883,14 @@ mod test {
             let mut init_vec = Vec::<Chunk>::new();
             init_vec.push(Chunk::DontCare { start: 0, size: 4096 });
             let mut res = init_vec.clone();
-            add_sparse_chunk(&mut res, Chunk::DontCare { start: 0, size: u32::MAX - 4095 })
+            add_sparse_chunk(&mut res, Chunk::DontCare { start: 0, size: u64::MAX - 4095 })
                 .unwrap();
             assert_eq!(2, res.len());
             assert_eq!(
                 res,
                 [
                     Chunk::DontCare { start: 0, size: 4096 },
-                    Chunk::DontCare { start: 0, size: u32::MAX - 4095 }
+                    Chunk::DontCare { start: 0, size: u64::MAX - 4095 }
                 ]
             );
         }
@@ -868,13 +929,13 @@ mod test {
             let mut init_vec = Vec::<Chunk>::new();
             init_vec.push(Chunk::Raw { start: 0, size: 4096 });
             let mut res = init_vec.clone();
-            add_sparse_chunk(&mut res, Chunk::Raw { start: 0, size: u32::MAX - 4095 }).unwrap();
+            add_sparse_chunk(&mut res, Chunk::Raw { start: 0, size: u64::MAX - 4095 }).unwrap();
             assert_eq!(2, res.len());
             assert_eq!(
                 res,
                 [
                     Chunk::Raw { start: 0, size: 4096 },
-                    Chunk::Raw { start: 0, size: u32::MAX - 4095 }
+                    Chunk::Raw { start: 0, size: u64::MAX - 4095 }
                 ]
             );
         }
@@ -1029,5 +1090,72 @@ mod test {
             vec![0u8; simg2img_output_bytes.len() - buf.len()],
             "The remainder of our simg2img_output_bytes should be 0"
         );
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_resparse_from_sparse() {
+        use crate::reader::SparseReader;
+        use crate::resparse_sparse_img;
+
+        let simg2img_path = Path::new("./host_x64/test_data/storage/sparse/simg2img");
+        assert!(
+            Path::exists(simg2img_path),
+            "simg2img binary must exist at {}",
+            simg2img_path.display()
+        );
+
+        let tmpdir = TempDir::new().unwrap();
+
+        // Generate a large temporary file
+        let (mut file, _temp_path) = NamedTempFile::new_in(&tmpdir).unwrap().into_parts();
+        let mut rng = SmallRng::from_entropy();
+        let mut buf = Vec::<u8>::new();
+        buf.resize(10 * 4096, 0);
+        rng.fill_bytes(&mut buf);
+        file.write_all(&buf).unwrap();
+        file.flush().unwrap();
+        file.seek(SeekFrom::Start(0)).unwrap();
+        let content_size = buf.len();
+
+        // build a sparse file
+        let sparse_file_tmp = NamedTempFile::new_in(&tmpdir).unwrap();
+        let mut sparse_file = sparse_file_tmp.into_file();
+        SparseImageBuilder::new()
+            .add_chunk(DataSource::Buffer(Box::new([0xffu8; 4096 * 2])))
+            .add_chunk(DataSource::Reader { reader: Box::new(file), size: content_size as u64 })
+            .add_chunk(DataSource::Fill(0xaaaa_aaaau32, 1024))
+            .add_chunk(DataSource::Skip(16384))
+            .build(&mut sparse_file)
+            .expect("Build sparse image failed");
+        sparse_file.seek(SeekFrom::Start(0)).unwrap();
+
+        let mut reader = SparseReader::new(sparse_file).expect("create reader");
+
+        let files = resparse_sparse_img(&mut reader, tmpdir.path(), 4096 * 3).unwrap();
+
+        // Re build the image from the sparse files
+        let mut simg2img_output_sparsed = tmpdir.path().to_path_buf();
+        simg2img_output_sparsed.push("output_sparsed");
+
+        let mut simg2img_sparsed = Command::new(simg2img_path)
+            .args(&files[..])
+            .arg(&simg2img_output_sparsed)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("Failed to spawn simg2img");
+        let res = simg2img_sparsed.wait().expect("simg2img did was not running");
+        assert!(res.success(), "simg2img did not succeed");
+        let mut simg2img_stdout = simg2img_sparsed.stdout.take().expect("Get stdout from simg2img");
+        let mut simg2img_stderr = simg2img_sparsed.stderr.take().expect("Get stderr from simg2img");
+
+        let mut stdout = String::new();
+        simg2img_stdout.read_to_string(&mut stdout).expect("Reading simg2img stdout");
+        assert_eq!(stdout, "");
+
+        let mut stderr = String::new();
+        simg2img_stderr.read_to_string(&mut stderr).expect("Reading simg2img stderr");
+        assert_eq!(stderr, "");
     }
 }

@@ -132,15 +132,24 @@ impl<'a, W: Write> ChunkWriter<'a, W> {
     }
 
     fn write_raw_chunk<R: Read>(&mut self, size: u32, mut source: R) -> Result<()> {
-        self.write_chunk_impl(Chunk::Raw { start: self.current_offset, size }, Some(&mut source))
+        self.write_chunk_impl(
+            Chunk::Raw { start: self.current_offset, size: size.into() },
+            Some(&mut source),
+        )
     }
 
     fn write_dont_care_chunk(&mut self, size: u32) -> Result<()> {
-        self.write_chunk_impl(Chunk::DontCare { start: self.current_offset, size }, NO_SOURCE)
+        self.write_chunk_impl(
+            Chunk::DontCare { start: self.current_offset, size: size.into() },
+            NO_SOURCE,
+        )
     }
 
     fn write_fill_chunk(&mut self, size: u32, value: u32) -> Result<()> {
-        self.write_chunk_impl(Chunk::Fill { start: self.current_offset, size, value }, NO_SOURCE)
+        self.write_chunk_impl(
+            Chunk::Fill { start: self.current_offset, size: size.into(), value },
+            NO_SOURCE,
+        )
     }
 }
 
@@ -220,14 +229,14 @@ mod tests {
 
         let reader = SparseReader::new(Cursor::new(&output)).unwrap();
         assert_eq!(
-            &reader.chunks(),
+            reader.chunks(),
             &[
                 (
-                    Chunk::Raw { start: 0, size: BLK_SIZE },
+                    Chunk::Raw { start: 0, size: BLK_SIZE.into() },
                     Some((SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE) as u64)
                 ),
                 (
-                    Chunk::Raw { start: BLK_SIZE as u64, size: BLK_SIZE },
+                    Chunk::Raw { start: BLK_SIZE as u64, size: BLK_SIZE.into() },
                     Some((SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE * 2 + BLK_SIZE) as u64)
                 )
             ]
@@ -271,18 +280,18 @@ mod tests {
 
         let reader = SparseReader::new(Cursor::new(&output)).unwrap();
         assert_eq!(
-            &reader.chunks(),
+            reader.chunks(),
             &[
                 (
-                    Chunk::Raw { start: 0, size: BLK_SIZE },
+                    Chunk::Raw { start: 0, size: BLK_SIZE.into() },
                     Some((SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE) as u64)
                 ),
                 (
-                    Chunk::Raw { start: BLK_SIZE as u64, size: BLK_SIZE },
+                    Chunk::Raw { start: BLK_SIZE as u64, size: BLK_SIZE.into() },
                     Some((SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE * 2 + BLK_SIZE) as u64)
                 ),
                 (
-                    Chunk::Raw { start: (BLK_SIZE * 2) as u64, size: BLK_SIZE },
+                    Chunk::Raw { start: (BLK_SIZE * 2) as u64, size: BLK_SIZE.into() },
                     Some((SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE * 3 + BLK_SIZE * 2) as u64)
                 ),
             ]
@@ -316,10 +325,10 @@ mod tests {
 
         let reader = SparseReader::new(Cursor::new(&output)).unwrap();
         assert_eq!(
-            &reader.chunks(),
+            reader.chunks(),
             &[
-                (Chunk::DontCare { start: 0, size: BLK_SIZE }, None),
-                (Chunk::DontCare { start: BLK_SIZE as u64, size: BLK_SIZE }, None)
+                (Chunk::DontCare { start: 0, size: BLK_SIZE.into() }, None),
+                (Chunk::DontCare { start: BLK_SIZE as u64, size: BLK_SIZE.into() }, None)
             ]
         );
     }
@@ -336,10 +345,10 @@ mod tests {
 
         let reader = SparseReader::new(Cursor::new(&output)).unwrap();
         assert_eq!(
-            &reader.chunks(),
+            reader.chunks(),
             &[
-                (Chunk::Fill { start: 0, size: BLK_SIZE, value: 0xAB }, None),
-                (Chunk::Fill { start: BLK_SIZE as u64, size: BLK_SIZE, value: 0xAB }, None)
+                (Chunk::Fill { start: 0, size: BLK_SIZE.into(), value: 0xAB }, None),
+                (Chunk::Fill { start: BLK_SIZE as u64, size: BLK_SIZE.into(), value: 0xAB }, None)
             ]
         );
     }

@@ -17,10 +17,9 @@ use futures::try_join;
 use pbms::is_local_product_bundle;
 use sdk::SdkVersion;
 use sparse::reader::SparseReader;
-use sparse::{build_sparse_files, unsparse};
+use sparse::{build_sparse_files, resparse_sparse_img};
 use std::fs::File;
 use std::path::PathBuf;
-use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -256,25 +255,19 @@ pub async fn flash_partition_impl<T: FastbootInterface>(
                     "Image is too big to fit into target RAM and is a sparse image. Re-sparsing"
                 );
 
-                // First unsparse it to a temporary file
-                let (mut unsparsed_file, unsparsed_temp_path) =
-                    NamedTempFile::new_in(std::env::temp_dir().as_path())?.into_parts();
-                tracing::debug!(
-                    "Unsparsing file: {} to: {}",
-                    file_to_upload,
-                    unsparsed_temp_path.to_str().unwrap()
-                );
-                unsparse(&mut file_handle, &mut unsparsed_file)?;
-
-                flash_partition_sparse(
-                    name,
-                    &messenger,
-                    &unsparsed_temp_path.to_str().unwrap(),
-                    fastboot_interface,
+                tracing::debug!("Is already a sparse file. Building Reader");
+                let mut reader = SparseReader::new(file_handle)?;
+                tracing::debug!("Building sparse image");
+                let sparse_files = resparse_sparse_img(
+                    &mut reader,
+                    std::env::temp_dir().as_path(),
                     max_download_size,
-                    timeout,
-                )
-                .await?;
+                )?;
+
+                for tmp_file_path in sparse_files {
+                    let tmp_file_name = tmp_file_path.to_str().unwrap();
+                    do_flash(name, &messenger, fastboot_interface, tmp_file_name, timeout).await?;
+                }
             }
             Err(_) | Ok(false) => {
                 tracing::debug!(
