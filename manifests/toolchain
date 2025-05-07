@@ -118,7 +118,7 @@
 
      <!-- rust-analyzer, used for rust editor support -->
      <package name="fuchsia/third_party/rust-analyzer/${platform}"
-              version="git_revision:5d66d45005fef79751294419ab9a9fa304dfdf5c"
+              version="git_revision:298fa81aacda7b06de4db55c377b1aa081906bc9"
               platforms="linux-amd64,mac-amd64,mac-arm64"
               path="prebuilt/third_party/rust-analyzer"/>
 
