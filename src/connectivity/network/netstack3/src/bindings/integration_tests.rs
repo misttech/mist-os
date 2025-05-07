@@ -68,8 +68,8 @@ pub(crate) struct TestStack {
     // Keep a clone of the netstack so we can peek into core contexts and such
     // in tests.
     netstack: crate::bindings::Netstack,
-    // The main task running the netstack.
-    task: Option<fasync::Task<()>>,
+    // The scope containing all netstack tasks.
+    scope: Option<fasync::Scope>,
     // A channel sink standing in for ServiceFs when running tests.
     services_sink: mpsc::UnboundedSender<crate::bindings::Service>,
     // The inspector instance given to Netstack, can be used to probe available
@@ -81,7 +81,7 @@ pub(crate) struct TestStack {
 
 impl Drop for TestStack {
     fn drop(&mut self) {
-        if self.task.is_some() {
+        if self.scope.is_some() {
             panic!("dropped TestStack without calling shutdown")
         }
     }
@@ -297,14 +297,16 @@ impl TestStack {
         let inspector = Arc::new(fuchsia_inspect::Inspector::default());
         let netstack = seed.netstack.clone();
         let inspector_cloned = inspector.clone();
-        let task = fasync::Task::spawn(async move {
+
+        let scope = fasync::Scope::new_with_name("TestStack");
+        let _: fasync::JoinHandle<()> = scope.spawn(async move {
             let inspect_publisher = InspectPublisher::new_for_test(&inspector_cloned);
             seed.serve(services, inspect_publisher).await
         });
 
         Self {
             netstack,
-            task: Some(task),
+            scope: Some(scope),
             services_sink,
             inspector: inspector,
             endpoint_ids: Default::default(),
@@ -335,13 +337,13 @@ impl TestStack {
 
     /// Synchronously shutdown the running stack.
     pub(crate) async fn shutdown(mut self) {
-        let task = self.task.take().unwrap();
+        let scope = self.scope.take().unwrap();
 
         // Drop all the TestStack, which will release our clone of Ctx and close
         // the services sink, which triggers the main loop shutdown.
         std::mem::drop(self);
 
-        task.await;
+        scope.join().await;
     }
 }
 
