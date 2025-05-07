@@ -678,28 +678,6 @@ void KTraceImpl<BufferMode::kPerCpu>::KernelAspaceAllocator::Free(ktl::byte* ptr
 }
 
 template <>
-void KTraceImpl<BufferMode::kPerCpu>::DisableWrites() {
-  // Start off by disabling writes.
-  // It may be possible to do this with relaxed semantics, but we do it with release semantics
-  // out of an abundance of caution.
-  writes_enabled_.store(false, ktl::memory_order_release);
-
-  // Wait for any in-progress writes to complete.
-  // We accomplish this by:
-  // 1. Disabling interrupts on this core, thus preventing this thread from being migrated across
-  //    CPUs. We could alternatively just disable preemption, but mp_sync_exec requires interrupts
-  //    to be disabled when using MP_IPI_TARGET_ALL_BUT_LOCAL.
-  // 2. Sending an IPI that runs a no-op to all other cores. Since writes run with interrupts
-  //    disabled, the mere fact that a core is able to process an IPI means that it is not
-  //    currently performing a trace record write. Additionally, mp_sync_exec issues a memory
-  //    barrier that ensures that every other core will see that writes are disabled after
-  //    processing the IPI.
-  InterruptDisableGuard irq_guard;
-  auto wait_for_write_completion = [](void*) {};
-  mp_sync_exec(MP_IPI_TARGET_ALL_BUT_LOCAL, 0, wait_for_write_completion, nullptr);
-}
-
-template <>
 zx_status_t KTraceImpl<BufferMode::kPerCpu>::Allocate() {
   if (percpu_buffers_) {
     return ZX_OK;
@@ -865,8 +843,32 @@ void KTraceImpl<BufferMode::kPerCpu>::Init(uint32_t bufsize, uint32_t initial_gr
 
 template <>
 zx_status_t KTraceImpl<BufferMode::kPerCpu>::Stop() {
+  // Calling Stop on an uninitialized KTrace buffer is a no-op.
+  if (!percpu_buffers_) {
+    return ZX_OK;
+  }
+
+  // Clear the categories bitmask and disable writes. This prevents any new writes from starting.
   set_categories_bitmask(0u);
   DisableWrites();
+
+  // Wait for any in-progress writes to complete and emit any dropped record statistics.
+  // We accomplish this by sending an IPI to all cores that instructs them to EmitDropStats.
+  // Since writes run with interrupts disabled, the mere fact that a core is able to process this
+  // IPI means that it is not performing any other concurrent writes. Additionally, mp_sync_exec
+  // issues a memory barrier that ensures that every other core will see that writes are disabled
+  // after processing the IPI.
+  auto emit_drop_stats = [](void* arg) {
+    const cpu_num_t curr_cpu = arch_curr_cpu_num();
+    PerCpuBuffer* percpu_buffers = static_cast<PerCpuBuffer*>(arg);
+    PerCpuBuffer& curr_cpu_buffer = percpu_buffers[curr_cpu];
+
+    // We do not require that this call succeeds. If the trace buffer still doesn't have enough
+    // space to contain the dropped record statistics, this will fail, but there's not much we can
+    // do about that.
+    curr_cpu_buffer.EmitDropStats();
+  };
+  mp_sync_exec(MP_IPI_TARGET_ALL, 0, emit_drop_stats, percpu_buffers_.get());
   return ZX_OK;
 }
 
@@ -884,13 +886,16 @@ zx_status_t KTraceImpl<BufferMode::kPerCpu>::Rewind() {
   // 2. Ensuring writes are disabled to prevent any future writes from starting.
   // 3. Performing the Drain within an IPI on each core, ensuring that this operation does not
   //    race with any in-progress writes.
-  writes_enabled_.store(false, ktl::memory_order_release);
+  // Rewind also resets the dropped record statistics on every buffer to prepare for the next
+  // tracing session.
+  DisableWrites();
 
   auto run_drain = [](void* arg) {
     const cpu_num_t curr_cpu = arch_curr_cpu_num();
     PerCpuBuffer* percpu_buffers = static_cast<PerCpuBuffer*>(arg);
     PerCpuBuffer& curr_cpu_buffer = percpu_buffers[curr_cpu];
     curr_cpu_buffer.Drain();
+    curr_cpu_buffer.ResetDropStats();
   };
   mp_sync_exec(MP_IPI_TARGET_ALL, 0, run_drain, percpu_buffers_.get());
   return ZX_OK;

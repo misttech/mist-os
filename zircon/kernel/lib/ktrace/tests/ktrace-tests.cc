@@ -351,6 +351,201 @@ class KTraceTests {
 
     END_TEST;
   }
+
+  static bool TestDroppedRecordTracking() {
+    BEGIN_TEST;
+
+    // Allocate a source buffer with random data to write and a destination buffer to read into.
+    fbl::AllocChecker ac;
+    ktl::byte* src = new (&ac) ktl::byte[PAGE_SIZE];
+    ASSERT_TRUE(ac.check());
+    memset(src, 0xff, PAGE_SIZE);
+    ktl::byte* dst = new (&ac) ktl::byte[PAGE_SIZE];
+    ASSERT_TRUE(ac.check());
+
+    enum class Action {
+      kWrite,
+      kStop,
+      kRewind,
+    };
+    struct TestCase {
+      Action action;
+      bool drain;
+    };
+    TestCase test_cases[] = {
+        // Test the case where a write would cause us to emit a dropped records duration, but the
+        // buffer does not contain enough space to do so.
+        {
+            .action = Action::kWrite,
+            .drain = false,
+        },
+        // Test the case where a write would cause us to emit a dropped records duration and we have
+        // enough space to do so.
+        {
+            .action = Action::kWrite,
+            .drain = true,
+        },
+        // Test the case where a stop would cause us to emit a dropped records duration, but the
+        // buffer does not contain enough space to do so.
+        {
+            .action = Action::kStop,
+            .drain = false,
+        },
+        // Test the case where a stop would cause us to emit a dropped records duration and we have
+        // enough space to do so.
+        {
+            .action = Action::kStop,
+            .drain = true,
+        },
+        // Test the case where we rewind after dropping records. This should not cause a dropped
+        // records duration to be emitted, regardless of whether we drain or not.
+        {
+            .action = Action::kRewind,
+        },
+    };
+    srand(4);
+    for (TestCase& tc : test_cases) {
+      // Dropped record size is the number of bytes we plan to drop.
+      const uint32_t dropped_record_size = static_cast<uint32_t>(rand()) % PAGE_SIZE;
+
+      // Write record size is the number of bytes to write if the action is kWrite.
+      const uint32_t write_record_size = static_cast<uint32_t>(rand()) % PAGE_SIZE;
+
+      // Initialize an instance of ktrace with a single per-CPU buffer for simplicity and start
+      // tracing.
+      TestKTrace ktrace;
+      const uint32_t num_cpus = 1;
+      const uint32_t total_bufsize = PAGE_SIZE * num_cpus;
+      ktrace.Init(total_bufsize, 0xffff);
+      TestKTrace::PerCpuBuffer& pcb = ktrace.percpu_buffers_[0];
+
+      // Fill the buffer up.
+      zx::result<TestKTrace::PerCpuBuffer::Reservation> res = pcb.Reserve(PAGE_SIZE);
+      ASSERT_OK(res.status_value());
+      res->Write(ktl::span<ktl::byte>(src, PAGE_SIZE));
+      res->Commit();
+
+      // Get the current time. This will be the lower bound for the start timestamp found in the
+      // dropped record statistics.
+      const zx_instant_boot_ticks_t start_lower_bound = TestKTrace::Timestamp();
+
+      // Drop a record.
+      res = pcb.Reserve(dropped_record_size);
+      ASSERT_EQ(ZX_ERR_NO_SPACE, res.status_value());
+
+      // Drain the buffer if the test case said we should do so.
+      if (tc.drain) {
+        pcb.Drain();
+      }
+
+      // Perform the action.
+      switch (tc.action) {
+        case Action::kWrite: {
+          res = pcb.Reserve(write_record_size);
+          if (tc.drain) {
+            ASSERT_OK(res.status_value());
+            res->Write(ktl::span<ktl::byte>(src, write_record_size));
+            res->Commit();
+          } else {
+            ASSERT_EQ(ZX_ERR_NO_SPACE, res.status_value());
+          }
+          break;
+        }
+        case Action::kRewind:
+          ASSERT_OK(ktrace.Control(KTRACE_ACTION_REWIND, 0u));
+          break;
+        case Action::kStop:
+          ASSERT_OK(ktrace.Control(KTRACE_ACTION_STOP, 0u));
+          break;
+      }
+
+      // Get the current time. This will be the upper bound for the end timestamp found in the
+      // dropped record statistics. We could make this bound tighter in cases where the action is
+      // Stop, but for simplicity we take the sample here.
+      const zx_instant_boot_ticks_t end_upper_bound = TestKTrace::Timestamp();
+
+      // Read out trace data.
+      memset(dst, 0, PAGE_SIZE);
+      auto copy_fn = [&](uint32_t offset, ktl::span<ktl::byte> src) {
+        memcpy(dst, src.data(), src.size());
+        return ZX_OK;
+      };
+      zx::result<size_t> read_result = pcb.Read(copy_fn, PAGE_SIZE);
+      ASSERT_OK(read_result.status_value());
+
+      //
+      // Now, validate that we got the right outcome.
+      //
+
+      // If we performed a Rewind, we should read nothing and the dropped records stats should be
+      // reset.
+      if (tc.action == Action::kRewind) {
+        ASSERT_EQ(0u, read_result.value());
+        ASSERT_TRUE(!pcb.first_dropped_.has_value());
+        continue;
+      }
+
+      // If we performed a Write or Stop without draining the buffer, then we should just read
+      // the source data we used to fill up the buffer, but the drop stats should contain the
+      // number and size of the records dropped.
+      if (!tc.drain) {
+        constexpr uint32_t expected_read_size = PAGE_SIZE;
+        ASSERT_EQ(expected_read_size, read_result.value());
+        ASSERT_BYTES_EQ(reinterpret_cast<uint8_t*>(src), reinterpret_cast<uint8_t*>(dst),
+                        expected_read_size)
+        ASSERT_TRUE(pcb.first_dropped_.has_value())
+        ASSERT_LE(start_lower_bound, pcb.first_dropped_.value());
+        ASSERT_GE(end_upper_bound, pcb.last_dropped_.value());
+
+        if (tc.action == Action::kWrite) {
+          ASSERT_EQ(2u, pcb.num_dropped_);
+          ASSERT_EQ(dropped_record_size + write_record_size, pcb.bytes_dropped_);
+        } else if (tc.action == Action::kStop) {
+          ASSERT_EQ(1u, pcb.num_dropped_);
+          ASSERT_EQ(dropped_record_size, pcb.bytes_dropped_);
+        }
+        continue;
+      }
+
+      // If we got here, then we drained the buffer before performing our action, and the action was
+      // either a Write or a Stop. In either case, a dropped records duration should have been
+      // emitted to the trace buffer.
+      struct DurationCompleteEvent {
+        uint64_t header;
+        zx_instant_boot_ticks_t start;
+        uint64_t process_id;
+        uint64_t thread_id;
+        uint64_t num_dropped_arg;
+        uint64_t bytes_dropped_arg;
+        zx_instant_boot_ticks_t end;
+      };
+      if (tc.action == Action::kStop) {
+        ASSERT_EQ(sizeof(DurationCompleteEvent), read_result.value());
+      } else if (tc.action == Action::kWrite) {
+        ASSERT_EQ(sizeof(DurationCompleteEvent) + write_record_size, read_result.value());
+      }
+
+      // Validate the dropped records statistics that we read.
+      DurationCompleteEvent* drop_stats = reinterpret_cast<DurationCompleteEvent*>(dst);
+      ASSERT_LE(start_lower_bound, drop_stats->start);
+      ASSERT_GE(end_upper_bound, drop_stats->end);
+      // The arguments use the fxt::Argument format:
+      // https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#32-bit-unsigned-integer-argument
+      // All we want to verify is the actual value of the argument, which is found in the upper 32
+      // bits.
+      ASSERT_EQ(1u, drop_stats->num_dropped_arg >> 32);
+      ASSERT_EQ(dropped_record_size, drop_stats->bytes_dropped_arg >> 32);
+
+      // Finally, if we performed a write, validate that we also read the correct record after the
+      // dropped records duration was emitted.
+      if (tc.action == Action::kWrite) {
+        ASSERT_BYTES_EQ(reinterpret_cast<uint8_t*>(dst + sizeof(DurationCompleteEvent)),
+                        reinterpret_cast<uint8_t*>(src), write_record_size);
+      }
+    }
+
+    END_TEST;
+  }
 };
 
 UNITTEST_START_TESTCASE(ktrace_tests)
@@ -360,4 +555,5 @@ UNITTEST("start_stop", KTraceTests::TestStartStop)
 UNITTEST("write", KTraceTests::TestWrite)
 UNITTEST("rewind", KTraceTests::TestRewind)
 UNITTEST("read_user", KTraceTests::TestReadUser)
+UNITTEST("dropped_records", KTraceTests::TestDroppedRecordTracking)
 UNITTEST_END_TESTCASE(ktrace_tests, "ktrace", "KTrace tests")
