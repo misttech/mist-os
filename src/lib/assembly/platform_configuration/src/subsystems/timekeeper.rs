@@ -58,7 +58,14 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
         //
         // At the moment the flag is set only if all conditions are met, i.e. the functionality
         // is requested, and the underlying driver is available.
+        //
+        // The same information is offered as a config capability to other components.
         let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms && has_aml_timer;
+        builder.set_config_capability(
+            "fuchsia.time.config.HasWakeAlarms",
+            //TODO: b/416081776 - replace `true` with serve_fuchsia_time_alarms.
+            Config::new(ConfigValueType::Bool, true.into()),
+        )?;
 
         // Adds hrtimer routing only for boards that have hardware support for
         // doing so.
