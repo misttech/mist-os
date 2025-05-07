@@ -32,6 +32,7 @@
 //! protocol does not remove the interface).
 
 use std::collections::hash_map;
+use std::convert::Infallible as Never;
 use std::fmt::Debug;
 use std::num::NonZeroU16;
 use std::ops::DerefMut as _;
@@ -43,7 +44,7 @@ use fidl_fuchsia_net_interfaces_ext::{NotPositiveMonotonicInstantError, Positive
 use fnet_interfaces_admin::GrantForInterfaceAuthorization;
 use futures::future::FusedFuture as _;
 use futures::stream::FusedStream as _;
-use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _};
 use log::{debug, error, info, warn};
 use net_types::ip::{AddrSubnetEither, IpAddr, Ipv4, Ipv6};
 use net_types::{SpecifiedAddr, Witness};
@@ -119,6 +120,14 @@ async fn run_blackhole_interface(
     control_server_end: ServerEnd<fnet_interfaces_admin::ControlMarker>,
     options: fnet_interfaces_admin::Options,
 ) {
+    let scope = fasync::Scope::current();
+    // Acquire a guard, we need to see run_interface_control running to
+    // completion.
+    let Some(guard) = scope.active_guard() else {
+        warn!("not creating blackhole interface, could not acquire scope guard");
+        return;
+    };
+
     let fnet_interfaces_admin::Options { name, metric, __source_breaking: _ } = options;
 
     let (binding_id, binding_id_alloc, name) = match name {
@@ -146,7 +155,7 @@ async fn run_blackhole_interface(
 
     let (control_sender, control_receiver) =
         OwnedControlHandle::new_channel_with_owned_handle(control_server_end).await;
-    let (_interface_control_stop_sender, interface_control_stop_receiver) =
+    let (interface_control_stop_sender, interface_control_stop_receiver) =
         futures::channel::oneshot::channel();
 
     let events = ns.create_interface_event_producer(
@@ -214,16 +223,31 @@ async fn run_blackhole_interface(
     info!("created interface {:?}", core_id);
     ns.ctx.bindings_ctx().devices.add_device(binding_id_alloc, core_id);
 
-    run_interface_control(
+    let interface_control_fut = pin!(run_interface_control(
         ns.ctx.clone(),
+        scope.new_child_with_name("blackhole_inner"),
         binding_id,
         interface_control_stop_receiver,
         control_receiver,
         true, /* removable */
         futures::stream::pending(),
-        || (),
-    )
-    .await;
+    ));
+    let stop_fut = guard.on_cancel().then(|()| {
+        interface_control_stop_sender
+            .send(fnet_interfaces_admin::InterfaceRemovedReason::PortClosed)
+            .unwrap_or_else(|reason| {
+                // Already stopped, we should be going down.
+                let _: fnet_interfaces_admin::InterfaceRemovedReason = reason;
+            });
+        futures::future::pending::<Never>()
+    });
+    {
+        let stop_fut = pin!(stop_fut);
+        match futures::future::select(interface_control_fut, stop_fut).await {
+            futures::future::Either::Left(((), _fut)) => (),
+        }
+    }
+    std::mem::drop(guard);
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -246,35 +270,39 @@ impl ErrorLogExt for DeviceControlError {
 async fn run_device_control(
     mut ns: Netstack,
     device: fidl::endpoints::ClientEnd<fhardware_network::DeviceMarker>,
-    req_stream: fnet_interfaces_admin::DeviceControlRequestStream,
+    mut req_stream: fnet_interfaces_admin::DeviceControlRequestStream,
 ) -> Result<(), DeviceControlError> {
+    let scope = fasync::Scope::new_with_name("device_control");
     let worker = netdevice_worker::NetdeviceWorker::new(ns.ctx.clone(), device).await?;
     let handler = worker.new_handler();
-    let worker_fut = worker.run().map_err(DeviceControlError::Worker);
-    let stop_event = async_utils::event::Event::new();
-    let req_stream =
-        req_stream.take_until(stop_event.wait_or_dropped()).map_err(DeviceControlError::Fidl);
-    let mut worker_fut = pin!(worker_fut);
-    let mut req_stream = pin!(req_stream);
+    let mut worker_fut = scope
+        .spawn(async move {
+            let result = worker.run().await;
+            match result {
+                Err(e) => log::warn!("netdevice worker exited: {e:?}"),
+            }
+            // If we lose the netdevice worker, that means we can't run anything
+            // for this device so we should drop the scope in case the device
+            // control has detached.
+            let _: fasync::scope::Join<_> = fasync::Scope::current().cancel();
+        })
+        .fuse();
+
+    enum Outcome {
+        WorkerFinished,
+        StreamClosed,
+        StreamError(fidl::Error),
+    }
+
     let mut detached = false;
-    let mut tasks = futures::stream::FuturesUnordered::new();
-    let res = loop {
+    let outcome = loop {
         let result = futures::select! {
             req = req_stream.try_next() => req,
-            r = worker_fut => match r {
-                Err(e) => Err(e)
-            },
-            ready_task = tasks.next() => {
-                let () = ready_task.unwrap_or(());
-                continue;
-            }
+            () = worker_fut => break Outcome::WorkerFinished,
         };
         match result {
             Ok(None) => {
-                // The client hung up; stop serving if not detached.
-                if !detached {
-                    break Ok(());
-                }
+                break Outcome::StreamClosed;
             }
             Ok(Some(req)) => match req {
                 fnet_interfaces_admin::DeviceControlRequest::CreateInterface {
@@ -283,34 +311,32 @@ async fn run_device_control(
                     options,
                     control_handle: _,
                 } => {
-                    if let Some(interface_task) = create_interface(
-                        port,
-                        control,
-                        options,
-                        &mut ns,
-                        &handler,
-                        stop_event.wait_or_dropped(),
-                    )
-                    .await
-                    {
-                        tasks.push(interface_task);
-                    }
+                    create_interface(port, control, options, &mut ns, scope.as_handle(), &handler)
+                        .await;
                 }
                 fnet_interfaces_admin::DeviceControlRequest::Detach { control_handle: _ } => {
                     detached = true;
                 }
             },
-            Err(e) => break Err(e),
+            Err(e) => break Outcome::StreamError(e),
         }
     };
 
-    // Send a stop signal to all tasks.
-    assert!(stop_event.signal(), "event was already signaled");
-    // Run all the tasks to completion. We sent the stop signal, they should all
-    // complete and perform interface cleanup.
-    tasks.collect::<()>().await;
+    // Check if we should cancel everything under this scope.
+    let (result, cancel) = match outcome {
+        Outcome::WorkerFinished => (Ok(()), true),
+        Outcome::StreamClosed => (Ok(()), !detached),
+        Outcome::StreamError(error) => (Err(error.into()), !detached),
+    };
 
-    res
+    if cancel {
+        scope.cancel().await;
+    } else {
+        // Parent scope will take care of this now.
+        scope.detach();
+    }
+
+    result
 }
 
 const INTERFACES_ADMIN_CHANNEL_SIZE: usize = 16;
@@ -372,36 +398,40 @@ impl OwnedControlHandle {
     }
 }
 
-/// Operates a fuchsia.net.interfaces.admin/DeviceControl.CreateInterface request.
-///
-/// Returns `Some(fuchsia_async::Task)` if an interface was created successfully. The returned
-/// `Task` must be polled to completion and is tied to the created interface's lifetime.
+/// Operates a fuchsia.net.interfaces.admin/DeviceControl.CreateInterface
+/// request.
 async fn create_interface(
     port: fhardware_network::PortId,
     control: fidl::endpoints::ServerEnd<fnet_interfaces_admin::ControlMarker>,
     options: fnet_interfaces_admin::Options,
     ns: &mut Netstack,
+    scope: &fasync::ScopeHandle,
     handler: &netdevice_worker::DeviceHandler,
-    device_stopped_fut: async_utils::event::EventWaitResult,
-) -> Option<fuchsia_async::Task<()>> {
+) {
     debug!("creating interface from {:?} with {:?}", port, options);
     let fnet_interfaces_admin::Options { name, metric, .. } = options;
     let (control_sender, mut control_receiver) =
         OwnedControlHandle::new_channel_with_owned_handle(control).await;
     match handler
-        .add_port(ns, netdevice_worker::InterfaceOptions { name, metric }, port, control_sender)
+        .add_port(
+            ns,
+            scope,
+            netdevice_worker::InterfaceOptions { name, metric },
+            port,
+            control_sender,
+        )
         .await
     {
-        Ok((binding_id, status_stream, tx_task)) => {
-            let interface_control_task = fasync::Task::spawn(run_netdevice_interface_control(
-                ns.ctx.clone(),
-                binding_id,
-                status_stream,
-                device_stopped_fut,
-                control_receiver,
-                tx_task,
-            ));
-            Some(interface_control_task)
+        Ok((binding_id, status_stream, guard, tx_task)) => {
+            let _: fasync::JoinHandle<()> =
+                guard.as_handle().spawn(run_netdevice_interface_control(
+                    ns.ctx.clone(),
+                    binding_id,
+                    status_stream,
+                    guard.clone(),
+                    control_receiver,
+                    tx_task,
+                ));
         }
         Err(e) => {
             warn!("failed to add port {:?} to device: {:?}", port, e);
@@ -436,7 +466,8 @@ async fn create_interface(
                     Some(fnet_interfaces_admin::InterfaceRemovedReason::PortAlreadyBound)
                 }
                 netdevice_worker::Error::CantConnectToPort(_)
-                | netdevice_worker::Error::PortClosed => {
+                | netdevice_worker::Error::PortClosed
+                | netdevice_worker::Error::ScopeFinished => {
                     Some(fnet_interfaces_admin::InterfaceRemovedReason::PortClosed)
                 }
                 netdevice_worker::Error::ConfigurationNotSupported
@@ -462,7 +493,6 @@ async fn create_interface(
                     warn!("failed to send removed reason: {:?}", e);
                 });
             }
-            None
         }
     }
 }
@@ -476,7 +506,7 @@ async fn run_netdevice_interface_control<
     ctx: Ctx,
     id: BindingId,
     status_stream: S,
-    mut device_stopped_fut: async_utils::event::EventWaitResult,
+    scope_guard: fasync::scope::ScopeActiveGuard,
     control_receiver: futures::channel::mpsc::Receiver<OwnedControlHandle>,
     tx_task: TxTask,
 ) {
@@ -502,54 +532,43 @@ async fn run_netdevice_interface_control<
 
     let (interface_control_stop_sender, interface_control_stop_receiver) =
         futures::channel::oneshot::channel();
+    // Create a scope where we'll spawn all the inner tasks for this interface,
+    // and we'll give it to the interface control loop to ensure all tasks are
+    // stopped before returning.
+    let scope = scope_guard.as_handle().new_child_with_name("netdevice_inner");
 
-    let (tx_task, tx_task_cancel) = tx_task.into_future_and_cancellation();
-    let mut tx_task = tx_task.map(|r| match r {
-        // Return a termination reason if tx task finishing should cause the
-        // interface to be removed.
-        Ok(()) | Err(TxTaskError::Aborted) => None,
-        Err(TxTaskError::Netdevice(e)) => {
-            // We expect all netdevice errors that can happen when driving the
-            // tx task are problems fulfilling buffer layouts, so we can't
-            // continue driving the interface. Log a loud message and we''ll
-            // close the channel with PortClosed.
-            error!("netdevice error operating tx task: {e:?} for {id}");
-            Some(fnet_interfaces_admin::InterfaceRemovedReason::BadPort)
-        }
-    });
+    let mut tx_task = scope
+        .compute(tx_task.run().map(move |r| match r {
+            Err(TxTaskError::Netdevice(e)) => {
+                // We expect all netdevice errors that can happen when driving the
+                // tx task are problems fulfilling buffer layouts, so we can't
+                // continue driving the interface. Log a loud message and we''ll
+                // close the channel with PortClosed.
+                error!("netdevice error operating tx task: {e:?} for {id}");
+                fnet_interfaces_admin::InterfaceRemovedReason::BadPort
+            }
+        }))
+        .fuse();
 
     // Device-backed interfaces are always removable.
     let removable = true;
     let interface_control_fut = run_interface_control(
         ctx.clone(),
+        scope,
         id,
         interface_control_stop_receiver,
         control_receiver,
         removable,
         status_stream,
-        move || {
-            // Abort the tx task when the interface is being removed.
-            tx_task_cancel.abort();
-        },
     )
     .fuse();
     let mut interface_control_fut = pin!(interface_control_fut);
-    let remove_reason = loop {
-        futures::select! {
-            o = device_stopped_fut => {
-                o.expect("event was orphaned");
-                break Some(fnet_interfaces_admin::InterfaceRemovedReason::PortClosed);
-            },
-            r = tx_task => {
-                // Remove the interface if we're given a reason.
-                 if r.is_some() {
-                    break r;
-                 }
-            },
-            () = interface_control_fut => {
-                break None;
-            },
-        };
+    let mut canceled_fut = pin!(scope_guard.on_cancel().fuse());
+    let remove_reason = futures::select! {
+        () = canceled_fut => Some(fnet_interfaces_admin::InterfaceRemovedReason::PortClosed),
+        // Remove the interface if tx task exits with a reason.
+        r = tx_task => Some(r),
+        () = interface_control_fut => None,
     };
 
     if let Some(remove_reason) = remove_reason {
@@ -562,12 +581,6 @@ async fn run_netdevice_interface_control<
             interface_control_fut.await
         }
     }
-
-    if !tx_task.is_terminated() {
-        // Drive the task to the end, but we don't have a use for the
-        // termination reason.
-        let _: Option<_> = tx_task.await;
-    }
 }
 
 pub(crate) struct DeviceState {
@@ -576,8 +589,9 @@ pub(crate) struct DeviceState {
 
 /// Runs a worker to serve incoming `fuchsia.net.interfaces.admin/Control`
 /// handles.
-pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>, F: FnOnce()>(
+pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>>(
     ctx: Ctx,
+    scope: fasync::Scope,
     id: BindingId,
     mut stop_receiver: futures::channel::oneshot::Receiver<
         fnet_interfaces_admin::InterfaceRemovedReason,
@@ -585,7 +599,6 @@ pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>
     control_receiver: futures::channel::mpsc::Receiver<OwnedControlHandle>,
     removable: bool,
     device_state: S,
-    shutting_down: F,
 ) {
     // An event indicating that the individual control request streams should stop.
     let cancel_request_streams = async_utils::event::Event::new();
@@ -602,6 +615,8 @@ pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>
 
     // Convert `control_receiver` (a stream-of-streams) into a stream of futures, where each future
     // represents the termination of an inner `ControlRequestStream`.
+
+    let scope_handle = scope.as_handle();
     let stream_of_fut = control_receiver.map(
         |OwnedControlHandle { request_stream, control_handle, owns_interface }| {
             let initial_state =
@@ -632,6 +647,7 @@ pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>
                             match dispatch_control_request(
                                 req,
                                 ctx,
+                                scope_handle,
                                 *id,
                                 removable,
                                 owns_interface,
@@ -740,30 +756,30 @@ pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>
         std::mem::drop(stream_of_fut);
         Vec::new()
     };
-    // Cancel the `AddressStateProvider` workers and drive them to completion.
-    let address_state_providers = {
+    // Cancel the `AddressStateProvider` workers with the right cancellation
+    // reason. They should all join in the scope later.
+    {
         let core_id =
             ctx.bindings_ctx().devices.get_core_id(id).expect("missing device info for interface");
         core_id.external_state().with_common_info_mut(|i| {
-            futures::stream::FuturesUnordered::from_iter(i.addresses.values_mut().map(
-                |devices::AddressInfo {
-                     address_state_provider: devices::FidlWorkerInfo { worker, cancelation_sender },
-                     assignment_state_sender: _,
-                 }| {
-                    if let Some(cancelation_sender) = cancelation_sender.take() {
-                        cancelation_sender
-                            .send(AddressStateProviderCancellationReason::InterfaceRemoved)
-                            .expect("failed to stop AddressStateProvider");
-                    }
-                    worker.clone()
-                },
-            ))
+            for addr_info in i.addresses.values_mut() {
+                let devices::AddressInfo {
+                    address_state_provider:
+                        devices::FidlWorkerInfo { worker: _, cancelation_sender },
+                    assignment_state_sender: _,
+                } = addr_info;
+                if let Some(cancelation_sender) = cancelation_sender.take() {
+                    cancelation_sender
+                        .send(AddressStateProviderCancellationReason::InterfaceRemoved)
+                        .expect("failed to stop AddressStateProvider");
+                }
+            }
         })
-    };
-    address_state_providers.collect::<()>().await;
+    }
 
-    // Notify any interested parties that we're removing the interface.
-    shutting_down();
+    // Cancel our inner scope to make sure nothing else is referencing this
+    // interface.
+    scope.cancel().await;
 
     // Nothing else should be borrowing ctx by now. Moving to a mutable bind
     // proves this.
@@ -787,6 +803,7 @@ enum ControlRequestResult {
 async fn dispatch_control_request(
     req: fnet_interfaces_admin::ControlRequest,
     ctx: &mut Ctx,
+    scope: &fasync::ScopeHandle,
     id: BindingId,
     removable: bool,
     owns_interface: &mut bool,
@@ -798,7 +815,7 @@ async fn dispatch_control_request(
             parameters,
             address_state_provider,
             control_handle: _,
-        } => Ok(add_address(ctx, id, address, parameters, address_state_provider)),
+        } => Ok(add_address(ctx, scope, id, address, parameters, address_state_provider)),
         fnet_interfaces_admin::ControlRequest::RemoveAddress { address, responder } => {
             responder.send(Ok(remove_address(ctx, id, address).await))
         }
@@ -1348,6 +1365,7 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
 /// to the address_state_provider.
 fn add_address(
     ctx: &mut Ctx,
+    scope: &fasync::ScopeHandle,
     id: BindingId,
     address: fnet::Subnet,
     params: fnet_interfaces_admin::AddressParameters,
@@ -1355,6 +1373,21 @@ fn add_address(
 ) {
     let (req_stream, control_handle) = address_state_provider.into_stream_and_control_handle();
     let core_addr = address.addr.into_core();
+
+    let Some(guard) = scope.active_guard() else {
+        warn!(
+            "not adding address {} to interface {}: failed to acquire scope guard",
+            core_addr, id
+        );
+        send_address_removal_event(
+            core_addr,
+            id,
+            control_handle,
+            fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved,
+        );
+        return;
+    };
+
     let addr_subnet_either: AddrSubnetEither = match address.try_into_core() {
         Ok(addr) => addr,
         Err(e) => {
@@ -1390,7 +1423,7 @@ fn add_address(
     let valid_until = match PositiveMonotonicInstant::try_from(valid_lifetime_end) {
         Ok(i) => Lifetime::from_zx_time(i.into()),
         Err(e) => {
-            warn!("not adding address {core_addr} to interface {id}: invalid lifetime {e}",);
+            warn!("not adding address {core_addr} to interface {id}: invalid lifetime {e}");
             send_address_removal_event(
                 core_addr,
                 id,
@@ -1475,17 +1508,19 @@ fn add_address(
             futures::channel::mpsc::unbounded();
         // Spawn the `AddressStateProvider` worker, which during
         // initialization, will add the address to Core.
-        let worker = fasync::Task::spawn(run_address_state_provider(
-            ctx.clone(),
-            addr_subnet_either,
-            add_subnet_route.unwrap_or(false),
-            id,
-            control_handle,
-            req_stream,
-            assignment_state_receiver,
-            cancelation_receiver,
-        ))
-        .shared();
+        let worker = scope
+            .spawn(run_address_state_provider(
+                ctx.clone(),
+                guard,
+                addr_subnet_either,
+                add_subnet_route.unwrap_or(false),
+                id,
+                control_handle,
+                req_stream,
+                assignment_state_receiver,
+                cancelation_receiver,
+            ))
+            .shared();
         let _: &mut devices::AddressInfo = vacant_address_entry.insert(devices::AddressInfo {
             address_state_provider: devices::FidlWorkerInfo {
                 worker,
@@ -1544,6 +1579,7 @@ impl From<AddressStateProviderCancellationReason> for fnet_interfaces_admin::Add
 /// A worker for `fuchsia.net.interfaces.admin/AddressStateProvider`.
 async fn run_address_state_provider(
     mut ctx: Ctx,
+    guard: fasync::scope::ScopeActiveGuard,
     addr_subnet_and_config: AddrSubnetAndManualConfigEither<StackTime>,
     add_subnet_route: bool,
     id: BindingId,
@@ -1690,8 +1726,9 @@ async fn run_address_state_provider(
     // Remove the address.
     let bindings_ctx = ctx.bindings_ctx();
     let core_id = bindings_ctx.devices.get_core_id(id).expect("missing device info for interface");
-    // Don't drop the worker yet; it's what's driving THIS function.
-    let _worker: futures::future::Shared<fuchsia_async::Task<()>> =
+    // We can drop the join handle safely, since it does not encode task
+    // lifetime (this task, specifically).
+    let _: futures::future::Shared<fasync::JoinHandle<()>> =
         match core_id.external_state().with_common_info_mut(|i| i.addresses.remove(&address)) {
             Some(devices::AddressInfo {
                 address_state_provider: devices::FidlWorkerInfo { worker, cancelation_sender: _ },
@@ -1732,6 +1769,10 @@ async fn run_address_state_provider(
     if let Some(removal_reason) = removal_reason {
         send_address_removal_event(address.get(), &core_id, control_handle, removal_reason.into());
     }
+
+    // Ensure our scope guard is only dropped after the address is fully
+    // removed.
+    std::mem::drop(guard);
 }
 
 enum AddressNeedsExplicitRemovalFromCore {
@@ -2311,11 +2352,11 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::DeviceControlMarker>(
             );
 
-        let device_control_task = fuchsia_async::Task::spawn(run_device_control(
-            test_stack.netstack(),
-            endpoint,
-            device_control_request_stream,
-        ));
+        let device_control_scope = fasync::Scope::new_with_name("test_scope");
+        let _: fasync::JoinHandle<()> = device_control_scope.spawn(
+            run_device_control(test_stack.netstack(), endpoint, device_control_request_stream)
+                .map(|e| e.expect("terminated with error")),
+        );
 
         let (interface_control, control_server_end) =
             fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
@@ -2381,7 +2422,8 @@ mod tests {
         // Drop the device control handle and expect the device task to exit.
         // This will cause the interface to be removed as well.
         drop(device_control_proxy);
-        device_control_task.await.expect("should not get error");
+        // Ensure all spawned tasks exit.
+        device_control_scope.join().await;
 
         // Expect that the event receiver observes the interface being removed
         // without ever seeing an `AddressRemoved` event, which would indicate

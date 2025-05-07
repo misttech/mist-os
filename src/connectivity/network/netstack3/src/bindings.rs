@@ -1099,6 +1099,7 @@ impl Netstack {
         scope: &fasync::ScopeHandle,
     ) -> (oneshot::Sender<fnet_interfaces_admin::InterfaceRemovedReason>, BindingId) {
         let guard = scope.active_guard().expect("scope should be active");
+        let inner_scope = scope.new_child_with_name("loopback_inner");
 
         // Add and initialize the loopback interface with the IPv4 and IPv6
         // loopback addresses and on-link routes to the loopback subnets.
@@ -1137,12 +1138,12 @@ impl Netstack {
 
         let LoopbackInfo { static_common_info: _, dynamic_common_info: _, rx_notifier } =
             loopback.external_state();
-        let _: fasync::JoinHandle<()> = scope.spawn_guarded_assert_cancelled(
+        let _: fasync::JoinHandle<()> = inner_scope.spawn_guarded_assert_cancelled(
             guard.clone(),
             crate::bindings::devices::rx_task(
                 self.ctx.clone(),
                 rx_notifier.watcher(),
-                loopback.downgrade(),
+                loopback.clone(),
             ),
         );
         let loopback: DeviceId<_> = loopback.into();
@@ -1197,12 +1198,12 @@ impl Netstack {
             guard,
             interfaces_admin::run_interface_control(
                 self.ctx.clone(),
+                inner_scope,
                 binding_id,
                 stop_receiver,
                 control_receiver,
                 removable,
                 state_stream,
-                || (),
             ),
         );
         (stop_sender, binding_id)
@@ -1310,11 +1311,8 @@ impl NetstackSeed {
         netstack.add_default_rule::<Ipv4>().await;
         netstack.add_default_rule::<Ipv6>().await;
 
-        let loopback_scope = level1_workers.new_child_with_name("loopback");
-        let (loopback_stopper, _): (_, BindingId) =
-            netstack.add_loopback(loopback_scope.as_handle()).await;
-        // We observe loopback terminating from the worker scope.
-        loopback_scope.detach();
+        let loopback_scope = level1_workers.new_detached_child("loopback");
+        let (loopback_stopper, _): (_, BindingId) = netstack.add_loopback(&loopback_scope).await;
 
         let _: fasync::JoinHandle<()> = level1_workers
             .spawn_new_guard_assert_cancelled(async move {
@@ -1412,14 +1410,7 @@ impl NetstackSeed {
         let neighbor_watcher_sink_ref = &neighbor_watcher_sink;
 
         let services_scope = fasync::Scope::new_with_name("services");
-        let sockets_scope = {
-            let scope = services_scope.new_child_with_name("sockets");
-            let sockets_scope = scope.to_handle();
-            // Child of services, this is just for pretty organization in async
-            // backtrace.
-            scope.detach();
-            sockets_scope
-        };
+        let sockets_scope = services_scope.new_detached_child("sockets");
 
         let filter_update_dispatcher = filter::UpdateDispatcher::default();
         let services_handle = services_scope.to_handle();

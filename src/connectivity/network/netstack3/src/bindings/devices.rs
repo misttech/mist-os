@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use std::collections::hash_map::{self, HashMap};
+use std::convert::Infallible as Never;
 use std::fmt::{self, Debug, Display};
 use std::num::NonZeroU64;
 use std::ops::{Deref as _, DerefMut as _};
@@ -12,7 +13,6 @@ use super::DeviceIdExt;
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use fuchsia_async as fasync;
-use futures::future::FusedFuture;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
 use itertools::Itertools as _;
 use net_types::ethernet::Mac;
@@ -20,7 +20,7 @@ use net_types::ip::{IpAddr, Mtu};
 use net_types::{SpecifiedAddr, UnicastAddr};
 use netstack3_core::device::{
     BatchSize, DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceSendFrameError,
-    EthernetLinkDevice, LoopbackWeakDeviceId, PureIpDevice, WeakDeviceId,
+    EthernetLinkDevice, LoopbackDeviceId, PureIpDevice,
 };
 use netstack3_core::sync::RwLock as CoreRwLock;
 use netstack3_core::trace::trace_duration;
@@ -327,29 +327,22 @@ impl DeviceSpecificInfo<'_> {
 pub(crate) async fn rx_task(
     mut ctx: Ctx,
     mut watcher: NeedsDataWatcher,
-    device_id: LoopbackWeakDeviceId<BindingsCtx>,
+    device_id: LoopbackDeviceId<BindingsCtx>,
 ) {
     let mut yield_fut = futures::future::OptionFuture::default();
     loop {
-        // Loop while we are woken up to handle enqueued RX packets.
-        let r = futures::select! {
-            w = watcher.next().fuse() => w,
-            y = yield_fut => Some(y.expect("OptionFuture is only selected when non-empty")),
+        // Loop while we are woken up to handle enqueued Rx packets.
+        let () = futures::select! {
+            w = watcher.next().fuse() => w.expect("watcher closed with loopback task running"),
+            y = yield_fut => y.expect("OptionFuture is only selected when non-empty"),
         };
 
-        let r = r.and_then(|()| {
-            device_id
-                .upgrade()
-                .map(|device_id| ctx.api().receive_queue().handle_queued_frames(&device_id))
-        });
-
-        match r {
-            Some(WorkQueueReport::AllDone) => (),
-            Some(WorkQueueReport::Pending) => {
+        match ctx.api().receive_queue().handle_queued_frames(&device_id) {
+            WorkQueueReport::AllDone => (),
+            WorkQueueReport::Pending => {
                 // Yield the task to the executor once.
                 yield_fut = Some(async_utils::futures::YieldToExecutorOnce::new()).into();
             }
-            None => break,
         }
     }
 }
@@ -358,35 +351,26 @@ pub(crate) async fn rx_task(
 pub(crate) enum TxTaskError {
     #[error("netdevice error: {0}")]
     Netdevice(#[from] netdevice_client::Error),
-    #[error("aborted")]
-    Aborted,
 }
 
 pub(crate) struct TxTask {
-    task: fasync::Task<Result<(), TxTaskError>>,
-    cancel: futures::future::AbortHandle,
+    ctx: Ctx,
+    device_id: DeviceId<BindingsCtx>,
+    watcher: NeedsDataWatcher,
 }
 
 impl TxTask {
     pub(crate) fn new(
         ctx: Ctx,
-        device_id: WeakDeviceId<BindingsCtx>,
+        device_id: DeviceId<BindingsCtx>,
         watcher: NeedsDataWatcher,
     ) -> Self {
-        let (fut, cancel) = futures::future::abortable(tx_task(ctx, device_id, watcher));
-        let fut = fut.map(|r| match r {
-            Ok(o) => o,
-            Err(futures::future::Aborted) => Err(TxTaskError::Aborted),
-        });
-        let task = fasync::Task::spawn(fut);
-        Self { task, cancel }
+        Self { ctx, device_id, watcher }
     }
 
-    pub(crate) fn into_future_and_cancellation(
-        self,
-    ) -> (impl FusedFuture<Output = Result<(), TxTaskError>>, futures::future::AbortHandle) {
-        let Self { task, cancel } = self;
-        (task.fuse(), cancel)
+    pub(crate) async fn run(self) -> Result<Never, TxTaskError> {
+        let Self { ctx, device_id, watcher } = self;
+        tx_task(ctx, device_id, watcher).await
     }
 }
 
@@ -425,12 +409,12 @@ impl TxTaskState {
 // device type.
 pub(crate) async fn tx_task(
     mut ctx: Ctx,
-    device_id: WeakDeviceId<BindingsCtx>,
+    device_id: DeviceId<BindingsCtx>,
     mut watcher: NeedsDataWatcher,
-) -> Result<(), TxTaskError> {
+) -> Result<Never, TxTaskError> {
     let mut yield_fut = futures::future::OptionFuture::default();
     let mut task_state = TxTaskState::default();
-    let mut suspension_handler = TransmitSuspensionHandler::new(&ctx, device_id.clone()).await;
+    let mut suspension_handler = TransmitSuspensionHandler::new(&ctx, device_id.downgrade()).await;
 
     // This control loop selects an action which may be:
     //   - suspension:
@@ -453,8 +437,9 @@ pub(crate) async fn tx_task(
             s = suspension_handler.wait().fuse() => Action::Suspension(s),
             w = watcher.next().fuse() => match w {
                 Some(()) => Action::TxAvailable,
-                // Notifying watcher is closed, ok to break.
-                None => break Ok(()),
+                // Notifying watcher is closed, interface must've been removed.
+                // This shouldn't happen we're keeping the device alive.
+                None => unreachable!("watcher closed unexpectedly"),
             },
             y = yield_fut => {
                 let () = y.expect("OptionFuture is only selected when non-empty");
@@ -462,12 +447,8 @@ pub(crate) async fn tx_task(
             }
         };
 
-        let device_id = match action {
-            Action::TxAvailable => match device_id.upgrade() {
-                Some(d) => d,
-                // Device was removed from the stack, ok to break.
-                None => break Ok(()),
-            },
+        match action {
+            Action::TxAvailable => {}
             Action::Suspension(s) => {
                 // Suspension requested, finish up in-progress work and block
                 // until we are allowed to resume.
@@ -633,9 +614,9 @@ pub(crate) struct AddressInfo {
 /// Information associated with FIDL Protocol workers.
 #[derive(Debug)]
 pub(crate) struct FidlWorkerInfo<R> {
-    // The worker `Task`, wrapped in a `Shared` future so that it can be awaited
-    // multiple times.
-    pub(crate) worker: futures::future::Shared<fasync::Task<()>>,
+    // The worker `JoinHandle`, wrapped in a `Shared` future so that it can be
+    // awaited multiple times.
+    pub(crate) worker: futures::future::Shared<fasync::JoinHandle<()>>,
     // Mechanism to cancel the worker with reason `R`. If `Some`, the worker is
     // active (and holds the `Receiver`). Otherwise, the worker has been
     // canceled.

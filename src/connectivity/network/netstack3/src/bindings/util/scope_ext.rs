@@ -76,6 +76,13 @@ pub(crate) trait ScopeExt: Borrow<ScopeHandle> {
     {
         self.spawn_fidl_task::<M, _, _>(f(server_end))
     }
+
+    fn new_detached_child(&self, name: impl Into<String>) -> ScopeHandle {
+        let child = self.borrow().new_child_with_name(name.into());
+        let handle = child.to_handle();
+        child.detach();
+        handle
+    }
 }
 
 impl<O> ScopeExt for O where O: Borrow<ScopeHandle> {}
