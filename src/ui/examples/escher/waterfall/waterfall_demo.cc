@@ -194,7 +194,6 @@ void WaterfallDemo::InitializeDemoScenes() {
   demo_scenes_.clear();
   demo_scenes_.emplace_back(new PaperDemoScene1(this, ycbcr_tex_));
   demo_scenes_.emplace_back(new PaperDemoScene1(this));
-  demo_scenes_.back()->ToggleGraph();
   for (auto& scene : demo_scenes_) {
     scene->Init(paper_scene_.get());
   }

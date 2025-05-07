@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 
 #include "src/ui/lib/escher/escher.h"
+#include "src/ui/lib/escher/renderer/frame.h"
 #include "src/ui/lib/escher/resources/resource_recycler.h"
 #include "src/ui/lib/escher/test/common/gtest_escher.h"
 #include "src/ui/lib/escher/vk/color_space.h"

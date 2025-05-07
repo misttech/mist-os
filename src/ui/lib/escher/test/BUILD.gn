@@ -126,7 +126,6 @@ if (is_linux && !has_prebuilt_vulkan_runtime) {
         "flib/frame_unittest.cc",
         "flib/util.cc",
         "flib/util.h",
-        "profiling/timestamp_profiler_unittest.cc",
       ]
       deps += [
         "//sdk/lib/async:async-cpp",

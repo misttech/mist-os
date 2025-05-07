@@ -48,8 +48,9 @@ static const char* kDependencyPath = "/gpu-manifest-fs";
 
 static constexpr zx::duration kShutdownTimeout = zx::sec(1);
 
-// NOTE: If this value changes, you should also change the corresponding kCleanupDelay inside
-// escher/profiling/timestamp_profiler.cc.
+// After every Flatland frame is sent to the display, we kick off a task for Escher to clean up
+// unused Vulkan resources such as command buffers, which repeats with the specified interval until
+// all resources are cleaned up.
 static constexpr zx::duration kEscherCleanupRetryInterval{1'000'000};  // 1 millisecond
 
 std::optional<fuchsia_hardware_display_types::wire::DisplayId> GetDisplayId(
