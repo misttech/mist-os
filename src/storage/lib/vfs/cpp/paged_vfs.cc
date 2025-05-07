@@ -4,7 +4,11 @@
 
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
 
+// TODO(https://fxbug.dev/415034348): Switch to `syscalls.h` or disable this
+// code when not targeting `HEAD` or `PLATFORM`.
+#define FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_INCOMPATIBLE_BUILDS
 #include <zircon/syscalls-next.h>
+#undef FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_INCOMPATIBLE_BUILDS
 
 #include <mutex>
 

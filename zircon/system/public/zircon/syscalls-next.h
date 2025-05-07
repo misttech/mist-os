@@ -6,11 +6,37 @@
 #define ZIRCON_SYSCALLS_NEXT_H_
 
 #include <stdint.h>
+#include <zircon/availability.h>
 #include <zircon/compiler.h>
 #include <zircon/syscalls/debug.h>
 #include <zircon/syscalls/exception.h>
 #include <zircon/syscalls/iob.h>
 #include <zircon/types.h>
+
+#ifdef __Fuchsia__
+
+// Only allow `syscalls-next.h` when the target API level is `HEAD` or
+// `PLATFORM`.
+#if FUCHSIA_API_LEVEL_LESS_THAN(HEAD)
+
+// TODO(https://fxbug.dev/415034348): Remove this opt-out mechanism.
+#ifndef FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_INCOMPATIBLE_BUILDS
+#error zircon/syscalls-next.h may not be included when targeting NEXT or a stable API level.
+#endif
+#endif
+
+#else  // ifdef __Fuchsia__
+
+// Sometimes host libraries indirectly include the syscall interface, but they
+// don't have a defined target API level, so we can't check that they're
+// targeting HEAD or PLATFORM.
+//
+// TODO(https://fxbug.dev/415033686): Remove this opt-out mechanism.
+#ifndef FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_HOST
+#error zircon/syscalls-next.h may only be included in on-target code.
+#endif
+
+#endif  // ifdef __Fuchsia__
 
 // ====== Pager writeback support ====== //
 

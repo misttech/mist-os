@@ -477,6 +477,7 @@ class PathRewriter(object):
             sysroot_rewriter = self.clone_with_exceptions(
                 [
                     "cdecls.inc",
+                    "cdecls-next.inc",
                     "libc.so",
                     "libzircon.so",
                     "Scrt1.o",

@@ -14,7 +14,10 @@
 #include <lib/unittest/unittest.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
+// TODO(https://fxbug.dev/415033686): Stop using `syscalls-next.h` on host.
+#define FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_HOST
 #include <zircon/syscalls-next.h>
+#undef FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_HOST
 #include <zircon/syscalls/port.h>
 #include <zircon/time.h>
 #include <zircon/types.h>

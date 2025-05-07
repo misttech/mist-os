@@ -8,7 +8,10 @@
 #define ZIRCON_KERNEL_LIB_POWER_MANAGEMENT_INCLUDE_LIB_POWER_MANAGEMENT_POWER_LEVEL_CONTROLLER_H_
 
 #include <lib/zx/result.h>
+// TODO(https://fxbug.dev/415033686): Stop using `syscalls-next.h` on host.
+#define FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_HOST
 #include <zircon/syscalls-next.h>
+#undef FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_HOST
 
 #include <atomic>
 
