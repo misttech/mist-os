@@ -613,7 +613,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("omaha_client") {
-  public_deps = [ ":omaha_client-v0_2_1" ]
+  public_deps = [ ":omaha_client-v0_2_2" ]
 }
 
 group("once_cell") {
@@ -9386,7 +9386,7 @@ rust_library("mock-omaha-server-v0_3_3") {
   deps += [ ":futures-v0_3_30" ]
   deps += [ ":hex-v0_3_2" ]
   deps += [ ":hyper-v0_14_19" ]
-  deps += [ ":omaha_client-v0_2_1" ]
+  deps += [ ":omaha_client-v0_2_2" ]
   deps += [ ":p256-v0_11_1" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_json-v1_0_128" ]
@@ -10429,19 +10429,19 @@ rust_library("numtoa-v0_1_0") {
   applicable_licenses = [ ":numtoa-v0_1_0.license" ]
 }
 
-license("omaha_client-v0_2_1.license") {
+license("omaha_client-v0_2_2.license") {
   public_package_name = "omaha_client"
   license_files = [
-    "//third_party/rust_crates/vendor/omaha_client-0.2.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/omaha_client-0.2.1/LICENSE-BSD",
-    "//third_party/rust_crates/vendor/omaha_client-0.2.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/omaha_client-0.2.2/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/omaha_client-0.2.2/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/omaha_client-0.2.2/LICENSE-MIT",
   ]
 }
 
-rust_library("omaha_client-v0_2_1") {
+rust_library("omaha_client-v0_2_2") {
   crate_name = "omaha_client"
-  crate_root = "//third_party/rust_crates/vendor/omaha_client-0.2.1/src/lib.rs"
-  output_name = "omaha_client-259785bc42cb99c5"
+  crate_root = "//third_party/rust_crates/vendor/omaha_client-0.2.2/src/lib.rs"
+  output_name = "omaha_client-f284b8e997d91b7e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -10450,10 +10450,10 @@ rust_library("omaha_client-v0_2_1") {
   deps += [ ":ecdsa-v0_14_8" ]
   deps += [ ":elliptic-curve-v0_12_3" ]
   deps += [ ":futures-v0_3_30" ]
-  deps += [ ":hex-v0_3_2" ]
+  deps += [ ":hex-v0_4_3" ]
   deps += [ ":http-v0_2_4" ]
   deps += [ ":hyper-v0_14_19" ]
-  deps += [ ":itertools-v0_10_1" ]
+  deps += [ ":itertools-v0_14_0" ]
   deps += [ ":p256-v0_11_1" ]
   deps += [ ":pin-project-v1_0_11" ]
   deps += [ ":pkcs8-v0_9_0" ]
@@ -10464,7 +10464,7 @@ rust_library("omaha_client-v0_2_1") {
   deps += [ ":serde_repr-v0_1_7($host_toolchain)" ]
   deps += [ ":sha2-v0_10_8" ]
   deps += [ ":signature-v1_6_4" ]
-  deps += [ ":thiserror-v1_0_69" ]
+  deps += [ ":thiserror-v2_0_11" ]
   deps += [ ":tracing-v0_1_40" ]
   deps += [ ":typed-builder-v0_10_0($host_toolchain)" ]
   deps += [ ":uuid-v1_1_2" ]
@@ -10474,13 +10474,13 @@ rust_library("omaha_client-v0_2_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=259785bc42cb99c5",
-    "-Cextra-filename=-259785bc42cb99c5",
+    "-Cmetadata=f284b8e997d91b7e",
+    "-Cextra-filename=-f284b8e997d91b7e",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":omaha_client-v0_2_1.license" ]
+  applicable_licenses = [ ":omaha_client-v0_2_2.license" ]
 }
 
 license("once_cell-v1_20_2.license") {

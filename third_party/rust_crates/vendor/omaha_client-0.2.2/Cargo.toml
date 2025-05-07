@@ -12,9 +12,10 @@
 [package]
 edition = "2021"
 name = "omaha_client"
-version = "0.2.1"
+version = "0.2.2"
 build = false
 exclude = [".*"]
+autolib = false
 autobins = false
 autoexamples = false
 autotests = false
@@ -33,10 +34,10 @@ name = "hello-world"
 path = "examples/hello-world/main.rs"
 
 [dependencies.anyhow]
-version = "1.0.75"
+version = "1.0"
 
 [dependencies.chrono]
-version = "0.4.19"
+version = "0.4"
 
 [dependencies.ecdsa]
 version = "0.14.8"
@@ -46,10 +47,10 @@ features = ["pem"]
 version = "0.12.3"
 
 [dependencies.futures]
-version = "0.3.19"
+version = "0.3"
 
 [dependencies.hex]
-version = "0.3.2"
+version = "0.4"
 
 [dependencies.http]
 version = "0.2.4"
@@ -58,45 +59,45 @@ version = "0.2.4"
 version = "0.14.19"
 
 [dependencies.itertools]
-version = "0.10.1"
+version = "0.14"
 
 [dependencies.p256]
-version = "0.11.1"
+version = "0.11"
 
 [dependencies.pin-project]
 version = "1.0.11"
 
 [dependencies.pkcs8]
-version = "0.9.0"
+version = "0.9"
 features = ["pem"]
 
 [dependencies.pretty_assertions]
 version = "1.2.1"
 
 [dependencies.rand]
-version = "0.8.4"
+version = "0.8"
 
 [dependencies.serde]
-version = "1.0.147"
+version = "1.0.204"
 features = ["derive"]
 
 [dependencies.serde_json]
-version = "1.0.87"
+version = "1.0.128"
 
 [dependencies.serde_repr]
 version = "0.1.7"
 
 [dependencies.sha2]
-version = "0.10.6"
+version = "0.10"
 
 [dependencies.signature]
 version = "1.6.4"
 
 [dependencies.thiserror]
-version = "1.0"
+version = "2.0"
 
 [dependencies.tracing]
-version = "0.1.37"
+version = "0.1"
 
 [dependencies.typed-builder]
 version = "0.10.0"
@@ -115,7 +116,7 @@ version = "0.1"
 version = "1.5.0"
 
 [dev-dependencies.futures-timer]
-version = "0.3.0"
+version = "0.3"
 
 [dev-dependencies.hyper-rustls]
 version = "0.25"
@@ -126,4 +127,4 @@ version = "1"
 features = ["full"]
 
 [dev-dependencies.url]
-version = "1.7.2"
+version = "1.7"

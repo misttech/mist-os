@@ -79,7 +79,7 @@ rust_library(
         "//third_party/rust_crates/vendor/futures-0.3.30:futures",
         "//third_party/rust_crates/vendor/hex-0.3.2:hex",
         "//third_party/rust_crates/vendor/hyper-0.14.19:hyper",
-        "//third_party/rust_crates/vendor/omaha_client-0.2.1:omaha_client",
+        "//third_party/rust_crates/vendor/omaha_client-0.2.2:omaha_client",
         "//third_party/rust_crates/vendor/p256-0.11.1:p256",
         "//third_party/rust_crates/vendor/serde-1.0.204:serde",
         "//third_party/rust_crates/vendor/serde_json-1.0.128:serde_json",

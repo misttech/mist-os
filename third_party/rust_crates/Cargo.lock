@@ -2860,19 +2860,19 @@ checksum = "b8f8bdf33df195859076e54ab11ee78a1b208382d3a26ec40d142ffc1ecc49ef"
 
 [[package]]
 name = "omaha_client"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95a0b085c1910601f43fb397361ca61d04737ff77cb638eb4a59468e3ee6befa"
+checksum = "7ec9fc18d891ccb6ad94cd34f1232a4caab623cb414973caa6d6cd0699c73a11"
 dependencies = [
  "anyhow",
  "chrono",
  "ecdsa",
  "elliptic-curve",
  "futures",
- "hex 0.3.2",
+ "hex 0.4.3",
  "http",
  "hyper",
- "itertools 0.10.1",
+ "itertools 0.14.0",
  "p256",
  "pin-project",
  "pkcs8 0.9.0",
@@ -2883,7 +2883,7 @@ dependencies = [
  "serde_repr",
  "sha2",
  "signature 1.6.4",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tracing",
  "typed-builder",
  "uuid 1.1.2",

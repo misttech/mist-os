@@ -407,7 +407,7 @@ _NORMAL_DEPENDENCIES = {
             "nu-ansi-term": Label("//third_party/rust_crates/vendor/nu-ansi-term-0.46.0:nu_ansi_term"),
             "num": Label("//third_party/rust_crates/vendor/num-0.4.3:num"),
             "num-traits": Label("//third_party/rust_crates/vendor/num-traits-0.2.19:num_traits"),
-            "omaha_client": Label("//third_party/rust_crates/vendor/omaha_client-0.2.1:omaha_client"),
+            "omaha_client": Label("//third_party/rust_crates/vendor/omaha_client-0.2.2:omaha_client"),
             "once_cell": Label("//third_party/rust_crates/vendor/once_cell-1.20.2:once_cell"),
             "overload": Label("//third_party/rust_crates/vendor/overload-0.1.1:overload"),
             "p256": Label("//third_party/rust_crates/vendor/p256-0.11.1:p256"),

@@ -1675,14 +1675,14 @@ alias(
 )
 
 alias(
-    name = "omaha_client-0.2.1",
-    actual = "//third_party/rust_crates/vendor/omaha_client-0.2.1:omaha_client",
+    name = "omaha_client-0.2.2",
+    actual = "//third_party/rust_crates/vendor/omaha_client-0.2.2:omaha_client",
     tags = ["manual"],
 )
 
 alias(
     name = "omaha_client",
-    actual = "//third_party/rust_crates/vendor/omaha_client-0.2.1:omaha_client",
+    actual = "//third_party/rust_crates/vendor/omaha_client-0.2.2:omaha_client",
     tags = ["manual"],
 )
 

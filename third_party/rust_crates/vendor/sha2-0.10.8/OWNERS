@@ -10,6 +10,6 @@ include /src/starnix/OWNERS
 include /src/storage/OWNERS
 include /src/sys/fuzzing/OWNERS
 include /src/sys/pkg/OWNERS
-include /third_party/rust_crates/vendor/omaha_client-0.2.1/OWNERS
+include /third_party/rust_crates/vendor/omaha_client-0.2.2/OWNERS
 include /third_party/rust_crates/vendor/p256-0.11.1/OWNERS
 include /tools/lib/cml/OWNERS
