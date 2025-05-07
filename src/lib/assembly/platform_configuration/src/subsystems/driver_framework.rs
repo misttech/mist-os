@@ -191,6 +191,11 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
             builder.platform_bundle("bus_kpci_driver");
         }
 
+        let interconnect = context.board_info.provides_feature("fuchsia::interconnect");
+        if interconnect {
+            builder.platform_bundle("interconnect_driver");
+        }
+
         Ok(())
     }
 }

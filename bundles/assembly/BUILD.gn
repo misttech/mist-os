@@ -589,6 +589,16 @@ assembly_input_bundle("ufs_driver") {
   ]
 }
 
+# AIB for the interconnect core driver
+assembly_input_bundle("interconnect_driver") {
+  boot_driver_packages = [
+    {
+      package_target = "//src/devices/interconnect/drivers/interconnect:package"
+      driver_components = [ "meta/interconnect.cm" ]
+    },
+  ]
+}
+
 # Trusted execution environment.
 assembly_input_bundle("trusted_execution_environment") {
   bootfs_packages = [

@@ -1,0 +1,28 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "driver_component/driver.shard.cml",
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: 'driver',
+        binary: 'driver/interconnect.so',
+        bind: 'meta/bind/interconnect.bindbc',
+        colocate: 'true',
+    },
+    capabilities: [
+        { service: 'fuchsia.hardware.interconnect.PathService' },
+    ],
+    use: [
+        { service: 'fuchsia.hardware.interconnect.Service' },
+    ],
+    expose: [
+        {
+            service: 'fuchsia.hardware.interconnect.PathService',
+            from: 'self',
+        },
+    ],
+}

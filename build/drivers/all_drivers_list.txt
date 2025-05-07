@@ -142,6 +142,8 @@
 //src/devices/i2c/drivers/aml-i2c:bazel_package.bazel_build
 //src/devices/i2c/drivers/i2c:i2c-driver
 //src/devices/i2c/drivers/intel-i2c:intel-i2c-driver
+//src/devices/interconnect/drivers/interconnect:driver
+//src/devices/interconnect/drivers/interconnect:fake_driver
 //src/devices/light-sensor/drivers/ams-light:ams-light-driver
 //src/devices/mcu/drivers/vim3-mcu:vim3-mcu-driver
 //src/devices/misc/drivers/compat:driver
