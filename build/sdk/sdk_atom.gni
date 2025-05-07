@@ -478,13 +478,7 @@ template("sdk_atom") {
   assert(defined(invoker.api) == defined(invoker.api_contents),
          "Must set only one of 'api' and 'api_contents' together")
 
-  # api files are only valid for the PLATFORM API level. When the
-  # current_build_target_api_level is not "PLATFORM", some of them will fail to
-  # reflect the API of the atom being built. Skip api verification when this is
-  # the case.
-  _verify_api =
-      defined(invoker.api) && current_build_target_api_level == "PLATFORM"
-
+  _verify_api = defined(invoker.api)
   if (_verify_api) {
     assert(invoker.api_contents != [], "api_contents cannot be empty")
 
@@ -531,13 +525,6 @@ template("sdk_atom") {
         deps = [ ":$generate_api_target_name" ]
       }
     }
-  } else if (defined(invoker.api)) {
-    # TODO(https://fxbug.dev/412696706): Remove when removing "PLATFORM" check.
-    not_needed(invoker,
-               [
-                 "api",
-                 "api_contents",
-               ])
   }
 
   # Builds a manifest representing this atom.
