@@ -5,9 +5,10 @@
 
 import fnmatch
 import json
-from typing import Mapping, TypeAlias, cast
+from typing import Mapping, cast
 
 from honeydew.fuchsia_device.fuchsia_device import FuchsiaDevice
+from honeydew.transports.ffx import errors as ffx_errors
 from trace_processing import trace_metrics
 from trace_processing.trace_metrics import JSON
 
@@ -30,16 +31,10 @@ class MemoryProfileMetrics(trace_metrics.ConstantMetricsProcessor):
     )
 
 
-ProcessGroups: TypeAlias = Mapping[str, str]
-"""
-Each entry maps a name for a group of processes to a glob pattern that defines
-which process names should be included in the group.
-"""
-
-
 def capture_and_compute_metrics(
-    process_groups: ProcessGroups,
+    process_groups: Mapping[str, str] | None,
     dut: FuchsiaDevice,
+    principal_groups: Mapping[str, str] | None = None,
 ) -> trace_metrics.ConstantMetricsProcessor:
     """Captures kernel and user space memory metrics using `ffx profile memory`.
 
@@ -47,6 +42,10 @@ def capture_and_compute_metrics(
       process_groups: The process groupings for which to report total memory
         usage metrics that will be tracked for regressions.
       dut: A FuchsiaDevice instance connected to the device to profile.
+      principal_groups: mapping from group name to a `fnmatch` pattern
+        that selects the principals by name. A metric labelled
+        "Memory/Principal/{group_name}/PrivatePopulated" is returned for each
+        item.
 
     Returns:
       MemoryProfileMetrics instance containing two sets of memory
@@ -55,34 +54,80 @@ def capture_and_compute_metrics(
             groups. This is private uncompressed memory.
         - A whole-device memory digest.
     """
-    profile = json.loads(
+    process_groups = process_groups or {}
+    principal_groups = principal_groups or {}
+
+    component_profile = json.loads(
         dut.ffx.run(
-            ["--machine", "json", "profile", "memory", "--buckets"],
+            [
+                "--machine",
+                "json",
+                "profile",
+                "memory",
+                "--backend",
+                "memory_monitor_2",
+            ],
         )
     )
-
     metrics = []
-    for process_group_name, process_name_pattern in process_groups.items():
+
+    for group_name, pattern in principal_groups.items():
         private_populated = sum(
-            proc["memory"]["private_populated"]
-            for proc in profile["CompleteDigest"]["processes"]
-            if fnmatch.fnmatch(proc["name"], process_name_pattern)
+            principal["populated_private"]
+            for principal in component_profile["ComponentDigest"]["principals"]
+            if fnmatch.fnmatch(principal["name"], pattern)
         )
         metrics.append(
             trace_metrics.TestCaseResult(
-                label=f"Memory/Process/{process_group_name}/PrivatePopulated",
+                label=f"Memory/Principal/{group_name}/PrivatePopulated",
                 unit=trace_metrics.Unit.bytes,
                 values=[private_populated],
-                doc=(
-                    f"{MemoryProfileMetrics.DESCRIPTION_BASE}: "
-                    f"{process_group_name}"
-                ),
+                doc=f"{MemoryProfileMetrics.DESCRIPTION_BASE}: {group_name}",
             )
         )
 
-    freeform_metrics = _simplify_digest(profile["CompleteDigest"])
+    # If memory_monitor1 is available.
+    try:
+        process_profile = json.loads(
+            dut.ffx.run(
+                [
+                    "--machine",
+                    "json",
+                    "profile",
+                    "memory",
+                    "--buckets",
+                    "--backend",
+                    "memory_monitor_1",
+                ],
+            )
+        )
+
+        for process_group_name, process_name_pattern in process_groups.items():
+            private_populated = sum(
+                proc["memory"]["private_populated"]
+                for proc in process_profile["CompleteDigest"]["processes"]
+                if fnmatch.fnmatch(proc["name"], process_name_pattern)
+            )
+            metrics.append(
+                trace_metrics.TestCaseResult(
+                    label=f"Memory/Process/{process_group_name}/PrivatePopulated",
+                    unit=trace_metrics.Unit.bytes,
+                    values=[private_populated],
+                    doc=(
+                        f"{MemoryProfileMetrics.DESCRIPTION_BASE}: "
+                        f"{process_group_name}"
+                    ),
+                )
+            )
+    except ffx_errors.FfxCommandError:
+        process_profile = None
+
     return MemoryProfileMetrics(
-        metrics=metrics, freeform_metrics=("memory_profile", freeform_metrics)
+        metrics=metrics,
+        freeform_metrics=(
+            "memory_profile",
+            _simplify_digest(process_profile, component_profile),
+        ),
     )
 
 
@@ -214,10 +259,20 @@ def _with_vmos_removed(metrics_dict: JSON) -> dict[str, JSON]:
     return {k: v for k, v in metrics_dict.items() if k != "vmos"}
 
 
-def _simplify_digest(digest: JSON) -> JSON:
-    if not isinstance(digest, dict):
-        raise ValueError
-    return dict(
-        buckets=_simplify_buckets(digest["buckets"]),
-        processes=_simplify_processes(digest["processes"]),
-    )
+def _simplify_digest(process_profile: JSON, component_profile: JSON) -> JSON:
+    result = {}
+
+    if isinstance(process_profile, dict):
+        digest = process_profile["CompleteDigest"]
+        if not isinstance(digest, dict):
+            raise ValueError
+        result["buckets"] = _simplify_buckets(digest["buckets"])
+        result["processes"] = _simplify_processes(digest["processes"])
+
+    if isinstance(component_profile, dict):
+        digest = component_profile["ComponentDigest"]
+        if not isinstance(digest, dict):
+            raise ValueError
+        result["principals"] = digest["principals"]
+
+    return result
