@@ -101,28 +101,9 @@ pub fn sys_reboot(
         LINUX_REBOOT_CMD_RESTART | LINUX_REBOOT_CMD_RESTART2 => {
             let reboot_args: Vec<_> = arg_bytes.split_str(b",").collect();
 
-            if reboot_args.contains(&&b"bootloader"[..]) {
+            let reboot_result = if reboot_args.contains(&&b"bootloader"[..]) {
                 log_info!("Rebooting to bootloader");
-                match proxy.reboot_to_bootloader(zx::MonotonicInstant::INFINITE) {
-                    Ok(_) => {
-                        // System is rebooting... wait until runtime ends.
-                        zx::MonotonicInstant::INFINITE.sleep();
-                    }
-                    Err(e) => {
-                        return panic_or_error(
-                            current_task.kernel(),
-                            errno!(EINVAL, format!("Failed to reboot, status: {e}")),
-                        )
-                    }
-                }
-            }
-
-            // TODO(https://391585107): Loop through all the arguments and
-            // generate a list of reboot reasons.
-            let reboot_reason = if reboot_args.contains(&&b"ota_update"[..])
-                || reboot_args.contains(&&b"System update during setup"[..])
-            {
-                fpower::RebootReason2::SystemUpdate
+                proxy.reboot_to_bootloader(zx::MonotonicInstant::INFINITE)
             } else if reboot_args.contains(&&b"recovery"[..]) {
                 // Read the bootloader message from the misc partition to determine whether the
                 // device is rebooting to perform an FDR.
@@ -159,35 +140,57 @@ pub fn sys_reboot(
                         Err(e) => log_warn!("Failed to read boot message: {e}"),
                     }
                 }
-                log_warn!("Recovery mode isn't supported yet, rebooting as normal...");
-                fpower::RebootReason2::UserRequest
-            } else if reboot_args == [b""] // args empty? splitting "" returns [""], not []
-                || reboot_args.contains(&&b"shell"[..])
-                || reboot_args.contains(&&b"userrequested"[..])
-            {
-                fpower::RebootReason2::UserRequest
+                log_info!("Rebooting to recovery...");
+                proxy.reboot_to_recovery(zx::MonotonicInstant::INFINITE)
             } else {
-                log_warn!("Unknown reboot args: {arg_bytes:?}");
-                track_stub!(
-                    TODO("https://fxbug.dev/322874610"),
-                    "unknown reboot args, see logs for strings"
-                );
-                fpower::RebootReason2::UserRequest
+                // TODO(https://391585107): Loop through all the arguments and
+                // generate a list of reboot reasons.
+                let reboot_reason = if reboot_args.contains(&&b"ota_update"[..])
+                    || reboot_args.contains(&&b"System update during setup"[..])
+                {
+                    fpower::RebootReason2::SystemUpdate
+                } else if reboot_args == [b""] // args empty? splitting "" returns [""], not []
+                    || reboot_args.contains(&&b"shell"[..])
+                    || reboot_args.contains(&&b"userrequested"[..])
+                {
+                    fpower::RebootReason2::UserRequest
+                } else {
+                    log_warn!("Unknown reboot args: {arg_bytes:?}");
+                    track_stub!(
+                        TODO("https://fxbug.dev/322874610"),
+                        "unknown reboot args, see logs for strings"
+                    );
+                    fpower::RebootReason2::UserRequest
+                };
+
+                log_info!("Rebooting... reason: {:?}", reboot_reason);
+                proxy.perform_reboot(
+                    &fpower::RebootOptions {
+                        reasons: Some(vec![reboot_reason]),
+                        ..Default::default()
+                    },
+                    zx::MonotonicInstant::INFINITE,
+                )
             };
 
-            log_info!("Rebooting... reason: {:?}", reboot_reason);
-            match proxy.perform_reboot(
-                &fpower::RebootOptions { reasons: Some(vec![reboot_reason]), ..Default::default() },
-                zx::MonotonicInstant::INFINITE,
-            ) {
-                Ok(_) => {
+            match reboot_result {
+                Ok(Ok(())) => {
                     // System is rebooting... wait until runtime ends.
                     zx::MonotonicInstant::INFINITE.sleep();
+                }
+                Ok(Err(e)) => {
+                    return panic_or_error(
+                        current_task.kernel(),
+                        errno!(
+                            EINVAL,
+                            format!("Failed to reboot, status: {}", zx::Status::from_raw(e))
+                        ),
+                    )
                 }
                 Err(e) => {
                     return panic_or_error(
                         current_task.kernel(),
-                        errno!(EINVAL, format!("Failed to reboot, status: {e}")),
+                        errno!(EINVAL, format!("Failed to reboot, FIDL error: {e}")),
                     )
                 }
             }
