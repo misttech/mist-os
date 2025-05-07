@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::fmt::Display;
-use std::panic::Location;
-
-use log::{debug, error, trace, warn};
+use std::fmt::{Debug, Display};
 
 /// An extension for common logging patterns for error types.
-pub trait ErrorLogExt {
-    /// Logs this error with `msg`.
-    fn log(&self, msg: impl Display);
+pub trait ErrorLogExt: Debug {
+    fn log_level(&self) -> log::Level;
+
+    #[track_caller]
+    fn log(&self, msg: impl Display) {
+        let level = self.log_level();
+        log::log!(level, "{msg}: {self:?}");
+    }
 }
 
 /// Extensions to `Result` types used in bindings.
@@ -84,36 +86,28 @@ impl<O, E: ErrorLogExt> ResultExt for Result<O, E> {
 }
 
 impl ErrorLogExt for fidl::Error {
-    #[track_caller]
-    fn log(&self, msg: impl Display) {
-        // TODO(https://fxbug.dev/343992493): don't embed location in the log
-        // message when better track_caller support is available.
-        let location = Location::caller();
+    fn log_level(&self) -> log::Level {
         if self.is_closed() {
-            debug!("{location}: {msg}: {self:?}");
+            log::Level::Debug
         } else {
-            error!("{location}: {msg}: {self:?}");
+            log::Level::Error
         }
     }
 }
 
 impl ErrorLogExt for fidl_fuchsia_posix::Errno {
-    #[track_caller]
-    fn log(&self, msg: impl Display) {
-        let location = Location::caller();
-        // TODO(https://fxbug.dev/343992493): don't embed location in the log
-        // message when better track_caller support is available.
+    fn log_level(&self) -> log::Level {
         match self {
             // Errnos that indicate the socket API is being called incorrectly.
             fidl_fuchsia_posix::Errno::Einval
             | fidl_fuchsia_posix::Errno::Eafnosupport
-            | fidl_fuchsia_posix::Errno::Enoprotoopt => warn!("{location}: {msg}: {self:?}"),
+            | fidl_fuchsia_posix::Errno::Enoprotoopt => log::Level::Warn,
             // Errnos that may occur under normal operation and are quite noisy.
             fidl_fuchsia_posix::Errno::Enetunreach
             | fidl_fuchsia_posix::Errno::Ehostunreach
-            | fidl_fuchsia_posix::Errno::Eagain => trace!("{location}: {msg}: {self:?}"),
+            | fidl_fuchsia_posix::Errno::Eagain => log::Level::Trace,
             // All other errnos.
-            _ => debug!("{location}: {msg}: {self:?}"),
+            _ => log::Level::Debug,
         }
     }
 }

@@ -24,7 +24,7 @@ use net_types::{SpecifiedAddr, Witness as _};
 
 use crate::bindings::devices::{BindingId, DeviceIdAndName};
 use crate::bindings::time::StackTime;
-use crate::bindings::util::IntoFidl;
+use crate::bindings::util::{ErrorLogExt, IntoFidl};
 use crate::bindings::{BindingsCtx, Ctx};
 use netstack3_core::device::{
     DeviceId, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId, WeakDeviceId,
@@ -493,6 +493,15 @@ pub(crate) enum Error {
     Send(#[from] WorkerClosedError),
     #[error(transparent)]
     Fidl(#[from] fidl::Error),
+}
+
+impl ErrorLogExt for Error {
+    fn log_level(&self) -> log::Level {
+        match self {
+            Self::Send(WorkerClosedError) => log::Level::Error,
+            Self::Fidl(fidl) => fidl.log_level(),
+        }
+    }
 }
 
 pub(crate) struct NewWatcher {

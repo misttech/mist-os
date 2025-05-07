@@ -7,7 +7,7 @@
 use std::fmt::Debug;
 
 use either::Either;
-use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker};
+use fidl::endpoints::ProtocolMarker;
 use futures::channel::oneshot;
 use futures::{TryStream, TryStreamExt as _};
 use log::{error, info, warn};
@@ -58,7 +58,10 @@ impl netstack3_core::neighbor::LinkResolutionNotifier<EthernetLinkDevice>
 }
 
 /// Serve the `fuchsia.net.routes/State` protocol.
-pub(crate) async fn serve_state(rs: fnet_routes::StateRequestStream, ctx: Ctx) {
+pub(crate) async fn serve_state(
+    rs: fnet_routes::StateRequestStream,
+    ctx: Ctx,
+) -> Result<(), fidl::Error> {
     rs.try_for_each_concurrent(None, |req| async {
         match req {
             fnet_routes::StateRequest::Resolve { destination, responder } => {
@@ -113,7 +116,6 @@ pub(crate) async fn serve_state(rs: fnet_routes::StateRequestStream, ctx: Ctx) {
         }
     })
     .await
-    .unwrap_or_else(|e| warn!("error serving {}: {:?}", fnet_routes::StateMarker::PROTOCOL_NAME, e))
 }
 
 /// Resolves the route to the given destination address.
@@ -233,11 +235,12 @@ where
 /// Serve the `fuchsia.net.routes/StateV4` protocol.
 pub(crate) async fn serve_state_v4(
     rs: fnet_routes::StateV4RequestStream,
-    dispatchers: &routes::Dispatchers<Ipv4>,
-) {
-    let routes::Dispatchers { route_update_dispatcher, rule_update_dispatcher } = dispatchers;
+    dispatchers: routes::Dispatchers<Ipv4>,
+) -> Result<(), fidl::Error> {
+    let routes::Dispatchers { route_update_dispatcher, rule_update_dispatcher } = &dispatchers;
     rs.try_for_each_concurrent(None, |req| async move {
         match req {
+            // TODO(https://fxbug.dev/380897722): This should spawn a new task.
             fnet_routes::StateV4Request::GetWatcherV4 { options, watcher, control_handle: _ } => {
                 Ok(serve_route_watcher::<Ipv4>(watcher, options.into(), route_update_dispatcher)
                     .await
@@ -245,6 +248,7 @@ pub(crate) async fn serve_state_v4(
                         warn!("error serving {}: {:?}", fnet_routes::WatcherV4Marker::DEBUG_NAME, e)
                     }))
             }
+            // TODO(https://fxbug.dev/380897722): This should spawn a new task.
             fnet_routes::StateV4Request::GetRuleWatcherV4 {
                 options:
                     fnet_routes::RuleWatcherOptionsV4 {
@@ -264,19 +268,18 @@ pub(crate) async fn serve_state_v4(
         }
     })
     .await
-    .unwrap_or_else(|e| {
-        warn!("error serving {}: {:?}", fnet_routes::StateV4Marker::PROTOCOL_NAME, e)
-    })
 }
 
 /// Serve the `fuchsia.net.routes/StateV6` protocol.
 pub(crate) async fn serve_state_v6(
     rs: fnet_routes::StateV6RequestStream,
-    dispatchers: &routes::Dispatchers<Ipv6>,
-) {
-    let routes::Dispatchers { route_update_dispatcher, rule_update_dispatcher } = dispatchers;
+    dispatchers: routes::Dispatchers<Ipv6>,
+) -> Result<(), fidl::Error> {
+    let routes::Dispatchers { route_update_dispatcher, rule_update_dispatcher } = &dispatchers;
     rs.try_for_each_concurrent(None, |req| async move {
         match req {
+            // TODO(https://fxbug.dev/380897722): This should spawn a new
+            // task.
             fnet_routes::StateV6Request::GetWatcherV6 { options, watcher, control_handle: _ } => {
                 Ok(serve_route_watcher::<Ipv6>(watcher, options.into(), route_update_dispatcher)
                     .await
@@ -284,6 +287,8 @@ pub(crate) async fn serve_state_v6(
                         warn!("error serving {}: {:?}", fnet_routes::WatcherV6Marker::DEBUG_NAME, e)
                     }))
             }
+            // TODO(https://fxbug.dev/380897722): This should spawn a new
+            // task.
             fnet_routes::StateV6Request::GetRuleWatcherV6 {
                 options:
                     fnet_routes::RuleWatcherOptionsV6 {
@@ -303,9 +308,6 @@ pub(crate) async fn serve_state_v6(
         }
     })
     .await
-    .unwrap_or_else(|e| {
-        warn!("error serving {}: {:?}", fnet_routes::StateV6Marker::PROTOCOL_NAME, e)
-    })
 }
 
 // Serve a single client of the `WatcherV4` or `WatcherV6` protocol.

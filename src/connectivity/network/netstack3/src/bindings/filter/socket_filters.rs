@@ -98,7 +98,7 @@ struct ValidAttachEbpfProgramOptions {
 
 pub(crate) async fn serve_socket_control(
     mut stream: fnet_filter::SocketControlRequestStream,
-    ctx: &Ctx,
+    ctx: Ctx,
 ) -> Result<(), fidl::Error> {
     use fnet_filter::SocketControlRequest;
 

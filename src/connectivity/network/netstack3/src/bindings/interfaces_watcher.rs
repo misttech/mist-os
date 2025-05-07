@@ -24,7 +24,7 @@ use {
 };
 
 use crate::bindings::devices::BindingId;
-use crate::bindings::util::{IntoFidl, ResultExt as _, TryIntoFidl as _};
+use crate::bindings::util::{ErrorLogExt, IntoFidl, ResultExt as _, TryIntoFidl as _};
 
 /// Possible errors when serving `fuchsia.net.interfaces/State`.
 #[derive(thiserror::Error, Debug)]
@@ -33,6 +33,15 @@ pub(crate) enum Error {
     Send(#[from] WorkerClosedError),
     #[error(transparent)]
     Fidl(#[from] fidl::Error),
+}
+
+impl ErrorLogExt for Error {
+    fn log_level(&self) -> log::Level {
+        match self {
+            Error::Send(WorkerClosedError {}) => log::Level::Error,
+            Error::Fidl(fidl) => fidl.log_level(),
+        }
+    }
 }
 
 #[cfg_attr(test, derive(Default))]

@@ -33,7 +33,7 @@ use packet_formats::utils::NonZeroDuration;
 use zx::{self as zx, Peered as _};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
-    fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket as fposix_socket, fuchsia_async as fasync,
 };
 
 use crate::bindings::socket::worker::{self, CloseResponder, SocketWorker};
@@ -43,7 +43,7 @@ use crate::bindings::socket::{
 };
 use crate::bindings::util::{
     AllowBindingIdFromWeak, ConversionContext, IntoCore, IntoFidl, IntoFidlWithContext as _,
-    ResultExt as _, TryIntoCoreWithContext, TryIntoFidlWithContext,
+    ResultExt as _, ScopeExt as _, TryIntoCoreWithContext, TryIntoFidlWithContext,
 };
 use crate::bindings::{BindingsCtx, Ctx};
 
@@ -163,8 +163,10 @@ struct BindingData<I: IpExt> {
 
 #[derive(Debug)]
 struct TaskControl {
+    // TODO(https://fxbug.dev/380897722): Replace with scope cancellation.
     abort_handle: async_utils::event::Event,
     send_shutdown: Option<oneshot::Sender<oneshot::Sender<()>>>,
+    scope: fasync::Scope,
 }
 
 impl TaskControl {
@@ -203,11 +205,14 @@ impl TaskControl {
 
     async fn shutdown_send_and_stop_tasks(mut self) {
         self.shutdown_send().await;
-        let Self { abort_handle, send_shutdown } = self;
+        let Self { abort_handle, send_shutdown, scope } = self;
         // Must've been handled by shutdown_send.
         assert!(send_shutdown.is_none());
         // Assert that event has not been signaled yet.
         assert!(abort_handle.signal());
+        // TODO(https://fxbug.dev/380897722): We should be able to cancel this
+        // scope instead of joining.
+        scope.join().await;
     }
 }
 
@@ -255,14 +260,8 @@ impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I> {
     type RequestStream = fposix_socket::StreamSocketRequestStream;
     type CloseResponder = fposix_socket::StreamSocketCloseResponder;
     type SetupArgs = InitialSocketState;
-    type Spawner = crate::bindings::util::TaskWaitGroupSpawner;
 
-    fn setup(
-        &mut self,
-        ctx: &mut Ctx,
-        args: InitialSocketState,
-        spawners: &worker::TaskSpawnerCollection<crate::bindings::util::TaskWaitGroupSpawner>,
-    ) {
+    fn setup(&mut self, ctx: &mut Ctx, args: InitialSocketState) {
         match args {
             InitialSocketState::Unbound(fposix_socket::SocketCreationOptions {
                 marks,
@@ -283,8 +282,7 @@ impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I> {
                 let Self { id, peer: _, task_data, task_control } = self;
                 let task_data =
                     task_data.take().expect("connected socket did not provide socket and watcher");
-                let control =
-                    spawn_tasks(ctx.clone(), id.clone(), task_data, &spawners.socket_scope);
+                let control = spawn_tasks(ctx.clone(), id.clone(), task_data);
                 assert_matches::assert_matches!(task_control.replace(control), None);
             }
         }
@@ -294,9 +292,8 @@ impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I> {
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,
-        spawners: &worker::TaskSpawnerCollection<crate::bindings::util::TaskWaitGroupSpawner>,
     ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
-        RequestHandler { ctx, data: self }.handle_request(request, spawners).await
+        RequestHandler { ctx, data: self }.handle_request(request).await
     }
 
     async fn close(self, ctx: &mut Ctx) {
@@ -316,29 +313,30 @@ pub(super) fn spawn_worker(
     proto: fposix_socket::StreamSocketProtocol,
     ctx: crate::bindings::Ctx,
     request_stream: fposix_socket::StreamSocketRequestStream,
-    spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
     creation_opts: fposix_socket::SocketCreationOptions,
 ) {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp) => {
-            spawner.spawn(SocketWorker::serve_stream_with(
-                ctx,
-                BindingData::<Ipv4>::new,
-                SocketWorkerProperties {},
-                request_stream,
-                InitialSocketState::Unbound(creation_opts),
-                spawner.clone(),
-            ))
+            fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
+                SocketWorker::serve_stream_with(
+                    ctx,
+                    BindingData::<Ipv4>::new,
+                    SocketWorkerProperties {},
+                    rs,
+                    InitialSocketState::Unbound(creation_opts),
+                )
+            })
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::StreamSocketProtocol::Tcp) => {
-            spawner.spawn(SocketWorker::serve_stream_with(
-                ctx,
-                BindingData::<Ipv6>::new,
-                SocketWorkerProperties {},
-                request_stream,
-                InitialSocketState::Unbound(creation_opts),
-                spawner.clone(),
-            ))
+            fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
+                SocketWorker::serve_stream_with(
+                    ctx,
+                    BindingData::<Ipv6>::new,
+                    SocketWorkerProperties {},
+                    rs,
+                    InitialSocketState::Unbound(creation_opts),
+                )
+            })
         }
     }
 }
@@ -435,7 +433,6 @@ fn spawn_tasks<I: IpExt>(
     ctx: crate::bindings::Ctx,
     id: TcpSocketId<I>,
     data: TaskSpawnData,
-    spawner: &worker::SocketScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
 ) -> TaskControl {
     let TaskSpawnData { socket, rx_task_receiver, tx_task_receiver } = data;
     let event = async_utils::event::Event::new();
@@ -448,7 +445,8 @@ fn spawn_tasks<I: IpExt>(
         send_shutdown_receiver,
         tx_task_receiver,
     );
-    spawner.spawn(async move {
+    let scope = fasync::Scope::new_with_name("tcp");
+    let _: fasync::JoinHandle<()> = scope.spawn(async move {
         let send_task = pin!(send_task);
         futures::future::select(send_task, event_wait)
             .map(|_: futures::future::Either<((), _), ((), _)>| ())
@@ -458,13 +456,13 @@ fn spawn_tasks<I: IpExt>(
     let event_wait = event.wait();
     let receive_task =
         buffer::receive_task(socket, buffer::ReceiveTaskArgs { ctx, id }, rx_task_receiver);
-    spawner.spawn(async move {
+    let _: fasync::JoinHandle<()> = scope.spawn(async move {
         let receive_task = pin!(receive_task);
         futures::future::select(receive_task, event_wait)
             .map(|_: futures::future::Either<((), _), ((), _)>| ())
             .await;
     });
-    TaskControl { abort_handle: event, send_shutdown: Some(send_shutdown) }
+    TaskControl { abort_handle: event, send_shutdown: Some(send_shutdown), scope }
 }
 
 struct RequestHandler<'a, I: IpExt> {
@@ -483,11 +481,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         Ok(())
     }
 
-    fn connect(
-        self,
-        addr: fnet::SocketAddress,
-        spawner: &worker::SocketScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
-    ) -> Result<(), fposix::Errno> {
+    fn connect(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _, task_data: _, task_control }, ctx } = self;
 
         let addr = I::SocketAddress::from_sock_addr(addr)?;
@@ -496,7 +490,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
         ctx.api().tcp().connect(id, ip, port).map_err(IntoErrno::into_errno)?;
         if let Some(task_data) = self.data.task_data.take() {
-            let control = spawn_tasks::<I>(ctx.clone(), id.clone(), task_data, spawner);
+            let control = spawn_tasks::<I>(ctx.clone(), id.clone(), task_data);
             assert_matches::assert_matches!(task_control.replace(control), None);
             Err(fposix::Errno::Einprogress)
         } else {
@@ -565,7 +559,6 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     fn accept(
         self,
         want_addr: bool,
-        spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
     ) -> Result<
         (Option<fnet::SocketAddress>, ClientEnd<fposix_socket::StreamSocketMarker>),
         fposix::Errno,
@@ -581,14 +574,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         let (client, request_stream) = crate::bindings::socket::create_request_stream();
         peer.signal_handle(zx::Signals::NONE, ZXSIO_SIGNAL_CONNECTED)
             .expect("failed to signal connection established");
-        spawn_connected_socket_task(
-            ctx.clone(),
-            accepted,
-            peer,
-            request_stream,
-            spawn_data,
-            spawner,
-        );
+        spawn_connected_socket_task(ctx.clone(), accepted, peer, request_stream, spawn_data);
         Ok((want_addr.then_some(addr), client))
     }
 
@@ -770,7 +756,6 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     async fn handle_request(
         self,
         request: fposix_socket::StreamSocketRequest,
-        spawners: &worker::TaskSpawnerCollection<crate::bindings::util::TaskWaitGroupSpawner>,
     ) -> ControlFlow<
         fposix_socket::StreamSocketCloseResponder,
         Option<fposix_socket::StreamSocketRequestStream>,
@@ -783,7 +768,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             }
             fposix_socket::StreamSocketRequest::Connect { addr, responder } => {
                 // Connect always spawns on the socket scope.
-                let response = self.connect(addr, &spawners.socket_scope);
+                let response = self.connect(addr);
                 responder.send(response).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Describe { responder } => {
@@ -807,7 +792,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             fposix_socket::StreamSocketRequest::Accept { want_addr, responder } => {
                 // Accept receives the provider scope because it creates a new
                 // socket worker for the newly created socket.
-                let response = self.accept(want_addr, &spawners.provider_scope);
+                let response = self.accept(want_addr);
                 responder
                     .send(match response {
                         Ok((ref addr, client)) => Ok((addr.as_ref(), client)),
@@ -1350,21 +1335,21 @@ fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
     peer: zx::Socket,
     request_stream: fposix_socket::StreamSocketRequestStream,
     task_data: TaskSpawnData,
-    spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
 ) {
-    spawner.spawn(SocketWorker::<BindingData<I>>::serve_stream_with(
-        ctx,
-        move |_: &mut Ctx, SocketWorkerProperties {}| BindingData {
-            id: accepted,
-            peer,
-            task_data: Some(task_data),
-            task_control: None,
-        },
-        SocketWorkerProperties {},
-        request_stream,
-        InitialSocketState::Connected,
-        spawner.clone(),
-    ))
+    fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
+        SocketWorker::<BindingData<I>>::serve_stream_with(
+            ctx,
+            move |_: &mut Ctx, SocketWorkerProperties {}| BindingData {
+                id: accepted,
+                peer,
+                task_data: Some(task_data),
+                task_control: None,
+            },
+            SocketWorkerProperties {},
+            rs,
+            InitialSocketState::Connected,
+        )
+    })
 }
 
 impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::SocketAddress>

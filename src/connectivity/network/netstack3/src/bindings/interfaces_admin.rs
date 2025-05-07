@@ -78,53 +78,40 @@ use crate::bindings::routes::admin::RouteSet;
 use crate::bindings::routes::{self};
 use crate::bindings::time::StackTime;
 use crate::bindings::util::{
-    IllegalNonPositiveValueError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _,
-    TryIntoCore,
+    ErrorLogExt, IllegalNonPositiveValueError, IntoCore as _, IntoFidl,
+    RemoveResourceResultExt as _, ScopeExt as _, TryIntoCore,
 };
 use crate::bindings::{
     netdevice_worker, BindingId, CoreRwLock, Ctx, DeviceIdExt as _, InterfaceProperties,
     LifetimeExt as _, Netstack,
 };
 
-pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerRequestStream) {
-    req.filter_map(|req| {
-        let req = match req {
-            Ok(req) => req,
-            Err(e) => {
-                if !e.is_closed() {
-                    error!(
-                        "{} request error {e:?}",
-                        fnet_interfaces_admin::InstallerMarker::DEBUG_NAME
-                    );
-                }
-                return futures::future::ready(None);
-            }
-        };
+pub(crate) async fn serve(
+    ns: Netstack,
+    mut req: fnet_interfaces_admin::InstallerRequestStream,
+) -> Result<(), fidl::Error> {
+    while let Some(req) = req.try_next().await? {
         match req {
             fnet_interfaces_admin::InstallerRequest::InstallBlackholeInterface {
                 interface,
                 options,
                 control_handle: _,
-            } => futures::future::ready(Some(fasync::Task::spawn(run_blackhole_interface(
-                ns.clone(),
-                interface,
-                options,
-            )))),
+            } => {
+                let _: fasync::JoinHandle<()> = fasync::Scope::current()
+                    .spawn(run_blackhole_interface(ns.clone(), interface, options));
+            }
             fnet_interfaces_admin::InstallerRequest::InstallDevice {
                 device,
                 device_control,
                 control_handle: _,
-            } => futures::future::ready(Some(fasync::Task::spawn(
-                run_device_control(ns.clone(), device, device_control.into_stream())
-                    .map(|r| r.unwrap_or_else(|e| warn!("device control finished with {:?}", e))),
-            ))),
+            } => fasync::Scope::current()
+                .spawn_request_stream_handler(device_control.into_stream(), |rs| {
+                    run_device_control(ns.clone(), device, rs)
+                }),
         }
-    })
-    .for_each_concurrent(None, |task| {
-        // Wait for all created devices on this installer to finish.
-        task
-    })
-    .await;
+    }
+
+    Ok(())
 }
 
 async fn run_blackhole_interface(
@@ -245,6 +232,15 @@ enum DeviceControlError {
     Worker(#[from] netdevice_worker::Error),
     #[error("fidl error: {0}")]
     Fidl(#[from] fidl::Error),
+}
+
+impl ErrorLogExt for DeviceControlError {
+    fn log_level(&self) -> log::Level {
+        match self {
+            DeviceControlError::Worker(_) => log::Level::Warn,
+            DeviceControlError::Fidl(fidl) => fidl.log_level(),
+        }
+    }
 }
 
 async fn run_device_control(

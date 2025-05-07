@@ -8,9 +8,7 @@ use std::sync::Arc;
 
 use assert_matches::assert_matches;
 use async_utils::event::Event;
-use fidl::endpoints::{
-    ControlHandle as _, ProtocolMarker as _, RequestStream as _, Responder as _,
-};
+use fidl::endpoints::{ControlHandle as _, RequestStream as _, Responder as _};
 use fidl_fuchsia_net_interfaces_admin::ProofOfInterfaceAuthorization;
 use fnet_routes_ext::admin::{FidlRouteAdminIpExt, RouteSetRequest, RouteTableRequest};
 use fnet_routes_ext::{FidlRouteIpExt, Responder as _};
@@ -23,13 +21,13 @@ use netstack3_core::routes::AddableEntry;
 use zx::{self as zx, AsHandleRef, HandleBased as _};
 use {
     fidl_fuchsia_net_routes_admin as fnet_routes_admin,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_async as fasync,
 };
 
 use crate::bindings::devices::StaticCommonInfo;
 use crate::bindings::routes::witness::TableId;
 use crate::bindings::routes::{self, RouteWorkItem, WeakDeviceId};
-use crate::bindings::util::{TaskWaitGroupSpawner, TryFromFidlWithContext};
+use crate::bindings::util::{ScopeExt as _, TaskWaitGroupSpawner, TryFromFidlWithContext};
 use crate::bindings::{BindingsCtx, Ctx, DeviceIdExt};
 
 pub(crate) use crate::bindings::routes::rules_admin::serve_rule_table;
@@ -81,7 +79,7 @@ pub(crate) async fn serve_route_set<
 pub(crate) async fn serve_route_table_provider_v4(
     stream: fnet_routes_admin::RouteTableProviderV4RequestStream,
     spawner: TaskWaitGroupSpawner,
-    ctx: &Ctx,
+    ctx: Ctx,
 ) -> Result<(), fidl::Error> {
     let mut stream = pin!(stream);
 
@@ -102,11 +100,14 @@ pub(crate) async fn serve_route_table_provider_v4(
                     }
                 };
                 let stream = provider.into_stream();
-                spawner.spawn(serve_route_table::<Ipv4, UserRouteTable<Ipv4>>(
-                    stream,
-                    spawner.clone(),
-                    route_table,
-                ));
+
+                fasync::Scope::current().spawn_request_stream_handler(stream, |stream| {
+                    serve_route_table::<Ipv4, UserRouteTable<Ipv4>>(
+                        stream,
+                        spawner.clone(),
+                        route_table,
+                    )
+                });
             }
         }
     }
@@ -116,7 +117,7 @@ pub(crate) async fn serve_route_table_provider_v4(
 pub(crate) async fn serve_route_table_provider_v6(
     stream: fnet_routes_admin::RouteTableProviderV6RequestStream,
     spawner: TaskWaitGroupSpawner,
-    ctx: &Ctx,
+    ctx: Ctx,
 ) -> Result<(), fidl::Error> {
     let mut stream = pin!(stream);
 
@@ -137,11 +138,13 @@ pub(crate) async fn serve_route_table_provider_v6(
                     }
                 };
                 let stream = provider.into_stream();
-                spawner.spawn(serve_route_table::<Ipv6, UserRouteTable<Ipv6>>(
-                    stream,
-                    spawner.clone(),
-                    route_table,
-                ));
+                fasync::Scope::current().spawn_request_stream_handler(stream, |stream| {
+                    serve_route_table::<Ipv6, UserRouteTable<Ipv6>>(
+                        stream,
+                        spawner.clone(),
+                        route_table,
+                    )
+                });
             }
         }
     }
@@ -152,18 +155,6 @@ pub(crate) async fn serve_route_table<
     I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     R: RouteTable<I>,
 >(
-    stream: <I as FidlRouteAdminIpExt>::RouteTableRequestStream,
-    spawner: TaskWaitGroupSpawner,
-    route_table: R,
-) {
-    serve_route_table_inner(stream, spawner, route_table).await.unwrap_or_else(|err| {
-        if !err.is_closed() {
-            error!("error while serving {}: {err:?}", I::RouteTableMarker::DEBUG_NAME);
-        }
-    });
-}
-
-async fn serve_route_table_inner<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt, R: RouteTable<I>>(
     mut stream: <I as FidlRouteAdminIpExt>::RouteTableRequestStream,
     spawner: TaskWaitGroupSpawner,
     mut route_table: R,

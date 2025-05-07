@@ -12,7 +12,7 @@ use std::num::NonZeroUsize;
 use std::pin::pin;
 use std::sync::Arc;
 
-use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
+use fidl::endpoints::ControlHandle as _;
 use futures::channel::mpsc;
 use futures::future::FusedFuture as _;
 use futures::lock::Mutex;
@@ -20,11 +20,13 @@ use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 use log::{debug, error, info, warn};
 use thiserror::Error;
+
 use {
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
-    fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_root as fnet_root, fuchsia_async as fasync,
 };
 
+use crate::bindings::util::{ErrorLogExt, ScopeExt as _};
 use controller::{CommitResult, Controller};
 
 // The maximum number of events a client for the `fuchsia.net.filter/Watcher` is
@@ -33,7 +35,7 @@ use controller::{CommitResult, Controller};
 // arbitrary) so that we don't artificially truncate the allowed batch size.
 const MAX_PENDING_EVENTS: usize = (fnet_filter::MAX_BATCH_SIZE * 5) as usize;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(crate) struct UpdateDispatcher(Arc<Mutex<UpdateDispatcherInner>>);
 
 #[derive(Default)]
@@ -335,26 +337,20 @@ impl Watcher {
 }
 
 pub(crate) async fn serve_state(
-    stream: fnet_filter::StateRequestStream,
-    dispatcher: &UpdateDispatcher,
+    mut stream: fnet_filter::StateRequestStream,
+    dispatcher: UpdateDispatcher,
 ) -> Result<(), fidl::Error> {
-    stream
-        .try_for_each_concurrent(None, |request| async {
-            match request {
-                fnet_filter::StateRequest::GetWatcher {
-                    options: _,
-                    request,
-                    control_handle: _,
-                } => {
-                    let requests = request.into_stream();
-                    serve_watcher(requests, dispatcher).await.unwrap_or_else(|e| {
-                        warn!("error serving {}: {e:?}", fnet_filter::WatcherMarker::DEBUG_NAME)
-                    });
-                }
+    while let Some(request) = stream.try_next().await? {
+        match request {
+            fnet_filter::StateRequest::GetWatcher { options: _, request, control_handle: _ } => {
+                let requests = request.into_stream();
+                fasync::Scope::current().spawn_request_stream_handler(requests, |requests| {
+                    serve_watcher(requests, dispatcher.clone())
+                })
             }
-            Ok(())
-        })
-        .await
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Error)]
@@ -369,10 +365,20 @@ enum ServeWatcherError {
     Canceled,
 }
 
+impl ErrorLogExt for ServeWatcherError {
+    fn log_level(&self) -> log::Level {
+        match self {
+            Self::ErrorInStream(fidl) | Self::FailedToRespond(fidl) => fidl.log_level(),
+            Self::Canceled | Self::PreviousPendingWatch => log::Level::Warn,
+        }
+    }
+}
+
 async fn serve_watcher(
     stream: fnet_filter::WatcherRequestStream,
-    UpdateDispatcher(dispatcher): &UpdateDispatcher,
+    dispatcher: UpdateDispatcher,
 ) -> Result<(), ServeWatcherError> {
+    let UpdateDispatcher(dispatcher) = &dispatcher;
     let mut watcher = dispatcher.lock().await.connect_new_client();
     let canceled_fut = watcher.canceled.wait();
 
@@ -420,21 +426,21 @@ async fn serve_watcher(
 
 pub(crate) async fn serve_root(
     stream: fnet_root::FilterRequestStream,
-    dispatcher: &UpdateDispatcher,
-    ctx: &crate::bindings::Ctx,
+    dispatcher: UpdateDispatcher,
+    ctx: crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
     use fnet_root::FilterRequest;
-
     stream
         .try_for_each_concurrent(None, |request| async {
             match request {
                 FilterRequest::OpenController { id, request, control_handle: _ } => {
-                    let UpdateDispatcher(inner) = dispatcher;
+                    let UpdateDispatcher(inner) = &dispatcher;
                     let id = fnet_filter_ext::ControllerId(id);
                     inner.lock().await.connect_or_create_new_controller(id.clone());
-
                     let (stream, control_handle) = request.into_stream_and_control_handle();
-                    serve_controller(&id, stream, control_handle, dispatcher, ctx.clone())
+                    // TODO(https://fxbug.dev/380897722): This should spawn a
+                    // new task.
+                    serve_controller(&id, stream, control_handle, &dispatcher, ctx.clone())
                         .await
                         .unwrap_or_else(|e| warn!("error serving namespace controller: {e:?}"));
 
@@ -450,22 +456,24 @@ pub(crate) async fn serve_root(
 
 pub(crate) async fn serve_control(
     stream: fnet_filter::ControlRequestStream,
-    dispatcher: &UpdateDispatcher,
-    ctx: &crate::bindings::Ctx,
+    dispatcher: UpdateDispatcher,
+    ctx: crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
     use fnet_filter::ControlRequest;
 
     stream
         .try_for_each_concurrent(None, |request| async {
             match request {
+                // TODO(https://fxbug.dev/380897722): This should spawn a new
+                // task.
                 ControlRequest::OpenController { id, request, control_handle: _ } => {
-                    let UpdateDispatcher(inner) = dispatcher;
+                    let UpdateDispatcher(inner) = &dispatcher;
                     let final_id =
                         inner.lock().await.new_controller(fnet_filter_ext::ControllerId(id));
 
                     let (stream, control_handle) = request.into_stream_and_control_handle();
 
-                    serve_controller(&final_id, stream, control_handle, dispatcher, ctx.clone())
+                    serve_controller(&final_id, stream, control_handle, &dispatcher, ctx.clone())
                         .await
                         .unwrap_or_else(|e| warn!("error serving namespace controller: {e:?}"));
 

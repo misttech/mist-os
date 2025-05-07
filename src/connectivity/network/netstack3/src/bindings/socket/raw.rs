@@ -5,8 +5,8 @@
 use core::num::NonZeroU8;
 use std::ops::ControlFlow;
 
-use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker, RequestStream};
-use futures::StreamExt as _;
+use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream};
+use futures::TryStreamExt as _;
 use log::error;
 use net_types::ip::{Ip, IpInvariant, IpVersion, Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
@@ -25,19 +25,18 @@ use zx::{HandleBased, Peered};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
     fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fpraw,
+    fuchsia_async as fasync,
 };
 
 use crate::bindings::socket::queue::{BodyLen, MessageQueue};
 use crate::bindings::socket::{IntoErrno, IpSockAddrExt, SockAddr};
 use crate::bindings::util::{
     AllowBindingIdFromWeak, IntoCore, IntoFidl, IntoFidlWithContext as _, RemoveResourceResultExt,
-    ResultExt as _, TryFromFidl, TryFromFidlWithContext,
+    ResultExt as _, ScopeExt as _, TryFromFidl, TryFromFidlWithContext,
 };
 use crate::bindings::{BindingsCtx, Ctx};
 
-use super::worker::{
-    self, CloseResponder, SocketWorker, SocketWorkerHandler, TaskSpawnerCollection,
-};
+use super::worker::{CloseResponder, SocketWorker, SocketWorkerHandler};
 use super::{SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING};
 
 type DeviceId = netstack3_core::device::DeviceId<BindingsCtx>;
@@ -154,14 +153,7 @@ impl<I: IpExt + IpSockAddrExt> SocketWorkerHandler for SocketWorkerState<I> {
 
     type SetupArgs = fposix_socket::SocketCreationOptions;
 
-    type Spawner = ();
-
-    fn setup(
-        &mut self,
-        ctx: &mut Ctx,
-        options: fposix_socket::SocketCreationOptions,
-        _spawners: &worker::TaskSpawnerCollection<()>,
-    ) {
+    fn setup(&mut self, ctx: &mut Ctx, options: fposix_socket::SocketCreationOptions) {
         let fposix_socket::SocketCreationOptions { marks, __source_breaking } = options;
         for (domain, mark) in marks.into_iter().map(fidl_fuchsia_net_ext::Marks::from).flatten() {
             ctx.api().raw_ip_socket().set_mark(
@@ -176,7 +168,6 @@ impl<I: IpExt + IpSockAddrExt> SocketWorkerHandler for SocketWorkerState<I> {
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,
-        _spawner: &TaskSpawnerCollection<Self::Spawner>,
     ) -> std::ops::ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
         RequestHandler { ctx, data: self }.handle_request(request)
     }
@@ -555,48 +546,28 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
 
 pub(crate) async fn serve(
     ctx: Ctx,
-    stream: fpraw::ProviderRequestStream,
-) -> crate::bindings::util::TaskWaitGroup {
+    mut stream: fpraw::ProviderRequestStream,
+) -> Result<(), fidl::Error> {
     let ctx = &ctx;
-    let (wait_group, spawner) = crate::bindings::util::TaskWaitGroup::new();
-    let spawner: worker::ProviderScopedSpawner<_> = spawner.into();
-    stream
-        .map(|req| {
-            let req = match req {
-                Ok(req) => req,
-                Err(e) => {
-                    if !e.is_closed() {
-                        error!("{} request error {e:?}", fpraw::ProviderMarker::DEBUG_NAME);
-                    }
-                    return;
-                }
-            };
-            match req {
-                fpraw::ProviderRequest::Socket { responder, domain, proto } => responder
-                    .send(
-                        handle_create_socket(
-                            ctx.clone(),
-                            domain,
-                            proto,
-                            &spawner,
-                            Default::default(),
-                        )
+    while let Some(req) = stream.try_next().await? {
+        match req {
+            fpraw::ProviderRequest::Socket { responder, domain, proto } => responder
+                .send(
+                    handle_create_socket(ctx.clone(), domain, proto, Default::default())
                         .log_error("raw::create"),
+                )
+                .unwrap_or_log("failed to respond"),
+            fpraw::ProviderRequest::SocketWithOptions { responder, domain, proto, opts } => {
+                responder
+                    .send(
+                        handle_create_socket(ctx.clone(), domain, proto, opts)
+                            .log_error("raw::create"),
                     )
-                    .unwrap_or_log("failed to respond"),
-                fpraw::ProviderRequest::SocketWithOptions { responder, domain, proto, opts } => {
-                    responder
-                        .send(
-                            handle_create_socket(ctx.clone(), domain, proto, &spawner, opts)
-                                .log_error("raw::create"),
-                        )
-                        .unwrap_or_log("failed to respond")
-                }
+                    .unwrap_or_log("failed to respond")
             }
-        })
-        .collect::<()>()
-        .await;
-    wait_group
+        }
+    }
+    Ok(())
 }
 
 /// Handler for a [`fpraw::ProviderRequest::Socket`] request.
@@ -604,32 +575,33 @@ fn handle_create_socket(
     ctx: Ctx,
     domain: fposix_socket::Domain,
     protocol: fpraw::ProtocolAssociation,
-    spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
     creation_opts: fposix_socket::SocketCreationOptions,
 ) -> Result<fidl::endpoints::ClientEnd<fpraw::SocketMarker>, fposix::Errno> {
     let (client, request_stream) = fidl::endpoints::create_request_stream();
     match domain {
         fposix_socket::Domain::Ipv4 => {
             let protocol = RawIpSocketProtocol::<Ipv4>::try_from_fidl(protocol)?;
-            spawner.spawn(SocketWorker::serve_stream_with(
-                ctx,
-                move |ctx, properties| SocketWorkerState::new(ctx, protocol, properties),
-                SocketWorkerProperties {},
-                request_stream,
-                creation_opts,
-                spawner.clone(),
-            ))
+            fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
+                SocketWorker::serve_stream_with(
+                    ctx,
+                    move |ctx, properties| SocketWorkerState::new(ctx, protocol, properties),
+                    SocketWorkerProperties {},
+                    rs,
+                    creation_opts,
+                )
+            })
         }
         fposix_socket::Domain::Ipv6 => {
             let protocol = RawIpSocketProtocol::<Ipv6>::try_from_fidl(protocol)?;
-            spawner.spawn(SocketWorker::serve_stream_with(
-                ctx,
-                move |ctx, properties| SocketWorkerState::new(ctx, protocol, properties),
-                SocketWorkerProperties {},
-                request_stream,
-                creation_opts,
-                spawner.clone(),
-            ))
+            fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
+                SocketWorker::serve_stream_with(
+                    ctx,
+                    move |ctx, properties| SocketWorkerState::new(ctx, protocol, properties),
+                    SocketWorkerProperties {},
+                    rs,
+                    creation_opts,
+                )
+            })
         }
     }
     Ok(client)

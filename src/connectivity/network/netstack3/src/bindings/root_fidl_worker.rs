@@ -88,7 +88,7 @@ fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_root::InterfacesGetM
 pub(crate) async fn serve_routes_v4(
     mut rs: fnet_root::RoutesV4RequestStream,
     spawner: TaskWaitGroupSpawner,
-    ctx: &crate::bindings::Ctx,
+    ctx: crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
     while let Some(req) = rs.try_next().await? {
         match req {
@@ -113,7 +113,7 @@ pub(crate) async fn serve_routes_v4(
 pub(crate) async fn serve_routes_v6(
     mut rs: fnet_root::RoutesV6RequestStream,
     spawner: TaskWaitGroupSpawner,
-    ctx: &crate::bindings::Ctx,
+    ctx: crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
     while let Some(req) = rs.try_next().await? {
         match req {

@@ -43,7 +43,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use assert_matches::assert_matches;
-use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker as _, RequestStream};
+use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_net_multicast_ext::FidlMulticastAdminIpExt;
 use fuchsia_inspect::health::Reporter as _;
 use futures::channel::{mpsc, oneshot};
@@ -1243,25 +1243,6 @@ pub(crate) enum Service {
     Stack(fidl_fuchsia_net_stack::StackRequestStream),
 }
 
-trait RequestStreamExt: RequestStream {
-    fn serve_with<F, Fut, E>(self, f: F) -> futures::future::Map<Fut, fn(Result<(), E>) -> ()>
-    where
-        E: std::error::Error,
-        F: FnOnce(Self) -> Fut,
-        Fut: Future<Output = Result<(), E>>;
-}
-
-impl<D: DiscoverableProtocolMarker, S: RequestStream<Protocol = D>> RequestStreamExt for S {
-    fn serve_with<F, Fut, E>(self, f: F) -> futures::future::Map<Fut, fn(Result<(), E>) -> ()>
-    where
-        E: std::error::Error,
-        F: FnOnce(Self) -> Fut,
-        Fut: Future<Output = Result<(), E>>,
-    {
-        f(self).map(|res| res.unwrap_or_else(|err| error!("{} error: {}", D::PROTOCOL_NAME, err)))
-    }
-}
-
 impl NetstackSeed {
     /// Consumes the netstack and starts serving all the FIDL services it
     /// implements to the outgoing service directory.
@@ -1421,15 +1402,6 @@ impl NetstackSeed {
 
         let diagnostics_handler = debug_fidl_worker::DiagnosticsHandler::default();
 
-        // Insert a stream after services to get a helpful log line when it
-        // completes. The future we create from it will still wait for all the
-        // user-created resources to be joined on before returning.
-        let services =
-            services.chain(futures::stream::poll_fn(|_: &mut std::task::Context<'_>| {
-                info!("services stream ended");
-                std::task::Poll::Ready(None)
-            }));
-
         // Keep a clone of Ctx around for teardown before moving it to the
         // services future.
         let teardown_ctx = netstack.ctx.clone();
@@ -1439,295 +1411,212 @@ impl NetstackSeed {
         let ndp_watcher_sink_ref = &ndp_watcher_sink;
         let neighbor_watcher_sink_ref = &neighbor_watcher_sink;
 
+        let services_scope = fasync::Scope::new_with_name("services");
+        let sockets_scope = {
+            let scope = services_scope.new_child_with_name("sockets");
+            let sockets_scope = scope.to_handle();
+            // Child of services, this is just for pretty organization in async
+            // backtrace.
+            scope.detach();
+            sockets_scope
+        };
+
+        // TODO(https://fxbug.dev/380897722): Remove wait group.
         let (route_waitgroup, route_spawner) = TaskWaitGroup::new();
-
         let filter_update_dispatcher = filter::UpdateDispatcher::default();
+        let services_handle = services_scope.to_handle();
 
-        // It is unclear why we need to wrap the `for_each_concurrent` call with
-        // `async move { ... }` but it seems like we do. Without this, the
-        // `Future` returned by this function fails to implement `Send` with the
-        // same issue reported in https://github.com/rust-lang/rust/issues/64552.
-        //
-        // TODO(https://github.com/rust-lang/rust/issues/64552): Remove this
-        // workaround.
-        let services_fut = async move {
+        let services_fut =
             services
-                .for_each_concurrent(None, |s| async {
-                    match s {
-                        Service::Stack(stack) => {
-                            stack
-                                .serve_with(|rs| {
-                                    stack_fidl_worker::StackFidlWorker::serve(netstack.clone(), rs)
-                                })
-                                .await
-                        }
-                        Service::Socket(socket) => {
-                            // Run on a separate task so socket requests are not
-                            // bound to the same thread as the main services
-                            // loop.
-                            let wait_group = fuchsia_async::Task::spawn(socket::serve(
+                // NB: Move here is load bearing to ensure things that are moved in
+                // do not outlive the services stream.
+                .map(move |s| match s {
+                    Service::Stack(stack) => services_handle
+                        .spawn_request_stream_handler(stack, |rs| {
+                            stack_fidl_worker::StackFidlWorker::serve(netstack.clone(), rs)
+                        }),
+                    Service::Socket(socket) => sockets_scope
+                        .spawn_request_stream_handler(socket, |rs| {
+                            socket::serve(netstack.ctx.clone(), rs)
+                        }),
+                    Service::PacketSocket(socket) => sockets_scope
+                        .spawn_request_stream_handler(socket, |rs| {
+                            socket::packet::serve(netstack.ctx.clone(), rs)
+                        }),
+                    Service::RawSocket(socket) => sockets_scope
+                        .spawn_request_stream_handler(socket, |rs| {
+                            socket::raw::serve(netstack.ctx.clone(), rs)
+                        }),
+                    Service::RootInterfaces(root_interfaces) => services_handle
+                        .spawn_request_stream_handler(root_interfaces, |rs| {
+                            root_fidl_worker::serve_interfaces(netstack.clone(), rs)
+                        }),
+                    Service::RootFilter(root_filter) => services_handle
+                        .spawn_request_stream_handler(root_filter, |rs| {
+                            filter::serve_root(
+                                rs,
+                                filter_update_dispatcher.clone(),
                                 netstack.ctx.clone(),
-                                socket,
-                            ))
-                            .await;
-                            // Wait for all socket tasks to finish.
-                            wait_group.await;
-                        }
-                        Service::PacketSocket(socket) => {
-                            // Run on a separate task so socket requests are not
-                            // bound to the same thread as the main services
-                            // loop.
-                            let wait_group = fuchsia_async::Task::spawn(socket::packet::serve(
-                                netstack.ctx.clone(),
-                                socket,
-                            ))
-                            .await;
-                            // Wait for all socket tasks to finish.
-                            wait_group.await;
-                        }
-                        Service::RawSocket(socket) => {
-                            // Run on a separate task so socket requests are not
-                            // bound to the same thread as the main services
-                            // loop.
-                            let wait_group = fuchsia_async::Task::spawn(socket::raw::serve(
-                                netstack.ctx.clone(),
-                                socket,
-                            ))
-                            .await;
-                            // Wait for all socket tasks to finish.
-                            wait_group.await;
-                        }
-                        Service::RootInterfaces(root_interfaces) => {
-                            root_interfaces
-                                .serve_with(|rs| {
-                                    root_fidl_worker::serve_interfaces(netstack.clone(), rs)
-                                })
-                                .await
-                        }
-                        Service::RootFilter(root_filter) => {
-                            root_filter
-                                .serve_with(|rs|
-                                    filter::serve_root(
-                                        rs,
-                                        &filter_update_dispatcher,
-                                        &netstack.ctx,
-                                    )
-                                )
-                                .await
-                        }
-                        Service::SocketControl(root_filter) => {
-                            root_filter
-                                .serve_with(|rs|
-                                    filter::socket_filters::serve_socket_control(
-                                        rs,
-                                        &netstack.ctx,
-                                    )
-                                )
-                                .await
-                        }
-                        Service::RoutesState(rs) => {
-                            routes::state::serve_state(rs, netstack.ctx.clone()).await
-                        }
-                        Service::RoutesStateV4(rs) => {
-                            routes::state::serve_state_v4(rs, &dispatchers_v4).await
-                        }
-                        Service::RoutesStateV6(rs) => {
-                            routes::state::serve_state_v6(rs, &dispatchers_v6).await
-                        }
-                        Service::RoutesAdminV4(rs) => routes::admin::serve_route_table::<
-                            Ipv4,
-                            routes::admin::MainRouteTable,
-                        >(
-                            rs,
-                            route_spawner.clone(),
-                            routes::admin::MainRouteTable::new(netstack.ctx.clone()),
-                        )
-                        .await,
-                        Service::RoutesAdminV6(rs) => routes::admin::serve_route_table::<
-                            Ipv6,
-                            routes::admin::MainRouteTable,
-                        >(
-                            rs,
-                            route_spawner.clone(),
-                            routes::admin::MainRouteTable::new(netstack.ctx.clone()),
-                        )
-                        .await,
-                        Service::RouteTableProviderV4(stream) => {
+                            )
+                        }),
+                    Service::SocketControl(rs) => services_handle
+                        .spawn_request_stream_handler(rs, |rs| {
+                            filter::socket_filters::serve_socket_control(rs, netstack.ctx.clone())
+                        }),
+                    Service::RoutesState(rs) => services_handle
+                        .spawn_request_stream_handler(rs, |rs| {
+                            routes::state::serve_state(rs, netstack.ctx.clone())
+                        }),
+                    Service::RoutesStateV4(rs) => services_handle
+                        .spawn_request_stream_handler(rs, |rs| {
+                            routes::state::serve_state_v4(rs, dispatchers_v4.clone())
+                        }),
+                    Service::RoutesStateV6(rs) => services_handle
+                        .spawn_request_stream_handler(rs, |rs| {
+                            routes::state::serve_state_v6(rs, dispatchers_v6.clone())
+                        }),
+                    Service::RoutesAdminV4(rs) => {
+                        services_handle.spawn_request_stream_handler(rs, |rs| {
+                            routes::admin::serve_route_table::<Ipv4, routes::admin::MainRouteTable>(
+                                rs,
+                                route_spawner.clone(),
+                                routes::admin::MainRouteTable::new(netstack.ctx.clone()),
+                            )
+                        })
+                    }
+                    Service::RoutesAdminV6(rs) => {
+                        services_handle.spawn_request_stream_handler(rs, |rs| {
+                            routes::admin::serve_route_table::<Ipv6, routes::admin::MainRouteTable>(
+                                rs,
+                                route_spawner.clone(),
+                                routes::admin::MainRouteTable::new(netstack.ctx.clone()),
+                            )
+                        })
+                    }
+                    Service::RouteTableProviderV4(stream) => services_handle
+                        .spawn_request_stream_handler(stream, |stream| {
                             routes::admin::serve_route_table_provider_v4(
                                 stream,
                                 route_spawner.clone(),
-                                &netstack.ctx,
+                                netstack.ctx.clone(),
                             )
-                            .await
-                            .unwrap_or_else(|e| {
-                                error!(
-                                    "error serving {}: {e:?}",
-                                    fnet_routes_admin::RouteTableProviderV4Marker::DEBUG_NAME
-                                );
-                            })
-                        }
-                        Service::RouteTableProviderV6(stream) => {
+                        }),
+                    Service::RouteTableProviderV6(stream) => services_handle
+                        .spawn_request_stream_handler(stream, |stream| {
                             routes::admin::serve_route_table_provider_v6(
                                 stream,
                                 route_spawner.clone(),
-                                &netstack.ctx,
+                                netstack.ctx.clone(),
                             )
-                            .await
-                            .unwrap_or_else(|e| {
-                                error!(
-                                    "error serving {}: {e:?}",
-                                    fnet_routes_admin::RouteTableProviderV6Marker::DEBUG_NAME
-                                );
-                            })
-                        }
-                        Service::RuleTableV4(rule_table) => {
-                            rule_table
-                                .serve_with(|rs| {
-                                    routes::admin::serve_rule_table::<Ipv4>(
-                                        rs,
-                                        route_spawner.clone(),
-                                        &netstack.ctx,
-                                    )
-                                })
-                                .await
-                        }
-                        Service::RuleTableV6(rule_table) => {
-                            rule_table
-                                .serve_with(|rs| {
-                                    routes::admin::serve_rule_table::<Ipv6>(
-                                        rs,
-                                        route_spawner.clone(),
-                                        &netstack.ctx,
-                                    )
-                                })
-                                .await
-                        }
-                        Service::RootRoutesV4(rs) => root_fidl_worker::serve_routes_v4(
-                            rs,
-                            route_spawner.clone(),
-                            &netstack.ctx,
-                        )
-                        .await
-                        .unwrap_or_else(|e| {
-                            error!(
-                                "error serving {}: {e:?}",
-                                fidl_fuchsia_net_root::RoutesV4Marker::DEBUG_NAME
-                            );
                         }),
-                        Service::RootRoutesV6(rs) => root_fidl_worker::serve_routes_v6(
-                            rs,
-                            route_spawner.clone(),
-                            &netstack.ctx,
-                        )
-                        .await
-                        .unwrap_or_else(|e| {
-                            error!(
-                                "error serving {}: {e:?}",
-                                fidl_fuchsia_net_root::RoutesV6Marker::DEBUG_NAME
-                            );
+                    Service::RuleTableV4(rule_table) => services_handle
+                        .spawn_request_stream_handler(rule_table, |rs| {
+                            routes::admin::serve_rule_table::<Ipv4>(
+                                rs,
+                                route_spawner.clone(),
+                                netstack.ctx.clone(),
+                            )
                         }),
-                        Service::Interfaces(interfaces) => {
-                            interfaces
-                                .serve_with(|rs| {
-                                    interfaces_watcher::serve(
-                                        rs,
-                                        interfaces_watcher_sink_ref.clone(),
-                                    )
-                                })
-                                .await
-                        }
-                        Service::NdpWatcher(stream) => {
-                            stream.serve_with(|rs| {
-                                ndp_watcher::serve(rs, ndp_watcher_sink_ref.clone())
-                            }).await
-                        }
-                        Service::InterfacesAdmin(installer) => {
-                            debug!(
-                                "serving {}",
-                                fidl_fuchsia_net_interfaces_admin::InstallerMarker::PROTOCOL_NAME
-                            );
-                            interfaces_admin::serve(netstack.clone(), installer).await;
-                        }
-                        Service::MulticastAdminV4(controller) => {
-                            debug!(
-                                "serving {}",
-                                fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME
-                            );
-                            netstack
-                                .ctx
-                                .bindings_ctx()
-                                .multicast_admin
-                                .sink::<Ipv4>()
-                                .serve_multicast_admin_client(controller);
-                        }
-                        Service::MulticastAdminV6(controller) => {
-                            debug!(
-                                "serving {}",
-                                fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME
-                            );
-                            netstack
-                                .ctx
-                                .bindings_ctx()
-                                .multicast_admin
-                                .sink::<Ipv6>()
-                                .serve_multicast_admin_client(controller);
-                        }
-                        Service::DebugInterfaces(debug_interfaces) => {
-                            debug_interfaces
-                                .serve_with(|rs| {
-                                    debug_fidl_worker::serve_interfaces(
-                                        netstack.ctx.bindings_ctx(),
-                                        rs,
-                                    )
-                                })
-                                .await
-                        }
-                        Service::DebugDiagnostics(debug_diagnostics) => {
-                            diagnostics_handler.serve_diagnostics(debug_diagnostics).await
-                        }
-                        Service::DnsServerWatcher(dns) => {
-                            dns.serve_with(|rs| name_worker::serve(netstack.clone(), rs)).await
-                        }
-                        Service::FilterState(filter) => {
-                            filter
-                                .serve_with(|rs| filter::serve_state(rs, &filter_update_dispatcher))
-                                .await
-                        }
-                        Service::FilterControl(filter) => {
-                            filter
-                                .serve_with(|rs| {
-                                    filter::serve_control(
-                                        rs,
-                                        &filter_update_dispatcher,
-                                        &netstack.ctx,
-                                    )
-                                })
-                                .await
-                        }
-                        Service::Neighbor(neighbor) => {
-                            neighbor
-                                .serve_with(|rs| {
-                                    neighbor_worker::serve_view(
-                                        rs,
-                                        neighbor_watcher_sink_ref.clone(),
-                                    )
-                                })
-                                .await
-                        }
-                        Service::NeighborController(neighbor_controller) => {
-                            neighbor_controller
-                                .serve_with(|rs| {
-                                    neighbor_worker::serve_controller(netstack.ctx.clone(), rs)
-                                })
-                                .await
-                        }
-                        Service::HealthCheck(health_check) => {
-                            health_check.serve_with(|rs| health_check_worker::serve(rs)).await
-                        }
+                    Service::RuleTableV6(rule_table) => services_handle
+                        .spawn_request_stream_handler(rule_table, |rs| {
+                            routes::admin::serve_rule_table::<Ipv6>(
+                                rs,
+                                route_spawner.clone(),
+                                netstack.ctx.clone(),
+                            )
+                        }),
+                    Service::RootRoutesV4(rs) => {
+                        services_handle.spawn_request_stream_handler(rs, |rs| {
+                            root_fidl_worker::serve_routes_v4(
+                                rs,
+                                route_spawner.clone(),
+                                netstack.ctx.clone(),
+                            )
+                        })
                     }
+                    Service::RootRoutesV6(rs) => {
+                        services_handle.spawn_request_stream_handler(rs, |rs| {
+                            root_fidl_worker::serve_routes_v6(
+                                rs,
+                                route_spawner.clone(),
+                                netstack.ctx.clone(),
+                            )
+                        })
+                    }
+                    Service::Interfaces(interfaces) => services_handle
+                        .spawn_request_stream_handler(interfaces, |rs| {
+                            interfaces_watcher::serve(rs, interfaces_watcher_sink_ref.clone())
+                        }),
+                    Service::NdpWatcher(stream) => services_handle
+                        .spawn_request_stream_handler(stream, |rs| {
+                            ndp_watcher::serve(rs, ndp_watcher_sink_ref.clone())
+                        }),
+                    Service::InterfacesAdmin(installer) => services_handle
+                        .spawn_request_stream_handler(installer, |installer| {
+                            interfaces_admin::serve(netstack.clone(), installer)
+                        }),
+                    Service::MulticastAdminV4(controller) => {
+                        debug!(
+                            "serving {}",
+                            fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME
+                        );
+                        netstack
+                            .ctx
+                            .bindings_ctx()
+                            .multicast_admin
+                            .sink::<Ipv4>()
+                            .serve_multicast_admin_client(controller);
+                    }
+                    Service::MulticastAdminV6(controller) => {
+                        debug!(
+                            "serving {}",
+                            fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME
+                        );
+                        netstack
+                            .ctx
+                            .bindings_ctx()
+                            .multicast_admin
+                            .sink::<Ipv6>()
+                            .serve_multicast_admin_client(controller);
+                    }
+                    Service::DebugInterfaces(debug_interfaces) => services_handle
+                        .spawn_request_stream_handler(debug_interfaces, |rs| {
+                            debug_fidl_worker::serve_interfaces(netstack.ctx.clone(), rs)
+                        }),
+                    Service::DebugDiagnostics(debug_diagnostics) => {
+                        diagnostics_handler.serve_diagnostics(debug_diagnostics)
+                    }
+                    Service::DnsServerWatcher(dns) => services_handle
+                        .spawn_request_stream_handler(dns, |rs| {
+                            name_worker::serve(netstack.clone(), rs)
+                        }),
+                    Service::FilterState(filter) => services_handle
+                        .spawn_request_stream_handler(filter, |rs| {
+                            filter::serve_state(rs, filter_update_dispatcher.clone())
+                        }),
+                    Service::FilterControl(filter) => {
+                        services_handle.spawn_request_stream_handler(filter, |rs| {
+                            filter::serve_control(
+                                rs,
+                                filter_update_dispatcher.clone(),
+                                netstack.ctx.clone(),
+                            )
+                        })
+                    }
+                    Service::Neighbor(neighbor) => services_handle
+                        .spawn_request_stream_handler(neighbor, |rs| {
+                            neighbor_worker::serve_view(rs, neighbor_watcher_sink_ref.clone())
+                        }),
+                    Service::NeighborController(neighbor_controller) => services_handle
+                        .spawn_request_stream_handler(neighbor_controller, |rs| {
+                            neighbor_worker::serve_controller(netstack.ctx.clone(), rs)
+                        }),
+                    Service::HealthCheck(health_check) => services_handle
+                        .spawn_request_stream_handler(health_check, |rs| {
+                            health_check_worker::serve(rs)
+                        }),
                 })
-                .await
-        };
+                .collect::<()>();
 
         // We just let this be destroyed on drop because it's effectively tied
         // to the lifecycle of the entire component.
@@ -1735,8 +1624,15 @@ impl NetstackSeed {
 
         // Wait for services to stop.
         services_fut.await;
+        info!("services stream terminated, starting shutdown");
 
-        info!("all services terminated, starting shutdown");
+        // Wait for all spawned worker tasks to end.
+        //
+        // TODO(https://fxbug.dev/380897722): Cancel the services scope, if
+        // we've stopped receiving futures this is our cue to shutdown.
+        services_scope.join().await;
+
+        info!("stopping level 1 workers");
         let level1_workers = level1_workers.cancel();
 
         let ctx = teardown_ctx;
@@ -1761,6 +1657,7 @@ impl NetstackSeed {
 
         // Now get rid of level2 workers that must exit after level1. Here we
         // carefully end each task separately.
+        info!("stopping level 2 workers");
         let level2_workers = level2_workers.cancel();
 
         // Stop the routes change runner.

@@ -12,7 +12,7 @@ use futures::{Future, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStream
 use log::{debug, error, info};
 
 use crate::bindings::devices::BindingId;
-use crate::bindings::util::ResultExt as _;
+use crate::bindings::util::{ErrorLogExt, ResultExt as _};
 
 use fidl_fuchsia_net_ndp::OptionType;
 use {fidl_fuchsia_net_ndp as fnet_ndp, fidl_fuchsia_net_ndp_ext as fnet_ndp_ext};
@@ -25,6 +25,15 @@ pub(crate) enum Error {
     WorkerClosed(#[from] WorkerClosedError),
     #[error(transparent)]
     Fidl(#[from] fidl::Error),
+}
+
+impl ErrorLogExt for Error {
+    fn log_level(&self) -> log::Level {
+        match self {
+            Self::WorkerClosed(WorkerClosedError) => log::Level::Error,
+            Self::Fidl(fidl) => fidl.log_level(),
+        }
+    }
 }
 
 pub(crate) async fn serve(
@@ -42,8 +51,7 @@ pub(crate) async fn serve(
                 Ok(interest) => interest,
                 Err(InterfaceIdMustBeNonZeroError) => {
                     option_watcher.close_with_epitaph(zx::Status::INVALID_ARGS).unwrap_or_log(
-                        "failed to write InvalidArgs epitaph \
-                                         for NDP option watcher",
+                        "failed to write InvalidArgs epitaph for NDP option watcher",
                     );
                     return Ok(sink);
                 }

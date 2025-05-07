@@ -431,7 +431,7 @@ async fn serve_rule_set<I: FidlRuleAdminIpExt>(
 pub(crate) async fn serve_rule_table<I: FidlRuleAdminIpExt>(
     stream: I::RuleTableRequestStream,
     spawner: TaskWaitGroupSpawner,
-    ctx: &Ctx,
+    ctx: Ctx,
 ) -> Result<(), fidl::Error> {
     let mut stream = pin!(stream);
 
