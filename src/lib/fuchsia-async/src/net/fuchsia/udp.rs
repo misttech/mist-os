@@ -341,7 +341,7 @@ mod test {
         match super::DatagramSocket::new_from_socket(sock) {
             Err(e) => {
                 if e.kind() != std::io::ErrorKind::InvalidInput {
-                    panic!("got: {:?}; want error of kind InvalidInput", e);
+                    panic!("got: {e:?}; want error of kind InvalidInput");
                 }
             }
             Ok(_) => panic!("DatagramSocket created from stream socket succeeded unexpectedly"),

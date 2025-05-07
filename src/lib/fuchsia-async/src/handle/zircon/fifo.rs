@@ -322,7 +322,7 @@ mod tests {
         let mut buffer = WrongEntry::default();
         let receive_future = rx
             .read_entries(&mut buffer)
-            .map_ok(|count| panic!("read should have failed, got {}", count));
+            .map_ok(|count| panic!("read should have failed, got {count}"));
 
         // add a timeout to receiver so if test is broken it doesn't take forever
         let receiver = receive_future
