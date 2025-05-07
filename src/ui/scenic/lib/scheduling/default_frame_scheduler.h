@@ -113,7 +113,7 @@ class DefaultFrameScheduler final : public FrameScheduler {
   bool HaveUpdatableSessions() const { return !pending_present_requests_.empty(); }
 
   // Signal all SessionUpdaters that frames up to |frame_number| have been presented.
-  void SignalPresentedUpTo(uint64_t frame_number, zx::time presentation_time,
+  void SignalPresentedUpTo(uint64_t frame_number, zx::time actual_presentation_time,
                            zx::duration presentation_interval);
 
   // Get map of latch times for each present up to |id_pair.present_id| for |id_pair.session_id|.

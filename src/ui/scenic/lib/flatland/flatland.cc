@@ -487,8 +487,13 @@ void Flatland::Present(fuchsia_ui_composition::PresentArgs args) {
   present2_helper_.RegisterPresent(present_id,
                                    /*present_received_time=*/zx::time(async_now(dispatcher())));
 
+  // TODO(https://fxbug.dev/414450649): remove this, since it is a subset of the
+  // `scenic_session_present` flow.  This will require updating trace-processing scripts.
   TRACE_FLOW_BEGIN("gfx", "ScheduleUpdate", present_id);
-  TRACE_FLOW_BEGIN("gfx", "wait_for_fences", SESSION_TRACE_ID(session_id_, present_id));
+
+  TRACE_INSTAFLOW_BEGIN("gfx", "scenic_session_present", "flatland_present",
+                        SESSION_TRACE_ID(session_id_, present_id), "session_id",
+                        TA_UINT64(session_id_), "present_id", TA_UINT64(present_id));
 
   // Safe to capture |this| because the Flatland is guaranteed to outlive |fence_queue_|,
   // Flatland is non-movable and FenceQueue does not fire closures after destruction.
@@ -503,7 +508,10 @@ void Flatland::Present(fuchsia_ui_composition::PresentArgs args) {
         // without also updating the "process_gfx_trace.go" script.
         TRACE_DURATION("gfx", "scenic_impl::Session::ScheduleNextPresent", "session_id",
                        session_id_, "requested_presentation_time", requested_presentation_time);
-        TRACE_FLOW_END("gfx", "wait_for_fences", SESSION_TRACE_ID(session_id_, present_id));
+
+        TRACE_INSTAFLOW_STEP("gfx", "scenic_session_present", "acquire_fences_signaled",
+                             SESSION_TRACE_ID(session_id_, present_id), "session_id",
+                             TA_UINT64(session_id_), "present_id", TA_UINT64(present_id));
 
         // Push the UberStruct, then schedule the associated Present that will eventually publish
         // it to the InstanceMap used for rendering.
@@ -2062,6 +2070,14 @@ void Flatland::OnFramePresented(const std::map<scheduling::PresentId, zx::time>&
   }
   FLATLAND_VERBOSE_LOG << oss.str();
 #endif
+
+  for (const auto& [present_id, latched_timestamp] : latched_times) {
+    TRACE_INSTAFLOW_END("gfx", "scenic_session_present", "flatland_frame_presented",
+                        SESSION_TRACE_ID(session_id_, present_id), "session_id",
+                        TA_UINT64(session_id_), "present_id", TA_UINT64(present_id), "latched_time",
+                        TA_INT64(latched_timestamp.get()), "presentation_time",
+                        TA_INT64(present_times.presented_time.get()));
+  }
 
   // TODO(https://fxbug.dev/42141795): remove `num_presents_allowed` from this event.  Clients
   // should obtain this information from OnPresentProcessedValues().
