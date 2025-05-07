@@ -980,84 +980,22 @@ function fx-exit-on-failure {
   "$@" || exit $?
 }
 
-# Massage a ninja command line to add default -j and/or -l switches.
+# Run a Ninja or Bazel command with the right environment, after eventually
+# prepending necessary RBE wrapper scripts to it.
+#
 # Arguments:
 #    print_full_cmd   if true, prints the full ninja command line before
 #                     executing it
-#    ninja command    the ninja command itself. This can be used both to run
-#                     ninja directly or to run a wrapper script around ninja.
-function fx-run-ninja {
-  # Separate the command from the arguments so we can prepend default -j/-l
-  # switch arguments.  They need to come before the user's arguments in case
-  # those include -- or something else that makes following arguments not be
-  # handled as normal switches.
+#    command_type     either "ninja" or "bazel"
+#
+#    build_command    The build command itself.
+#
+function fx-run-build-command {
   local print_full_cmd="$1"
   shift
-  local cmd="$1"
+  local command_type="$1"
   shift
-
-  local args=()
-  local full_cmdline
-  local cpu_load
-  local concurrency
-  local have_load=false
-  local have_jobs=false
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-    -l)
-      have_load=true
-      cpu_load="$2"
-      ;;
-    -j)
-      have_jobs=true
-      concurrency="$2"
-      ;;
-    -l*)
-      have_load=true
-      cpu_load="${1#-l}"
-      ;;
-    -j*)
-      have_jobs=true
-      concurrency="${1#-j}"
-      ;;
-    esac
-    args+=("$1")
-    shift
-  done
-
-  if ! "$have_load"; then
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-      # Load level on Darwin is quite different from that of Linux, wherein a
-      # load level of 1 per CPU is not necessarily a prohibitive load level. An
-      # unscientific study of build side effects suggests that cpus*20 is a
-      # reasonable value to prevent catastrophic load (i.e. user can not kill
-      # the build, can not lock the screen, etc).
-      local cpus
-      cpus="$(fx-cpu-count)"
-      cpu_load=$((cpus * 20))
-      args=("-l" "${cpu_load}" "${args[@]}")
-    fi
-  elif [[ -z "${cpu_load}" ]]; then
-    echo "ERROR: Missing cpu load (-l) argument."
-    exit 1
-  fi
-
-  if ! "$have_jobs"; then
-    concurrency="$(fx-choose-build-concurrency)"
-    # macOS in particular has a low default for number of open file descriptors
-    # per process, which is prohibitive for higher job counts. Here we raise
-    # the number of allowed file descriptors per process if it appears to be
-    # low in order to avoid failures due to the limit. See `getrlimit(2)` for
-    # more information.
-    local min_limit=$((concurrency * 2))
-    if [[ $(ulimit -n) -lt "${min_limit}" ]]; then
-      ulimit -n "${min_limit}"
-    fi
-    args=("-j" "${concurrency}" "${args[@]}")
-  elif [[ -z "${concurrency}" ]]; then
-    echo "ERROR: Missing job count (-j) argument."
-    exit 1
-  fi
+  local build_command=("$@")
 
   # Check for a bad element in $PATH.
   # We build tools in the build, such as touch(1), targeting Fuchsia. Those
@@ -1084,7 +1022,6 @@ function fx-run-ninja {
     exit 1
   ;;
   esac
-
 
   # TERM is passed for the pretty ninja UI
   # PATH is passed through.  The ninja actions should invoke tools without
@@ -1205,6 +1142,7 @@ EOF
     # Forward the following only if the environment already sets them:
     ${MAKEFLAGS+"MAKEFLAGS=${MAKEFLAGS}"}
     ${FUCHSIA_BAZEL_DISK_CACHE+"FUCHSIA_BAZEL_DISK_CACHE=${FUCHSIA_BAZEL_DISK_CACHE}"}
+    ${FUCHSIA_BAZEL_JOB_COUNT+"FUCHSIA_BAZEL_JOB_COUNT=$FUCHSIA_BAZEL_JOB_COUNT"}
     ${FUCHSIA_DEBUG_BAZEL_SANDBOX+"FUCHSIA_DEBUG_BAZEL_SANDBOX=${FUCHSIA_DEBUG_BAZEL_SANDBOX}"}
     ${NINJA_PERSISTENT_TIMEOUT_SECONDS+"NINJA_PERSISTENT_TIMEOUT_SECONDS=$NINJA_PERSISTENT_TIMEOUT_SECONDS"}
     ${NINJA_PERSISTENT_LOG_FILE+"NINJA_PERSISTENT_LOG_FILE=$NINJA_PERSISTENT_LOG_FILE"}
@@ -1212,13 +1150,6 @@ EOF
     ${CLICOLOR_FORCE+"CLICOLOR_FORCE=$CLICOLOR_FORCE"}
     ${FX_BUILD_RBE_STATS+"FX_BUILD_RBE_STATS=$FX_BUILD_RBE_STATS"}
   )
-
-  if [[ "${have_jobs}" ]]; then
-    # Pass any _explicit_ job count provided by the user to the Bazel
-    # launcher script through an environment variable.
-    # See https://fxbug.dev/351623259
-    envs+=("FUCHSIA_BAZEL_JOB_COUNT=${concurrency}")
-  fi
 
   local profile_wrapper=()
   if [[ "$BUILD_PROFILE_ENABLED" == 1 ]]
@@ -1239,19 +1170,112 @@ EOF
     )
   fi
 
-  full_cmdline=(
+  local full_cmdline=(
     env -i "${envs[@]}"
     "${profile_wrapper[@]}"
     "${rbe_wrapper[@]}"
-    "$cmd"
-    "${args[@]}"
+    "${build_command[@]}"
   )
 
   if [[ "${print_full_cmd}" = true ]]; then
     echo "${full_cmdline[@]}"
     echo
   fi
-  fx-try-locked "${full_cmdline[@]}"
+  if [[ "${command_type}" == "ninja" ]]; then
+    fx-try-locked "${full_cmdline[@]}"
+  else
+    # There is no need to use a lock file for Bazel
+    "${full_cmdline[@]}"
+  fi
+}
+
+# Massage a ninja command line to add default -j and/or -l switches.
+# Arguments:
+#    print_full_cmd   if true, prints the full ninja command line before
+#                     executing it
+#    ninja command    the ninja command itself. This can be used both to run
+#                     ninja directly or to run a wrapper script around ninja.
+function fx-run-ninja {
+  # Separate the command from the arguments so we can prepend default -j/-l
+  # switch arguments.  They need to come before the user's arguments in case
+  # those include -- or something else that makes following arguments not be
+  # handled as normal switches.
+  local print_full_cmd="$1"
+  shift
+  local cmd="$1"
+  shift
+
+  local args=()
+  local full_cmdline
+  local cpu_load
+  local concurrency
+  local have_load=false
+  local have_jobs=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    -l)
+      have_load=true
+      cpu_load="$2"
+      ;;
+    -j)
+      have_jobs=true
+      concurrency="$2"
+      ;;
+    -l*)
+      have_load=true
+      cpu_load="${1#-l}"
+      ;;
+    -j*)
+      have_jobs=true
+      concurrency="${1#-j}"
+      ;;
+    esac
+    args+=("$1")
+    shift
+  done
+
+  if ! "$have_load"; then
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      # Load level on Darwin is quite different from that of Linux, wherein a
+      # load level of 1 per CPU is not necessarily a prohibitive load level. An
+      # unscientific study of build side effects suggests that cpus*20 is a
+      # reasonable value to prevent catastrophic load (i.e. user can not kill
+      # the build, can not lock the screen, etc).
+      local cpus
+      cpus="$(fx-cpu-count)"
+      cpu_load=$((cpus * 20))
+      args=("-l" "${cpu_load}" "${args[@]}")
+    fi
+  elif [[ -z "${cpu_load}" ]]; then
+    echo "ERROR: Missing cpu load (-l) argument."
+    exit 1
+  fi
+
+  if ! "$have_jobs"; then
+    concurrency="$(fx-choose-build-concurrency)"
+    # macOS in particular has a low default for number of open file descriptors
+    # per process, which is prohibitive for higher job counts. Here we raise
+    # the number of allowed file descriptors per process if it appears to be
+    # low in order to avoid failures due to the limit. See `getrlimit(2)` for
+    # more information.
+    local min_limit=$((concurrency * 2))
+    if [[ $(ulimit -n) -lt "${min_limit}" ]]; then
+      ulimit -n "${min_limit}"
+    fi
+    args=("-j" "${concurrency}" "${args[@]}")
+  elif [[ -z "${concurrency}" ]]; then
+    echo "ERROR: Missing job count (-j) argument."
+    exit 1
+  fi
+
+  if [[ "${have_jobs}" ]]; then
+    # Pass any _explicit_ job count provided by the user to the Bazel
+    # launcher script through an environment variable.
+    # See https://fxbug.dev/351623259
+    FUCHSIA_BAZEL_JOB_COUNT=${concurrency}
+  fi
+
+  fx-run-build-command "${print_full_cmd}" "ninja" "${cmd}" "${args[@]}"
 }
 
 function fx-get-image {

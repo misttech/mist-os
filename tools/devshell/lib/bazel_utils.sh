@@ -65,5 +65,5 @@ fx-bazel () {
   local workspace_variant="fuchsia"
   local opt
   fx-update-bazel-workspace "${workspace_variant}"
-  "$(fx-get-bazel)" "$@"
+  fx-run-build-command "" "bazel" "$(fx-get-bazel)" "$@"
 }
