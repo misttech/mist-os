@@ -1848,6 +1848,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.web/PermissionType.NOTIFICATIONS",
+        "value": "5"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.web/PermissionType.PERSISTENT_STORAGE",
         "value": "4"
     },
