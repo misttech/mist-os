@@ -5,12 +5,11 @@
 use std::convert::Infallible as Never;
 use std::fmt::Debug;
 use std::num::{NonZeroU16, NonZeroU64};
-use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
 use futures::task::AtomicWaker;
-use futures::{Future, FutureExt as _, Stream};
+use futures::{Future, Stream};
 use log::debug;
 use net_types::ethernet::Mac;
 use net_types::ip::{
@@ -132,121 +131,6 @@ impl Stream for NeedsDataWatcher {
                 std::task::Poll::Ready(Some(std::task::ready!(needs_data.poll_ready(cx))))
             }
         }
-    }
-}
-
-struct TaskWaitGroupInner {
-    counter: std::sync::atomic::AtomicUsize,
-    waker: AtomicWaker,
-}
-
-/// Provides a means to wait on the completion of tasks spawned in
-/// [`TaskWaitGroupSpawner`].
-///
-/// `TaskWaitGroup` provides a [`futures::Future`] implementation that will
-/// resolve once the associated [`TaskGroupSpawner`] and all its clones are
-/// dropped *and* all the tasks spawned from those have finished.
-///
-/// The [`TaskWaitGroupSpawner`] and `TaskWaitGroup` pair provide a way to
-/// ensure [`fuchsia_async::Task`] spawning + detaching and then joining without
-/// keeping track of each individual task.
-#[must_use = "Future must be polled to completion"]
-pub(crate) struct TaskWaitGroup {
-    inner: Arc<TaskWaitGroupInner>,
-}
-
-impl futures::Future for TaskWaitGroup {
-    type Output = ();
-
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        let Self { inner } = self.deref();
-        let TaskWaitGroupInner { counter, waker } = inner.deref();
-        // Optimistically check the counter once. Use the strongest ordering
-        // guarantees since we're not too worried about performance here.
-        if counter.load(Ordering::SeqCst) == 0 {
-            return std::task::Poll::Ready(());
-        }
-        // Register the waker and check again.
-        waker.register(cx.waker());
-        if counter.load(Ordering::SeqCst) == 0 {
-            return std::task::Poll::Ready(());
-        } else {
-            return std::task::Poll::Pending;
-        }
-    }
-}
-
-impl TaskWaitGroup {
-    /// Creates a new [`TaskWaitGroup`] and [`TaskWaitGroupSpawner`] pair.
-    pub(crate) fn new() -> (Self, TaskWaitGroupSpawner) {
-        let inner = Arc::new(TaskWaitGroupInner {
-            // Start counter at 1 because we're creating a spawner.
-            counter: std::sync::atomic::AtomicUsize::new(1),
-            waker: AtomicWaker::new(),
-        });
-        (Self { inner: inner.clone() }, TaskWaitGroupSpawner { inner })
-    }
-}
-
-/// Provides a way to spawn [`fuchsia_async::Task`]s.
-///
-/// See [`TaskWaitGroup`].
-pub(crate) struct TaskWaitGroupSpawner {
-    inner: Arc<TaskWaitGroupInner>,
-}
-
-impl Clone for TaskWaitGroupSpawner {
-    fn clone(&self) -> Self {
-        let Self { inner } = self;
-        let TaskWaitGroupInner { counter, waker: _ } = inner.deref();
-        // Use the strongest ordering guarantee we have. Spawning and finishing
-        // tasks is not going to be happening very frequently so prefer the
-        // safest ordering we have available.
-        let prev = counter.fetch_add(1, Ordering::SeqCst);
-        // Because count can only be increased from spawners and spawners
-        // themselves increase the count, assert that the previous value could
-        // not be zero.
-        assert!(prev != 0);
-
-        Self { inner: inner.clone() }
-    }
-}
-
-impl Drop for TaskWaitGroupSpawner {
-    fn drop(&mut self) {
-        let Self { inner } = self;
-        let TaskWaitGroupInner { counter, waker } = (*inner).deref();
-        // Use the strongest ordering guarantee we have. Spawning and finishing
-        // tasks is not going to be happening very frequently so prefer the
-        // safest ordering we have available.
-        let prev = counter.fetch_sub(1, Ordering::SeqCst);
-        if prev == 1 {
-            // Just finished the last task, the counter is now at zero and we
-            // can wake any parked tasks.
-            waker.wake();
-        }
-    }
-}
-
-impl TaskWaitGroupSpawner {
-    /// Spawns the future `fut` in this wait group.
-    // fuchsia_async::Task::spawn tracks the caller and adds trace-level logging
-    // when tasks start and finish, allow track_caller here in instrumented
-    // builds so we can see who the real caller is.
-    #[cfg_attr(feature = "instrumented", track_caller)]
-    pub(crate) fn spawn<F: futures::Future<Output = ()> + Send + 'static>(&self, fut: F) {
-        let spawner = self.clone();
-        // Spawn the task and detach. The executor will take care of it but
-        // we'll get notified when it finishes by `future.map`. We give it a
-        // clone of the spawner (increasing the counter by 1) and drop it when
-        // the future is complete (decreasing the counter by 1).
-        fuchsia_async::Task::spawn(fut.map(move |()| {
-            std::mem::drop(spawner);
-        }))
-        .detach();
     }
 }
 
@@ -1785,35 +1669,5 @@ mod tests {
         let value_core: Option<u8> = value.into_core();
         assert_eq!(value_core, Some(46));
         assert_eq!(value_core.into_fidl(), value);
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn wait_group_waits_spawner_drop() {
-        let (mut wait_group, spawner) = TaskWaitGroup::new();
-        assert_eq!(futures::poll!(&mut wait_group), futures::task::Poll::Pending);
-        std::mem::drop(spawner);
-        assert_eq!(futures::poll!(&mut wait_group), futures::task::Poll::Ready(()));
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn wait_group_waits_futures() {
-        let (mut wait_group, spawner) = TaskWaitGroup::new();
-        assert_eq!(futures::poll!(&mut wait_group), futures::task::Poll::Pending);
-        let (sender, receiver) = futures::channel::oneshot::channel();
-        spawner.spawn(async move {
-            receiver.await.unwrap();
-        });
-        std::mem::drop(spawner);
-
-        // Yield this for a while to the executor while ensuring the wait group
-        // hasn't finished.
-        for _ in 0..50 {
-            async_utils::futures::YieldToExecutorOnce::new().await;
-            assert_eq!(futures::poll!(&mut wait_group), futures::task::Poll::Pending);
-        }
-
-        sender.send(()).unwrap();
-        // Now wait_group should finish.
-        wait_group.await;
     }
 }

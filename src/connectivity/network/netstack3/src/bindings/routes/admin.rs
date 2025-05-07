@@ -8,14 +8,14 @@ use std::sync::Arc;
 
 use assert_matches::assert_matches;
 use async_utils::event::Event;
-use fidl::endpoints::{ControlHandle as _, RequestStream as _, Responder as _};
+use fidl::endpoints::{ControlHandle as _, ProtocolMarker, RequestStream, Responder as _};
 use fidl_fuchsia_net_interfaces_admin::ProofOfInterfaceAuthorization;
 use fnet_routes_ext::admin::{FidlRouteAdminIpExt, RouteSetRequest, RouteTableRequest};
 use fnet_routes_ext::{FidlRouteIpExt, Responder as _};
 use futures::channel::{mpsc, oneshot};
 use futures::{Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use log::{debug, error, warn};
-use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
+use net_types::ip::{Ip, Ipv4, Ipv6};
 use netstack3_core::device::DeviceId;
 use netstack3_core::routes::AddableEntry;
 use zx::{self as zx, AsHandleRef, HandleBased as _};
@@ -27,7 +27,7 @@ use {
 use crate::bindings::devices::StaticCommonInfo;
 use crate::bindings::routes::witness::TableId;
 use crate::bindings::routes::{self, RouteWorkItem, WeakDeviceId};
-use crate::bindings::util::{ScopeExt as _, TaskWaitGroupSpawner, TryFromFidlWithContext};
+use crate::bindings::util::{ScopeExt as _, TryFromFidlWithContext};
 use crate::bindings::{BindingsCtx, Ctx, DeviceIdExt};
 
 pub(crate) use crate::bindings::routes::rules_admin::serve_rule_table;
@@ -40,37 +40,27 @@ pub(crate) async fn serve_route_set<
     stream: I::RouteSetRequestStream,
     route_set: &mut R,
     cancel_token: C,
-) {
-    let debug_name = match I::VERSION {
-        IpVersion::V4 => "RouteSetV4",
-        IpVersion::V6 => "RouteSetV6",
-    };
-
+) -> Result<(), fidl::Error> {
+    let debug_name =
+        <<I::RouteSetRequestStream as RequestStream>::Protocol as ProtocolMarker>::DEBUG_NAME;
     let mut cancel_token = pin!(cancel_token.fuse());
     let control_handle = stream.control_handle();
     let mut stream = stream.map_ok(I::into_route_set_request).into_stream().fuse();
-
     loop {
         futures::select_biased! {
             () = cancel_token => {
                 control_handle.shutdown_with_epitaph(zx::Status::UNAVAILABLE);
-                break;
+                return Ok(());
             },
-            request = stream.try_next() => match request {
-                Ok(Some(request)) => {
+            request = stream.try_next() => match request? {
+                Some(request) => {
                     route_set.handle_request(request).await.unwrap_or_else(|e| {
                         if !e.is_closed() {
                             error!("error handling {debug_name} request: {e:?}");
                         }
-                    });
+                    })
                 },
-                Err(err) => {
-                    if !err.is_closed() {
-                        error!("error handling {debug_name} request: {err:?}");
-                    }
-                    break;
-                }
-                Ok(None) => break,
+                None => return Ok(()),
             },
         }
     }
@@ -78,7 +68,6 @@ pub(crate) async fn serve_route_set<
 
 pub(crate) async fn serve_route_table_provider_v4(
     stream: fnet_routes_admin::RouteTableProviderV4RequestStream,
-    spawner: TaskWaitGroupSpawner,
     ctx: Ctx,
 ) -> Result<(), fidl::Error> {
     let mut stream = pin!(stream);
@@ -102,11 +91,7 @@ pub(crate) async fn serve_route_table_provider_v4(
                 let stream = provider.into_stream();
 
                 fasync::Scope::current().spawn_request_stream_handler(stream, |stream| {
-                    serve_route_table::<Ipv4, UserRouteTable<Ipv4>>(
-                        stream,
-                        spawner.clone(),
-                        route_table,
-                    )
+                    serve_route_table::<Ipv4, UserRouteTable<Ipv4>>(stream, route_table)
                 });
             }
         }
@@ -116,7 +101,6 @@ pub(crate) async fn serve_route_table_provider_v4(
 
 pub(crate) async fn serve_route_table_provider_v6(
     stream: fnet_routes_admin::RouteTableProviderV6RequestStream,
-    spawner: TaskWaitGroupSpawner,
     ctx: Ctx,
 ) -> Result<(), fidl::Error> {
     let mut stream = pin!(stream);
@@ -139,11 +123,7 @@ pub(crate) async fn serve_route_table_provider_v6(
                 };
                 let stream = provider.into_stream();
                 fasync::Scope::current().spawn_request_stream_handler(stream, |stream| {
-                    serve_route_table::<Ipv6, UserRouteTable<Ipv6>>(
-                        stream,
-                        spawner.clone(),
-                        route_table,
-                    )
+                    serve_route_table::<Ipv6, UserRouteTable<Ipv6>>(stream, route_table)
                 });
             }
         }
@@ -156,14 +136,13 @@ pub(crate) async fn serve_route_table<
     R: RouteTable<I>,
 >(
     mut stream: <I as FidlRouteAdminIpExt>::RouteTableRequestStream,
-    spawner: TaskWaitGroupSpawner,
     mut route_table: R,
 ) -> Result<(), fidl::Error> {
     while let Some(request) = stream.try_next().await? {
         match I::into_route_table_request(request) {
             RouteTableRequest::NewRouteSet { route_set, control_handle: _ } => {
                 let set_request_stream = route_set.into_stream();
-                route_table.serve_user_route_set(spawner.clone(), set_request_stream);
+                route_table.serve_user_route_set(set_request_stream);
             }
             RouteTableRequest::GetTableId { responder } => {
                 responder.send(route_table.id().into())?;
@@ -222,7 +201,7 @@ pub(crate) trait RouteTable<I: FidlRouteAdminIpExt + FidlRouteIpExt>: Send + Syn
     /// Returns whether the table was detached.
     fn detached(&self) -> bool;
     /// Serves the user route set.
-    fn serve_user_route_set(&self, spawner: TaskWaitGroupSpawner, stream: I::RouteSetRequestStream);
+    fn serve_user_route_set(&self, stream: I::RouteSetRequestStream);
 }
 
 pub(crate) struct MainRouteTable {
@@ -256,21 +235,18 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for MainRouteTable {
     fn detached(&self) -> bool {
         true
     }
-    fn serve_user_route_set(
-        &self,
-        spawner: TaskWaitGroupSpawner,
-        stream: I::RouteSetRequestStream,
-    ) {
+    fn serve_user_route_set(&self, stream: I::RouteSetRequestStream) {
         let mut user_route_set = UserRouteSet::from_main_table(self.ctx.clone());
-        spawner.spawn(async move {
-            serve_route_set::<I, UserRouteSet<I>, _>(
+        fasync::Scope::current().spawn_request_stream_handler(stream, |stream| async move {
+            let result = serve_route_set::<I, UserRouteSet<I>, _>(
                 stream,
                 &mut user_route_set,
                 std::future::pending(), /* never cancelled */
             )
             .await;
-            user_route_set.close().await
-        })
+            user_route_set.close().await;
+            result
+        });
     }
 }
 
@@ -331,22 +307,20 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for UserRouteTable<I
     fn detached(&self) -> bool {
         self.detached
     }
-    fn serve_user_route_set(
-        &self,
-        spawner: TaskWaitGroupSpawner,
-        stream: I::RouteSetRequestStream,
-    ) {
+    fn serve_user_route_set(&self, stream: I::RouteSetRequestStream) {
         let mut user_route_set =
             UserRouteSet::new(self.ctx.clone(), self.table_id, self.route_work_sink.clone());
         // Wait on the event to be signaled, if the signaler was dropped without
         // signalling, this means the table was detached and we don't cancel
         // serving the user route sets.
         let cancel_token = self.cancel_event.wait();
-        spawner.spawn(async move {
-            serve_route_set::<I, UserRouteSet<I>, _>(stream, &mut user_route_set, cancel_token)
-                .await;
+        fasync::Scope::current().spawn_request_stream_handler(stream, |stream| async move {
+            let result =
+                serve_route_set::<I, UserRouteSet<I>, _>(stream, &mut user_route_set, cancel_token)
+                    .await;
             user_route_set.close().await;
-        })
+            result
+        });
     }
 }
 

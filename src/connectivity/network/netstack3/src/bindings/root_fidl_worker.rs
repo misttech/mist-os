@@ -11,11 +11,12 @@ use log::debug;
 use net_types::ip::{Ipv4, Ipv6};
 use {
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fidl_fuchsia_net_root as fnet_root,
+    fuchsia_async as fasync,
 };
 
 use crate::bindings::devices::{BindingId, DeviceSpecificInfo, LOOPBACK_MAC};
 use crate::bindings::routes::admin::{serve_route_set, GlobalRouteSet};
-use crate::bindings::util::{IntoFidl as _, ResultExt as _, TaskWaitGroupSpawner};
+use crate::bindings::util::{IntoFidl as _, ResultExt as _, ScopeExt as _};
 use crate::bindings::{interfaces_admin, DeviceIdExt as _, Netstack};
 
 // Serve a stream of fuchsia.net.root.Interfaces API requests for a single
@@ -87,7 +88,6 @@ fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_root::InterfacesGetM
 
 pub(crate) async fn serve_routes_v4(
     mut rs: fnet_root::RoutesV4RequestStream,
-    spawner: TaskWaitGroupSpawner,
     ctx: crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
     while let Some(req) = rs.try_next().await? {
@@ -95,13 +95,15 @@ pub(crate) async fn serve_routes_v4(
             fnet_root::RoutesV4Request::GlobalRouteSet { route_set, control_handle: _ } => {
                 let stream = route_set.into_stream();
                 let ctx = ctx.clone();
-                spawner.spawn(async {
-                    serve_route_set::<Ipv4, _, _>(
-                        stream,
-                        &mut GlobalRouteSet::new(ctx),
-                        std::future::pending(), /* never cancelled */
-                    )
-                    .await;
+                fasync::Scope::current().spawn_request_stream_handler(stream, |stream| {
+                    async move {
+                        serve_route_set::<Ipv4, _, _>(
+                            stream,
+                            &mut GlobalRouteSet::new(ctx),
+                            std::future::pending(), /* never cancelled */
+                        )
+                        .await
+                    }
                 });
             }
         }
@@ -112,7 +114,6 @@ pub(crate) async fn serve_routes_v4(
 
 pub(crate) async fn serve_routes_v6(
     mut rs: fnet_root::RoutesV6RequestStream,
-    spawner: TaskWaitGroupSpawner,
     ctx: crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
     while let Some(req) = rs.try_next().await? {
@@ -120,13 +121,15 @@ pub(crate) async fn serve_routes_v6(
             fnet_root::RoutesV6Request::GlobalRouteSet { route_set, control_handle: _ } => {
                 let stream = route_set.into_stream();
                 let ctx = ctx.clone();
-                spawner.spawn(async {
-                    serve_route_set::<Ipv6, _, _>(
-                        stream,
-                        &mut GlobalRouteSet::new(ctx),
-                        std::future::pending(), /* never cancelled */
-                    )
-                    .await;
+                fasync::Scope::current().spawn_request_stream_handler(stream, |stream| {
+                    async move {
+                        serve_route_set::<Ipv6, _, _>(
+                            stream,
+                            &mut GlobalRouteSet::new(ctx),
+                            std::future::pending(), /* never cancelled */
+                        )
+                        .await
+                    }
                 });
             }
         }
