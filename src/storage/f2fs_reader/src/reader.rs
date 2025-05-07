@@ -265,14 +265,12 @@ impl F2fsReader {
                 ensure!(symlink_len == filename.len() as u16, "invalid encrypted symlink");
                 if let Some(decryptor) = self.get_decryptor_for_inode(inode) {
                     decryptor.decrypt_filename_data(inode.footer.ino, &mut filename);
+                    filename.truncate(symlink_len as usize);
                 } else {
                     let proxy_filename: String =
                         fscrypt::proxy_filename::ProxyFilename::new(0, &filename).into();
                     filename = proxy_filename.as_bytes().to_vec();
                 }
-            }
-            while let Some(b'\0') = filename.last() {
-                filename.pop();
             }
             Ok(filename.into_boxed_slice())
         } else {

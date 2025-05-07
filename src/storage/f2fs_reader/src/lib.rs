@@ -12,7 +12,7 @@ mod xattr;
 
 // Explicitly re-export things we want to expose.
 pub use dir::{DirEntry, FileType};
-pub use inode::{Flags, InlineFlags, Inode, Mode};
+pub use inode::{AdviseFlags, Flags, InlineFlags, Inode, Mode};
 pub use reader::F2fsReader;
 pub use superblock::BLOCK_SIZE;
 pub use xattr::XattrEntry;

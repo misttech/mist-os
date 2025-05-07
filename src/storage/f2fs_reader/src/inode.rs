@@ -180,7 +180,7 @@ pub struct Inode {
     pub xattr: Vec<XattrEntry>,
 
     // Crypto context, if present in xattr.
-    pub(super) context: Option<fscrypt::Context>,
+    pub context: Option<fscrypt::Context>,
 
     // Contains the set of block addresses in the data segment used by this inode.
     // This includes nids, indirect and double indirect address pages, and the xattr page
