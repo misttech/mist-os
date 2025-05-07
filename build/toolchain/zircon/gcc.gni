@@ -36,6 +36,7 @@ gnu_linker_synthetic_symbols = [
   "__bss_start",
   "_edata",
   "_end",
+  "_stack",
 ]
 
 if (is_gcc) {

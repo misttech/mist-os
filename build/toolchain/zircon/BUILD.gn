@@ -20,10 +20,6 @@ if (current_toolchain == default_toolchain) {
       ]
       source_deps = [ "//build/config/zircon:user_deps" ]
 
-      # Since //build/config/zircon:user-executable uses BFD, we can't use ICF.
-      # It's only supported by Gold and LLD.  But we can't use Gold for
-      # executables because it doesn't have --no-dynamic-linker for static PIE.
-      remove_executable_configs = [ "//build/config/zircon:default_icf" ]
       executable_configs = [ "//build/config/zircon:user-executable" ]
 
       tags = [

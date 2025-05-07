@@ -837,7 +837,7 @@ if (is_kernel) {
   # The GNU linkers don't do page-aligned segments by default like LLD,
   # so a linker script is required.
   config("phys-elf-module.config") {
-    visibility = [ ":*" ]
+    visibility = [ "./*" ]
     if (is_gcc) {
       ldflags = [ "-Wl,-z,relro" ]
       if (toolchain_environment != "kernel") {

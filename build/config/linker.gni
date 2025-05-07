@@ -14,16 +14,8 @@ if (current_os == "mac") {
   # Only the native host linker works for macOS.
   linker = ""
 } else if (is_gcc) {
-  # Assume ld.gold is available for any native Linux host, and for any ELF
-  # cross-compile target.  Use Gold for userland, and BFD ld for kernel.
-  if (current_os == "linux" ||
-      ((current_cpu != host_cpu || current_os != host_os) && !is_kernel &&
-       current_os != "win")) {
-    linker = "gold"
-  } else {
-    # For GCC on non-ELF hosts, use the system default linker.
-    linker = ""
-  }
+  # The "system default" with GCC means BFD ld.
+  linker = ""
 } else {
   # Always use lld with Clang.
   linker = "lld"

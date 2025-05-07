@@ -123,6 +123,7 @@ kernel_elf_binary("elf-code-patching-test-add-one") {
 
   output_name = "add-one"
 
+  configs += [ "//zircon/kernel/phys:phys-elf-module.config" ]
   ldflags = [ "-Wl,-e,AddOne" ]
 
   deps = [
@@ -137,6 +138,7 @@ kernel_elf_binary("elf-code-patching-test-multiply") {
 
   output_name = "multiply_by_factor"
 
+  configs += [ "//zircon/kernel/phys:phys-elf-module.config" ]
   ldflags = [ "-Wl,-e,multiply_by_factor" ]
 
   deps = [
