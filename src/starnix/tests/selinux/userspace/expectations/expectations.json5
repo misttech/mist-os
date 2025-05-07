@@ -12,9 +12,6 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO: https://fxbug.dev/361552580 - Fix "create" computation for non-process/socket types.
-                "SeLinuxFsCreate.DefaultComputeCreateForFile",
-
                 // TODO: https://fxbug.dev/361552580 - Fix SELinuxFS API handling of extra whitespace.
                 "SeLinuxFsCreate.ExtraWhitespace",
 
@@ -23,13 +20,6 @@
 
                 // TODO: https://fxbug.dev/364569703 - Implement correct SO_PEERSEC for socketpair() sockets.
                 "SocketPeerSecTest.SocketPairUnixStream",
-
-                // TODO: https://fxbug.dev/377912777 - Fix `fs_use_task` not to apply type transitions.
-                "PipeTest.BeforePolicyReceivesKernelContext",
-                "PipeTest.LabeledFromTask",
-
-                // TODO: https://fxbug.dev/416040663 - Fix FIFOs to be labeled like other files.
-                "FifoTest.LabeledFromFilesystem",
             ],
         },
     ],

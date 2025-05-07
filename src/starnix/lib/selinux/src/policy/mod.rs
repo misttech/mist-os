@@ -381,57 +381,47 @@ impl<PS: ParseStrategy> Policy<PS> {
         security_context.serialize(&self.0)
     }
 
-    /// Returns the security context that should be applied to a newly created file-like SELinux
+    /// Returns the security context that should be applied to a newly created SELinux
     /// object according to `source` and `target` security contexts, as well as the new object's
-    /// `class`. This context should be used only if no filename-transition match is found, via
-    /// [`new_file_security_context_by_name()`].
-    pub fn new_file_security_context(
-        &self,
-        source: &SecurityContext,
-        target: &SecurityContext,
-        class: impl Into<sc::FsNodeClass>,
-    ) -> SecurityContext {
-        self.0.new_file_security_context(source, target, class.into())
-    }
-
-    /// Returns the security context that should be applied to a newly created file-like SELinux
-    /// object according to `source` and `target` security contexts, as well as the new object's
-    /// `class` and `name`. If no filename-transition rule matches the supplied arguments then
+    /// `class`.
+    ///
+    /// If no filename-transition rule matches the supplied arguments then
     /// `None` is returned, and the caller should fall-back to filename-independent labeling
-    /// via [`new_file_security_context()`]
-    pub fn new_file_security_context_by_name(
+    /// via [`compute_create_context()`]
+    pub fn compute_create_context_with_name(
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: impl Into<sc::FsNodeClass>,
+        class: impl Into<sc::ObjectClass>,
         name: sc::NullessByteStr<'_>,
     ) -> Option<SecurityContext> {
-        self.0.new_file_security_context_by_name(source, target, class.into(), name)
+        self.0.compute_create_context_with_name(source, target, class.into(), name)
     }
 
     /// Returns the security context that should be applied to a newly created SELinux
     /// object according to `source` and `target` security contexts, as well as the new object's
     /// `class`.
-    /// Defaults to the `source` security context if the policy does not specify transitions or
-    /// defaults for the `source`, `target` or `class` components.
     ///
-    /// Returns an error if the security context for such an object is not well-defined
-    /// by this [`Policy`].
-    pub fn new_security_context(
+    /// Computation follows the "create" algorithm for labeling newly created objects:
+    /// - user is taken from the `source` by default, or `target` if specified by policy.
+    /// - role, type and range are taken from the matching transition rules, if any.
+    /// - role, type and range fall-back to the `source` or `target` values according to policy.
+    ///
+    /// If no transitions apply, and the policy does not explicitly specify defaults then the
+    /// role, type and range values have defaults chosen based on the `class`:
+    /// - For "process", and socket-like classes, role, type and range are taken from the `source`.
+    /// - Otherwise role is "object_r", type is taken from `target` and range is set to the
+    ///   low level of the `source` range.
+    ///
+    /// Returns an error if the Security Context for such an object is not valid under this
+    /// [`Policy`] (e.g. if the type is not permitted for the chosen role, etc).
+    pub fn compute_create_context(
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
         class: impl Into<sc::ObjectClass>,
     ) -> SecurityContext {
-        self.0.new_security_context(
-            source,
-            target,
-            class.into(),
-            source.role(),
-            source.type_(),
-            source.low_level(),
-            source.high_level(),
-        )
+        self.0.compute_create_context(source, target, class.into())
     }
 
     /// Computes the access vector that associates type `source_type_name` and
@@ -1329,7 +1319,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn new_file_security_context_minimal() {
+    fn compute_create_context_minimal() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/minimal_policy.pp");
         let policy = parse_policy_by_reference(policy_bytes.as_slice())
@@ -1343,7 +1333,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, FileClass::File);
+        let actual = policy.compute_create_context(&source, &target, FileClass::File);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:object_r:target_t:s0:c0".into())
             .expect("valid expected security context");
@@ -1366,13 +1356,13 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_security_context(&source, &target, KernelClass::Process);
+        let actual = policy.compute_create_context(&source, &target, KernelClass::Process);
 
         assert_eq!(source, actual);
     }
 
     #[test]
-    fn new_file_security_context_class_defaults() {
+    fn compute_create_context_class_defaults() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/class_defaults_policy.pp");
         let policy = parse_policy_by_reference(policy_bytes.as_slice())
@@ -1386,7 +1376,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c0-s1:c0.c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, FileClass::File);
+        let actual = policy.compute_create_context(&source, &target, FileClass::File);
         let expected: SecurityContext = policy
             .parse_security_context(b"target_u:source_r:source_t:s1:c0-s1:c0.c1".into())
             .expect("valid expected security context");
@@ -1409,7 +1399,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c0-s1:c0.c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_security_context(&source, &target, KernelClass::Process);
+        let actual = policy.compute_create_context(&source, &target, KernelClass::Process);
         let expected: SecurityContext = policy
             .parse_security_context(b"target_u:source_r:source_t:s1:c0-s1:c0.c1".into())
             .expect("valid expected security context");
@@ -1418,7 +1408,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn new_file_security_context_role_transition() {
+    fn compute_create_context_role_transition() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/role_transition_policy.pp");
         let policy = parse_policy_by_reference(policy_bytes.as_slice())
@@ -1432,7 +1422,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, FileClass::File);
+        let actual = policy.compute_create_context(&source, &target, FileClass::File);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:transition_r:target_t:s0:c0".into())
             .expect("valid expected security context");
@@ -1455,7 +1445,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_security_context(&source, &target, KernelClass::Process);
+        let actual = policy.compute_create_context(&source, &target, KernelClass::Process);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:transition_r:source_t:s0:c0-s2:c0.c1".into())
             .expect("valid expected security context");
@@ -1464,9 +1454,9 @@ pub(super) mod tests {
     }
 
     #[test]
-    // TODO(http://b/334968228): Determine whether allow-role-transition check belongs in `new_file_security_context()`, or in the calling hooks, or `PermissionCheck::has_permission()`.
+    // TODO(http://b/334968228): Determine whether allow-role-transition check belongs in `compute_create_context()`, or in the calling hooks, or `PermissionCheck::has_permission()`.
     #[ignore]
-    fn new_file_security_context_role_transition_not_allowed() {
+    fn compute_create_context_role_transition_not_allowed() {
         let policy_bytes = include_bytes!(
             "../../testdata/composite_policies/compiled/role_transition_not_allowed_policy.pp"
         );
@@ -1481,14 +1471,14 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, FileClass::File);
+        let actual = policy.compute_create_context(&source, &target, FileClass::File);
 
         // TODO(http://b/334968228): Update expectation once role validation is implemented.
         assert!(policy.validate_security_context(&actual).is_err());
     }
 
     #[test]
-    fn new_file_security_context_type_transition() {
+    fn compute_create_context_type_transition() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/type_transition_policy.pp");
         let policy = parse_policy_by_reference(policy_bytes.as_slice())
@@ -1502,7 +1492,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, FileClass::File);
+        let actual = policy.compute_create_context(&source, &target, FileClass::File);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:object_r:transition_t:s0:c0".into())
             .expect("valid expected security context");
@@ -1525,7 +1515,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_security_context(&source, &target, KernelClass::Process);
+        let actual = policy.compute_create_context(&source, &target, KernelClass::Process);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:source_r:transition_t:s0:c0-s2:c0.c1".into())
             .expect("valid expected security context");
@@ -1534,7 +1524,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn new_file_security_context_range_transition() {
+    fn compute_create_context_range_transition() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/range_transition_policy.pp");
         let policy = parse_policy_by_reference(policy_bytes.as_slice())
@@ -1548,7 +1538,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, FileClass::File);
+        let actual = policy.compute_create_context(&source, &target, FileClass::File);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:object_r:target_t:s1:c1-s2:c1.c2".into())
             .expect("valid expected security context");
@@ -1571,7 +1561,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_security_context(&source, &target, KernelClass::Process);
+        let actual = policy.compute_create_context(&source, &target, KernelClass::Process);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:source_r:source_t:s1:c1-s2:c1.c2".into())
             .expect("valid expected security context");

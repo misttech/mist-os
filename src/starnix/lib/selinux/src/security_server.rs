@@ -482,7 +482,7 @@ impl SecurityServer {
     /// based on the specified source & target security SIDs.
     /// For file-like classes the `compute_new_fs_node_sid*()` APIs should be used instead.
     // TODO: Move this API to sit alongside the other `compute_*()` APIs.
-    pub fn compute_new_sid(
+    pub fn compute_create_sid(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
@@ -491,11 +491,10 @@ impl SecurityServer {
         let mut locked_state = self.state.lock();
         let active_policy = locked_state.expect_active_policy_mut();
 
-        // Policy is loaded, so `sid_to_security_context()` will not panic.
         let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
-        let security_context = active_policy.parsed.new_security_context(
+        let security_context = active_policy.parsed.compute_create_context(
             source_context,
             target_context,
             target_class.into(),
@@ -549,26 +548,7 @@ impl Query for SecurityServer {
         target_sid: SecurityId,
         fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error> {
-        let mut locked_state = self.state.lock();
-
-        // This interface will not be reached without a policy having been loaded.
-        let active_policy = locked_state.active_policy.as_mut().expect("Policy loaded");
-
-        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
-        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
-
-        // TODO(http://b/334968228): check that transitions are allowed.
-        let new_file_context = active_policy.parsed.new_file_security_context(
-            source_context,
-            target_context,
-            fs_node_class,
-        );
-
-        active_policy
-            .sid_table
-            .security_context_to_sid(&new_file_context)
-            .map_err(anyhow::Error::from)
-            .context("computing new file security context from policy")
+        self.compute_create_sid(source_sid, target_sid, fs_node_class)
     }
 
     fn compute_new_fs_node_sid_with_name(
@@ -586,7 +566,7 @@ impl Query for SecurityServer {
         let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
-        let new_file_context = active_policy.parsed.new_file_security_context_by_name(
+        let new_file_context = active_policy.parsed.compute_create_context_with_name(
             source_context,
             target_context,
             fs_node_class,

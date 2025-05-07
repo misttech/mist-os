@@ -176,7 +176,7 @@ pub(in crate::security) fn check_exec_access(
         exec_sid
     } else {
         security_server
-            .compute_new_sid(current_sid, executable_sid, KernelClass::Process)
+            .compute_create_sid(current_sid, executable_sid, KernelClass::Process)
             .map_err(|_| errno!(EACCES))?
     };
 

@@ -196,6 +196,16 @@ TEST(SeLinuxFsCreate, DefaultComputeCreateForFile) {
             fit::ok("test_selinuxfs_u:object_r:test_selinuxfs_create_target_t:s0"));
 }
 
+TEST(SeLinuxFsCreate, ComputeCreateForFifoFile) {
+  constexpr std::string_view kSourceContext =
+      "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0";
+  constexpr std::string_view kTargetContext =
+      "test_selinuxfs_create_target_u:test_selinuxfs_create_target_r:test_selinuxfs_create_target_t:s0";
+
+  EXPECT_EQ(ComputeCreateContext(kSourceContext, kTargetContext, "fifo_file"),
+            fit::ok("test_selinuxfs_u:object_r:test_selinuxfs_create_target_t:s0"));
+}
+
 // Validate handling of whitespace between request elements.
 TEST(SeLinuxFsCreate, ExtraWhitespace) {
   constexpr std::string_view kExpectedContext =
