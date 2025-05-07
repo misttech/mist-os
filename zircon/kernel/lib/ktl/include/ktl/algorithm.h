@@ -52,6 +52,7 @@ using std::copy_if;
 using std::fill;
 using std::fill_n;
 using std::reverse;
+using std::shuffle;
 using std::transform;
 
 namespace ranges {
@@ -60,6 +61,7 @@ using std::ranges::copy_if;
 using std::ranges::fill;
 using std::ranges::fill_n;
 using std::ranges::reverse;
+using std::ranges::shuffle;
 using std::ranges::transform;
 }  // namespace ranges
 
@@ -106,7 +108,7 @@ using std::ranges::min;
 using std::ranges::min_element;
 using std::ranges::minmax;
 using std::ranges::minmax_element;
-}
+}  // namespace ranges
 
 }  // namespace ktl
 
