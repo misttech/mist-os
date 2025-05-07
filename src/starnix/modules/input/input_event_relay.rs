@@ -5,6 +5,7 @@
 use crate::{
     parse_fidl_button_event, parse_fidl_keyboard_event_to_linux_input_event,
     FuchsiaTouchEventToLinuxTouchEventConverter, InputDeviceStatus, InputFile,
+    LinuxEventWithTraceId,
 };
 use fidl::endpoints::{ClientEnd, RequestStream};
 use fidl_fuchsia_ui_input3::{
@@ -312,7 +313,7 @@ impl InputEventsRelay {
                                         );
                                     }
                                     let mut inner = file.inner.lock();
-                                    inner.events.extend(new_events.clone());
+                                    inner.events.extend(new_events.clone().into_iter().map(LinuxEventWithTraceId::new));
                                     inner.waiters.notify_fd_events(FdEvents::POLLIN);
                                 }
 
@@ -382,7 +383,12 @@ impl InputEventsRelay {
                                 let mut inner = file.inner.lock();
 
                                 if !new_events.is_empty() {
-                                    inner.events.extend(new_events.clone());
+                                    inner.events.extend(
+                                        new_events
+                                            .clone()
+                                            .into_iter()
+                                            .map(LinuxEventWithTraceId::new),
+                                    );
                                     inner.waiters.notify_fd_events(FdEvents::POLLIN);
                                 }
 
@@ -534,7 +540,9 @@ impl InputEventsRelay {
                                 );
                             }
                             let mut inner = file.inner.lock();
-                            inner.events.extend(batch.events.clone());
+                            inner.events.extend(
+                                batch.events.clone().into_iter().map(LinuxEventWithTraceId::new),
+                            );
                             inner.waiters.notify_fd_events(FdEvents::POLLIN);
                         }
 
@@ -704,7 +712,9 @@ impl InputEventsRelay {
                                 );
                             }
                             let mut inner = file.inner.lock();
-                            inner.events.extend(new_events.clone());
+                            inner.events.extend(
+                                new_events.clone().into_iter().map(LinuxEventWithTraceId::new),
+                            );
                             inner.waiters.notify_fd_events(FdEvents::POLLIN);
                         }
                         true

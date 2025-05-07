@@ -8,7 +8,7 @@ use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt};
 use starnix_core::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{fileops_impl_noop_sync, FileObject, FileOps};
-use starnix_logging::{log_info, track_stub};
+use starnix_logging::{log_info, trace_duration, trace_flow_begin, trace_flow_end, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::time::duration_from_timeval;
@@ -137,9 +137,30 @@ pub struct InputFile {
     device_name: String,
 }
 
+pub struct LinuxEventWithTraceId {
+    pub event: uapi::input_event,
+    pub trace_id: Option<fuchsia_trace::Id>,
+}
+
+impl LinuxEventWithTraceId {
+    pub fn new(event: uapi::input_event) -> Self {
+        match event.type_ as u32 {
+            uapi::EV_SYN => {
+                let trace_id = fuchsia_trace::Id::random();
+                trace_duration!(c"input", c"linux_event_create");
+                trace_flow_begin!(c"input", c"linux_event", trace_id);
+                LinuxEventWithTraceId { event: event, trace_id: Some(trace_id) }
+            }
+            // EV_SYN marks the end of a complete input event. Other event types are its properties,
+            // so they don't initiate a trace.
+            _ => LinuxEventWithTraceId { event: event, trace_id: None },
+        }
+    }
+}
+
 // Mutable state of `InputFile`
 pub struct InputFileMutableState {
-    pub events: VecDeque<uapi::input_event>,
+    pub events: VecDeque<LinuxEventWithTraceId>,
     pub waiters: WaitQueue,
 }
 
@@ -509,14 +530,23 @@ impl FileOps for InputFile {
             );
             inner.waiters.notify_fd_events(FdEvents::POLLIN);
         }
-        let events: Vec<uapi::input_event> = inner.events.drain(..limit).collect::<Vec<_>>();
-        let last_event_timeval = events.last().expect("events is nonempty").time;
+        let events: Vec<LinuxEventWithTraceId> = inner.events.drain(..limit).collect::<Vec<_>>();
+        let last_event_timeval = events.last().expect("events is nonempty").event.time;
         let last_event_time_ns = duration_from_timeval::<zx::MonotonicTimeline>(last_event_timeval)
             .unwrap()
             .into_nanos();
         self.inspect_status
             .clone()
             .map(|status| status.count_read_events(events.len() as u64, last_event_time_ns));
+
+        for event in &events {
+            if let Some(trace_id) = event.trace_id {
+                trace_duration!(c"input", c"linux_event_read");
+                trace_flow_end!(c"input", c"linux_event", trace_id);
+            }
+        }
+
+        let events: Vec<uapi::input_event> = events.iter().map(|e| e.event).collect();
         data.write_all(events.as_bytes())
     }
 
