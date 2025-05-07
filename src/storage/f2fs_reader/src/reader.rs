@@ -262,14 +262,19 @@ impl F2fsReader {
                 ensure!(filename.len() >= 2, "invalid encrypted symlink");
                 let symlink_len = u16::read_from_bytes(&filename[..2]).unwrap();
                 filename.drain(..2);
+                filename.truncate(symlink_len as usize);
                 ensure!(symlink_len == filename.len() as u16, "invalid encrypted symlink");
                 if let Some(decryptor) = self.get_decryptor_for_inode(inode) {
                     decryptor.decrypt_filename_data(inode.footer.ino, &mut filename);
-                    filename.truncate(symlink_len as usize);
                 } else {
                     let proxy_filename: String =
                         fscrypt::proxy_filename::ProxyFilename::new(0, &filename).into();
                     filename = proxy_filename.as_bytes().to_vec();
+                }
+                // Unfortunately, it seems we still have to remove trailing nulls.
+                // fscrypt + f2fs publishes a file size equal to padded symlink length + 2 bytes.
+                while let Some(0) = filename.last() {
+                    filename.pop();
                 }
             }
             Ok(filename.into_boxed_slice())
