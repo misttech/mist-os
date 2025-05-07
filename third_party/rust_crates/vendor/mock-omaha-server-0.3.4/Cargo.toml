@@ -12,9 +12,10 @@
 [package]
 edition = "2021"
 name = "mock-omaha-server"
-version = "0.3.3"
+version = "0.3.4"
 build = false
 exclude = [".*"]
+autolib = false
 autobins = false
 autoexamples = false
 autotests = false
@@ -23,6 +24,13 @@ description = "Mock implementation of the server end of the Omaha Protocol"
 readme = "README.md"
 license = "BSD-2-Clause OR Apache-2.0 OR MIT"
 repository = "https://github.com/google/omaha-client"
+
+[features]
+default = ["tokio"]
+tokio = [
+    "dep:tokio",
+    "hyper/tcp",
+]
 
 [lib]
 name = "mock_omaha_server"
@@ -45,7 +53,7 @@ version = "0.11"
 version = "0.3"
 
 [dependencies.hex]
-version = "0.3"
+version = "0.4"
 
 [dependencies.hyper]
 version = "0.14.19"
@@ -87,13 +95,6 @@ version = "1.7"
 
 [dev-dependencies.proptest]
 version = "1.4"
-
-[features]
-default = ["tokio"]
-tokio = [
-    "dep:tokio",
-    "hyper/tcp",
-]
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

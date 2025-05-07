@@ -1530,7 +1530,7 @@ dependencies = [
  "handlebars",
  "hashlink",
  "heck 0.4.1",
- "hex 0.4.3",
+ "hex",
  "hkdf",
  "hmac",
  "home",
@@ -2001,12 +2001,6 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 [[package]]
 name = "hermit-abi"
 version = "0.3.9"
-
-[[package]]
-name = "hex"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
 
 [[package]]
 name = "hex"
@@ -2558,15 +2552,15 @@ version = "0.3.7"
 
 [[package]]
 name = "mock-omaha-server"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fbc7214259f458a4110e8802acf60270f672fde1bf09c7cb7f9d53c72d670bb"
+checksum = "8b3102212924ba4d2bd0ec4525301dbdbbdaaa5c52d95e183534876675450275"
 dependencies = [
  "anyhow",
  "argh",
  "derive_builder",
  "futures",
- "hex 0.3.2",
+ "hex",
  "hyper",
  "omaha_client",
  "p256",
@@ -2869,7 +2863,7 @@ dependencies = [
  "ecdsa",
  "elliptic-curve",
  "futures",
- "hex 0.4.3",
+ "hex",
  "http",
  "hyper",
  "itertools 0.14.0",

@@ -553,7 +553,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("mock-omaha-server") {
-  public_deps = [ ":mock-omaha-server-v0_3_3" ]
+  public_deps = [ ":mock-omaha-server-v0_3_4" ]
 }
 
 group("mockall") {
@@ -7324,36 +7324,6 @@ rust_library("hermit-abi-v0_3_9") {
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
-license("hex-v0_3_2.license") {
-  public_package_name = "hex"
-  license_files = [
-    "//third_party/rust_crates/vendor/hex-0.3.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/hex-0.3.2/LICENSE-MIT",
-  ]
-}
-
-rust_library("hex-v0_3_2") {
-  crate_name = "hex"
-  crate_root = "//third_party/rust_crates/vendor/hex-0.3.2/src/lib.rs"
-  output_name = "hex-67ad4b3000c63154"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=67ad4b3000c63154",
-    "-Cextra-filename=-67ad4b3000c63154",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":hex-v0_3_2.license" ]
-}
-
 license("hex-v0_4_3.license") {
   public_package_name = "hex"
   license_files = [
@@ -9363,20 +9333,20 @@ rust_library("miow-v0_3_7") {
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
-license("mock-omaha-server-v0_3_3.license") {
+license("mock-omaha-server-v0_3_4.license") {
   public_package_name = "mock_omaha_server"
   license_files = [
-    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.3/LICENSE-BSD",
-    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.4/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.4/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.4/LICENSE-MIT",
   ]
 }
 
-rust_library("mock-omaha-server-v0_3_3") {
+rust_library("mock-omaha-server-v0_3_4") {
   crate_name = "mock_omaha_server"
   crate_root =
-      "//third_party/rust_crates/vendor/mock-omaha-server-0.3.3/src/lib.rs"
-  output_name = "mock_omaha_server-194573524e7fddb1"
+      "//third_party/rust_crates/vendor/mock-omaha-server-0.3.4/src/lib.rs"
+  output_name = "mock_omaha_server-14dc45907f853546"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -9384,7 +9354,7 @@ rust_library("mock-omaha-server-v0_3_3") {
   deps += [ ":argh-v0_1_12" ]
   deps += [ ":derive_builder-v0_11_1" ]
   deps += [ ":futures-v0_3_30" ]
-  deps += [ ":hex-v0_3_2" ]
+  deps += [ ":hex-v0_4_3" ]
   deps += [ ":hyper-v0_14_19" ]
   deps += [ ":omaha_client-v0_2_2" ]
   deps += [ ":p256-v0_11_1" ]
@@ -9407,14 +9377,14 @@ rust_library("mock-omaha-server-v0_3_3") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=194573524e7fddb1",
-    "-Cextra-filename=-194573524e7fddb1",
+    "-Cmetadata=14dc45907f853546",
+    "-Cextra-filename=-14dc45907f853546",
     "--cfg=fasync",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":mock-omaha-server-v0_3_3.license" ]
+  applicable_licenses = [ ":mock-omaha-server-v0_3_4.license" ]
 }
 
 license("mockall-v0_9_0.license") {
