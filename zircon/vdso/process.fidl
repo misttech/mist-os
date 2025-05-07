@@ -416,6 +416,7 @@ closed protocol Process {
     ///  - [`zx_process_write_memory()`]
     ///
     /// [`zx_process_write_memory()`]: process_write_memory.md
+    @blocking
     strict ReadMemory(resource struct {
         handle Handle:PROCESS;
         vaddr Vaddr;
@@ -504,6 +505,7 @@ closed protocol Process {
     ///  - [`zx_process_read_memory()`]
     ///
     /// [`zx_process_read_memory()`]: process_read_memory.md
+    @blocking
     strict WriteMemory(resource struct {
         handle Handle:PROCESS;
         vaddr Vaddr;
