@@ -21,6 +21,8 @@ use log::{debug, error, warn};
 use netstack3_core::sync::Mutex;
 use thiserror::Error;
 
+use crate::bindings::util::ErrorLogExt;
+
 #[derive(Debug, Error)]
 pub(crate) enum ServeWatcherError {
     #[error("the request stream contained a FIDL error")]
@@ -33,10 +35,19 @@ pub(crate) enum ServeWatcherError {
     Canceled,
 }
 
+impl ErrorLogExt for ServeWatcherError {
+    fn log_level(&self) -> log::Level {
+        match self {
+            Self::ErrorInStream(fidl) | Self::FailedToRespond(fidl) => fidl.log_level(),
+            Self::PreviousPendingWatch | Self::Canceled => log::Level::Warn,
+        }
+    }
+}
+
 pub(crate) async fn serve_watcher<E: FidlWatcherEvent, WI: WatcherInterest<E>>(
     server_end: fidl::endpoints::ServerEnd<E::WatcherMarker>,
     interest: WI,
-    UpdateDispatcher(dispatcher): &UpdateDispatcher<E, WI>,
+    UpdateDispatcher(dispatcher): UpdateDispatcher<E, WI>,
 ) -> Result<(), ServeWatcherError> {
     let mut watcher = {
         let mut dispatcher = dispatcher.lock();

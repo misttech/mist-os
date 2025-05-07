@@ -21,7 +21,7 @@ use netstack3_core::neighbor::{LinkResolutionContext, LinkResolutionResult};
 use netstack3_core::routes::{NextHop, ResolvedRoute};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_async as fasync,
 };
 
 use crate::bindings::routes::rules_state::RuleInterest;
@@ -29,7 +29,9 @@ use crate::bindings::routes::watcher::{
     serve_watcher, FidlWatcherEvent, ServeWatcherError, Update, UpdateDispatcher, WatcherEvent,
     WatcherInterest,
 };
-use crate::bindings::util::{ConversionContext as _, IntoCore as _, IntoFidl as _, ResultExt as _};
+use crate::bindings::util::{
+    ConversionContext as _, IntoCore as _, IntoFidl as _, ResultExt as _, ScopeExt as _,
+};
 use crate::bindings::{routes, BindingsCtx, Ctx, IpExt};
 
 impl LinkResolutionContext<EthernetLinkDevice> for BindingsCtx {
@@ -234,21 +236,21 @@ where
 
 /// Serve the `fuchsia.net.routes/StateV4` protocol.
 pub(crate) async fn serve_state_v4(
-    rs: fnet_routes::StateV4RequestStream,
+    mut rs: fnet_routes::StateV4RequestStream,
     dispatchers: routes::Dispatchers<Ipv4>,
 ) -> Result<(), fidl::Error> {
-    let routes::Dispatchers { route_update_dispatcher, rule_update_dispatcher } = &dispatchers;
-    rs.try_for_each_concurrent(None, |req| async move {
+    let routes::Dispatchers { route_update_dispatcher, rule_update_dispatcher } = dispatchers;
+    while let Some(req) = rs.try_next().await? {
         match req {
-            // TODO(https://fxbug.dev/380897722): This should spawn a new task.
             fnet_routes::StateV4Request::GetWatcherV4 { options, watcher, control_handle: _ } => {
-                Ok(serve_route_watcher::<Ipv4>(watcher, options.into(), route_update_dispatcher)
-                    .await
-                    .unwrap_or_else(|e| {
-                        warn!("error serving {}: {:?}", fnet_routes::WatcherV4Marker::DEBUG_NAME, e)
-                    }))
+                fasync::Scope::current().spawn_server_end(watcher, |watcher| {
+                    serve_route_watcher::<Ipv4>(
+                        watcher,
+                        options.into(),
+                        route_update_dispatcher.clone(),
+                    )
+                })
             }
-            // TODO(https://fxbug.dev/380897722): This should spawn a new task.
             fnet_routes::StateV4Request::GetRuleWatcherV4 {
                 options:
                     fnet_routes::RuleWatcherOptionsV4 {
@@ -256,39 +258,35 @@ pub(crate) async fn serve_state_v4(
                     },
                 watcher,
                 control_handle: _,
-            } => Ok(serve_watcher::<fnet_routes_ext::rules::RuleEvent<Ipv4>, _>(
-                watcher,
-                RuleInterest,
-                rule_update_dispatcher,
-            )
-            .await
-            .unwrap_or_else(|e| {
-                warn!("error serving {}: {:?}", fnet_routes::RuleWatcherV4Marker::DEBUG_NAME, e)
-            })),
+            } => fasync::Scope::current().spawn_server_end(watcher, |watcher| {
+                serve_watcher::<fnet_routes_ext::rules::RuleEvent<Ipv4>, _>(
+                    watcher,
+                    RuleInterest,
+                    rule_update_dispatcher.clone(),
+                )
+            }),
         }
-    })
-    .await
+    }
+    Ok(())
 }
 
 /// Serve the `fuchsia.net.routes/StateV6` protocol.
 pub(crate) async fn serve_state_v6(
-    rs: fnet_routes::StateV6RequestStream,
+    mut rs: fnet_routes::StateV6RequestStream,
     dispatchers: routes::Dispatchers<Ipv6>,
 ) -> Result<(), fidl::Error> {
-    let routes::Dispatchers { route_update_dispatcher, rule_update_dispatcher } = &dispatchers;
-    rs.try_for_each_concurrent(None, |req| async move {
+    let routes::Dispatchers { route_update_dispatcher, rule_update_dispatcher } = dispatchers;
+    while let Some(req) = rs.try_next().await? {
         match req {
-            // TODO(https://fxbug.dev/380897722): This should spawn a new
-            // task.
             fnet_routes::StateV6Request::GetWatcherV6 { options, watcher, control_handle: _ } => {
-                Ok(serve_route_watcher::<Ipv6>(watcher, options.into(), route_update_dispatcher)
-                    .await
-                    .unwrap_or_else(|e| {
-                        warn!("error serving {}: {:?}", fnet_routes::WatcherV6Marker::DEBUG_NAME, e)
-                    }))
+                fasync::Scope::current().spawn_server_end(watcher, |watcher| {
+                    serve_route_watcher::<Ipv6>(
+                        watcher,
+                        options.into(),
+                        route_update_dispatcher.clone(),
+                    )
+                })
             }
-            // TODO(https://fxbug.dev/380897722): This should spawn a new
-            // task.
             fnet_routes::StateV6Request::GetRuleWatcherV6 {
                 options:
                     fnet_routes::RuleWatcherOptionsV6 {
@@ -296,25 +294,23 @@ pub(crate) async fn serve_state_v6(
                     },
                 watcher,
                 control_handle: _,
-            } => Ok(serve_watcher::<fnet_routes_ext::rules::RuleEvent<Ipv6>, _>(
-                watcher,
-                RuleInterest,
-                rule_update_dispatcher,
-            )
-            .await
-            .unwrap_or_else(|e| {
-                warn!("error serving {}: {:?}", fnet_routes::RuleWatcherV6Marker::DEBUG_NAME, e)
-            })),
+            } => fasync::Scope::current().spawn_server_end(watcher, |watcher| {
+                serve_watcher::<fnet_routes_ext::rules::RuleEvent<Ipv6>, _>(
+                    watcher,
+                    RuleInterest,
+                    rule_update_dispatcher.clone(),
+                )
+            }),
         }
-    })
-    .await
+    }
+    Ok(())
 }
 
 // Serve a single client of the `WatcherV4` or `WatcherV6` protocol.
 async fn serve_route_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
     server_end: fidl::endpoints::ServerEnd<I::WatcherMarker>,
     fnet_routes_ext::WatcherOptions { table_interest }: fnet_routes_ext::WatcherOptions,
-    dispatcher: &RouteUpdateDispatcher<I>,
+    dispatcher: RouteUpdateDispatcher<I>,
 ) -> Result<(), ServeWatcherError> {
     let client_interest = match table_interest {
         Some(fnet_routes::TableInterest::Main(fnet_routes::Main)) => {

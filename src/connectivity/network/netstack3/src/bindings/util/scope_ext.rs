@@ -66,6 +66,16 @@ pub(crate) trait ScopeExt: Borrow<ScopeHandle> {
     {
         self.spawn_fidl_task::<S::Protocol, _, _>(f(rs))
     }
+
+    fn spawn_server_end<M, E, Fut, F>(&self, server_end: fidl::endpoints::ServerEnd<M>, f: F)
+    where
+        F: FnOnce(fidl::endpoints::ServerEnd<M>) -> Fut,
+        Fut: Future<Output = Result<(), E>> + Send + 'static,
+        E: ErrorLogExt,
+        M: ProtocolMarker,
+    {
+        self.spawn_fidl_task::<M, _, _>(f(server_end))
+    }
 }
 
 impl<O> ScopeExt for O where O: Borrow<ScopeHandle> {}
