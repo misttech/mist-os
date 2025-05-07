@@ -26,14 +26,46 @@ namespace msd {
 
 class MagmaTestServer;
 
+// The shared objects that the MSD and FIDL server interact with.
+struct MagmaObjects {
+  std::mutex magma_mutex;
+  std::unique_ptr<msd::Driver> magma_driver FIT_GUARDED(magma_mutex);
+  std::unique_ptr<MagmaSystemDevice> magma_system_device FIT_GUARDED(magma_mutex);
+};
+
+class MagmaCombinedDeviceServer : public fidl::WireServer<fuchsia_gpu_magma::CombinedDevice> {
+ public:
+  explicit MagmaCombinedDeviceServer(std::shared_ptr<MagmaObjects> magma)
+      : magma_(std::move(magma)) {}
+  void Query(QueryRequestView request, QueryCompleter::Sync& completer) override;
+
+  void Connect2(Connect2RequestView request, Connect2Completer::Sync& completer) override;
+  void DumpState(DumpStateRequestView request, DumpStateCompleter::Sync& completer) override;
+  void GetIcdList(GetIcdListCompleter::Sync& completer) override;
+
+ private:
+  template <typename T>
+  bool CheckSystemDevice(T& completer) FIT_REQUIRES(magma_->magma_mutex) {
+    if (!magma_->magma_system_device) {
+      MAGMA_LOG(WARNING, "Got message on torn-down device");
+      completer.Close(ZX_ERR_BAD_STATE);
+      return false;
+    }
+    return true;
+  }
+
+  std::shared_ptr<MagmaObjects> magma_;
+};
+
 class MagmaDriverBase : public fdf::DriverBase,
-                        public fidl::WireServer<fuchsia_gpu_magma::CombinedDevice>,
                         public fidl::WireServer<fuchsia_gpu_magma::PowerElementProvider>,
                         internal::DependencyInjectionServer::Owner {
  public:
   MagmaDriverBase(std::string_view name, fdf::DriverStartArgs start_args,
                   fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase(name, std::move(start_args), std::move(driver_dispatcher)),
+        magma_(std::make_shared<MagmaObjects>()),
+        combined_device_server_(magma_),
         magma_devfs_connector_(fit::bind_member<&MagmaDriverBase::BindConnector>(this)) {}
 
   zx::result<> Start() override;
@@ -59,32 +91,21 @@ class MagmaDriverBase : public fdf::DriverBase,
   zx::result<zx::resource> GetInfoResource();
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node>& node_client() { return node_client_; }
-  std::mutex& magma_mutex() FIT_RETURN_CAPABILITY(magma_mutex_) { return magma_mutex_; }
-
-  msd::Driver* magma_driver() FIT_REQUIRES(magma_mutex_) { return magma_driver_.get(); }
-
-  void set_magma_driver(std::unique_ptr<msd::Driver> magma_driver) FIT_REQUIRES(magma_mutex_);
-
-  void set_magma_system_device(std::unique_ptr<MagmaSystemDevice> magma_system_device)
-      FIT_REQUIRES(magma_mutex_);
-
-  MagmaSystemDevice* magma_system_device() FIT_REQUIRES(magma_mutex_);
-
-  template <typename T>
-  bool CheckSystemDevice(T& completer) FIT_REQUIRES(magma_mutex_) {
-    if (!magma_system_device_) {
-      MAGMA_LOG(WARNING, "Got message on torn-down device");
-      completer.Close(ZX_ERR_BAD_STATE);
-      return false;
-    }
-    return true;
+  std::mutex& magma_mutex() FIT_RETURN_CAPABILITY(magma_->magma_mutex) {
+    return magma_->magma_mutex;
   }
 
-  void Query(QueryRequestView request, QueryCompleter::Sync& _completer) override;
+  msd::Driver* magma_driver() FIT_REQUIRES(magma_->magma_mutex) {
+    return magma_->magma_driver.get();
+  }
 
-  void Connect2(Connect2RequestView request, Connect2Completer::Sync& _completer) override;
-  void DumpState(DumpStateRequestView request, DumpStateCompleter::Sync& _completer) override;
-  void GetIcdList(GetIcdListCompleter::Sync& completer) override;
+  void set_magma_driver(std::unique_ptr<msd::Driver> magma_driver)
+      FIT_REQUIRES(magma_->magma_mutex);
+
+  void set_magma_system_device(std::unique_ptr<MagmaSystemDevice> magma_system_device)
+      FIT_REQUIRES(magma_->magma_mutex);
+
+  MagmaSystemDevice* magma_system_device() FIT_REQUIRES(magma_->magma_mutex);
 
   zx::result<> CreateTestService(MagmaTestServer& test_server);
 
@@ -92,7 +113,7 @@ class MagmaDriverBase : public fdf::DriverBase,
   zx::result<> CreateDevfsNode();
 
   void BindConnector(fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server) {
-    fidl::BindServer(dispatcher(), std::move(server), this);
+    fidl::BindServer(dispatcher(), std::move(server), &combined_device_server_);
   }
 
   void InitializeInspector();
@@ -105,9 +126,8 @@ class MagmaDriverBase : public fdf::DriverBase,
 
   fit::deferred_callback teardown_logger_callback_;
 
-  std::mutex magma_mutex_;
-  std::unique_ptr<msd::Driver> magma_driver_ FIT_GUARDED(magma_mutex_);
-  std::unique_ptr<MagmaSystemDevice> magma_system_device_ FIT_GUARDED(magma_mutex_);
+  std::shared_ptr<MagmaObjects> magma_;
+  MagmaCombinedDeviceServer combined_device_server_;
   driver_devfs::Connector<fuchsia_gpu_magma::CombinedDevice> magma_devfs_connector_;
   // Node representing /dev/class/gpu/<id>.
   fidl::WireSyncClient<fuchsia_driver_framework::Node> gpu_node_;

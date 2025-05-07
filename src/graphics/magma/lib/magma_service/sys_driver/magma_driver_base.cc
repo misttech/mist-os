@@ -25,8 +25,8 @@ zx::result<> MagmaDriverBase::Start() {
     return result.take_error();
   }
   {
-    std::lock_guard lock(magma_mutex_);
-    magma_system_device_->set_perf_count_access_token_id(perf_counter_.GetEventKoid());
+    std::lock_guard lock(magma_->magma_mutex);
+    magma_->magma_system_device->set_perf_count_access_token_id(perf_counter_.GetEventKoid());
   }
 
   if (zx::result result = dependency_injection_.Create(node_client_); result.is_error()) {
@@ -45,12 +45,12 @@ zx::result<> MagmaDriverBase::Start() {
 }
 
 void MagmaDriverBase::Stop() {
-  std::lock_guard lock(magma_mutex_);
-  if (magma_system_device_) {
-    magma_system_device_->Shutdown();
+  std::lock_guard lock(magma_->magma_mutex);
+  if (magma_->magma_system_device) {
+    magma_->magma_system_device->Shutdown();
   }
-  magma_system_device_.reset();
-  magma_driver_.reset();
+  magma_->magma_system_device.reset();
+  magma_->magma_driver.reset();
   teardown_logger_callback_.call();
 }
 
@@ -86,110 +86,19 @@ zx::result<zx::resource> MagmaDriverBase::GetInfoResource() {
 }
 
 void MagmaDriverBase::set_magma_driver(std::unique_ptr<msd::Driver> magma_driver)
-    FIT_REQUIRES(magma_mutex_) {
-  ZX_DEBUG_ASSERT(!magma_driver_);
-  magma_driver_ = std::move(magma_driver);
+    FIT_REQUIRES(magma_->magma_mutex) {
+  ZX_DEBUG_ASSERT(!magma_->magma_driver);
+  magma_->magma_driver = std::move(magma_driver);
 }
 
 void MagmaDriverBase::set_magma_system_device(
-    std::unique_ptr<MagmaSystemDevice> magma_system_device) FIT_REQUIRES(magma_mutex_) {
-  ZX_DEBUG_ASSERT(!magma_system_device_);
-  magma_system_device_ = std::move(magma_system_device);
+    std::unique_ptr<MagmaSystemDevice> magma_system_device) FIT_REQUIRES(magma_->magma_mutex) {
+  ZX_DEBUG_ASSERT(!magma_->magma_system_device);
+  magma_->magma_system_device = std::move(magma_system_device);
 }
 
-MagmaSystemDevice* MagmaDriverBase::magma_system_device() FIT_REQUIRES(magma_mutex_) {
-  return magma_system_device_.get();
-}
-
-void MagmaDriverBase::Query(QueryRequestView request, QueryCompleter::Sync& _completer) {
-  MAGMA_DLOG("MagmaDriverBase::Query");
-  std::lock_guard lock(magma_mutex_);
-  if (!CheckSystemDevice(_completer))
-    return;
-
-  zx_handle_t result_buffer = ZX_HANDLE_INVALID;
-  uint64_t result = 0;
-
-  magma::Status status =
-      magma_system_device_->Query(fidl::ToUnderlying(request->query_id), &result_buffer, &result);
-  if (!status.ok()) {
-    _completer.ReplyError(magma::ToZxStatus(status.get()));
-    return;
-  }
-
-  if (result_buffer != ZX_HANDLE_INVALID) {
-    _completer.ReplySuccess(
-        fuchsia_gpu_magma::wire::DeviceQueryResponse::WithBufferResult(zx::vmo(result_buffer)));
-  } else {
-    _completer.ReplySuccess(fuchsia_gpu_magma::wire::DeviceQueryResponse::WithSimpleResult(
-        fidl::ObjectView<uint64_t>::FromExternal(&result)));
-  }
-}
-
-void MagmaDriverBase::Connect2(Connect2RequestView request, Connect2Completer::Sync& _completer) {
-  MAGMA_DLOG("MagmaDriverBase::Connect2");
-  std::lock_guard lock(magma_mutex_);
-  if (!CheckSystemDevice(_completer))
-    return;
-
-  auto connection =
-      magma_system_device_->Open(request->client_id, std::move(request->primary_channel),
-                                 std::move(request->notification_channel));
-
-  if (!connection) {
-    MAGMA_DLOG("MagmaSystemDevice::Open failed");
-    _completer.Close(ZX_ERR_INTERNAL);
-    return;
-  }
-
-  magma_system_device_->StartConnectionThread(std::move(connection), [](const char* role_name) {
-    zx_status_t status = fuchsia_scheduler::SetRoleForThisThread(role_name);
-    if (status != ZX_OK) {
-      MAGMA_DMESSAGE("Failed to set role for this thread; status: %s",
-                     zx_status_get_string(status));
-      return;
-    }
-  });
-}
-
-void MagmaDriverBase::DumpState(DumpStateRequestView request,
-                                DumpStateCompleter::Sync& _completer) {
-  MAGMA_DLOG("MagmaDriverBase::DumpState");
-  std::lock_guard lock(magma_mutex_);
-  if (!CheckSystemDevice(_completer))
-    return;
-  if (request->dump_type & ~MAGMA_DUMP_TYPE_NORMAL) {
-    MAGMA_DLOG("Invalid dump type %d", request->dump_type);
-    return;
-  }
-
-  if (magma_system_device_)
-    magma_system_device_->DumpStatus(request->dump_type);
-}
-
-void MagmaDriverBase::GetIcdList(GetIcdListCompleter::Sync& completer) {
-  std::lock_guard lock(magma_mutex_);
-  if (!CheckSystemDevice(completer))
-    return;
-  fidl::Arena allocator;
-  std::vector<msd::MsdIcdInfo> msd_icd_infos;
-  magma_system_device_->GetIcdList(&msd_icd_infos);
-  std::vector<fuchsia_gpu_magma::wire::IcdInfo> icd_infos;
-  for (auto& item : msd_icd_infos) {
-    auto icd_info = fuchsia_gpu_magma::wire::IcdInfo::Builder(allocator);
-    icd_info.component_url(fidl::StringView::FromExternal(item.component_url));
-    fuchsia_gpu_magma::wire::IcdFlags flags;
-    if (item.support_flags & ICD_SUPPORT_FLAG_VULKAN)
-      flags |= fuchsia_gpu_magma::wire::IcdFlags::kSupportsVulkan;
-    if (item.support_flags & ICD_SUPPORT_FLAG_OPENCL)
-      flags |= fuchsia_gpu_magma::wire::IcdFlags::kSupportsOpencl;
-    if (item.support_flags & ICD_SUPPORT_FLAG_MEDIA_CODEC_FACTORY)
-      flags |= fuchsia_gpu_magma::wire::IcdFlags::kSupportsMediaCodecFactory;
-    icd_info.flags(flags);
-    icd_infos.push_back(icd_info.Build());
-  }
-
-  completer.Reply(fidl::VectorView<fuchsia_gpu_magma::wire::IcdInfo>::FromExternal(icd_infos));
+MagmaSystemDevice* MagmaDriverBase::magma_system_device() FIT_REQUIRES(magma_->magma_mutex) {
+  return magma_->magma_system_device.get();
 }
 
 zx::result<> MagmaDriverBase::CreateTestService(MagmaTestServer& test_server) {
@@ -199,7 +108,7 @@ zx::result<> MagmaDriverBase::CreateTestService(MagmaTestServer& test_server) {
       };
   auto device_protocol =
       [this](fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server_end) mutable {
-        fidl::BindServer(dispatcher(), std::move(server_end), this);
+        fidl::BindServer(dispatcher(), std::move(server_end), &combined_device_server_);
       };
   auto test_protocol =
       [this, &test_server](fidl::ServerEnd<fuchsia_gpu_magma::TestDevice2> server_end) mutable {
@@ -254,7 +163,7 @@ zx::result<> MagmaDriverBase::CreateDevfsNode() {
       };
   auto device_protocol =
       [this](fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server_end) mutable {
-        fidl::BindServer(dispatcher(), std::move(server_end), this);
+        fidl::BindServer(dispatcher(), std::move(server_end), &combined_device_server_);
       };
 
   fuchsia_gpu_magma::Service::InstanceHandler handler(
@@ -271,7 +180,7 @@ zx::result<> MagmaDriverBase::CreateDevfsNode() {
 }
 
 void MagmaDriverBase::InitializeInspector() {
-  std::lock_guard lock(magma_mutex_);
+  std::lock_guard lock(magma_->magma_mutex);
   auto inspector = magma_driver()->DuplicateInspector();
   if (inspector) {
     InitInspectorExactlyOnce(inspector.value());
@@ -279,9 +188,103 @@ void MagmaDriverBase::InitializeInspector() {
 }
 
 void MagmaDriverBase::SetMemoryPressureLevel(MagmaMemoryPressureLevel level) {
-  std::lock_guard lock(magma_mutex_);
-  MAGMA_DASSERT(magma_system_device_);
-  magma_system_device_->SetMemoryPressureLevel(level);
+  std::lock_guard lock(magma_->magma_mutex);
+  MAGMA_DASSERT(magma_->magma_system_device);
+  magma_->magma_system_device->SetMemoryPressureLevel(level);
+}
+
+void MagmaCombinedDeviceServer::Query(QueryRequestView request, QueryCompleter::Sync& _completer) {
+  MAGMA_DLOG("MagmaDriverBase::Query");
+  std::lock_guard lock(magma_->magma_mutex);
+  if (!CheckSystemDevice(_completer))
+    return;
+
+  zx_handle_t result_buffer = ZX_HANDLE_INVALID;
+  uint64_t result = 0;
+
+  magma::Status status = magma_->magma_system_device->Query(fidl::ToUnderlying(request->query_id),
+                                                            &result_buffer, &result);
+  if (!status.ok()) {
+    _completer.ReplyError(magma::ToZxStatus(status.get()));
+    return;
+  }
+
+  if (result_buffer != ZX_HANDLE_INVALID) {
+    _completer.ReplySuccess(
+        fuchsia_gpu_magma::wire::DeviceQueryResponse::WithBufferResult(zx::vmo(result_buffer)));
+  } else {
+    _completer.ReplySuccess(fuchsia_gpu_magma::wire::DeviceQueryResponse::WithSimpleResult(
+        fidl::ObjectView<uint64_t>::FromExternal(&result)));
+  }
+}
+
+void MagmaCombinedDeviceServer::Connect2(Connect2RequestView request,
+                                         Connect2Completer::Sync& _completer) {
+  MAGMA_DLOG("MagmaDriverBase::Connect2");
+  std::lock_guard lock(magma_->magma_mutex);
+  if (!CheckSystemDevice(_completer))
+    return;
+
+  auto connection =
+      magma_->magma_system_device->Open(request->client_id, std::move(request->primary_channel),
+                                        std::move(request->notification_channel));
+
+  if (!connection) {
+    MAGMA_DLOG("MagmaSystemDevice::Open failed");
+    _completer.Close(ZX_ERR_INTERNAL);
+    return;
+  }
+
+  magma_->magma_system_device->StartConnectionThread(
+      std::move(connection), [](const char* role_name) {
+        zx_status_t status = fuchsia_scheduler::SetRoleForThisThread(role_name);
+        if (status != ZX_OK) {
+          MAGMA_DMESSAGE("Failed to set role for this thread; status: %s",
+                         zx_status_get_string(status));
+          return;
+        }
+      });
+}
+
+void MagmaCombinedDeviceServer::DumpState(DumpStateRequestView request,
+                                          DumpStateCompleter::Sync& _completer) {
+  MAGMA_DLOG("MagmaDriverBase::DumpState");
+  std::lock_guard lock(magma_->magma_mutex);
+  if (!CheckSystemDevice(_completer))
+    return;
+  if (request->dump_type & ~MAGMA_DUMP_TYPE_NORMAL) {
+    MAGMA_DLOG("Invalid dump type %d", request->dump_type);
+    return;
+  }
+
+  if (magma_->magma_system_device) {
+    magma_->magma_system_device->DumpStatus(request->dump_type);
+  }
+}
+
+void MagmaCombinedDeviceServer::GetIcdList(GetIcdListCompleter::Sync& completer) {
+  std::lock_guard lock(magma_->magma_mutex);
+  if (!CheckSystemDevice(completer))
+    return;
+  fidl::Arena allocator;
+  std::vector<msd::MsdIcdInfo> msd_icd_infos;
+  magma_->magma_system_device->GetIcdList(&msd_icd_infos);
+  std::vector<fuchsia_gpu_magma::wire::IcdInfo> icd_infos;
+  for (auto& item : msd_icd_infos) {
+    auto icd_info = fuchsia_gpu_magma::wire::IcdInfo::Builder(allocator);
+    icd_info.component_url(fidl::StringView::FromExternal(item.component_url));
+    fuchsia_gpu_magma::wire::IcdFlags flags;
+    if (item.support_flags & ICD_SUPPORT_FLAG_VULKAN)
+      flags |= fuchsia_gpu_magma::wire::IcdFlags::kSupportsVulkan;
+    if (item.support_flags & ICD_SUPPORT_FLAG_OPENCL)
+      flags |= fuchsia_gpu_magma::wire::IcdFlags::kSupportsOpencl;
+    if (item.support_flags & ICD_SUPPORT_FLAG_MEDIA_CODEC_FACTORY)
+      flags |= fuchsia_gpu_magma::wire::IcdFlags::kSupportsMediaCodecFactory;
+    icd_info.flags(flags);
+    icd_infos.push_back(icd_info.Build());
+  }
+
+  completer.Reply(fidl::VectorView<fuchsia_gpu_magma::wire::IcdInfo>::FromExternal(icd_infos));
 }
 
 }  // namespace msd
