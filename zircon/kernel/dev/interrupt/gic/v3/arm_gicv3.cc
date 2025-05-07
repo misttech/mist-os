@@ -108,7 +108,14 @@ void gic_redistributor_sleep(bool sleep) {
   cpu_num_t cpu = arch_curr_cpu_num();
   DEBUG_ASSERT(arch_ints_disabled());
 
-  // TODO(drewry): we may need to check GICD_CTRL_DS to ensure we can access.
+  // GICR_WAKER could be RW or RAZ/WI.  When GICD_CTLR.DS is 1, GICR_WAKER is
+  // RW.  However, when GICD_CTLR.DS is 0, GICR_WAKER could be RW or RAZ/WI
+  // depending on whether the access is Secure/Non-secure and FEAT_RME.
+  //
+  // Instead of checking those things we're going to take a shortcut.  In the
+  // case we're writing a 1 to WAKER_PROCESSOR_SLEEP we'll read back GICR_WAKER
+  // to determine if it's RW or RAZ/WI.  If the former, we'll
+  // gic_wait_for_mask.  If the latter, we'll bail out.
   uint waker = arm_gicv3_read32(GICR_WAKER(cpu));
   if (sleep) {
     waker |= WAKER_PROCESSOR_SLEEP;
@@ -116,6 +123,14 @@ void gic_redistributor_sleep(bool sleep) {
     waker &= ~WAKER_PROCESSOR_SLEEP;
   }
   arm_gicv3_write32(GICR_WAKER(cpu), waker);
+  if (sleep) {
+    const uint read_back = arm_gicv3_read32(GICR_WAKER(cpu));
+    if ((read_back & WAKER_PROCESSOR_SLEEP) == 0) {
+      // Our write didn't take.  Must be RAZ/WI.  Don't bother waiting.
+      return;
+    }
+  }
+
   uint64_t val = sleep ? WAKER_CHILDREN_ASLEEP : 0;
   gic_wait_for_mask(GICR_WAKER(cpu), WAKER_CHILDREN_ASLEEP, val);
 }
