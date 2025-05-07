@@ -14,6 +14,7 @@ lib_srcs = [
 lib_deps = [
   "//src/storage/lib/storage_device",
   "//third_party/rust_crates:anyhow",
+  "//third_party/rust_crates:bitflags",
   "//third_party/rust_crates:sha2",
   "//third_party/rust_crates:static_assertions",
   "//third_party/rust_crates:zerocopy",

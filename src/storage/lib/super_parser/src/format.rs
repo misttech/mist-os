@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, ensure, Error};
+use bitflags::bitflags;
 use sha2::Digest;
 use static_assertions::const_assert;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
@@ -15,7 +16,13 @@ pub const METADATA_GEOMETRY_RESERVED_SIZE: u32 = 4096;
 
 pub const METADATA_MAJOR_VERSION: u16 = 10;
 pub const METADATA_MINOR_VERSION_MAX: u16 = 2;
-pub const CURRENT_METADATA_HEADER_VERSION_MIN: u16 = 2;
+
+/// The minimum metadata version required for the current, expanded, metadata header struct.
+pub const METADATA_VERSION_FOR_EXPANDED_HEADER_MIN: u16 = 2;
+/// The minimum metadata version required for the current attributes defined in
+/// `PARTITION_ATTRIBUTE_MASK`. Below this version, the accepted attributes are defined in
+/// `PARTITION_ATTRIBUTE_MASK_V0`.
+pub const METADATA_VERSION_FOR_UPDATED_ATTRIBUTES_MIN: u16 = 1;
 
 /// `MetadataGeometry` provides information on the location of logical partitions. This struct is
 /// stored at block 0 of the first 4096 bytes of the partition.
@@ -122,7 +129,7 @@ impl MetadataHeader {
         ensure!(self.major_version == METADATA_MAJOR_VERSION, "Incompatible metadata version.");
         ensure!(self.minor_version <= METADATA_MINOR_VERSION_MAX, "Incompatible metadata version.");
 
-        if self.minor_version < CURRENT_METADATA_HEADER_VERSION_MIN {
+        if self.minor_version < METADATA_VERSION_FOR_EXPANDED_HEADER_MIN {
             // Verify size against the old metadata header
             ensure!(
                 self.header_size == METADATA_HEADER_V1_SIZE as u32,
@@ -156,7 +163,11 @@ impl MetadataHeader {
             .validate_table_bounds(self.tables_size)
             .map_err(|_| anyhow!("block_devices tables failed table bounds check."))?;
 
-        // TODO(https://fxbug.dev/404952286): Validate entry size.
+        // TODO(https://fxbug.dev/404952286): Validate entry size for extents, groups.
+        ensure!(
+            self.partitions.entry_size == std::mem::size_of::<MetadataPartition>() as u32,
+            "Invalid partition table entry size."
+        );
 
         Ok(())
     }
@@ -179,6 +190,64 @@ impl MetadataTableDescriptor {
     fn validate_table_bounds(&self, total_tables_size: u32) -> Result<(), Error> {
         ensure!(self.offset < total_tables_size, "Invalid table bounds.");
         ensure!(self.num_entries * self.entry_size < total_tables_size, "Invalid table bounds.");
+        Ok(())
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Immutable, FromBytes, IntoBytes)]
+pub struct PartitionAttributes(u32);
+bitflags! {
+    impl PartitionAttributes: u32 {
+        /// This partition is not writable.
+        const READONLY = 1 << 0;
+        /// If set, indicates that the partition name has a slot suffix applied. The slot suffix is
+        /// determined by the metadata slot number (e.g. slot 0 will have suffix "_a", and slot 1
+        /// will have suffix "_b").
+        const SLOT_SUFFIXED = 1 << 1;
+        /// If set, indicates the the partition was created (or modified) for a snapshot-based
+        /// update. If not present, the partition was likely flashed via fastboot.
+        const UPDATED = 1 << 2;
+        /// If set, indicates that this partition is disabled.
+        const DISABLED = 1 << 3;
+    }
+}
+
+pub const PARTITION_ATTRIBUTE_MASK_V0: PartitionAttributes =
+    PartitionAttributes::READONLY.union(PartitionAttributes::SLOT_SUFFIXED);
+pub const PARTITION_ATTRIBUTE_MASK_V1: PartitionAttributes =
+    PartitionAttributes::UPDATED.union(PartitionAttributes::DISABLED);
+pub const PARTITION_ATTRIBUTE_MASK: PartitionAttributes =
+    PARTITION_ATTRIBUTE_MASK_V0.union(PARTITION_ATTRIBUTE_MASK_V1);
+
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable)]
+pub struct MetadataPartition {
+    pub name: [u8; 36],
+    pub attributes: PartitionAttributes,
+    pub first_extent_index: u32,
+    pub num_extents: u32,
+    pub group_index: u32,
+}
+
+impl MetadataPartition {
+    pub fn validate(&self, header: &MetadataHeader) -> Result<(), Error> {
+        if header.minor_version < METADATA_VERSION_FOR_UPDATED_ATTRIBUTES_MIN {
+            ensure!(self.attributes.difference(PARTITION_ATTRIBUTE_MASK_V0).is_empty());
+        } else {
+            ensure!(self.attributes.difference(PARTITION_ATTRIBUTE_MASK).is_empty());
+        }
+        ensure!(
+            self.first_extent_index + self.num_extents >= self.first_extent_index,
+            "Logical partition's first_extent_index and num_extents overflowed."
+        );
+        ensure!(
+            self.first_extent_index + self.num_extents <= header.extents.num_entries,
+            "Logical partition has invalid extent list."
+        );
+        ensure!(
+            self.group_index < header.groups.num_entries,
+            "Logical partition has invalid group index."
+        );
         Ok(())
     }
 }
@@ -256,7 +325,7 @@ mod tests {
     const VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM: MetadataHeader = MetadataHeader {
         magic: METADATA_HEADER_MAGIC,
         major_version: METADATA_MAJOR_VERSION,
-        minor_version: CURRENT_METADATA_HEADER_VERSION_MIN,
+        minor_version: METADATA_VERSION_FOR_EXPANDED_HEADER_MIN,
         header_size: std::mem::size_of::<MetadataHeader>() as u32,
         header_checksum: [0; 32],
         tables_size: 188,
@@ -285,7 +354,7 @@ mod tests {
     async fn test_valid_older_metadata_header() {
         let mut header = VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM;
         header.minor_version = 1;
-        assert!(header.minor_version < CURRENT_METADATA_HEADER_VERSION_MIN);
+        assert!(header.minor_version < METADATA_VERSION_FOR_EXPANDED_HEADER_MIN);
         header.header_size = METADATA_HEADER_V1_SIZE as u32;
 
         // Zero the fields that does not exist in the older version of the metadata header before
@@ -362,6 +431,59 @@ mod tests {
             invalid_header.validate().expect_err(
                 "metadata header with invalid entry offset passed validation unexpectedly",
             );
+        }
+    }
+
+    const VALID_PARTITION_TABLE_ENTRY: MetadataPartition = MetadataPartition {
+        name: [
+            115, 121, 115, 116, 101, 109, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ],
+        attributes: PartitionAttributes::READONLY,
+        first_extent_index: 0,
+        num_extents: 1,
+        group_index: 0,
+    };
+
+    #[fuchsia::test]
+    async fn test_valid_partition_table_entry() {
+        let partition = VALID_PARTITION_TABLE_ENTRY;
+        partition
+            .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+            .expect("metadata partition passed validation unexpectedly");
+    }
+
+    #[fuchsia::test]
+    async fn test_invalid_partition_table_entry() {
+        let mut header = VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM;
+        let mut invalid_partition = VALID_PARTITION_TABLE_ENTRY;
+
+        // Check that there is validation check for extent list.
+        {
+            invalid_partition.first_extent_index = 10;
+            assert!(header.partitions.num_entries < invalid_partition.first_extent_index);
+            invalid_partition
+                .validate(&header)
+                .expect_err("metadata partition passed validation unexpectedly");
+        }
+
+        // Check that there is validation check for group index.
+        {
+            invalid_partition.group_index = 8;
+            assert!(header.groups.num_entries < invalid_partition.group_index);
+            invalid_partition
+                .validate(&header)
+                .expect_err("metadata partition passed validation unexpectedly");
+        }
+
+        // Check that there is validation check for partition attributes.
+        {
+            header.minor_version = 0;
+            assert!(header.minor_version < METADATA_VERSION_FOR_UPDATED_ATTRIBUTES_MIN);
+            invalid_partition.attributes = PARTITION_ATTRIBUTE_MASK_V1;
+            invalid_partition
+                .validate(&header)
+                .expect_err("metadata partition passed validation unexpectedly");
         }
     }
 }

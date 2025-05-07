@@ -8,6 +8,7 @@ use crate::format::{
     MetadataGeometry, MetadataHeader, METADATA_GEOMETRY_RESERVED_SIZE, PARTITION_RESERVED_BYTES,
 };
 use anyhow::{anyhow, ensure, Error};
+use format::MetadataPartition;
 use sha2::Digest;
 use storage_device::fake_device::FakeDevice;
 use storage_device::Device;
@@ -23,7 +24,8 @@ fn round_up_to_alignment(x: u32, alignment: u32) -> Result<u32, Error> {
 pub struct SuperParser {
     metadata_geometry: MetadataGeometry,
     metadata_header: MetadataHeader,
-    // TODO(https://fxbug.dev/404952286): parse partitions, extents, groups, and block devices.
+    partitions: Vec<MetadataPartition>,
+    // TODO(https://fxbug.dev/404952286): parse extents, groups, and block devices.
 }
 
 impl SuperParser {
@@ -36,15 +38,28 @@ impl SuperParser {
             metadata_header.tables_size <= metadata_geometry.metadata_max_size,
             "Invalid tables size."
         );
+
+        // Get tables bytes
+        let metadata_header_offset = PARTITION_RESERVED_BYTES + 2 * METADATA_GEOMETRY_RESERVED_SIZE;
+        ensure!(metadata_header_offset % device.block_size() == 0, "Reads must be block aligned.");
+        let header_and_tables_size = metadata_header.header_size + metadata_header.tables_size;
+        let buffer_len = round_up_to_alignment(header_and_tables_size, device.block_size())?;
+        let mut buffer = device.allocate_buffer(buffer_len as usize).await;
+        device.read(metadata_header_offset as u64, buffer.as_mut()).await?;
+        let tables_bytes = &buffer.as_slice()
+            [metadata_header.header_size as usize..header_and_tables_size as usize];
+
         // Read tables to verify `table_checksum` in metadata_header.
-        let computed_tables_checksum =
-            Self::compute_tables_checksum(&device, &metadata_header).await.unwrap();
+        let computed_tables_checksum: [u8; 32] = sha2::Sha256::digest(tables_bytes).into();
         ensure!(
             computed_tables_checksum == metadata_header.tables_checksum,
             "Invalid metadata tables checksum"
         );
 
-        let this = Self { metadata_geometry, metadata_header };
+        // Parse partition entries
+        let partitions = Self::parse_partitions(tables_bytes, &metadata_header).await.unwrap();
+
+        let this = Self { metadata_geometry, metadata_header, partitions };
         Ok(this)
     }
 
@@ -84,27 +99,28 @@ impl SuperParser {
         Ok(metadata_header)
     }
 
-    async fn compute_tables_checksum(
-        device: &FakeDevice,
+    async fn parse_partitions(
+        tables_bytes: &[u8],
         metadata_header: &MetadataHeader,
-    ) -> Result<[u8; 32], Error> {
-        // Reads should be block aligned. The start of the tables may not be block aligned, however,
-        // the start of the metadata header should be. Note that a backup metadata geometry is
-        // stored right after the initial metadata geometry.
-        let metadata_header_offset = PARTITION_RESERVED_BYTES + 2 * METADATA_GEOMETRY_RESERVED_SIZE;
-        ensure!(metadata_header_offset % device.block_size() == 0, "Reads must be block aligned.");
-        let header_and_tables_size = metadata_header.header_size + metadata_header.tables_size;
-        let buffer_len = round_up_to_alignment(header_and_tables_size, device.block_size())?;
-        let mut buffer = device.allocate_buffer(buffer_len as usize).await;
-        device.read(metadata_header_offset as u64, buffer.as_mut()).await?;
-
-        let tables_bytes = &buffer.as_slice()
-            [metadata_header.header_size as usize..header_and_tables_size as usize];
-        Ok(sha2::Sha256::digest(tables_bytes).into())
+    ) -> Result<Vec<MetadataPartition>, Error> {
+        let mut partitions = Vec::new();
+        let entry_size = metadata_header.partitions.entry_size;
+        let num_entries = metadata_header.partitions.num_entries;
+        for index in 0..num_entries {
+            let offset = (index * entry_size) as usize;
+            let (partition, _remainder) =
+                MetadataPartition::read_from_prefix(&tables_bytes[offset..]).unwrap();
+            partition.validate(metadata_header)?;
+            partitions.push(partition);
+        }
+        Ok(partitions)
     }
 }
+
 #[cfg(test)]
 mod tests {
+    use crate::format::PartitionAttributes;
+
     use super::*;
     use std::path::Path;
     use storage_device::fake_device::FakeDevice;
@@ -129,5 +145,20 @@ mod tests {
 
         let num_partition_entries = super_partition.metadata_header.partitions.num_entries;
         assert_eq!(num_partition_entries, 2);
+
+        let partitions = super_partition.partitions;
+        let expected_name = "system".to_string();
+        let partition_name = String::from_utf8(partitions[0].name.to_vec())
+            .expect("failed to convert partition entry name to string");
+        assert_eq!(partition_name[..expected_name.len()], expected_name);
+        let partition_attributes = partitions[0].attributes;
+        assert_eq!(partition_attributes, PartitionAttributes::READONLY);
+
+        let expected_name = "system_ext".to_string();
+        let partition_name = String::from_utf8(partitions[1].name.to_vec())
+            .expect("failed to convert partition entry name to string");
+        assert_eq!(partition_name[..expected_name.len()], expected_name);
+        let partition_attributes = partitions[1].attributes;
+        assert_eq!(partition_attributes, PartitionAttributes::READONLY);
     }
 }
