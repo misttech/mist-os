@@ -173,6 +173,9 @@ pub fn process_trace_file(
                 // If this is a flow event...
                 if let Some((flow_id, flow_stage)) = event_flow_info(&event_record) {
                     // If this is a flow event for a flow we care about...
+                    if event_record.category.as_str() != "kernel:ipc" {
+                        return parsed_bytes;
+                    }
                     if let Some(call_state) = flow_state.get_mut(&flow_id) {
                         // Flows with steps should have been excluded above...
                         assert_ne!(flow_stage, FlowStage::Step,);
