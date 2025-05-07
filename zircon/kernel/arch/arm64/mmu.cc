@@ -872,7 +872,7 @@ void ArmArchVmAspace::FlushAsid() const {
 using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
 
 ktl::pair<zx_status_t, uint> ArmArchVmAspace::UnmapPageTable(
-    VirtualAddressCursor& cursor, ArchUnmapOptions enlarge, CheckForEmptyPt pt_check,
+    VirtualAddressCursor& cursor, ArchUnmapOptions unmap_options, CheckForEmptyPt pt_check,
     const uint index_shift, volatile pte_t* page_table, ConsistencyManager& cm, Reclaim reclaim) {
   const vaddr_t block_size = 1UL << index_shift;
   const uint num_entries = (1u << (page_size_shift_ - 3));
@@ -894,14 +894,14 @@ ktl::pair<zx_status_t, uint> ArmArchVmAspace::UnmapPageTable(
         (!IS_ALIGNED(cursor.vaddr_rel(), block_size) || cursor.size() < block_size)) {
       // Splitting a large page may perform break-before-make, and during that window we will have
       // temporarily unmapped beyond our range, so make sure we are permitted to do that.
-      if (!allow_bbm && !(enlarge & ArchUnmapOptions::Enlarge)) {
+      if (!allow_bbm && !(unmap_options & ArchUnmapOptions::Enlarge)) {
         return {ZX_ERR_NOT_SUPPORTED, unmapped};
       }
       zx_status_t s = SplitLargePage(cursor.vaddr(), index_shift, index, page_table, cm);
       if (unlikely(s != ZX_OK)) {
         // If split fails, just unmap the whole thing, and let a
         // subsequent page fault clean it up.
-        if (enlarge == ArchUnmapOptions::None) {
+        if (unmap_options == ArchUnmapOptions::None) {
           return {s, unmapped};
         }
         // We must unmap here, and not in the normal block below, so that we can use SkipEntry
@@ -928,7 +928,7 @@ ktl::pair<zx_status_t, uint> ArmArchVmAspace::UnmapPageTable(
       // pass to remove a PT.
       const vaddr_t unmap_vaddr = cursor.vaddr();
       auto [status, lower_unmapped] =
-          UnmapPageTable(cursor, enlarge, pt_check, index_shift - (page_size_shift_ - 3),
+          UnmapPageTable(cursor, unmap_options, pt_check, index_shift - (page_size_shift_ - 3),
                          next_page_table, cm, reclaim);
       bool unmap_lower = false;
       // Regardless of success or failure we must update the mapping count. Since this involves
@@ -964,6 +964,16 @@ ktl::pair<zx_status_t, uint> ArmArchVmAspace::UnmapPageTable(
       LTRACEF("pte %p[0x%x] = 0 (was phys %#lx)\n", page_table, index,
               page_table[index] & MMU_PTE_OUTPUT_ADDR_MASK);
       update_pte(&page_table[index], MMU_PTE_DESCRIPTOR_INVALID);
+
+      if (!!(unmap_options & ArchUnmapOptions::Harvest)) {
+        const paddr_t pte_addr = pte & MMU_PTE_OUTPUT_ADDR_MASK;
+        const paddr_t paddr = pte_addr + (cursor.vaddr_rel() & (block_size - 1));
+        vm_page_t* page = paddr_to_vm_page(paddr);
+        if (likely(page) && (pte & MMU_PTE_ATTR_AF)) {
+          pmm_page_queues()->MarkAccessed(page);
+        }
+      }
+
       unmapped++;
       cm.FlushEntry(cursor.vaddr(), true);
       cursor.Consume(block_size);
@@ -1600,7 +1610,7 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
   return ZX_OK;
 }
 
-zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
+zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions unmap_options,
                                    size_t* unmapped) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
@@ -1626,7 +1636,7 @@ zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions
   if (!cursor.SetVaddrRelativeOffset(vaddr_base_, 1ull << top_size_shift_)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
-  auto [ret, lower_unmapped] = UnmapPageTable(cursor, enlarge, CheckForEmptyPt::No,
+  auto [ret, lower_unmapped] = UnmapPageTable(cursor, unmap_options, CheckForEmptyPt::No,
                                               top_index_shift_, tt_virt_, cm, Reclaim::No);
   tt_page_->mmu.num_mappings -= lower_unmapped;
   MarkAspaceModified();

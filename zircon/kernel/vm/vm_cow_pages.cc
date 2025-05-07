@@ -72,6 +72,9 @@ KCOUNTER(vm_vmo_discardable_failed_reclaim, "vm.vmo.discardable_failed_reclaim")
 KCOUNTER(vm_vmo_range_update_from_parent_skipped, "vm.vmo.range_updated_from_parent.skipped")
 KCOUNTER(vm_vmo_range_update_from_parent_performed, "vm.vmo.range_updated_from_parent.performed")
 
+KCOUNTER(vm_vmo_evict_accessed, "vm.vmo.evict_accessed")
+KCOUNTER(vm_vmo_compress_accessed, "vm.vmo.compress_accessed")
+
 template <typename T>
 uint32_t GetShareCount(T p) {
   DEBUG_ASSERT(p->IsPageOrRef());
@@ -6412,7 +6415,17 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   }
 
   // Remove any mappings to this page before we remove it.
-  RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, &deferred);
+  uint8_t old_queue = page->object.get_page_queue_ref().load(ktl::memory_order_relaxed);
+  RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::UnmapAndHarvest, &deferred);
+  const uint8_t new_queue = page->object.get_page_queue_ref().load(ktl::memory_order_relaxed);
+  // If queue has changed, the accessed bit will have been set by the unmap.
+  // Page has been accessed, don't evict.
+  // TODO(https://fxbug.dev/412464435): don't unmap & return accessed status to avoid checking page
+  // queues.
+  if (old_queue != new_queue) {
+    vm_vmo_evict_accessed.Add(1);
+    return ReclaimCounts{};
+  }
 
   // Use RemovePage over just writing to page_or_marker so that the page list has the opportunity
   // to release any now empty intermediate nodes.
@@ -6463,7 +6476,18 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
       // possible writable mappings, although our children could still have read-only mappings.
       // These read-only mappings will be dealt with later, for now the page will at least be
       // immutable.
-      RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, &deferred);
+      uint8_t old_queue = page->object.get_page_queue_ref().load(ktl::memory_order_relaxed);
+      RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::UnmapAndHarvest,
+                              &deferred);
+      const uint8_t new_queue = page->object.get_page_queue_ref().load(ktl::memory_order_relaxed);
+      // If queue has changed, the accessed bit will have been set by the unmap.
+      // Page has been accessed, don't compress.
+      // TODO(https://fxbug.dev/412464435): don't unmap & return accessed status to avoid checking
+      // page queues.
+      if (old_queue != new_queue) {
+        vm_vmo_compress_accessed.Add(1);
+        return ReclaimCounts{};
+      }
 
       // Start compression of the page by swapping the page list to contain the temporary reference.
       // Ensure the compression system is aware of the page's current share_count so it can track

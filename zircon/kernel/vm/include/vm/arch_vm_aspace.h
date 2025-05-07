@@ -123,13 +123,17 @@ class ArchVmAspaceInterface {
   virtual zx_status_t Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
                           ExistingEntryAction existing_action, size_t* mapped) = 0;
 
-  // Unmap the given virtual address range.
+  // Options for unmapping the given virtual address range.
   // ArchUnmapOptions::Enlarge controls whether the unmap region can be extended to be larger, or if
   // only the exact region may be unmapped. The unmap region might be extended, even if only
   // temporarily, if large pages need to be split.
+  //
+  // ArchUnmapOptions::Harvest requests that the accessed bit be harvested, and the page queues
+  // updated.
   enum class ArchUnmapOptions : uint8_t {
     None = 0,
     Enlarge = (1u << 0),
+    Harvest = (1u << 1),
   };
 
   virtual zx_status_t Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,

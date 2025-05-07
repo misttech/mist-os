@@ -372,6 +372,8 @@ void VmObject::RangeChangeUpdateMappingsLocked(uint64_t offset, uint64_t len, Ra
         m.AspaceUnmapLockedObject(offset, len, VmMapping::UnmapOptions::kNone);
       } else if (op == RangeChangeOp::UnmapZeroPage) {
         m.AspaceUnmapLockedObject(offset, len, VmMapping::UnmapOptions::OnlyHasZeroPages);
+      } else if (op == RangeChangeOp::UnmapAndHarvest) {
+        m.AspaceUnmapLockedObject(offset, len, VmMapping::UnmapOptions::Harvest);
       } else if (op == RangeChangeOp::RemoveWrite) {
         m.AspaceRemoveWriteLockedObject(offset, len);
       } else if (op == RangeChangeOp::DebugUnpin) {

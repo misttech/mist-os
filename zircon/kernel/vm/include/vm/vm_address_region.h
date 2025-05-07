@@ -1095,6 +1095,7 @@ class VmMapping final : public VmAddressRegionOrMapping {
   enum UnmapOptions : uint8_t {
     kNone = 0u,
     OnlyHasZeroPages = (1u << 0),
+    Harvest = (1u << 1),
   };
 
   // Unmap any pages that map the passed in vmo range from the arch aspace.

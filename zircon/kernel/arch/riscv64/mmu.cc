@@ -1203,6 +1203,7 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
   return ZX_OK;
 }
 
+// TODO(https://fxbug.dev/412464435): Implement ArchUnmapOptions::Harvest for riscv.
 zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
                                        size_t* unmapped) {
   canary_.Assert();

@@ -496,8 +496,12 @@ void VmMapping::AspaceUnmapLockedObject(uint64_t offset, uint64_t len, UnmapOpti
   DEBUG_ASSERT(aspace_->is_user() || aspace_->is_guest_physical() ||
                flags_ & VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING);
 
-  zx_status_t status =
-      aspace_->arch_aspace().Unmap(base, new_len / PAGE_SIZE, aspace_->EnlargeArchUnmap(), nullptr);
+  auto aspace_op = aspace_->EnlargeArchUnmap();
+  if (options & UnmapOptions::Harvest) {
+    aspace_op |= ArchUnmapOptions::Harvest;
+  }
+
+  zx_status_t status = aspace_->arch_aspace().Unmap(base, new_len / PAGE_SIZE, aspace_op, nullptr);
   ASSERT(status == ZX_OK);
 }
 
