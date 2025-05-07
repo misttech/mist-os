@@ -225,7 +225,7 @@ void mp_unplug_current_cpu() {
     current_thread->wait_queue_state().AssertNoOwnedWaitQueues();
   }
 
-  lockup_secondary_shutdown();
+  lockup_percpu_shutdown();
   Scheduler::MigrateUnpinnedThreads();
   DEBUG_ASSERT(!Scheduler::PeekIsActive(arch_curr_cpu_num()));
 
