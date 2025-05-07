@@ -748,7 +748,7 @@ impl MemoryManagerState {
             false,
         )?;
 
-        let end = (mapped_addr + length).round_up(*PAGE_SIZE)?;
+        let end = (mapped_addr + length)?.round_up(*PAGE_SIZE)?;
         if let DesiredAddress::FixedOverwrite(addr) = addr {
             assert_eq!(addr, mapped_addr);
             self.update_after_unmap(mm, addr, end - addr, released_mappings)?;
@@ -964,6 +964,7 @@ impl MemoryManagerState {
             MappingBacking::PrivateAnonymous => {
                 let growth_start = original_range.end;
                 let growth_length = new_length - old_length;
+                let final_end = (original_range.start + final_length)?;
                 // Map new pages to back the growth.
                 self.map_in_user_vmar(
                     SelectedAddress::FixedOverwrite(growth_start),
@@ -974,10 +975,7 @@ impl MemoryManagerState {
                     false,
                 )?;
                 // Overwrite the mapping entry with the new larger size.
-                self.mappings.insert(
-                    original_range.start..original_range.start + final_length,
-                    original_mapping.clone(),
-                );
+                self.mappings.insert(original_range.start..final_end, original_mapping.clone());
                 Ok(Some(original_range.start))
             }
         }
@@ -1082,11 +1080,14 @@ impl MemoryManagerState {
             MappingBacking::PrivateAnonymous => {
                 let dst_addr =
                     self.select_address(dst_addr_for_map, dst_length, src_mapping.flags())?.addr();
+                let dst_end = (dst_addr + dst_length)?;
 
                 let length_to_move = std::cmp::min(dst_length, src_length) as u64;
+                let growth_start_addr = (dst_addr + length_to_move)?;
 
                 if dst_addr != src_addr {
-                    let range_to_move = src_range.start..src_range.start + length_to_move;
+                    let src_move_end = (src_range.start + length_to_move)?;
+                    let range_to_move = src_range.start..src_move_end;
                     // Move the previously mapped pages into their new location.
                     self.private_anonymous.move_pages(&range_to_move, dst_addr)?;
                 }
@@ -1102,7 +1103,6 @@ impl MemoryManagerState {
 
                 if dst_length > src_length {
                     // The mapping has grown, map new pages in to cover the growth.
-                    let growth_start_addr = dst_addr + length_to_move;
                     let growth_length = dst_length - src_length;
 
                     self.map_private_anonymous(
@@ -1117,7 +1117,7 @@ impl MemoryManagerState {
                 }
 
                 self.mappings.insert(
-                    dst_addr..dst_addr + dst_length,
+                    dst_addr..dst_end,
                     Mapping::new_private_anonymous(src_mapping.flags(), src_mapping.name().clone()),
                 );
 
@@ -1852,9 +1852,7 @@ impl MemoryManagerState {
         {
             return Err(());
         }
-        (addr - self.user_vmar_info.base)
-            .map(|addr| addr.ptr())
-            .map_err(|_| ())
+        (addr - self.user_vmar_info.base).map(|addr| addr.ptr()).map_err(|_| ())
     }
 
     fn get_mappings_for_vmsplice(
