@@ -146,6 +146,10 @@ When updating, please add the value in alphabetical order.
     |                                         | `error`, `warn`, `info`, `debug`,  |
     |                                         | `trace`. No components are defined |
     |                                         | by default                         |
+    | `pbms.base_urls`                        | List of base URLS (of scheme file: |
+    |                                         | or gs:). Files are used directly,  |
+    |                                         | gs links are used to construct     |
+    |                                         | branch-specific GCS objects.       |
     | `repository.repositories`               |                                    |
     | `repository.registrations`              |                                    |
     | `repository.default`                    |                                    |
