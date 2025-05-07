@@ -238,7 +238,6 @@ rustc_library("starnix_core") {
     "task/net.rs",
     "task/pid_table.rs",
     "task/process_group.rs",
-    "task/psi_provider.rs",
     "task/ptrace.rs",
     "task/scheduler/manager.rs",
     "task/scheduler/mod.rs",

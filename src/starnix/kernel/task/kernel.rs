@@ -17,8 +17,7 @@ use crate::security;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
     HrTimerManagerHandle, IpTables, KernelCgroups, KernelStats, KernelThreads, NetstackDevices,
-    PidTable, PsiProvider, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace,
-    UtsNamespaceHandle,
+    PidTable, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
 };
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::crypt_service::CryptService;
@@ -261,9 +260,6 @@ pub struct Kernel {
 
     pub stats: Arc<KernelStats>,
 
-    // Proxy to the PSI provider we received from the runner, if any.
-    pub psi_provider: PsiProvider,
-
     /// Resource limits that are exposed, for example, via sysctl.
     pub system_limits: SystemLimits,
 
@@ -436,7 +432,6 @@ impl Kernel {
             disable_unprivileged_bpf: AtomicU8::new(0), // Enable unprivileged BPF by default.
             build_version: OnceCell::new(),
             stats: Arc::new(KernelStats::default()),
-            psi_provider: PsiProvider::default(),
             delayed_releaser: Default::default(),
             scheduler,
             syslog: Default::default(),

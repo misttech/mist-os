@@ -16,6 +16,7 @@ use fidl_fuchsia_starnix_psi::{
     PsiProviderWatchMemoryStallRequest,
 };
 use fuchsia_async::{OnSignals, WakeupTime};
+use fuchsia_component::client::connect_to_protocol_sync;
 use futures::{select, FutureExt};
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
@@ -35,7 +36,8 @@ pub fn pressure_directory(
     current_task: &CurrentTask,
     fs: &FileSystemHandle,
 ) -> Option<FsNodeHandle> {
-    let Some(psi_provider) = current_task.kernel().psi_provider.get() else {
+    let psi_provider = current_task.kernel().expando.get::<PsiProvider>();
+    if psi_provider.proxy.is_none() {
         return None;
     };
 
@@ -43,7 +45,7 @@ pub fn pressure_directory(
     dir.entry(
         current_task,
         "memory",
-        MemoryPressureFile::new_node(psi_provider.clone()),
+        MemoryPressureFile::new_node(psi_provider),
         mode!(IFREG, 0o666),
     );
     dir.entry(
@@ -61,14 +63,35 @@ pub fn pressure_directory(
     Some(dir.build(current_task))
 }
 
+struct PsiProvider {
+    proxy: Option<PsiProviderSynchronousProxy>,
+}
+
+fn connect_to_psi_provider() -> Option<PsiProviderSynchronousProxy> {
+    let proxy = connect_to_protocol_sync::<fidl_fuchsia_starnix_psi::PsiProviderMarker>().ok()?;
+    // Our manifest lists PsiProvider as an optional protocol. Let's check if it's
+    // connected for real or not.
+    let _ = proxy.get_memory_pressure_stats(zx::Instant::INFINITE).ok()?;
+    Some(proxy)
+}
+
+impl Default for PsiProvider {
+    fn default() -> Self {
+        Self { proxy: connect_to_psi_provider() }
+    }
+}
+
 struct MemoryPressureFileSource {
-    psi_provider: Arc<PsiProviderSynchronousProxy>,
+    psi_provider: Arc<PsiProvider>,
 }
 
 impl DynamicFileSource for MemoryPressureFileSource {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let PsiProviderGetMemoryPressureStatsResponse { some, full, .. } = self
             .psi_provider
+            .proxy
+            .as_ref()
+            .ok_or_else(|| errno!(EIO))?
             .get_memory_pressure_stats(zx::MonotonicInstant::INFINITE)
             .map_err(|e| {
                 log_error!("FIDL error getting memory pressure stats: {e}");
@@ -106,7 +129,7 @@ struct MemoryPressureFile {
 }
 
 impl MemoryPressureFile {
-    pub fn new_node(psi_provider: Arc<PsiProviderSynchronousProxy>) -> impl FsNodeOps {
+    pub fn new_node(psi_provider: Arc<PsiProvider>) -> impl FsNodeOps {
         SimpleFileNode::new(move || {
             Ok(Self {
                 source: DynamicFile::new(MemoryPressureFileSource {
@@ -143,7 +166,8 @@ impl FileOps for MemoryPressureFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let kernel = current_task.kernel();
-        let Some(psi_provider) = kernel.psi_provider.get() else {
+        let psi_provider = kernel.expando.get::<PsiProvider>();
+        let Some(psi_provider_proxy) = &psi_provider.proxy else {
             return error!(ENOTSUP);
         };
 
@@ -178,7 +202,7 @@ impl FileOps for MemoryPressureFile {
             return error!(EBUSY);
         }
 
-        let zircon_event = match psi_provider.watch_memory_stall(
+        let zircon_event = match psi_provider_proxy.watch_memory_stall(
             &PsiProviderWatchMemoryStallRequest {
                 kind: Some(kind),
                 threshold: Some(threshold.into_nanos()),
