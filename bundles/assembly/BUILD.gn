@@ -4944,12 +4944,6 @@ assembly_input_bundle("kernel_anonymous_memory_compression_eager_lru") {
   kernel_cmdline = [ "kernel.page-scanner.lru-action=compress_only" ]
 }
 
-# Performs eviction continuously while under memory pressure instead of only once when the pressure
-# level changes.
-assembly_input_bundle("kernel_evict_continuous") {
-  kernel_cmdline = [ "kernel.oom.evict-continuous=true" ]
-}
-
 # Makes the kernel age pages faster; this allows more pages to be reclaimed by reducing the working
 # set.
 assembly_input_bundle("kernel_page_scanner_aging_fast") {

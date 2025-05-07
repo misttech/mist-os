@@ -18,7 +18,7 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         kernel_config: &PlatformKernelConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        match (&context.build_type, &kernel_config.oom_behavior) {
+        match (&context.build_type, &kernel_config.oom.behavior) {
             (_, OOMBehavior::Reboot { timeout: OOMRebootTimeout::Normal }) => {}
             (&BuildType::Eng, OOMBehavior::Reboot { timeout: OOMRebootTimeout::Low }) => {
                 builder.platform_bundle("kernel_oom_reboot_timeout_low")
@@ -42,6 +42,21 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         }
         if let Some(eviction_delta_at_oom_mb) = kernel_config.oom.eviction_delta_at_oom_mb {
             builder.kernel_arg(KernelArg::OomEvictionDeltaAtOomMib(eviction_delta_at_oom_mb));
+        }
+        if kernel_config.oom.evict_at_warning {
+            builder.kernel_arg(KernelArg::OomEvictAtWarning(true));
+        }
+        if kernel_config.oom.evict_continuous {
+            builder.kernel_arg(KernelArg::OomEvictContinuous(true));
+        }
+        if let Some(outofmemory_mb) = kernel_config.oom.out_of_memory_mb {
+            builder.kernel_arg(KernelArg::OomOutOfMemoryMib(outofmemory_mb));
+        }
+        if let Some(critical_mb) = kernel_config.oom.critical_mb {
+            builder.kernel_arg(KernelArg::OomCriticalMib(critical_mb));
+        }
+        if let Some(warning_mb) = kernel_config.oom.warning_mb {
+            builder.kernel_arg(KernelArg::OomWarningMib(warning_mb));
         }
         match (&context.board_info.kernel.serial_mode, &context.build_type) {
             (SerialMode::NoOutput, &BuildType::User) => {
@@ -72,9 +87,6 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         }
         if kernel_config.lru_memory_compression {
             builder.platform_bundle("kernel_anonymous_memory_compression_eager_lru");
-        }
-        if kernel_config.continuous_eviction {
-            builder.platform_bundle("kernel_evict_continuous");
         }
 
         // If the board supports the PMM checker, and this is an eng build-type
@@ -112,24 +124,6 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                 "'quiet_early_boot' can only be enabled in 'eng' builds"
             );
             builder.kernel_arg(KernelArg::PhysVerbose(false))
-        }
-
-        if let Some(oom) = &context.board_info.kernel.oom {
-            if oom.evict_at_warning {
-                builder.kernel_arg(KernelArg::OomEvictAtWarning(true));
-            }
-            if oom.evict_continuous {
-                builder.kernel_arg(KernelArg::OomEvictContinuous(true));
-            }
-            if let Some(outofmemory_mb) = oom.out_of_memory_mb {
-                builder.kernel_arg(KernelArg::OomOutOfMemoryMib(outofmemory_mb));
-            }
-            if let Some(critical_mb) = oom.critical_mb {
-                builder.kernel_arg(KernelArg::OomCriticalMib(critical_mb));
-            }
-            if let Some(warning_mb) = oom.warning_mb {
-                builder.kernel_arg(KernelArg::OomWarningMib(warning_mb));
-            }
         }
 
         match kernel_config.memory_reclamation_strategy {

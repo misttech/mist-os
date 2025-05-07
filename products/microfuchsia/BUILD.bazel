@@ -123,7 +123,9 @@ fuchsia_product_configuration(
                 # The kernel's OOM monitoring mechanism does not work well with a "machine" (VM)
                 # that has tens of MB of headroom. Disable until we have a chance to tune it.
                 # TODO(https://fxbug.dev/337041626): Define OOM policy for this configuration.
-                "oom_behavior": "disable",
+                "oom": {
+                    "behavior": "disable",
+                },
             },
             "development_support": {
                 "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,

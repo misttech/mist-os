@@ -16,7 +16,9 @@ if (is_fuchsia) {
         include_netsvc = true
       }
       kernel = {
-        oom_behavior = "job_kill"
+        oom = {
+          behavior = "job_kill"
+        }
       }
       storage = {
         filesystems = {
