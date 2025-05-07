@@ -7,7 +7,6 @@
 use std::fmt::Debug;
 use std::num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError};
 use std::ops::ControlFlow;
-use std::pin::pin;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -15,7 +14,6 @@ use explicit::ResultExt as _;
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _, RequestStream as _};
 use fidl::{AsHandleRef as _, HandleBased as _};
 use futures::channel::{mpsc, oneshot};
-use futures::FutureExt as _;
 use log::{debug, error};
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv6};
 use net_types::{NonMappedAddr, SpecifiedAddr, ZonedAddr};
@@ -163,8 +161,6 @@ struct BindingData<I: IpExt> {
 
 #[derive(Debug)]
 struct TaskControl {
-    // TODO(https://fxbug.dev/380897722): Replace with scope cancellation.
-    abort_handle: async_utils::event::Event,
     send_shutdown: Option<oneshot::Sender<oneshot::Sender<()>>>,
     scope: fasync::Scope,
 }
@@ -205,14 +201,10 @@ impl TaskControl {
 
     async fn shutdown_send_and_stop_tasks(mut self) {
         self.shutdown_send().await;
-        let Self { abort_handle, send_shutdown, scope } = self;
+        let Self { send_shutdown, scope } = self;
         // Must've been handled by shutdown_send.
         assert!(send_shutdown.is_none());
-        // Assert that event has not been signaled yet.
-        assert!(abort_handle.signal());
-        // TODO(https://fxbug.dev/380897722): We should be able to cancel this
-        // scope instead of joining.
-        scope.join().await;
+        scope.cancel().await;
     }
 }
 
@@ -435,9 +427,7 @@ fn spawn_tasks<I: IpExt>(
     data: TaskSpawnData,
 ) -> TaskControl {
     let TaskSpawnData { socket, rx_task_receiver, tx_task_receiver } = data;
-    let event = async_utils::event::Event::new();
 
-    let event_wait = event.wait();
     let (send_shutdown, send_shutdown_receiver) = oneshot::channel();
     let send_task = buffer::send_task(
         socket.clone(),
@@ -446,23 +436,12 @@ fn spawn_tasks<I: IpExt>(
         tx_task_receiver,
     );
     let scope = fasync::Scope::new_with_name("tcp");
-    let _: fasync::JoinHandle<()> = scope.spawn(async move {
-        let send_task = pin!(send_task);
-        futures::future::select(send_task, event_wait)
-            .map(|_: futures::future::Either<((), _), ((), _)>| ())
-            .await;
-    });
+    let _: fasync::JoinHandle<()> = scope.spawn(send_task);
 
-    let event_wait = event.wait();
     let receive_task =
         buffer::receive_task(socket, buffer::ReceiveTaskArgs { ctx, id }, rx_task_receiver);
-    let _: fasync::JoinHandle<()> = scope.spawn(async move {
-        let receive_task = pin!(receive_task);
-        futures::future::select(receive_task, event_wait)
-            .map(|_: futures::future::Either<((), _), ((), _)>| ())
-            .await;
-    });
-    TaskControl { abort_handle: event, send_shutdown: Some(send_shutdown), scope }
+    let _: fasync::JoinHandle<()> = scope.spawn(receive_task);
+    TaskControl { send_shutdown: Some(send_shutdown), scope }
 }
 
 struct RequestHandler<'a, I: IpExt> {
