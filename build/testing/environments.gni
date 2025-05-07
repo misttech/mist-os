@@ -114,6 +114,14 @@ wlan_vim3_ap_env = {
   }
 }
 
+wlan_sorrel_ap_env = {
+  dimensions = {
+    access_points = "1"
+    device_type = "Sorrel"
+    pool = "fuchsia.tests.connectivity"
+  }
+}
+
 linux_env = {
   dimensions = {
     os = "Linux"
