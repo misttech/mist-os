@@ -5,7 +5,8 @@
 use crate::security;
 use crate::task::{CurrentTask, EventHandler, WaitCallback, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::OutputBuffer;
-use diagnostics_data::{Data, Logs, Severity};
+use diagnostics_data::{Data, Logs, LogsData, Severity};
+use diagnostics_message::from_extended_record;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fuchsia_component::client::connect_to_protocol_sync;
 use serde::Deserialize;
@@ -256,7 +257,7 @@ impl LogIterator {
         let stream_parameters = fdiagnostics::StreamParameters {
             stream_mode: Some(mode),
             data_type: Some(fdiagnostics::DataType::Logs),
-            format: Some(fdiagnostics::Format::Json),
+            format: Some(fdiagnostics::Format::Fxt),
             client_selector_configuration: Some(
                 fdiagnostics::ClientSelectorConfiguration::SelectAll(true),
             ),
@@ -280,8 +281,8 @@ impl LogIterator {
         })
     }
 
-    // TODO(b/315520045): implement and use a more efficient approach for fetching logs that
-    // doesn't involve having to parse JSON...
+    // TODO(b/315520045): Investigate if we should make this
+    // not allocate anything.
     fn get_next(&mut self) -> Result<Option<Vec<u8>>, Errno> {
         'main_loop: loop {
             while let Some(data) = self.pending_datas.pop_front() {
@@ -291,12 +292,36 @@ impl LogIterator {
             }
             while let Some(formatted_content) = self.pending_formatted_contents.pop_front() {
                 let output: OneOrMany<Data<Logs>> = match formatted_content {
-                    fdiagnostics::FormattedContent::Json(data) => {
-                        let buf = data.vmo.read_to_vec(0, data.size).map_err(|err| {
-                            errno!(EIO, format!("failed to read logs vmo: {err}"))
-                        })?;
-                        serde_json::from_slice(&buf)
-                            .map_err(|_| errno!(EIO, format!("archivist returned invalid data")))?
+                    fdiagnostics::FormattedContent::Fxt(data) => {
+                        let buf = data
+                            .read_to_vec(
+                                0,
+                                data.get_content_size().map_err(|a| {
+                                    errno!(EIO, format!("Error {a} getting VMO size"))
+                                })?,
+                            )
+                            .map_err(|err| {
+                                errno!(EIO, format!("failed to read logs vmo: {err}"))
+                            })?;
+                        let mut current_slice = buf.as_ref();
+                        let mut ret: Option<OneOrMany<LogsData>> = None;
+                        loop {
+                            let (data, remaining) = from_extended_record(current_slice)
+                                .map_err(|a| errno!(EIO, format!("Error {a} parsing FXT")))?;
+                            ret = Some(match ret.take() {
+                                Some(OneOrMany::One(one)) => OneOrMany::Many(vec![one, data]),
+                                Some(OneOrMany::Many(mut many)) => {
+                                    many.push(data);
+                                    OneOrMany::Many(many)
+                                }
+                                None => OneOrMany::One(data),
+                            });
+                            if remaining.is_empty() {
+                                break;
+                            }
+                            current_slice = remaining;
+                        }
+                        ret.ok_or_else(|| errno!(EIO, format!("archivist returned invalid data")))?
                     }
                     format => {
                         unreachable!("we only request and expect one format. Got: {format:?}")
