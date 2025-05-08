@@ -10,6 +10,7 @@
 #include <inttypes.h>
 #include <lib/counters.h>
 #include <lib/crypto/global_prng.h>
+#include <lib/fit/defer.h>
 #include <lib/ktrace.h>
 #include <string.h>
 #include <trace.h>
@@ -1079,4 +1080,40 @@ zx_status_t ProcessDispatcher::MakeAndAddHandle(KernelHandle<Dispatcher> kernel_
   *out = handle_table().MapHandleToValue(handle);
   handle_table().AddHandle(ktl::move(handle));
   return ZX_OK;
+}
+
+zx_status_t ProcessDispatcher::Start(fbl::RefPtr<ThreadDispatcher> thread, zx_vaddr_t pc,
+                                     zx_vaddr_t sp, HandleOwner arg_handle, uintptr_t arg2) {
+  // Test that the thread belongs to the starting process.
+  if (thread->process() != this) {
+    return ZX_ERR_ACCESS_DENIED;
+  }
+
+  // Insert the arg_handle into the process and get its local zx_handle_t.
+  zx_handle_t arg_nhv = ZX_HANDLE_INVALID;
+  auto remove_arg_handle = fit::defer([this, &arg_nhv] {
+    if (arg_nhv != ZX_HANDLE_INVALID) {
+      // Remove `arg_handle` from the process that failed to start.
+      handle_table().RemoveHandle(*this, arg_nhv);
+    }
+  });
+  if (arg_handle) {
+    if (!arg_handle->HasRights(ZX_RIGHT_TRANSFER)) {
+      return ZX_ERR_ACCESS_DENIED;
+    }
+    arg_nhv = handle_table().MapHandleToValue(arg_handle);
+    handle_table().AddHandle(ktl::move(arg_handle));
+  }
+
+  const ThreadDispatcher::EntryState entry = {
+      .pc = pc,
+      .sp = sp,
+      .arg1 = arg_nhv,
+      .arg2 = arg2,
+  };
+  zx_status_t status = thread->Start(entry, /*ensure_initial_thread=*/true);
+  if (status == ZX_OK) {
+    remove_arg_handle.cancel();
+  }
+  return status;
 }
