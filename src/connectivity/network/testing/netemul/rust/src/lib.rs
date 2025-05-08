@@ -258,6 +258,11 @@ pub struct InterfaceConfig<'a> {
     /// Number of DAD transmits to use before marking an IPv6 address as
     /// Assigned.
     pub ipv6_dad_transmits: Option<u16>,
+    /// Whether to generate temporary SLAAC addresses.
+    ///
+    /// If `None`, the interface configuration will not be modified and will remain
+    /// the netstack-chosen default.
+    pub temporary_addresses: Option<bool>,
 }
 
 #[derive(Debug)]
@@ -1147,9 +1152,13 @@ impl<'a> TestEndpoint<'a> {
     pub async fn install(
         &self,
         installer: fnet_interfaces_admin::InstallerProxy,
-        InterfaceConfig { name, metric, ipv4_dad_transmits, ipv6_dad_transmits }: InterfaceConfig<
-            '_,
-        >,
+        InterfaceConfig {
+            name,
+            metric,
+            ipv4_dad_transmits,
+            ipv6_dad_transmits,
+            temporary_addresses,
+        }: InterfaceConfig<'_>,
     ) -> Result<(u64, Control, fnet_interfaces_admin::DeviceControlProxy)> {
         let name = name.map(|n| {
             truncate_dropping_front(n.into(), fnet_interfaces::INTERFACE_NAME_LENGTH.into())
@@ -1179,6 +1188,11 @@ impl<'a> TestEndpoint<'a> {
             let _: Option<u16> = set_ipv6_dad_transmits(&control, ipv6_dad_transmits)
                 .await
                 .context("set dad transmits")?;
+        }
+        if let Some(enabled) = temporary_addresses {
+            set_temporary_address_generation_enabled(&control, enabled)
+                .await
+                .context("set temporary addresses")?;
         }
 
         let id = control.get_id().await.context("get id")?;
@@ -2087,20 +2101,7 @@ impl<'a> TestInterface<'a> {
     /// Sets whether temporary SLAAC address generation is enabled
     /// or disabled on this interface.
     pub async fn set_temporary_address_generation_enabled(&self, enabled: bool) -> Result<()> {
-        self.set_configuration(fnet_interfaces_admin::Configuration {
-            ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                ndp: Some(fnet_interfaces_admin::NdpConfiguration {
-                    slaac: Some(fnet_interfaces_admin::SlaacConfiguration {
-                        temporary_address: Some(enabled),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            ..Default::default()
-        })
-        .await
+        set_temporary_address_generation_enabled(self.control(), enabled).await
     }
 }
 
@@ -2142,6 +2143,27 @@ async fn set_ipv6_dad_transmits(control: &Control, dad_transmits: u16) -> Result
         .await?
         .map(|config| config.ipv6?.ndp?.dad?.transmits)
         .map_err(|e| anyhow::anyhow!("set configuration error {e:?}"))
+}
+
+async fn set_temporary_address_generation_enabled(control: &Control, enabled: bool) -> Result<()> {
+    let _config: fnet_interfaces_admin::Configuration = control
+        .set_configuration(&fnet_interfaces_admin::Configuration {
+            ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+                ndp: Some(fnet_interfaces_admin::NdpConfiguration {
+                    slaac: Some(fnet_interfaces_admin::SlaacConfiguration {
+                        temporary_address: Some(enabled),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .await
+        .context("FIDL error")?
+        .map_err(|e| anyhow::anyhow!("set configuration error {e:?}"))?;
+    Ok(())
 }
 
 /// Get the [`socket2::Domain`] for `addr`.

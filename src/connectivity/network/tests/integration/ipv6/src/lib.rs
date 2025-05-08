@@ -91,7 +91,12 @@ async fn install_and_get_stable_ipv6_addrs_for_endpoint<N: Netstack>(
     let (id, control, _device_control) = endpoint
         .add_to_stack(
             realm,
-            netemul::InterfaceConfig { name: Some(name.into()), ..Default::default() },
+            netemul::InterfaceConfig {
+                name: Some(name.into()),
+                // Disable temporary addresses so we only observe stable addresses.
+                temporary_addresses: Some(false),
+                ..Default::default()
+            },
         )
         .await
         .expect("installing interface");
