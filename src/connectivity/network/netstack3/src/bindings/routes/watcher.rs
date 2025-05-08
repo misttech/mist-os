@@ -49,51 +49,47 @@ pub(crate) async fn serve_watcher<E: FidlWatcherEvent, WI: WatcherInterest<E>>(
     interest: WI,
     UpdateDispatcher(dispatcher): UpdateDispatcher<E, WI>,
 ) -> Result<(), ServeWatcherError> {
-    let mut watcher = {
+    let watcher = {
         let mut dispatcher = dispatcher.lock();
         dispatcher.connect_new_client(interest)
     };
 
-    let request_stream = server_end.into_stream();
-
-    let canceled_fut = watcher.canceled.wait();
-
-    let result = {
-        let mut request_stream = request_stream.map_err(ServeWatcherError::ErrorInStream).fuse();
-        let mut canceled_fut = pin!(canceled_fut);
-        let mut pending_watch_request = futures::future::OptionFuture::default();
-        loop {
-            pending_watch_request = futures::select! {
-                request = request_stream.try_next() => match request {
-                    Ok(Some(req)) => if pending_watch_request.is_terminated() {
-                        // Convince the compiler that we're not holding on to a
-                        // borrow of watcher.
-                        std::mem::drop(pending_watch_request);
-                        // Old request is terminated, accept this new one.
-                        Some(watcher.watch().map(move |events| (req, events))).into()
-                    } else {
-                        break Err(ServeWatcherError::PreviousPendingWatch);
-                    },
-                    Ok(None) => break Ok(()),
-                    Err(e) => break Err(e),
-                },
-                r = pending_watch_request => {
-                    let (request, events) = r.expect("OptionFuture is not selected if empty");
-                    match E::respond_to_watch_request(request, events) {
-                        Ok(()) => None.into(),
-                        Err(e) => break Err(ServeWatcherError::FailedToRespond(e)),
-                    }
-                },
-                () = canceled_fut => break Err(ServeWatcherError::Canceled),
-            };
-        }
-    };
-    {
+    // Always disconnect the client when we finish this future.
+    let mut watcher = scopeguard::guard(watcher, |watcher| {
         let mut dispatcher = dispatcher.lock();
         dispatcher.disconnect_client(watcher);
-    }
+    });
 
-    result
+    let request_stream = server_end.into_stream();
+    let canceled_fut = watcher.canceled.wait();
+
+    let mut request_stream = request_stream.map_err(ServeWatcherError::ErrorInStream).fuse();
+    let mut canceled_fut = pin!(canceled_fut);
+    let mut pending_watch_request = futures::future::OptionFuture::default();
+    loop {
+        pending_watch_request = futures::select! {
+            request = request_stream.try_next() => match request? {
+                Some(req) => if pending_watch_request.is_terminated() {
+                    // Convince the compiler that we're not holding on to a
+                    // borrow of watcher.
+                    std::mem::drop(pending_watch_request);
+                    // Old request is terminated, accept this new one.
+                    Some(watcher.watch().map(move |events| (req, events))).into()
+                } else {
+                    break Err(ServeWatcherError::PreviousPendingWatch);
+                },
+                None => break Ok(()),
+            },
+            r = pending_watch_request => {
+                let (request, events) = r.expect("OptionFuture is not selected if empty");
+                match E::respond_to_watch_request(request, events) {
+                    Ok(()) => None.into(),
+                    Err(e) => break Err(ServeWatcherError::FailedToRespond(e)),
+                }
+            },
+            () = canceled_fut => break Err(ServeWatcherError::Canceled),
+        };
+    }
 }
 
 /// An update to the routing/rule table.

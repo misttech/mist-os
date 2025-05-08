@@ -275,11 +275,16 @@ impl Worker {
             let item = futures::select! {
                 i = stream.next() => Item::SinkItem(i),
                 w = watchers.select_next_some() => Item::WatcherEnded(w),
-                complete => break,
             };
             match item {
                 Item::SinkItem(None) => {
-                    info!("neighbor worker shutting down, waiting for watchers to end")
+                    if !watchers.is_empty() {
+                        warn!(
+                            "neighbor worker shutting down, dropping {} watchers",
+                            watchers.len()
+                        );
+                    }
+                    break;
                 }
                 Item::WatcherEnded(r) => r.unwrap_or_else(|e| {
                     if !e.is_closed() {
@@ -360,7 +365,6 @@ impl Worker {
                 }
             }
         }
-        info!("all neighbor watchers closed, neighbor worker shutdown is complete");
     }
 }
 

@@ -9,7 +9,7 @@ use derivative::Derivative;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::channel::mpsc;
 use futures::{Future, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 
 use crate::bindings::devices::BindingId;
 use crate::bindings::util::{ErrorLogExt, ResultExt as _};
@@ -457,19 +457,9 @@ impl Worker {
             }
         };
 
-        info!("NDP watcher worker shutting down, waiting for watchers to end");
-        current_watchers
-            .map(|res| match res {
-                Ok(()) => (),
-                Err(e) => {
-                    if !e.is_closed() {
-                        error!("error {e:?} collecting watchers");
-                    }
-                }
-            })
-            .collect::<()>()
-            .await;
-        info!("all NDP watchers closed, NDP watcher worker shutdown is complete")
+        if !current_watchers.is_empty() {
+            warn!("NDP watcher shutting down, dropped {} watchers", current_watchers.len());
+        }
     }
 
     fn consume_router_advertisement(

@@ -1318,19 +1318,9 @@ impl NetstackSeed {
             .spawn_new_guard_assert_cancelled(async move {
                 let result = interfaces_worker.run().await;
                 let watchers = result.expect("interfaces worker ended with an error");
-                info!("interfaces worker shutting down, waiting for watchers to end");
-                watchers
-                    .map(|res| match res {
-                        Ok(()) => (),
-                        Err(e) => {
-                            if !e.is_closed() {
-                                error!("error {e:?} collecting watchers");
-                            }
-                        }
-                    })
-                    .collect::<()>()
-                    .await;
-                info!("all interface watchers closed, interfaces worker shutdown is complete");
+                if !watchers.is_empty() {
+                    warn!("interfaces worker shut down, dropped {} watchers", watchers.len());
+                }
             })
             .expect("scope cancelled");
 
@@ -1587,11 +1577,8 @@ impl NetstackSeed {
         services_fut.await;
         info!("services stream terminated, starting shutdown");
 
-        // Wait for all spawned worker tasks to end.
-        //
-        // TODO(https://fxbug.dev/380897722): Cancel the services scope, if
-        // we've stopped receiving futures this is our cue to shutdown.
-        services_scope.join().await;
+        // Cancel all services and wait for them to join.
+        services_scope.cancel().await;
 
         info!("stopping level 1 workers");
         let level1_workers = level1_workers.cancel();

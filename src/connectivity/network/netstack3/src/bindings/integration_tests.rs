@@ -7,12 +7,16 @@ use std::pin::pin;
 use std::sync::{Arc, Once};
 
 use assert_matches::assert_matches;
+use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_net_ext::IntoExt as _;
 use fidl_fuchsia_net_interfaces_ext::admin::TerminalError;
 use futures::channel::mpsc;
-use futures::{StreamExt as _, TryFutureExt as _};
+use futures::{FutureExt, StreamExt as _, TryFutureExt as _};
 use ip_test_macro::ip_test;
-use net_declare::{net_ip_v4, net_ip_v6, net_mac, net_subnet_v4, net_subnet_v6};
+use net_declare::{
+    fidl_ip, fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_mac, fidl_socket_addr, net_ip_v4, net_ip_v6,
+    net_mac, net_subnet_v4, net_subnet_v6,
+};
 use net_types::ethernet::Mac;
 use net_types::ip::{AddrSubnetEither, Ip, IpAddr, IpInvariant, Ipv4, Ipv6};
 use net_types::{SpecifiedAddr, Witness as _};
@@ -21,13 +25,21 @@ use netstack3_core::error::AddressResolutionFailed;
 use netstack3_core::ip::{IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate};
 use netstack3_core::neighbor::LinkResolutionResult;
 use netstack3_core::routes::{AddableEntry, AddableEntryEither, AddableMetric, Entry, RawMetric};
+use packet_formats::ip::Ipv4Proto;
+use test_case::{test_case, test_matrix};
 use {
-    fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_filter_ext as fnet_filter_ext, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fidl_fuchsia_net_multicast_admin as fnet_multicast_admin,
+    fidl_fuchsia_net_multicast_ext as fnet_multicast_ext, fidl_fuchsia_net_ndp as fnet_ndp,
     fidl_fuchsia_net_neighbor as fnet_neighbor, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_netemul_network as net,
-    fuchsia_async as fasync,
+    fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
+    fidl_fuchsia_posix_socket_raw as fposix_socket_raw, fuchsia_async as fasync,
 };
 
 use crate::bindings::ctx::BindingsCtx;
@@ -127,8 +139,34 @@ impl_service_marker!(fidl_fuchsia_net_routes::StateMarker, RoutesState);
 impl_service_marker!(fidl_fuchsia_net_routes::StateV4Marker, RoutesStateV4);
 impl_service_marker!(fidl_fuchsia_net_routes::StateV6Marker, RoutesStateV6);
 impl_service_marker!(fidl_fuchsia_posix_socket::ProviderMarker, Socket);
+impl_service_marker!(fidl_fuchsia_net_routes_admin::RouteTableV4Marker, RoutesAdminV4);
+impl_service_marker!(fidl_fuchsia_net_routes_admin::RouteTableV6Marker, RoutesAdminV6);
+impl_service_marker!(fidl_fuchsia_net_routes_admin::RuleTableV4Marker, RuleTableV4);
+impl_service_marker!(fidl_fuchsia_net_routes_admin::RuleTableV6Marker, RuleTableV6);
+impl_service_marker!(
+    fidl_fuchsia_net_routes_admin::RouteTableProviderV4Marker,
+    RouteTableProviderV4
+);
+impl_service_marker!(
+    fidl_fuchsia_net_routes_admin::RouteTableProviderV6Marker,
+    RouteTableProviderV6
+);
 impl_service_marker!(fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker, HealthCheck);
 impl_service_marker!(fidl_fuchsia_net_stack::StackMarker, Stack);
+impl_service_marker!(
+    fidl_fuchsia_net_ndp::RouterAdvertisementOptionWatcherProviderMarker,
+    NdpWatcher
+);
+impl_service_marker!(fidl_fuchsia_net_filter::ControlMarker, FilterControl);
+impl_service_marker!(fidl_fuchsia_net_filter::StateMarker, FilterState);
+impl_service_marker!(
+    fidl_fuchsia_net_multicast_admin::Ipv4RoutingTableControllerMarker,
+    MulticastAdminV4
+);
+impl_service_marker!(
+    fidl_fuchsia_net_multicast_admin::Ipv6RoutingTableControllerMarker,
+    MulticastAdminV6
+);
 
 impl TestStack {
     /// Connects a service to the contained stack.
@@ -211,7 +249,7 @@ impl TestStack {
     }
 
     /// Waits for interface with given `if_id` to come online.
-    pub(crate) async fn wait_for_interface_online(&mut self, if_id: BindingId) {
+    pub(crate) async fn wait_for_interface_online(&self, if_id: BindingId) {
         let watcher = self.new_interfaces_watcher();
         loop {
             let event = watcher.watch().await.expect("failed to watch");
@@ -236,7 +274,7 @@ impl TestStack {
         }
     }
 
-    async fn wait_for_loopback_id(&mut self) -> BindingId {
+    async fn wait_for_loopback_id(&self) -> BindingId {
         let watcher = self.new_interfaces_watcher();
         loop {
             let event = watcher.watch().await.expect("failed to watch");
@@ -1189,4 +1227,644 @@ async fn device_strong_ids_delay_clean_shutdown() {
     // Now we can finally shutdown.
     std::mem::drop(loopback_id);
     shutdown.await;
+}
+
+#[test_matrix(
+    [true, false],
+    [true, false],
+    [true, false]
+)]
+#[fasync::run_singlethreaded(test)]
+async fn shutdown_with_open_resources_netdev(
+    detach_device_control: bool,
+    detach_interface_control: bool,
+    detach_asp: bool,
+) {
+    const EP_NAME: &'static str = "shutdown-ep";
+    let mut t = TestSetupBuilder::new().add_named_endpoint(EP_NAME).add_empty_stack().build().await;
+    // Create resources for a device_control, interface control and address
+    // state provider for a netdevice interface.
+    let (installer, device_control, interface_control, asp) = {
+        let (endpoint, port_id) = t.get_endpoint(EP_NAME).await;
+        let stack = t.get(0);
+        let installer = stack.connect_interfaces_installer();
+        let (device_control, server_end) = fidl::endpoints::create_proxy();
+        installer.install_device(endpoint, server_end).expect("install device");
+        let (interface_control, server_end) = fidl::endpoints::create_proxy();
+        device_control
+            .create_interface(
+                &port_id,
+                server_end,
+                &fidl_fuchsia_net_interfaces_admin::Options::default(),
+            )
+            .expect("create interface");
+
+        let if_id = interface_control
+            .get_id()
+            .map_ok(|i| BindingId::new(i).expect("nonzero id"))
+            .await
+            .expect("get id");
+
+        assert!(interface_control.enable().await.expect("calling enable").expect("enable failed"));
+        stack.wait_for_interface_online(if_id).await;
+        let control = fnet_interfaces_ext::admin::Control::new(interface_control);
+        let (asp, server_end) =
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
+        control
+            .add_address(
+                &net_declare::fidl_subnet!("192.0.2.1/24"),
+                &fnet_interfaces_admin::AddressParameters {
+                    add_subnet_route: Some(true),
+                    ..Default::default()
+                },
+                server_end,
+            )
+            .expect("add address should succeed");
+        assert_matches!(
+            asp.take_event_stream().next().await,
+            Some(Ok(fnet_interfaces_admin::AddressStateProviderEvent::OnAddressAdded {}))
+        );
+
+        if detach_device_control {
+            device_control.detach().expect("detach device control");
+        }
+        if detach_interface_control {
+            control.detach().expect("detach interface control");
+        }
+        if detach_asp {
+            asp.detach().expect("detach asp");
+        }
+
+        (installer, device_control, control, asp)
+    };
+
+    t.shutdown().await;
+
+    // All of our open channels should be closed.
+    assert_eq!(installer.as_channel().on_closed().await, Ok(fidl::Signals::CHANNEL_PEER_CLOSED));
+    assert_eq!(
+        device_control.as_channel().on_closed().await,
+        Ok(fidl::Signals::CHANNEL_PEER_CLOSED)
+    );
+    assert_matches!(
+        interface_control.wait_termination().await,
+        fnet_interfaces_ext::admin::TerminalError::Terminal(
+            fnet_interfaces_admin::InterfaceRemovedReason::PortClosed
+        )
+    );
+    assert_matches!(
+        asp.take_event_stream().next().await,
+        Some(Ok(fnet_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved {
+            error: fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved
+        }))
+    );
+    assert_eq!(asp.as_channel().on_closed().await, Ok(fidl::Signals::CHANNEL_PEER_CLOSED));
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn shutdown_with_open_resources_blackhole() {
+    let t = TestSetupBuilder::new().add_empty_stack().build().await;
+
+    let (installer, interface_control, asp) = {
+        let stack = t.get(0);
+        let installer = stack.connect_interfaces_installer();
+
+        let (interface_control, server_end) = fidl::endpoints::create_proxy();
+        installer
+            .install_blackhole_interface(
+                server_end,
+                &fidl_fuchsia_net_interfaces_admin::Options::default(),
+            )
+            .expect("install interface");
+
+        let if_id = interface_control
+            .get_id()
+            .map_ok(|i| BindingId::new(i).expect("nonzero id"))
+            .await
+            .expect("get id");
+
+        assert!(interface_control.enable().await.expect("calling enable").expect("enable failed"));
+        stack.wait_for_interface_online(if_id).await;
+        let control = fnet_interfaces_ext::admin::Control::new(interface_control);
+        let (asp, server_end) =
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
+        control
+            .add_address(
+                &net_declare::fidl_subnet!("192.0.2.1/24"),
+                &fnet_interfaces_admin::AddressParameters {
+                    add_subnet_route: Some(true),
+                    ..Default::default()
+                },
+                server_end,
+            )
+            .expect("add address should succeed");
+        assert_matches!(
+            asp.take_event_stream().next().await,
+            Some(Ok(fnet_interfaces_admin::AddressStateProviderEvent::OnAddressAdded {}))
+        );
+        (installer, control, asp)
+    };
+
+    t.shutdown().await;
+
+    // All of our open channels should be closed.
+    assert_eq!(installer.as_channel().on_closed().await, Ok(fidl::Signals::CHANNEL_PEER_CLOSED));
+    assert_matches!(
+        interface_control.wait_termination().await,
+        fnet_interfaces_ext::admin::TerminalError::Terminal(
+            fnet_interfaces_admin::InterfaceRemovedReason::PortClosed
+        )
+    );
+    assert_matches!(
+        asp.take_event_stream().next().await,
+        Some(Ok(fnet_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved {
+            error: fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved
+        }))
+    );
+    assert_eq!(asp.as_channel().on_closed().await, Ok(fidl::Signals::CHANNEL_PEER_CLOSED));
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn shutdown_with_open_resources_sockets() {
+    let t = TestSetupBuilder::new().add_empty_stack().build().await;
+
+    let channels = {
+        let stack = t.get(0);
+        let loopback_id = stack.wait_for_loopback_id().await.get();
+        let socket_provider = stack.connect_socket_provider();
+        let socket_provider_ref = &socket_provider;
+        let new_datagram_socket = |protocol| async move {
+            let sock = socket_provider_ref
+                .datagram_socket(fposix_socket::Domain::Ipv4, protocol)
+                .await
+                .expect("calling datagram socket")
+                .expect("creating socket");
+            let sock = assert_matches!(
+                sock,
+                fposix_socket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(s) => s
+            )
+            .into_proxy();
+            sock.bind(&fidl_socket_addr!("0.0.0.0:0")).await.expect("calling bind").expect("bind");
+            sock
+        };
+
+        let new_tcp_socket = || async move {
+            let sock = socket_provider_ref
+                .stream_socket(
+                    fposix_socket::Domain::Ipv4,
+                    fposix_socket::StreamSocketProtocol::Tcp,
+                )
+                .await
+                .expect("calling stream socket")
+                .expect("creating socket")
+                .into_proxy();
+            sock
+        };
+
+        async fn connect_tcp_socket(
+            socket: &fposix_socket::StreamSocketProxy,
+            addr: &fidl_net::SocketAddress,
+        ) {
+            assert_matches!(
+                socket.connect(addr).await,
+                Ok(Err(fidl_fuchsia_posix::Errno::Einprogress))
+            );
+            let zx_socket =
+                socket.describe().await.expect("calling describe").socket.expect("missing socket");
+            let _: zx::Signals = fasync::OnSignals::new(
+                &zx_socket,
+                zx::Signals::from_bits(fposix_socket::SIGNAL_STREAM_CONNECTED).expect("from_bits"),
+            )
+            .await
+            .expect("wait signals");
+            assert_matches!(socket.connect(addr).await, Ok(Ok(())));
+        }
+
+        let udp = new_datagram_socket(fposix_socket::DatagramSocketProtocol::Udp).await;
+        let icmp = new_datagram_socket(fposix_socket::DatagramSocketProtocol::IcmpEcho).await;
+        let tcp_listener = new_tcp_socket().await;
+        let server_addr = fidl_socket_addr!("127.0.0.1:8080");
+        tcp_listener.bind(&server_addr).await.expect("calling bind").expect("bind");
+        tcp_listener.listen(10).await.expect("calling listen").expect("listen");
+        let tcp_connected1 = new_tcp_socket().await;
+        connect_tcp_socket(&tcp_connected1, &server_addr).await;
+        let tcp_connected2 = new_tcp_socket().await;
+        connect_tcp_socket(&tcp_connected2, &server_addr).await;
+        let (_, tcp_accepted) =
+            tcp_listener.accept(false).await.expect("calling accept").expect("accept");
+
+        let packet_provider = stack.connect_proxy::<fposix_socket_packet::ProviderMarker>();
+        let packet = packet_provider
+            .socket(fposix_socket_packet::Kind::Link)
+            .await
+            .expect("calling socket")
+            .expect("create socket")
+            .into_proxy();
+        packet
+            .bind(None, &fposix_socket_packet::BoundInterfaceId::Specified(loopback_id))
+            .await
+            .expect("calling bind")
+            .expect("bind");
+
+        let raw_provider = stack.connect_proxy::<fposix_socket_raw::ProviderMarker>();
+        let raw = raw_provider
+            .socket(
+                fposix_socket::Domain::Ipv4,
+                &fposix_socket_raw::ProtocolAssociation::Associated(Ipv4Proto::Icmp.into()),
+            )
+            .await
+            .expect("calling bind")
+            .expect("bind")
+            .into_proxy();
+
+        [
+            ("socket provider", socket_provider.into_channel().unwrap()),
+            ("udp", udp.into_channel().unwrap()),
+            ("icmp", icmp.into_channel().unwrap()),
+            ("tcp_listener", tcp_listener.into_channel().unwrap()),
+            ("tcp_connected1", tcp_connected1.into_channel().unwrap()),
+            ("tcp_connected2", tcp_connected2.into_channel().unwrap()),
+            ("tcp_accepted", tcp_accepted.into_proxy().into_channel().unwrap()),
+            ("packet provider", packet_provider.into_channel().unwrap()),
+            ("packet", packet.into_channel().unwrap()),
+            ("raw provider", raw_provider.into_channel().unwrap()),
+            ("raw", raw.into_channel().unwrap()),
+        ]
+    };
+
+    t.shutdown().await;
+
+    for (name, ch) in channels {
+        assert_eq!(
+            ch.on_closed().now_or_never(),
+            Some(Ok(fidl::Signals::CHANNEL_PEER_CLOSED)),
+            "{name} closed"
+        );
+    }
+}
+
+#[test_case(true; "detached")]
+#[test_case(false; "not detached")]
+#[fasync::run_singlethreaded(test)]
+async fn shutdown_with_open_resources_routes(detach_route_table: bool) {
+    const EP_IDX: usize = 1;
+    let t = TestSetupBuilder::new()
+        .add_endpoint()
+        .add_stack(StackSetupBuilder::new().add_endpoint(EP_IDX, None))
+        .build()
+        .await;
+    let channels = {
+        let stack = t.get(0);
+        let if_id = stack.get_endpoint_id(EP_IDX);
+
+        let if_control = stack.get_interface_control(if_id.get());
+
+        let state = stack.connect_proxy::<fnet_routes::StateV4Marker>();
+        let (routes_watcher, server_end) = fidl::endpoints::create_proxy();
+        state.get_watcher_v4(server_end, &Default::default()).expect("calling get_watcher_v4");
+        let _: Vec<fnet_routes::EventV4> = routes_watcher.watch().await.expect("calling watch");
+        let (rules_watcher, server_end) = fidl::endpoints::create_proxy();
+        state
+            .get_rule_watcher_v4(server_end, &Default::default())
+            .expect("calling get_rule_watcher_v4");
+        let _: Vec<fnet_routes::RuleEventV4> = rules_watcher.watch().await.expect("calling watch");
+
+        let route = fnet_routes::RouteV4 {
+            destination: fidl_ip_v4_with_prefix!("192.0.2.0/24"),
+            action: fnet_routes::RouteActionV4::Forward(fnet_routes::RouteTargetV4 {
+                outbound_interface: if_id.get(),
+                next_hop: None,
+            }),
+            properties: fnet_routes::RoutePropertiesV4 {
+                specified_properties: Some(fnet_routes::SpecifiedRouteProperties {
+                    metric: Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+                        fnet_routes::Empty {},
+                    )),
+                    __source_breaking: fidl::marker::SourceBreaking,
+                }),
+                __source_breaking: fidl::marker::SourceBreaking,
+            },
+        };
+
+        let main_route_table = stack.connect_proxy::<fnet_routes_admin::RouteTableV4Marker>();
+        let (main_route_set, server_end) = fidl::endpoints::create_proxy();
+        main_route_table.new_route_set(server_end).expect("calling new_route_set");
+
+        let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =
+            if_control.get_authorization_for_interface().await.expect("get authorization");
+        main_route_set
+            .authenticate_for_interface(fnet_interfaces_admin::ProofOfInterfaceAuthorization {
+                interface_id,
+                token,
+            })
+            .await
+            .expect("calling authenticate")
+            .expect("authenticate");
+        assert!(main_route_set
+            .add_route(&route)
+            .await
+            .expect("calling add_route")
+            .expect("add route"));
+        let route_table_provider =
+            stack.connect_proxy::<fnet_routes_admin::RouteTableProviderV4Marker>();
+
+        let (route_table, server_end) = fidl::endpoints::create_proxy();
+        route_table_provider
+            .new_route_table(server_end, &Default::default())
+            .expect("calling new_route_table");
+
+        if detach_route_table {
+            route_table.detach().expect("calling detach")
+        }
+
+        let (route_set, server_end) = fidl::endpoints::create_proxy();
+        route_table.new_route_set(server_end).expect("calling new_route_set");
+        let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =
+            if_control.get_authorization_for_interface().await.expect("get authorization");
+        route_set
+            .authenticate_for_interface(fnet_interfaces_admin::ProofOfInterfaceAuthorization {
+                interface_id,
+                token,
+            })
+            .await
+            .expect("calling authenticate")
+            .expect("authenticate");
+        assert!(route_set.add_route(&route).await.expect("calling add_route").expect("add route"));
+
+        let rule_table = stack.connect_proxy::<fnet_routes_admin::RuleTableV4Marker>();
+        let (rule_set, server_end) = fidl::endpoints::create_proxy();
+        rule_table.new_rule_set(2, server_end).expect("calling new_rule_set");
+        let fnet_routes_admin::GrantForRouteTableAuthorization { table_id, token } = route_table
+            .get_authorization_for_route_table()
+            .await
+            .expect("calling get authorization");
+        rule_set
+            .authenticate_for_route_table(table_id, token)
+            .await
+            .expect("calling authenticate")
+            .expect("authenticate");
+
+        rule_set
+            .add_rule(
+                0,
+                &fnet_routes::RuleMatcherV4 {
+                    base: Some(fnet_routes::BaseMatcher::default()),
+                    ..Default::default()
+                },
+                &fnet_routes::RuleAction::Lookup(table_id),
+            )
+            .await
+            .expect("calling add_rule")
+            .expect("add rule");
+
+        [
+            ("state", state.into_channel().unwrap()),
+            ("routes watcher", routes_watcher.into_channel().unwrap()),
+            ("rules watcher", rules_watcher.into_channel().unwrap()),
+            ("main route table", main_route_table.into_channel().unwrap()),
+            ("main route set", main_route_set.into_channel().unwrap()),
+            ("route table provider", route_table_provider.into_channel().unwrap()),
+            ("route table", route_table.into_channel().unwrap()),
+            ("route set", route_set.into_channel().unwrap()),
+            ("rule table", rule_table.into_channel().unwrap()),
+            ("rule set", rule_set.into_channel().unwrap()),
+        ]
+    };
+
+    t.shutdown().await;
+
+    for (name, ch) in channels {
+        assert_eq!(
+            ch.on_closed()
+                // Some protocols send epitaphs, so we'll observe readable as
+                // well. Ignore that.
+                .map_ok(|s| s.contains(fidl::Signals::CHANNEL_PEER_CLOSED))
+                .now_or_never(),
+            Some(Ok(true)),
+            "{name} closed"
+        );
+    }
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn shutdown_with_open_resources_interfaces_watcher() {
+    let t = TestSetupBuilder::new().add_empty_stack().build().await;
+    let channels = {
+        let stack = t.get(0);
+        let state = stack.connect_proxy::<fnet_interfaces::StateMarker>();
+        let (watcher, server_end) = fidl::endpoints::create_proxy();
+        state.get_watcher(&Default::default(), server_end).expect("calling get_watcher");
+        let _: fnet_interfaces::Event = watcher.watch().await.expect("calling watch");
+        [("state", state.into_channel().unwrap()), ("watcher", watcher.into_channel().unwrap())]
+    };
+
+    t.shutdown().await;
+
+    for (name, ch) in channels {
+        assert_eq!(
+            ch.on_closed().now_or_never(),
+            Some(Ok(fidl::Signals::CHANNEL_PEER_CLOSED)),
+            "{name} closed"
+        );
+    }
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn shutdown_with_open_resources_ndp_watcher() {
+    let t = TestSetupBuilder::new().add_empty_stack().build().await;
+    let channels = {
+        let stack = t.get(0);
+        let provider =
+            stack.connect_proxy::<fnet_ndp::RouterAdvertisementOptionWatcherProviderMarker>();
+        let (watcher, server_end) = fidl::endpoints::create_proxy();
+        provider
+            .new_router_advertisement_option_watcher(server_end, &Default::default())
+            .expect("calling new_router_advertisement_option_watcher");
+        watcher.probe().await.expect("calling probe");
+        [
+            ("provider", provider.into_channel().unwrap()),
+            ("watcher", watcher.into_channel().unwrap()),
+        ]
+    };
+
+    t.shutdown().await;
+
+    for (name, ch) in channels {
+        assert_eq!(
+            ch.on_closed().now_or_never(),
+            Some(Ok(fidl::Signals::CHANNEL_PEER_CLOSED)),
+            "{name} closed"
+        );
+    }
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn shutdown_with_open_resources_filter() {
+    let t = TestSetupBuilder::new().add_empty_stack().build().await;
+    let channels = {
+        let stack = t.get(0);
+        let control = stack.connect_proxy::<fnet_filter::ControlMarker>();
+        let (namespace_controller, server_end) = fidl::endpoints::create_proxy();
+        control.open_controller("test", server_end).expect("calling open_controller");
+
+        let namespace_id = fnet_filter_ext::NamespaceId("namespace".into());
+        let namespace = fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
+            id: namespace_id.clone(),
+            domain: fnet_filter_ext::Domain::AllIp,
+        });
+        let routine_id = fnet_filter_ext::RoutineId {
+            namespace: namespace_id.clone(),
+            name: "test-routine1".into(),
+        };
+        let routine1 = fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+            id: routine_id.clone(),
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::Ingress,
+                    priority: 0,
+                },
+            )),
+        });
+        let routine2 = fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace_id.clone(),
+                name: "test-routine2".into(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Ip(None),
+        });
+        let rule = fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+            id: fnet_filter_ext::RuleId { routine: routine_id.clone(), index: 0 },
+            matchers: fnet_filter_ext::Matchers::default(),
+            action: fnet_filter_ext::Action::Drop,
+        });
+        let result = namespace_controller
+            .push_changes(&[
+                fnet_filter::Change::Create(namespace.into()),
+                fnet_filter::Change::Create(routine1.into()),
+                fnet_filter::Change::Create(routine2.into()),
+                fnet_filter::Change::Create(rule.into()),
+            ])
+            .await
+            .expect("calling push_changes");
+        assert_matches!(result, fnet_filter::ChangeValidationResult::Ok(fnet_filter::Empty {}));
+        let result = namespace_controller.commit(Default::default()).await.expect("calling commit");
+        assert_matches!(result, fnet_filter::CommitResult::Ok(fnet_filter::Empty {}));
+
+        let state = stack.connect_proxy::<fnet_filter::StateMarker>();
+        let (watcher, server_end) = fidl::endpoints::create_proxy();
+        state.get_watcher(&Default::default(), server_end).expect("calling get_watcher");
+
+        let _: Vec<fnet_filter::Event> = watcher.watch().await.expect("calling watch");
+        [
+            ("control", control.into_channel().unwrap()),
+            ("namespace controller", namespace_controller.into_channel().unwrap()),
+            ("state", state.into_channel().unwrap()),
+            ("watcher", watcher.into_channel().unwrap()),
+        ]
+    };
+
+    t.shutdown().await;
+
+    for (name, ch) in channels {
+        assert_eq!(
+            ch.on_closed().now_or_never(),
+            Some(Ok(fidl::Signals::CHANNEL_PEER_CLOSED)),
+            "{name} closed"
+        );
+    }
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn shutdown_with_open_resources_neighbor() {
+    const EP_IDX: usize = 1;
+    let t = TestSetupBuilder::new()
+        .add_endpoint()
+        .add_stack(StackSetupBuilder::new().add_endpoint(EP_IDX, None))
+        .build()
+        .await;
+    let channels = {
+        let stack = t.get(0);
+        let if_id = stack.get_endpoint_id(EP_IDX);
+        let controller = stack.connect_proxy::<fnet_neighbor::ControllerMarker>();
+        controller
+            .add_entry(if_id.get(), &fidl_ip!("192.0.2.1"), &fidl_mac!("02:03:04:05:06:07"))
+            .await
+            .expect("calling get_entry")
+            .expect("add entry");
+        let view = stack.connect_proxy::<fnet_neighbor::ViewMarker>();
+        let (entry_iterator, server_end) = fidl::endpoints::create_proxy();
+        view.open_entry_iterator(server_end, &Default::default())
+            .expect("calling open_entry_iterator");
+        let _: Vec<fnet_neighbor::EntryIteratorItem> =
+            entry_iterator.get_next().await.expect("calling get_next");
+        [
+            ("controller", controller.into_channel().unwrap()),
+            ("view", view.into_channel().unwrap()),
+            ("entry iterator", entry_iterator.into_channel().unwrap()),
+        ]
+    };
+
+    t.shutdown().await;
+
+    for (name, ch) in channels {
+        assert_eq!(
+            ch.on_closed().now_or_never(),
+            Some(Ok(fidl::Signals::CHANNEL_PEER_CLOSED)),
+            "{name} closed"
+        );
+    }
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn shutdown_with_open_resources_multicast_admin() {
+    const EP_IDX1: usize = 1;
+    const EP_IDX2: usize = 2;
+    let t = TestSetupBuilder::new()
+        .add_endpoint()
+        .add_endpoint()
+        .add_stack(StackSetupBuilder::new().add_endpoint(EP_IDX1, None).add_endpoint(EP_IDX2, None))
+        .build()
+        .await;
+    let (hanging_get, controller) = {
+        let stack = t.get(0);
+        let if_id1 = stack.get_endpoint_id(EP_IDX1);
+        let if_id2 = stack.get_endpoint_id(EP_IDX2);
+        let loopback = stack.wait_for_loopback_id().await;
+        let controller =
+            stack.connect_proxy::<fnet_multicast_admin::Ipv4RoutingTableControllerMarker>();
+
+        controller
+            .add_route(
+                &fnet_multicast_admin::Ipv4UnicastSourceAndMulticastDestination {
+                    unicast_source: fidl_ip_v4!("192.0.2.1"),
+                    multicast_destination: fidl_ip_v4!("224.1.0.1"),
+                },
+                &fnet_multicast_ext::Route {
+                    action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
+                        fnet_multicast_admin::OutgoingInterfaces { id: if_id1.get(), min_ttl: 1 },
+                        fnet_multicast_admin::OutgoingInterfaces { id: loopback.get(), min_ttl: 1 },
+                    ]),
+                    expected_input_interface: if_id2.get(),
+                }
+                .into(),
+            )
+            .await
+            .expect("calling add_route")
+            .expect("add route");
+        (controller.watch_routing_events(), controller)
+    };
+
+    t.shutdown().await;
+
+    assert_matches!(
+        hanging_get.now_or_never(),
+        Some(Err(e)) if e.is_closed(),
+        "hanging get closed",
+    );
+    let ch = controller.into_channel().unwrap();
+    assert_eq!(
+        ch.on_closed().now_or_never(),
+        Some(Ok(fidl::Signals::CHANNEL_PEER_CLOSED)),
+        "controller closed"
+    );
 }
