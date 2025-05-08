@@ -6,6 +6,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/scheduler/role.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
 
@@ -32,6 +33,13 @@ int main(int argc, const char** argv) {
   if (!tracing_result.is_ok()) {
     FX_LOGS(ERROR) << tracing_result.error_value() << " Failed to get tracing resource";
     return 1;
+  }
+
+  // Apply the scheduler role defined for kernel trace reading.
+  const zx_status_t thread_status =
+      fuchsia_scheduler::SetRoleForThisThread("fuchsia.ktrace.reader");
+  if (thread_status != ZX_OK) {
+    FX_PLOGS(WARNING, thread_status) << "Failed to apply profile to main thread";
   }
 
   ktrace_provider::App app(std::move(tracing_result->resource()), command_line);

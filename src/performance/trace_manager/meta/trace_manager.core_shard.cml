@@ -15,6 +15,7 @@
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.TracingResource",
+                "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
             ],
             from: "parent",

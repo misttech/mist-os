@@ -82,7 +82,10 @@
             to: "#perfetto-bridge",
         },
         {
-            protocol: [ "fuchsia.boot.ReadOnlyLog" ],
+            protocol: [
+                "fuchsia.boot.ReadOnlyLog",
+                "fuchsia.scheduler.RoleManager",
+            ],
             from: "parent",
             to: [ "#ktrace_provider" ],
         },

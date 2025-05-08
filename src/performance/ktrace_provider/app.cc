@@ -126,24 +126,6 @@ void ForwardBuffer(std::unique_ptr<DrainContext> drain_context) {
                        << sizeof(drain_context->buffer_) << " bytes";
     }
 
-    // Attempt to adapt our polling interval to the actual buffer rate. Nothing fancy, just reading
-    // attempting to poll at a rate that keeps the buffer use at around 25% each time we read. That
-    // way, if we'd need a 4x spike of trace data output over the polling interval to overflow the
-    // buffer.
-    //
-    zx_duration_t new_poll =
-        (drain_context->poll_period.get() * sizeof(drain_context->buffer_)) / (actual * size_t{4});
-
-    // Clamp the value between 1ms and 100ms.
-    //
-    // Servicing the buffer takes on the order of 100-200us. Faster than 1ms and we begin hogging a
-    // significant amount of CPU.
-    //
-    // Above 100ms, we're already using a smaller percent of cpu polling the buffer. We don't want
-    // it to get too big else we could miss a burst of activity after a long idle period.
-    drain_context->poll_period =
-        zx::duration(std::clamp(new_poll, zx_duration_t{1'000'000}, zx_duration_t{100'000'000}));
-
     size_t offset = 0;
     const size_t num_words = actual / 8;
     while (offset < num_words) {
@@ -289,7 +271,7 @@ zx::result<> App::StartKTrace(uint32_t group_mask, trace_buffering_mode_t buffer
 
   if constexpr (kKernelStreamingSupport) {
     // In kernel streaming mode, we need to poll zx_ktrace_read for data while tracing.
-    auto drain_context = DrainContext::Create(tracing_resource_, zx::msec(50));
+    auto drain_context = DrainContext::Create(tracing_resource_, zx::msec(10));
     if (!drain_context) {
       FX_LOGS(ERROR) << "Failed to start reading kernel buffer";
       return zx::error(ZX_ERR_NO_RESOURCES);

@@ -32,6 +32,9 @@
 
     // Fuchsia memory monitor profiles.
     "fuchsia.memory-monitor.main": { "priority": 8},
+
+    // Callers of zx_ktrace_read.
+    "fuchsia.ktrace.reader": { "capacity": "1ms", "deadline": "10ms", "period": "10ms" },
   },
   "memory": {
     "fuchsia.media.audio.core": { "priority": 24 },
