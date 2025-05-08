@@ -24,6 +24,7 @@ use std::thread;
 // TODO(b/414848887): Pass more descriptive errors.
 enum Request {
     ReadLocalAddress(oneshot::Sender<Result<[u8; 6], anyhow::Error>>),
+    GetKnownPeers(oneshot::Sender<Result<Vec<Peer>, anyhow::Error>>),
     GetPeerId(CString, oneshot::Sender<Result<PeerId, anyhow::Error>>),
     Connect(PeerId, oneshot::Sender<Result<(), anyhow::Error>>),
     Forget(PeerId, oneshot::Sender<Result<(), anyhow::Error>>),
@@ -75,6 +76,21 @@ impl WorkThread {
                                         .await,
                                 )
                                 .expect("Failed to send");
+                        }
+                        Request::GetKnownPeers(sender) => {
+                            if let Err(err) = refresh_peer_cache(
+                                std::time::Duration::ZERO,
+                                &mut peer_cache,
+                                &mut peer_watcher_stream,
+                            )
+                            .await
+                            {
+                                sender
+                                    .send(Err(anyhow!("refresh_peer_cache() error: {}", err)))
+                                    .expect("Failed to send");
+                                continue;
+                            }
+                            sender.send(Ok(peer_cache.clone())).expect("Failed to send");
                         }
                         Request::GetPeerId(address, result_sender) => {
                             let (_discovery_session, discovery_session_server) =
@@ -193,8 +209,6 @@ impl WorkThread {
     }
 
     // Write address of active host into `addr_byte_buff`.
-    //
-    // Returns ZX_ERR_INTERNAL on error (check logs).
     pub async fn read_local_address(&self, addr_byte_buff: *mut u8) -> Result<(), anyhow::Error> {
         let addr_bytes_slice = unsafe { std::slice::from_raw_parts_mut(addr_byte_buff, 6) };
         let (sender, receiver) = oneshot::channel::<Result<[u8; 6], anyhow::Error>>();
@@ -211,6 +225,12 @@ impl WorkThread {
             .send(Request::GetPeerId(address.to_owned(), sender))
             .await
             .expect("Failed to send");
+        receiver.await.expect("Failed to receive")
+    }
+
+    pub async fn get_known_peers(&self) -> Result<Vec<Peer>, anyhow::Error> {
+        let (sender, receiver) = oneshot::channel::<Result<Vec<Peer>, anyhow::Error>>();
+        self.sender.clone().send(Request::GetKnownPeers(sender)).await.expect("Failed to send");
         receiver.await.expect("Failed to receive")
     }
 

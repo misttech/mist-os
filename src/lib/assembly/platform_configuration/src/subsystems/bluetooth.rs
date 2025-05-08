@@ -161,6 +161,7 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
         if *context.feature_set_level == FeatureSetLevel::Standard
             && *context.build_type == BuildType::Eng
         {
+            builder.platform_bundle("bluetooth_affordances");
             builder.platform_bundle("bluetooth_pandora");
 
             if !profiles.a2dp.enabled {

@@ -2452,6 +2452,25 @@ assembly_input_bundle("bluetooth_snoop_eager") {
   ]
 }
 
+# Basic Bluetooth workflows for automated testing and tooling.
+#
+# feature_set_levels: standard
+# build-types: eng
+#
+assembly_input_bundle("bluetooth_affordances") {
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/connectivity/bluetooth/testing/bt-affordances/meta/bt-affordances-server.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # Support for Pandora Bluetooth test interface server and virtual HCI with Rootcanal.
 #
 # feature_set_levels: standard

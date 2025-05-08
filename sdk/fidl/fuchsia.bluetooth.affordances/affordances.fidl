@@ -1,0 +1,24 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+@available(added=HEAD)
+library fuchsia.bluetooth.affordances;
+
+using fuchsia.bluetooth.sys as sys;
+
+// TODO(b/415341030): Evaluate consolidating fuchsia.bluetooth.*.test protocols here.
+
+type Error = strict enum {
+    /// Operation failed (check logs).
+    INTERNAL = 1;
+};
+
+@discoverable
+open protocol PeerController {
+    /// Get a list of discovered peers.
+    ///
+    /// * error Returns `INTERNAL` if the operation failed (check logs).
+    flexible GetKnownPeers() -> (struct {
+        peers vector<sys.Peer>:MAX;
+    }) error Error;
+};

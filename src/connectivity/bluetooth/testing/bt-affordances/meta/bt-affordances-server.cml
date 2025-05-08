@@ -1,0 +1,19 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/bt-affordances-server-bin",
+    },
+    capabilities: [
+        { protocol: "fuchsia.bluetooth.affordances.PeerController" },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.bluetooth.affordances.PeerController",
+            from: "self",
+        },
+    ],
+}

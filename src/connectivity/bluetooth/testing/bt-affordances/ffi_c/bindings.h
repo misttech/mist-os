@@ -15,7 +15,6 @@ extern "C" {
 
 /// Stop serving Rust affordances.
 ///
-/// Returns ZX_STATUS_BAD_STATE if Rust affordances are not running.
 /// Returns ZX_STATUS_INTERNAL if Rust affordances exited with an error (check logs).
 zx_status_t stop_rust_affordances();
 
