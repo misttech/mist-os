@@ -99,5 +99,10 @@
         /// reference, expressed in seconds, when the proposed UTC reference is
         /// in the "future" with respect of actual UTC reference.
         utc_max_allowed_delta_future_sec: { type: "int64" },
+
+        /// If set, connectivity information is used to direct whether to sample
+        /// external time sources. Specifically, if we know that we do not have
+        /// network access, we don't sample time sources at all.
+        use_connectivity: { type: "bool" },
     },
 }

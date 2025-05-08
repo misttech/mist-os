@@ -549,23 +549,47 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         }
     }
 
+    // Produces a time sample from the time source manager, possibly after a
+    // delay.
+    //
+    // # Args
+    // - `first_deadline`: if specified and nonzero, the method call
+    //   will await before attempting to sample the time source the first time that
+    //   `delayed_sample` is called.
+    // - `back_off_deadline`: the deadline until the next attempt sample the
+    //    time source in all cases where `first_deadline` does not apply.
+    // - `conn_rcv`: a notification channel that gets pinged when we get an internet
+    //   connection.
+    // - `has_connectivity`: `true` if at the time delayed_sample was called the
+    //   HTTP connectivity was operational.
     async fn delayed_sample(
         &mut self,
-        first_delay: Option<&zx::MonotonicDuration>,
-        back_off_delay: &zx::MonotonicDuration,
+        first_deadline: Option<&fasync::MonotonicInstant>,
+        back_off_deadline: &fasync::MonotonicInstant,
+        mut conn_rx: mpsc::Receiver<()>,
+        has_connectivity: bool,
     ) -> Sample {
+        // Hold sampling off if there is no connectivity, since attempting to sample
+        // an external source is useless without connectivity.
+        if !has_connectivity {
+            debug!("no connectivity, waiting before sampling.");
+            let _ignore = conn_rx.next().await;
+            debug!("connectivity acquired");
+        }
+
         // Pause before first sampling is sometimes useful. But not if no delay
         // was ordered, so as not to change the scheduling order.
-        if let Some(first_delay) = first_delay {
-            if *first_delay != zx::MonotonicDuration::ZERO {
+        let now = fasync::MonotonicInstant::now();
+        if let Some(first_deadline) = first_deadline {
+            if *first_deadline > now {
                 // This should be an uncommon setting, so log it.
-                info!("first time source sample, delaying by: {:?}", first_delay);
-                _ = fasync::Timer::new(fasync::MonotonicInstant::after(*first_delay)).await;
-                debug!("first time source sample, delay    done");
+                info!("first time source sample, delaying by: {:?}", *first_deadline - now);
+                _ = fasync::Timer::new(*first_deadline).await;
+                debug!("first time source sample, delay done");
             }
         } else {
-            info!("source sample pause, delaying by: {:?}", *back_off_delay);
-            _ = fasync::Timer::new(fasync::MonotonicInstant::after(*back_off_delay)).await;
+            info!("source sample pause, delaying by: {:?}", *back_off_deadline - now);
+            _ = fasync::Timer::new(*back_off_deadline).await;
         }
         debug!("manage_clock: asking for a time sample");
         self.time_source_manager.next_sample().await
@@ -587,7 +611,6 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         // timeline, which means they can pause.
         debug!("maintain_clock: function entered");
         let pull_delay = self.config.get_back_off_time_between_pull_samples();
-        let mut first_delay = Some(self.config.get_first_sampling_delay());
 
         let details = self.clock.get_details().expect("failed to get UTC clock details");
         let mut clock_started = details.backstop != details.ticks_to_synthetic.synthetic_offset;
@@ -617,11 +640,26 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
             max_window_width_future: self.config.max_window_width_future(),
         };
         let mut last_proposal: Option<Sample> = None;
+        // If set, denotes whether HTTP connectivity is available for deciding
+        // when to sample external time sources. If connectivity is not used,
+        // we always sample, even if this is suboptimal.
+        let mut has_connectivity = false || !self.config.use_connectivity();
 
+        // Sets the deadlines such that other command activity does not push them
+        // out.
+        use fasync::MonotonicInstant as Mi;
+        let mut first_deadline = Some(Mi::after(self.config.get_first_sampling_delay()));
+        let mut back_off_deadline = Mi::after(back_off_delay);
         loop {
             debug!("clock_manager: waiting for command");
+            // Used to notify delayed_sample of connectivity changes.
+            let (mut conn_snd, conn_rcv) = mpsc::channel(1);
             select! {
-                sample = self.delayed_sample(first_delay.as_ref(), &back_off_delay).fuse() => {
+                sample = self.delayed_sample(
+                        first_deadline.as_ref(),
+                        &back_off_deadline, conn_rcv,
+                        has_connectivity,
+                    ).fuse() => {
                     debug!("manage_clock: `---- got a time sample: {:?}", sample);
                     self.init_or_update_estimator(sample);
 
@@ -635,7 +673,11 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                         &adjust_decision).await;
 
                     // Don't use the initial sampling delay in next loop iterations.
-                    first_delay.take();
+                    first_deadline.take();
+                    // Update the amount of time to back off only if we went through
+                    // the loop because we sampled a time. This ensures that command
+                    // activity does not move the back off deadline.
+                    back_off_deadline = Mi::after(back_off_delay);
 
                     // Used as a test-only hook.
                     if let Some(ref mut test_signaler) = self.sample_test_signaler {
@@ -648,6 +690,21 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                     debug!("received command: {:?}", &command);
 
                     match command {
+                        Some(Command::Connectivity { http_available }) => {
+                            has_connectivity = http_available;
+                            debug!("HTTP connectivity: {}", http_available);
+
+                            // Note that this only unblocks `delayed_sample` above, but
+                            // will not necessarily cause it to complete. However, what it
+                            // does is to cause it to retry sampling with a potentially
+                            // expired first deadline, which is the behavior we want.
+                            //
+                            // It will be very common for this to return Err(_) in normal
+                            // operation. This is why we report the error only as debug!
+                            if let Err(e) = conn_snd.send(()).await {
+                                debug!("could not send connectivity: {:?}", e);
+                            }
+                        }
                         Some(Command::PowerManagement) => {
                             if clock_started {
                                 // Updating an unstarted clock without actually starting it
@@ -1507,7 +1564,7 @@ mod tests {
 
         let clock = create_clock();
         let diagnostics = Arc::new(FakeDiagnostics::new());
-        let reference = zx::BootInstant::from_nanos(executor.boot_now().into_nanos());
+        let reference: zx::BootInstant = executor.boot_now().into();
         let config = make_test_config();
         let clock_manager = create_clock_manager(
             Arc::clone(&clock),
@@ -1919,6 +1976,105 @@ mod tests {
             expected,
             actual - expected,
         );
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    fn test_connectivity_startup() -> Result<()> {
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
+        let (real_now, _) = clone_system_time(&mut executor);
+
+        let clock = create_clock();
+        let diagnostics = Arc::new(FakeDiagnostics::new());
+        let reference = executor.boot_now();
+
+        debug!("\n\treference   : {:?}\n\treal_boot_now: {:?}", reference, real_now);
+
+        const SAMPLING_DELAY_SEC: i64 = 5;
+
+        // Configure sampling delays of about 5 seconds.
+        let config = make_test_config_with_fn(|mut config| {
+            config.first_sampling_delay_sec = SAMPLING_DELAY_SEC;
+            config.back_off_time_between_pull_samples_sec = SAMPLING_DELAY_SEC;
+            config.use_connectivity = true;
+            config
+        });
+
+        let (sample_signaler_tx, mut sample_signaler_rx) = mpsc::channel::<()>(1);
+        let clock_manager = create_clock_manager(
+            Arc::clone(&clock),
+            vec![Sample::new(
+                UtcInstant::from_nanos((reference + OFFSET_2).into_nanos()),
+                reference.into(),
+                STD_DEV,
+            )],
+            None,
+            None,
+            Arc::clone(&diagnostics),
+            config,
+            /*command_test_signaler=*/ None,
+            Some(sample_signaler_tx),
+        );
+
+        let (mut cmd_tx, cmd_rx) = mpsc::channel(2);
+        let (mut delay_tx, mut delay_rx) = mpsc::channel(1);
+        let b = new_state_for_test(false);
+
+        // Run the clock_manager coroutine, in parallel with a delayed "has connectivity"
+        // signal.  This should result in clock_manager not trying to get time samples
+        // for as long as there is no connectivity.
+        let mut run_fut = pin!(async move {
+            // Run in parallel with clock_manager below.
+            fasync::Task::local(async move {
+                debug!("Pause before reporting connectivity.");
+                // This causes us to not act on
+                // the first sampling deadline, because we don't have connectivity.
+                let _ignore = delay_rx.next().await;
+                debug!("send Command::Connectivity true");
+                cmd_tx.send(Command::Connectivity { http_available: true }).await.unwrap();
+                debug!("Command::Connectivity sent");
+            })
+            .detach();
+
+            debug!("before clock_manager.maintain_clock");
+            // This future never returns.
+            clock_manager.maintain_clock(cmd_rx, b).await;
+        });
+
+        let _ignore = run_in_fake_time(
+            &mut executor,
+            &mut run_fut,
+            // This is past the initial `SAMPLING_DELAY_SEC`. But since we have no connectivity
+            // yet, we won't get a sample.
+            fasync::MonotonicDuration::from_seconds(2 * SAMPLING_DELAY_SEC - 2),
+        );
+
+        // No sample arrived within the first ~9 seconds. We were supposed to
+        // sample at 5s, but missed that due to connectivity. We didn't run
+        // for long enough to get to a 2nd sample, so we get no signals that
+        // sampling completed.
+        assert_matches!(sample_signaler_rx.try_next(), Err(_));
+
+        // Allow getting a sample.
+        let mut get_sample_fut = pin!(async move {
+            delay_tx.send(()).await.unwrap();
+        });
+        let _ignore = run_in_fake_time(
+            &mut executor,
+            &mut get_sample_fut,
+            fasync::MonotonicDuration::from_seconds(1),
+        );
+
+        debug!("Run for some more fake time to receive a time sample");
+        let _ignore = run_in_fake_time(
+            &mut executor,
+            &mut run_fut,
+            fasync::MonotonicDuration::from_seconds(SAMPLING_DELAY_SEC),
+        );
+
+        // This time around, we got a sample.
+        assert_matches!(sample_signaler_rx.try_next(), Ok(_));
+
         Ok(())
     }
 }

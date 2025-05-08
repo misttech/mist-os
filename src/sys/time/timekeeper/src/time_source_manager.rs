@@ -207,6 +207,10 @@ impl<D: Diagnostics, M: ReferenceTimeProvider> PushSourceManager<D, M> {
                         return Ok(sample);
                     }
                     Err(error) => {
+                        debug!(
+                            "Rejected invalid sample {:?} from {:?}: {:?}",
+                            sample, self.role, error
+                        );
                         error!("Rejected invalid sample from {:?}: {:?}", self.role, error);
                         self.diagnostics.record(Event::SampleRejected { role: self.role, error });
                     }
@@ -232,6 +236,10 @@ impl<D: Diagnostics, M: ReferenceTimeProvider> PushSourceManager<D, M> {
         } else if sample.reference > current_reference {
             Err(SampleValidationError::ReferenceInstantInFuture)
         } else if sample.reference < current_reference - MIN_UPDATE_DELAY {
+            debug!(
+                "too old sample:\n\treference: {:?}\n\tcurrent_reference: {:?}",
+                sample.reference, current_reference
+            );
             Err(SampleValidationError::ReferenceInstantTooOld)
         } else if current_reference < earliest_allowed_arrival {
             Err(SampleValidationError::TooCloseToPrevious)

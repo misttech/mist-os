@@ -27,6 +27,11 @@ pub enum Command {
         /// the adjustment attempt.
         responder: mpsc::Sender<Result<()>>,
     },
+    /// Reports the connectivity status.
+    Connectivity {
+        /// If true, we expect that attempting a HTTP request should work.
+        http_available: bool,
+    },
 }
 
 /// Serves the "Adjust" FIDL API.

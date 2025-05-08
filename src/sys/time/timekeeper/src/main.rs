@@ -11,6 +11,7 @@ mod diagnostics;
 mod enums;
 mod estimator;
 mod power_topology_integration;
+mod reachability;
 mod rtc;
 mod rtc_testing;
 mod time_source;
@@ -44,8 +45,9 @@ use time_adjust::Command;
 use time_metrics_registry::TimeMetricDimensionExperiment;
 use zx::BootTimeline;
 use {
-    fidl_fuchsia_time as ftime, fidl_fuchsia_time_alarms as fta,
-    fidl_fuchsia_time_external as ffte, fidl_fuchsia_time_test as fftt, fuchsia_async as fasync,
+    fidl_fuchsia_net_reachability as ffnr, fidl_fuchsia_time as ftime,
+    fidl_fuchsia_time_alarms as fta, fidl_fuchsia_time_external as ffte,
+    fidl_fuchsia_time_test as fftt, fuchsia_async as fasync,
 };
 
 type UtcTransform = time_util::Transform<BootTimeline, UtcTimeline>;
@@ -167,6 +169,10 @@ impl Config {
     fn max_window_width_future(&self) -> UtcDuration {
         assert!(self.source_config.utc_max_allowed_delta_future_sec >= 0);
         UtcDuration::from_seconds(self.source_config.utc_max_allowed_delta_future_sec)
+    }
+
+    fn use_connectivity(&self) -> bool {
+        self.source_config.use_connectivity
     }
 }
 
@@ -398,6 +404,21 @@ async fn main() -> Result<()> {
     } else {
         None
     });
+
+    // Start the reachabilitiy monitor loop. The loop may fail, in which case,
+    // we will effectively be disabling reachability and external time sync.
+    if let Ok(proxy) = fuchsia_component::client::connect_to_protocol::<ffnr::MonitorMarker>() {
+        let cmd = cmd_send.clone();
+        let mut monitor = reachability::Monitor::new(cmd);
+        fasync::Task::local(async move {
+            if let Err(result) = monitor.serve(proxy).await {
+                error!("error on fuchsia.net.reachability/Monitor: {:?}", &result);
+            }
+        })
+        .detach();
+    } else {
+        warn!("no connection to fuchsia.net.reachability/Monitor: sampling time sources is turned off.");
+    }
 
     // fuchsia::main can only return () or Result<()>.
     let result = fs
@@ -836,6 +857,7 @@ mod tests {
             utc_max_allowed_delta_future_sec: 0,
             utc_max_allowed_delta_past_sec: 0,
             serve_test_protocols: false,
+            use_connectivity: false,
         };
         Arc::new(Config::from(adjust_fn(config)))
     }

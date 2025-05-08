@@ -53,6 +53,9 @@ pub struct TimekeeperConfig {
     pub utc_max_allowed_delta_future_sec: u64,
     /// If set, timekeeper will use the capabilities related to power management.
     pub power_topology_integration_enabled: bool,
+    /// If set, Timekeeper will use connectivity information to gauge whether
+    /// to sample external time sources or not.
+    pub use_connectivity: bool,
 }
 
 impl Default for TimekeeperConfig {
@@ -71,6 +74,7 @@ impl Default for TimekeeperConfig {
             utc_max_allowed_delta_past_sec: 0,
             utc_max_allowed_delta_future_sec: 0,
             power_topology_integration_enabled: false,
+            use_connectivity: false,
         }
     }
 }
