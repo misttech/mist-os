@@ -49,8 +49,12 @@ if [[ "${BOOTLOADER}" != "sorrel" ]]; then
   fx-info "Checking current bootmode..."
   # Capture output and potential errors. Use awk to extract the value after 'bootmode='.
   # Store the exit code separately.
-  BOOTMODE_OUTPUT=$(${FASTBOOT} oem get_config bootmode 2>&1)
-  BOOTMODE_EXIT_CODE=$?
+  if BOOTMODE_OUTPUT=$(${FASTBOOT} oem get_config bootmode 2>&1); then
+    BOOTMODE_EXIT_CODE=0
+  else
+    BOOTMODE_EXIT_CODE=$?
+  fi
+
   INITIAL_BOOTMODE="" # Initialize to empty
 
   if [[ ${BOOTMODE_EXIT_CODE} -eq 0 ]]; then
