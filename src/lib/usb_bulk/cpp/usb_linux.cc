@@ -99,7 +99,13 @@ static void log_error(int err) {
 // be reliable.
 // 256KiB seems to work, but 1MiB bulk transfers lock up my z620 with a 3.13
 // kernel.
-#define MAX_USBFS_BULK_SIZE (256 * 1024)
+#define MAX_USBFS_BULK_WRITE_SIZE (256 * 1024)
+#define MAX_USBFS_BULK_READ_SIZE (16 * 1024)
+
+// This size should pretty much always work (it's compatible with pre-3.3
+// kernels and it's what we used to use historically), so if it doesn't work
+// something has gone badly wrong.
+#define MIN_USBFS_BULK_WRITE_SIZE (16 * 1024)
 
 struct usb_handle {
   char fname[64];
@@ -124,6 +130,7 @@ class UsbInterface {
  private:
   std::unique_ptr<usb_handle> handle_;
   const uint32_t ms_timeout_;
+  size_t max_usbfs_bulk_write_size_ = MAX_USBFS_BULK_WRITE_SIZE;
 
   // DISALLOW_COPY_AND_ASSIGN(UsbInterface);
 };
@@ -482,33 +489,93 @@ UsbInterface::~UsbInterface() { Close(); }
 ssize_t UsbInterface::Write(const void *_data, size_t len) {
   unsigned char *data = (unsigned char *)_data;
   unsigned count = 0;
-  struct usbdevfs_bulktransfer bulk;
-  int n;
+  struct usbdevfs_urb urb[2] = {};
+  bool pending[2] = {};
 
   if (handle_->ep_out == 0 || handle_->desc == -1) {
-    return EINVAL;
+    return -1;
   }
 
-  do {
-    int xfer;
-    xfer = (len > MAX_USBFS_BULK_SIZE) ? MAX_USBFS_BULK_SIZE : len;
+  auto submit_urb = [&](size_t i) {
+    while (true) {
+      int xfer = (len > max_usbfs_bulk_write_size_) ? max_usbfs_bulk_write_size_ : len;
 
-    bulk.ep = handle_->ep_out;
-    bulk.len = xfer;
-    bulk.data = data;
-    bulk.timeout = ms_timeout_;
+      urb[i].type = USBDEVFS_URB_TYPE_BULK;
+      urb[i].endpoint = handle_->ep_out;
+      urb[i].buffer_length = xfer;
+      urb[i].buffer = data;
+      urb[i].usercontext = reinterpret_cast<void *>(i);
 
-    n = ioctl(handle_->desc, USBDEVFS_BULK, &bulk);
-    if (n != xfer) {
-      DBG("ERROR: n = %d, errno = %d (%s)\n", n, errno, strerror(errno));
-      return -errno;
+      int n = ioctl(handle_->desc, USBDEVFS_SUBMITURB, &urb[i]);
+      if (n != 0) {
+        if (errno == ENOMEM && max_usbfs_bulk_write_size_ > MIN_USBFS_BULK_WRITE_SIZE) {
+          max_usbfs_bulk_write_size_ /= 2;
+          continue;
+        }
+        DBG("ioctl(USBDEVFS_SUBMITURB) failed. result = %d, errno %d (%s)\n", n, errno,
+            strerror(errno));
+        return false;
+      }
+
+      pending[i] = true;
+      count += xfer;
+      len -= xfer;
+      data += xfer;
+
+      return true;
     }
+  };
 
-    count += xfer;
-    len -= xfer;
-    data += xfer;
-  } while (len > 0);
+  auto reap_urb = [&](size_t i) {
+    while (pending[i]) {
+      struct usbdevfs_urb *urbp;
+      int res = ioctl(handle_->desc, USBDEVFS_REAPURB, &urbp);
+      if (res != 0) {
+        DBG("ioctl(USBDEVFS_REAPURB) failed. result = %d, errno %d (%s)\n", res, errno,
+            strerror(errno));
+        return false;
+      }
+      size_t done = (size_t)urbp->usercontext;
+      if (done >= 2 || !pending[done]) {
+        DBG("unexpected urb. idx = %zu\n", done);
+        return false;
+      }
+      if (urbp->status != 0 || urbp->actual_length != urbp->buffer_length) {
+        DBG("urb returned error. status = %d, acual_length = %d, buffer_length = %d\n",
+            urbp->status, urbp->actual_length, urbp->buffer_length);
+        return false;
+      }
+      pending[done] = false;
+    }
+    return true;
+  };
 
+  if (!submit_urb(0)) {
+    return -1;
+  }
+  while (len > 0) {
+    if (!submit_urb(1)) {
+      return -1;
+    }
+    if (!reap_urb(0)) {
+      return -1;
+    }
+    if (len <= 0) {
+      if (!reap_urb(1)) {
+        return -1;
+      }
+      return count;
+    }
+    if (!submit_urb(0)) {
+      return -1;
+    }
+    if (!reap_urb(1)) {
+      return -1;
+    }
+  }
+  if (!reap_urb(0)) {
+    return -1;
+  }
   return count;
 }
 
@@ -523,7 +590,7 @@ ssize_t UsbInterface::Read(void *_data, size_t len) {
   }
 
   while (len > 0) {
-    int xfer = (len > MAX_USBFS_BULK_SIZE) ? MAX_USBFS_BULK_SIZE : len;
+    int xfer = (len > MAX_USBFS_BULK_READ_SIZE) ? MAX_USBFS_BULK_READ_SIZE : len;
 
     bulk.ep = handle_->ep_in;
     bulk.len = xfer;
