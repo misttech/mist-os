@@ -22,7 +22,6 @@ schemas = [
   "ffx_tool.json",
   "fhcp_tests.json",
   "fidl_library.json",
-  "hardware.json",
   "host_tool.json",
   "loadable_module.json",
   "manifest.json",
@@ -30,7 +29,6 @@ schemas = [
   "rust_3p_library.json",
   "sysroot.json",
   "version_history.json",
-  "virtual_device.json",
 ]
 
 sdk_documentation("meta") {
