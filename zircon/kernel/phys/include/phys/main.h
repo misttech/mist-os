@@ -80,12 +80,6 @@ void ApplyRelocations();
 void InitMemory(const void* bootloader_data, ktl::optional<EarlyBootZbi> zbi,
                 AddressSpace* aspace = nullptr);
 
-// TODO(https://fxbug.dev/408020980): Remove once internal boot shims start
-// calling the previous overload.
-inline void InitMemory(const void* bootloader_data, AddressSpace* aspace = nullptr) {
-  InitMemory(bootloader_data, {}, aspace);
-}
-
 // This does most of the InitMemory() work for ZBI executables, where
 // InitMemory() calls it with the ZBI_TYPE_MEM_CONFIG payload from the ZBI.
 void ZbiInitMemory(const void* zbi_ptr, EarlyBootZbi zbi, ktl::span<zbi_mem_range_t> mem_config,
@@ -93,13 +87,6 @@ void ZbiInitMemory(const void* zbi_ptr, EarlyBootZbi zbi, ktl::span<zbi_mem_rang
                    AddressSpace* aspace = nullptr);
 
 void ArchSetUp(ktl::optional<EarlyBootZbi> zbi);
-
-// TODO(https://fxbug.dev/408020980): Remove once internal boot shims start
-// calling the previous overload.
-inline void ArchSetUp(const void* zbi_ptr) {
-  ZX_ASSERT(!zbi_ptr);
-  ArchSetUp(ktl::nullopt);
-}
 
 // Try to reboot or shut down the machine in a panic situation.
 [[noreturn]] void ArchPanicReset();
