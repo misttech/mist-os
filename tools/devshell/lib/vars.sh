@@ -511,7 +511,8 @@ function json-config-get {
 function get-device-raw {
   fx-config-read
   local device=""
-  device="$(ffx target default get)"
+  # Suppress the unset default target message from stderr.
+  device="$(ffx target default get 2>/dev/null)"
 
   if ! is-valid-device "${device}"; then
     fx-error "Invalid device name or address: '${device}'. Some valid examples are:
