@@ -172,7 +172,7 @@ impl FsNodeOps for ExtDirectory {
             .ok_or_else(|| errno!(ENOENT, name))?;
         let ext_node = ExtNode::new(fs_ops, entry.e2d_ino.into())?;
         let inode_num = ext_node.inode_num as ino_t;
-        fs.get_or_create_node(current_task, Some(inode_num as ino_t), |inode_num| {
+        fs.get_or_create_node(Some(inode_num as ino_t), |inode_num| {
             let entry_type = EntryType::from_u8(entry.e2d_type).map_err(|e| errno!(EIO, e))?;
             let mode = FileMode::from_bits(ext_node.inode.e2di_mode.into());
             let owner =

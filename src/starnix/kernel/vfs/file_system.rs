@@ -201,28 +201,15 @@ impl FileSystem {
         self.root.get()
     }
 
-    /// Prepare a node for insertion in the node cache.
-    ///
-    /// Currently, apply the required selinux context if the selinux workaround is enabled on this
-    /// filesystem.
-    fn prepare_node_for_insertion(
-        &self,
-        _current_task: &CurrentTask,
-        node: &FsNodeHandle,
-    ) -> WeakFsNodeHandle {
-        Arc::downgrade(node)
-    }
-
     pub fn get_or_create_node<F>(
         &self,
-        current_task: &CurrentTask,
         node_id: Option<ino_t>,
         create_fn: F,
     ) -> Result<FsNodeHandle, Errno>
     where
         F: FnOnce(ino_t) -> Result<FsNodeHandle, Errno>,
     {
-        self.get_and_validate_or_create_node(current_task, node_id, |_| true, create_fn)
+        self.get_and_validate_or_create_node(node_id, |_| true, create_fn)
     }
 
     /// Get a node that is validated with the callback, or create an FsNode for
@@ -241,7 +228,6 @@ impl FileSystem {
     /// Returns Err only if create_fn returns Err.
     pub fn get_and_validate_or_create_node<V, C>(
         &self,
-        current_task: &CurrentTask,
         node_id: Option<ino_t>,
         validate_fn: V,
         create_fn: C,
@@ -255,7 +241,7 @@ impl FileSystem {
         match nodes.entry(node_id) {
             Entry::Vacant(entry) => {
                 let node = create_fn(node_id)?;
-                entry.insert(self.prepare_node_for_insertion(current_task, &node));
+                entry.insert(Arc::downgrade(&node));
                 Ok(node)
             }
             Entry::Occupied(mut entry) => {
@@ -265,7 +251,7 @@ impl FileSystem {
                     }
                 }
                 let node = create_fn(node_id)?;
-                entry.insert(self.prepare_node_for_insertion(current_task, &node));
+                entry.insert(Arc::downgrade(&node));
                 Ok(node)
             }
         }
@@ -283,9 +269,7 @@ impl FileSystem {
     ) -> FsNodeHandle {
         let ops = ops.into();
         let node = FsNode::new_uncached(current_task, ops, self, id, info);
-        self.nodes
-            .lock()
-            .insert(node.node_id, self.prepare_node_for_insertion(current_task, &node));
+        self.nodes.lock().insert(node.node_id, Arc::downgrade(&node));
         node
     }
 

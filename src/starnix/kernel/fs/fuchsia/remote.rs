@@ -797,7 +797,6 @@ impl FsNodeOps for RemoteNode {
             UtcInstant::from_nanos(attrs.change_time.try_into().unwrap_or(i64::MAX));
         time_access = UtcInstant::from_nanos(attrs.access_time.try_into().unwrap_or(i64::MAX));
         let node = fs.get_or_create_node(
-            current_task,
             if fs_ops.use_remote_ids {
                 if node_id == fio::INO_UNKNOWN {
                     return error!(ENOTSUP);

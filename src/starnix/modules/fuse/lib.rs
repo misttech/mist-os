@@ -666,7 +666,6 @@ impl FuseNode {
             return error!(ENOENT);
         }
         let node = node.fs().get_and_validate_or_create_node(
-            current_task,
             Some(entry.nodeid),
             |node| {
                 let fuse_node = FuseNode::from_node(&node);
