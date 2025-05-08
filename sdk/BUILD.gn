@@ -288,25 +288,11 @@ if (!is_host) {
     idk_export_dir = "$root_build_dir/sdk/exported/fuchsia_idk_head_only"
   }
 
+  import("//sdk/idk_contents.gni")
   import("//sdk/idk_rules.gni")
 
   # Instantiate the target rules for the complete external IDK and the in-tree
   # IDK used by the in-tree Bazel SDK.
-
-  _common_non_sdk_deps_build_tests_for_all_builds = [
-    # Successfully building at each API level, including PLATFORM, is the test.
-    "//zircon/system:availability_test",
-  ]
-
-  _common_atoms_independent_of_api_level_and_cpu_arch = [
-    ":core_bindlib",
-    ":core_data",
-    ":version_history_sdk($default_toolchain)",
-  ]
-  _common_fidl_libraries = [ "//sdk/fidl" ]
-  _common_prebuilt_libraries = [ ":core_cc_prebuilt_libraries" ]
-  _common_source_libraries = [ ":core_cc_source_libraries" ]
-  _common_sysroot = [ ":core_sysroot" ]
 
   # The Fuchsia IDK that is distributed to out-of-tree developers.
   idk_rules("fuchsia") {
@@ -322,53 +308,7 @@ if (!is_host) {
     ]
     subbuilds_visibility = [ ":final_fuchsia_idk.exported" ]
 
-    non_sdk_deps_build_tests_for_all_builds =
-        _common_non_sdk_deps_build_tests_for_all_builds
-
-    atoms_independent_of_api_level_and_cpu_arch =
-        _common_atoms_independent_of_api_level_and_cpu_arch
-
-    fidl_libraries = _common_fidl_libraries
-    prebuilt_libraries = _common_prebuilt_libraries
-    source_libraries = _common_source_libraries
-    sysroot = _common_sysroot
-
-    dart_library = [ ":core_dart_library" ]
-    packages = [ ":core_packages" ]
-    vulkan_layers = [ "//src/lib/vulkan:vulkan_layers" ]
-
-    docs = [
-      ":core_licenses",
-      "//sdk/docs",
-    ]
-    docs_dependent_on_fidl = [ "//tools/docsgen:ref_docs_sdk" ]
-
-    host_tests = [
-      # These host tests are (currently) unversioned and only need to be
-      # built once.
-      # TODO(https://fxbug.dev/330373943): Move once tests are versioned.
-      ":fuchsia_idk_atoms_host_tests",
-    ]
-
-    host_tools = [
-      # IDK atoms that are host tools. They must currently support all
-      # Supported API levels and thus only need to be built once.
-      # TODO(https://fxbug.dev/349889250): Move host tools to
-      # :fuchsia_idk_atoms_at_platform_for_host_cpu_arch_only and/or
-      # :fuchsia_idk_atoms_for_each_api_level as appropriate.
-      ":host_tools_for_configured_host_cpus",
-
-      # Emulators that we include along with the SDK.
-      # TODO(https://fxbug.dev/42177692): Remove these once the emulators are
-      # available independently.
-      ":emulators($host_toolchain)",
-    ]
-
-    # TODO(https://fxbug.dev/310006516): Remove these once the Bazel SDK and all
-    # out-of-tree IDK users are using the per-API-level artifacts.
-    # Note that they will still be built at PLATFORM via the sub-builds
-    # deps; they just won't be included in the IDK.
-    atoms_to_include_in_deprecated_arch_directory = prebuilt_libraries + sysroot
+    forward_variables_from(fuchsia_idk_contents, "*")
   }
 
   # The in-tree subset of the IDK that contains only those atoms needed for the
@@ -381,47 +321,7 @@ if (!is_host) {
     ]
     subbuilds_visibility = []  # There are no sub-builds.
 
-    non_sdk_deps_build_tests_for_all_builds =
-        _common_non_sdk_deps_build_tests_for_all_builds
-
-    atoms_independent_of_api_level_and_cpu_arch =
-        _common_atoms_independent_of_api_level_and_cpu_arch
-
-    fidl_libraries = _common_fidl_libraries
-    prebuilt_libraries = _common_prebuilt_libraries
-    source_libraries = _common_source_libraries
-    sysroot = _common_sysroot
-
-    # Not used in-tree.
-    dart_library = []
-
-    # The packages are large and not used in-tree.
-    packages = []
-
-    # The Vulkan layers are large and not used by the in-tree SDK.
-    vulkan_layers = []
-
-    # No need for docs in-tree.
-    docs = []
-    docs_dependent_on_fidl = []
-
-    # The host tests are not used via the SDK in-tree.
-    host_tests = []
-
-    # The minimum set of tools required to support the Bazel SDK.
-    host_tools = [
-      ":build_host_tools($host_toolchain)",
-      ":non_build_host_tools_required_by_bazel_sdk($host_toolchain)",
-      ":emulators_required_by_bazel_sdk($host_toolchain)",
-    ]
-
-    # TODO(https://fxbug.dev/385406226): Exclude these from the in-tree IDK
-    # once the Bazel SDK uses artifacts built at HEAD.
-    # Note that they will still be built at PLATFORM via the sub-builds
-    # deps; they just won't be included in the IDK.
-    # For the sysroot, Bazel needs to support the per-level sysroot first -
-    # see https://fxbug.dev/385408047.
-    atoms_to_include_in_deprecated_arch_directory = prebuilt_libraries + sysroot
+    forward_variables_from(in_tree_idk_contents, "*")
   }
 
   # In-tree, ffx plugins/tools and tests depend on the existence of a
