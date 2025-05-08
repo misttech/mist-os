@@ -1112,7 +1112,7 @@ void AudioCompositeServer::WatchTopology(WatchTopologyCompleter::Sync& completer
   if (!topology_completer_.first_response_sent) {
     topology_completer_.first_response_sent = true;
     completer.Reply(kTopologyId);
-  } else if (topology_completer_.completer) {
+  } else if (topology_completer_.completer.has_value()) {
     // The client called WatchTopology when another hanging get was pending.
     // This is an error condition and hence we unbind the channel.
     FDF_LOG(ERROR, "WatchTopology was re-called while the previous call was still pending");

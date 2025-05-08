@@ -765,8 +765,6 @@ void VirtualAudioComposite::WatchTopology(WatchTopologyCompleter::Sync& complete
     // The client called WatchTopology when another hanging get was pending.
     // This is an error condition and hence we unbind the channel.
     fdf::error("WatchTopology was re-called while the previous call was still pending");
-    watch_topology_needs_reply_ = true;
-    watch_topology_completer_.reset();
     completer.Close(ZX_ERR_BAD_STATE);
   } else {
     watch_topology_completer_ = completer.ToAsync();

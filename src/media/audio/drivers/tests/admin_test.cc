@@ -116,6 +116,75 @@ void AdminTest::ResetAndExpectResponse() {
   ExpectCallbacks();
 }
 
+// Is this id a RingBuffer element?
+bool AdminTest::ElementIsRingBuffer(fuchsia::hardware::audio::ElementId element_id) {
+  return std::ranges::any_of(
+      elements_, [element_id](const fuchsia::hardware::audio::signalprocessing::Element& element) {
+        return element.has_id() && element.id() == element_id && element.has_type() &&
+               element.type() ==
+                   fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER;
+      });
+}
+
+// Is this RingBuffer element Incoming (its contents are READ-ONLY) or Outgoing (also WRITABLE)?
+// We walk the signalprocessing topologies. If (across all the topologies) this element ever has
+// any incoming edges, then it is not itself an outgoing RingBuffer. If this element ever has any
+// outgoing edges, then it is not itself an incoming RingBuffer.
+std::optional<bool> AdminTest::ElementIsIncoming(
+    std::optional<fuchsia::hardware::audio::ElementId> ring_buffer_element_id) {
+  if (!device_entry().isComposite()) {
+    return TestBase::IsIncoming();
+  }
+
+  if (!ring_buffer_element_id.has_value()) {
+    ADD_FAILURE() << "ring_buffer_element_id is not set";
+    return std::nullopt;
+  }
+
+  if (!ElementIsRingBuffer(*ring_buffer_element_id)) {
+    ADD_FAILURE() << "element_id " << *ring_buffer_element_id << " is not a RingBuffer element";
+    return std::nullopt;
+  }
+
+  if (!current_topology_id_.has_value()) {
+    ADD_FAILURE() << "current_topology_id_ is n ot set";
+    return std::nullopt;
+  }
+
+  std::vector<fuchsia::hardware::audio::signalprocessing::EdgePair> edge_pairs;
+  for (const auto& t : topologies_) {
+    if (t.has_id() && t.id() == *current_topology_id_) {
+      edge_pairs = t.processing_elements_edge_pairs();
+      break;
+    }
+  }
+  if (edge_pairs.empty()) {
+    ADD_FAILURE() << "could not find edge_pairs for current_topology_id " << *current_topology_id_;
+    return std::nullopt;
+  }
+  bool has_outgoing = std::ranges::any_of(
+      edge_pairs, [element_id = *ring_buffer_element_id](
+                      const fuchsia::hardware::audio::signalprocessing::EdgePair& edge_pair) {
+        return (edge_pair.processing_element_id_from == element_id);
+      });
+  bool has_incoming = std::ranges::any_of(
+      edge_pairs, [element_id = *ring_buffer_element_id](
+                      const fuchsia::hardware::audio::signalprocessing::EdgePair& edge_pair) {
+        return (edge_pair.processing_element_id_to == element_id);
+      });
+
+  if (has_outgoing && !has_incoming) {
+    return false;
+  }
+  if (!has_outgoing && has_incoming) {
+    return true;
+  }
+
+  ADD_FAILURE() << "For RingBuffer element " << *ring_buffer_element_id
+                << ", has_outgoing and has_incoming are both " << (has_outgoing ? "TRUE" : "FALSE");
+  return std::nullopt;
+}
+
 // For the channelization and sample_format that we've set for the ring buffer, determine the size
 // of each frame. This method assumes that CreateRingBuffer has already been sent to the driver.
 void AdminTest::CalculateRingBufferFrameSize() {
@@ -134,7 +203,7 @@ void AdminTest::RequestRingBufferChannel() {
   fidl::InterfaceHandle<fuchsia::hardware::audio::RingBuffer> ring_buffer_handle;
   if (device_entry().isComposite()) {
     RequestTopologies();
-    RequestTopology();
+    RetrieveInitialTopology();
 
     // If a ring_buffer_id exists, request it - but don't fail if the driver has no ring buffer.
     if (ring_buffer_id().has_value()) {
@@ -152,7 +221,7 @@ void AdminTest::RequestRingBufferChannel() {
       if (!composite().is_bound()) {
         FAIL() << "Composite failed to get ring buffer channel";
       }
-      SetRingBufferIncoming(IsIncoming(ring_buffer_id()));
+      SetRingBufferIncoming(ElementIsIncoming(ring_buffer_id()));
     }
   } else if (device_entry().isDai()) {
     fuchsia::hardware::audio::DaiFormat dai_format = {};
@@ -348,6 +417,85 @@ void AdminTest::CooldownAfterRingBufferDisconnect() {
   zx::nanosleep(zx::deadline_after(kRingBufferDisconnectCooldownDuration));
 }
 
+void AdminTest::CooldownAfterSignalProcessingDisconnect() {
+  zx::nanosleep(zx::deadline_after(kSignalProcessingDisconnectCooldownDuration));
+}
+
+void AdminTest::RetrieveRingBufferFormats() {
+  if (!device_entry().isComposite()) {
+    TestBase::RetrieveRingBufferFormats();
+    return;
+  }
+  RequestTopologies();
+
+  // If ring_buffer_id_ is set, then a ring-buffer element exists for this composite device.
+  // Retrieve the supported ring buffer formats for that node.
+  if (!ring_buffer_id_.has_value()) {
+    // "No ring buffer" is valid (Composite can replace Codec); do nothing in that case.
+    return;
+  }
+  composite()->GetRingBufferFormats(
+      *ring_buffer_id_,
+      AddCallback("GetRingBufferFormats",
+                  [this](fuchsia::hardware::audio::Composite_GetRingBufferFormats_Result result) {
+                    ASSERT_FALSE(result.is_err()) << static_cast<int32_t>(result.err());
+                    auto& supported_formats = result.response().ring_buffer_formats;
+                    EXPECT_FALSE(supported_formats.empty());
+
+                    for (size_t i = 0; i < supported_formats.size(); ++i) {
+                      SCOPED_TRACE(testing::Message()
+                                   << "Composite supported_formats[" << i << "]");
+                      ASSERT_TRUE(supported_formats[i].has_pcm_supported_formats());
+                      auto& format_set = *supported_formats[i].mutable_pcm_supported_formats();
+                      ring_buffer_pcm_formats().push_back(std::move(format_set));
+                    }
+                  }));
+  ExpectCallbacks();
+
+  ValidateRingBufferFormatSets(ring_buffer_pcm_formats());
+  if (!HasFailure()) {
+    SetMinMaxRingBufferFormats();
+  }
+}
+
+// Request that the driver return the format ranges that it supports.
+void AdminTest::RetrieveDaiFormats() {
+  if (!device_entry().isComposite()) {
+    TestBase::RetrieveDaiFormats();
+    return;
+  }
+
+  RequestTopologies();
+
+  // If there is a dai id, request the DAI formats for this interconnect.
+  if (dai_id_.has_value()) {
+    composite()->GetDaiFormats(
+        *dai_id_,
+        AddCallback("Composite::GetDaiFormats",
+                    [this](fuchsia::hardware::audio::Composite_GetDaiFormats_Result result) {
+                      ASSERT_FALSE(result.is_err());
+                      auto& supported_formats = result.response().dai_formats;
+                      EXPECT_FALSE(supported_formats.empty());
+
+                      for (size_t i = 0; i < supported_formats.size(); ++i) {
+                        SCOPED_TRACE(testing::Message()
+                                     << "Composite supported_formats[" << i << "]");
+                        dai_formats().push_back(std::move(supported_formats[i]));
+                      }
+                    }));
+  } else {
+    // "No DAI" is also valid (Composite can replace StreamConfig); do nothing in that case.
+    return;
+  }
+
+  ExpectCallbacks();
+
+  ValidateDaiFormatSets(dai_formats());
+  if (!HasFailure()) {
+    SetMinMaxDaiFormats();
+  }
+}
+
 // Request that the driver start the ring buffer engine, responding with the start_time.
 // This method assumes that GetVmo has previously been called and we are not already started.
 zx::time AdminTest::RequestRingBufferStart() {
@@ -486,6 +634,276 @@ void AdminTest::DropRingBuffer() {
   CooldownAfterRingBufferDisconnect();
 }
 
+// All signalprocessing-related methods are in AdminTest, because only Composite drivers support the
+// signalprocessing protocols, and Composite drivers have only AdminTest cases.
+void AdminTest::SignalProcessingConnect() {
+  if (signal_processing().is_bound()) {
+    return;  // Already connected.
+  }
+  fidl::InterfaceHandle<fuchsia::hardware::audio::signalprocessing::SignalProcessing> sp_client;
+  fidl::InterfaceRequest<fuchsia::hardware::audio::signalprocessing::SignalProcessing> sp_server =
+      sp_client.NewRequest();
+  composite()->SignalProcessingConnect(std::move(sp_server));
+  signal_processing() = sp_client.Bind();
+
+  AddErrorHandler(signal_processing(), "SignalProcessing");
+}
+
+// Retrieve the element list. If signalprocessing is not supported, exit early;
+// otherwise save the ID of a RING_BUFFER element, and the ID of a DAI_INTERCONNECT element.
+// We will use these IDs later, when performing Dai-specific and RingBuffer-specific checks.
+void AdminTest::RequestElements() {
+  SignalProcessingConnect();
+
+  // If we've already checked for signalprocessing support, then no need to do it again.
+  if (signalprocessing_is_supported_.has_value()) {
+    return;
+  }
+  if (!elements_.empty()) {
+    return;
+  }
+
+  zx_status_t status = ZX_OK;
+  ring_buffer_id_.reset();
+  dai_id_.reset();
+  signal_processing()->GetElements(AddCallback(
+      "signalprocessing::Reader::GetElements",
+      [this,
+       &status](fuchsia::hardware::audio::signalprocessing::Reader_GetElements_Result result) {
+        status = result.is_err() ? result.err() : ZX_OK;
+        if (status == ZX_OK) {
+          elements_ = std::move(result.response().processing_elements);
+        } else {
+          signalprocessing_is_supported_ = false;
+        }
+      }));
+  ExpectCallbacks();
+
+  // Either we get elements or the API method is not supported.
+  ASSERT_TRUE(status == ZX_OK || status == ZX_ERR_NOT_SUPPORTED);
+  // We don't check for topologies if GetElements is not supported.
+  if (status == ZX_ERR_NOT_SUPPORTED) {
+    signalprocessing_is_supported_ = false;
+    return;
+  }
+
+  // If supported, GetElements must return at least one element.
+  if (elements_.empty()) {
+    signalprocessing_is_supported_ = false;
+    FAIL() << "elements list is empty";
+  }
+
+  signalprocessing_is_supported_ = true;
+
+  std::unordered_set<fuchsia::hardware::audio::signalprocessing::ElementId> element_ids;
+  for (auto& element : elements_) {
+    // All elements must have an id and type
+    ASSERT_TRUE(element.has_id());
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER) {
+      ring_buffer_id_.emplace(element.id());  // Override any previous.
+    } else if (element.type() ==
+               fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT) {
+      dai_id_.emplace(element.id());  // Override any previous.
+    }
+
+    // No element id may be a duplicate.
+    ASSERT_FALSE(element_ids.contains(element.id())) << "Duplicate element id " << element.id();
+    element_ids.insert(element.id());
+  }
+}
+
+// First retrieve the element list. If signalprocessing is not supported, exit early;
+// otherwise save the ID of a RING_BUFFER element, and the ID of a DAI_INTERCONNECT element.
+// We will use these IDs later, when performing Dai-specific and RingBuffer-specific checks.
+void AdminTest::RequestTopologies() {
+  SignalProcessingConnect();
+  RequestElements();
+
+  if (!signalprocessing_is_supported_.value_or(false)) {
+    return;
+  }
+  if (!topologies_.empty()) {
+    return;
+  }
+
+  signal_processing()->GetTopologies(AddCallback(
+      "signalprocessing::Reader::GetTopologies",
+      [this](fuchsia::hardware::audio::signalprocessing::Reader_GetTopologies_Result result) {
+        if (result.is_err()) {
+          signalprocessing_is_supported_ = false;
+          FAIL() << "GetTopologies returned err " << result.err();
+          __UNREACHABLE;
+        }
+        topologies_ = std::move(result.response().topologies);
+      }));
+  ExpectCallbacks();
+
+  // We only call GetTopologies if we have elements, so we must have at least one topology.
+  if (topologies_.empty()) {
+    signalprocessing_is_supported_ = false;
+    FAIL() << "topologies list is empty";
+    __UNREACHABLE;
+  }
+
+  std::unordered_set<fuchsia::hardware::audio::signalprocessing::TopologyId> topology_ids;
+  for (const auto& topology : topologies_) {
+    // All topologies must have an id and a non-empty list of edges.
+    ASSERT_TRUE(topology.has_id());
+    ASSERT_TRUE(topology.has_processing_elements_edge_pairs())
+        << "Topology " << topology.id() << " processing_elements_edge_pairs is null";
+    ASSERT_FALSE(topology.processing_elements_edge_pairs().empty())
+        << "Topology " << topology.id() << " processing_elements_edge_pairs is empty";
+
+    // No topology id may be a duplicate.
+    ASSERT_FALSE(topology_ids.contains(topology.id())) << "Duplicate topology id " << topology.id();
+    topology_ids.insert(topology.id());
+  }
+}
+
+void AdminTest::RetrieveInitialTopology() {
+  SignalProcessingConnect();
+  RequestElements();
+  RequestTopologies();
+
+  ASSERT_TRUE(signalprocessing_is_supported_.value_or(false))
+      << "signalprocessing is required for this test";
+
+  if (initial_topology_id_.has_value()) {
+    return;
+  }
+
+  signal_processing()->WatchTopology(AddCallback(
+      "signalprocessing::Reader::WatchTopology",
+      [this](fuchsia::hardware::audio::signalprocessing::Reader_WatchTopology_Result result) {
+        ASSERT_TRUE(result.is_response());
+        initial_topology_id_ = result.response().topology_id;
+        current_topology_id_ = initial_topology_id_;
+      }));
+  ExpectCallbacks();
+
+  // We only call WatchTopology if we support signalprocessing, so a topology should be set now.
+  ASSERT_TRUE(current_topology_id_.has_value());
+  if (std::ranges::none_of(topologies_, [id = *current_topology_id_](const auto& topo) {
+        return (topo.has_id() && topo.id() == id);
+      })) {
+    // This topology_id is not in the list returned earlier.
+    signalprocessing_is_supported_ = false;
+    FAIL() << "WatchTopology returned " << *current_topology_id_
+           << " which is not in our topology list";
+  }
+}
+
+void AdminTest::WatchForTopology(fuchsia::hardware::audio::signalprocessing::TopologyId id) {
+  ASSERT_TRUE(signalprocessing_is_supported_.value_or(false))
+      << "signalprocessing is required for this test";
+  // We only call WatchTopology if we support signalprocessing, so a topology should already be set.
+  ASSERT_TRUE(current_topology_id_.has_value());
+  // We should only expect a response if this represents a change. Don't call this method otherwise.
+  ASSERT_NE(id, *current_topology_id_);
+
+  // Make sure we're watching for a topology that is in the supported list.
+  if (std::ranges::none_of(topologies_,
+                           [id](const auto& t) { return (t.has_id() && t.id() == id); })) {
+    // This topology_id is not in the list returned earlier.
+    FAIL() << "We shouldn't wait for topology " << id << " which is not in our list";
+    __UNREACHABLE;
+  }
+
+  signal_processing()->WatchTopology(AddCallbackUnordered(
+      "signalprocessing::Reader::WatchTopology(update)",
+      [this, id](fuchsia::hardware::audio::signalprocessing::Reader_WatchTopology_Result result) {
+        ASSERT_TRUE(result.is_response());
+        ASSERT_EQ(id, result.response().topology_id);
+        current_topology_id_ = result.response().topology_id;
+      }));
+}
+
+void AdminTest::FailOnWatchTopologyCompletion() {
+  signal_processing()->WatchTopology(AddUnexpectedCallback("unexpected WatchTopology completion"));
+}
+
+void AdminTest::SetAllTopologies() {
+  ASSERT_FALSE(topologies_.empty());
+  ASSERT_TRUE(initial_topology_id_.has_value());
+  ASSERT_TRUE(current_topology_id_.has_value());
+  ASSERT_EQ(current_topology_id_, initial_topology_id_);
+
+  if (topologies_.size() == 1) {
+    GTEST_SKIP() << "Device has only one topology; we cannot test changing it";
+    __UNREACHABLE;
+  }
+
+  // Ensure that all the supported topologies can be set.
+  for (const auto& t : topologies_) {
+    ASSERT_TRUE(t.has_id());
+    // Try them all, except the current one (which _should_ be the initial topology).
+    if (t.id() == *initial_topology_id_) {
+      continue;
+    }
+    SetTopologyAndExpectCallback(t.id());
+  }
+
+  // Now restore the initial topology.
+  SetTopologyAndExpectCallback(*initial_topology_id_);
+}
+
+void AdminTest::SetTopologyAndExpectCallback(
+    fuchsia::hardware::audio::signalprocessing::TopologyId id) {
+  ASSERT_NE(id, current_topology_id_);
+  ASSERT_FALSE(pending_set_topology_id_.has_value());
+  pending_set_topology_id_ = id;
+  signal_processing()->SetTopology(
+      id,
+      AddCallbackUnordered(
+          "SetTopology(" + std::to_string(id) + ")",
+          [this, id](fuchsia::hardware::audio::signalprocessing::SignalProcessing_SetTopology_Result
+                         result) {
+            ASSERT_FALSE(result.is_err()) << "SetTopology(" << id << ") failed";
+            ASSERT_TRUE(pending_set_topology_id_.has_value());
+            ASSERT_EQ(*pending_set_topology_id_, id);
+            pending_set_topology_id_.reset();
+          }));
+  ASSERT_TRUE(signal_processing().is_bound()) << "SignalProcessing failed to set the topology";
+  WatchForTopology(id);
+  ExpectCallbacks();
+}
+
+void AdminTest::WatchTopologyAndExpectDisconnect(zx_status_t expected_error) {
+  FailOnWatchTopologyCompletion();
+  ExpectError(signal_processing(), expected_error);
+  CooldownAfterSignalProcessingDisconnect();
+}
+
+void AdminTest::SetUnknownTopologyAndExpectError() {
+  RequestTopologies();
+  ASSERT_FALSE(pending_set_topology_id_.has_value());
+
+  fuchsia::hardware::audio::signalprocessing::TopologyId unknown_id = 0;
+  while (std::ranges::any_of(topologies_, [unknown_id](const auto& topo) {
+    return topo.has_id() && topo.id() == unknown_id;
+  })) {
+    ++unknown_id;
+  }
+
+  pending_set_topology_id_ = unknown_id;
+  signal_processing()->SetTopology(
+      unknown_id,
+      AddCallback(
+          "SetTopology(" + std::to_string(unknown_id) + ")",
+          [this, unknown_id](
+              fuchsia::hardware::audio::signalprocessing::SignalProcessing_SetTopology_Result
+                  result) {
+            pending_set_topology_id_.reset();
+            ASSERT_TRUE(result.is_err()) << "SetTopology(" << unknown_id << ") did not fail";
+            ASSERT_EQ(result.err(), ZX_ERR_INVALID_ARGS);
+          }));
+  ASSERT_TRUE(signal_processing().is_bound())
+      << "SignalProcessing disconnected after setting an unknown topology";
+  FailOnWatchTopologyCompletion();
+  ExpectCallbacks();
+}
+
 // Validate that the collection of element IDs found in the topology list are complete and correct.
 void AdminTest::ValidateElementTopologyClosure() {
   ASSERT_FALSE(elements().empty());
@@ -553,6 +971,167 @@ void AdminTest::ValidateElementTopologyClosure() {
       << ") were not referenced in any topology";
 }
 
+bool AdminTest::ValidateElement(
+    const fuchsia::hardware::audio::signalprocessing::Element& element) {
+  if (!element.has_id()) {
+    ADD_FAILURE() << "ElementId is a required field";
+    return false;
+  }
+  if (!element.has_type()) {
+    ADD_FAILURE() << "ElementType is a required field";
+    return false;
+  }
+  bool should_have_type_specific =
+      (element.type() ==
+           fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT ||
+       element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::DYNAMICS ||
+       element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::EQUALIZER ||
+       element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::GAIN ||
+       element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::VENDOR_SPECIFIC);
+  if (element.has_type_specific() != should_have_type_specific) {
+    ADD_FAILURE() << "ElementTypeSpecific should " << (should_have_type_specific ? "" : "not")
+                  << " be set, for this ElementType";
+    return false;
+  }
+  return true;
+}
+
+void AdminTest::ValidateDaiElements() {
+  ASSERT_FALSE(elements().empty());
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() ==
+        fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT) {
+      ASSERT_TRUE(element.has_type_specific());
+      ASSERT_TRUE(element.type_specific().is_dai_interconnect());
+      ASSERT_TRUE(element.type_specific().dai_interconnect().has_plug_detect_capabilities());
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No DAI_INTERCONNECT elements found";
+  }
+}
+
+void AdminTest::ValidateDynamicsElements() {
+  ASSERT_FALSE(elements().empty());
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::DYNAMICS) {
+      ASSERT_TRUE(element.has_type_specific());
+      ASSERT_TRUE(element.type_specific().is_dynamics());
+      ASSERT_TRUE(element.type_specific().dynamics().has_bands());
+      ASSERT_FALSE(element.type_specific().dynamics().bands().empty());
+      for (const auto& band : element.type_specific().dynamics().bands()) {
+        ASSERT_TRUE(band.has_id());
+      }
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No DYNAMICS elements found";
+  }
+}
+
+void AdminTest::ValidateEqualizerElements() {
+  ASSERT_FALSE(elements().empty());
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::EQUALIZER) {
+      ASSERT_TRUE(element.has_type_specific());
+      ASSERT_TRUE(element.type_specific().is_equalizer());
+      const auto& eq = element.type_specific().equalizer();
+
+      ASSERT_TRUE(eq.has_bands());
+      ASSERT_FALSE(eq.bands().empty());
+      for (const auto& band : element.type_specific().equalizer().bands()) {
+        ASSERT_TRUE(band.has_id());
+      }
+
+      ASSERT_TRUE(eq.has_min_frequency());
+      ASSERT_TRUE(eq.has_max_frequency());
+      ASSERT_LE(eq.min_frequency(), eq.max_frequency());
+      ASSERT_TRUE(!eq.has_max_q() || (std::isfinite(eq.max_q()) && eq.max_q() > 0.0f));
+
+      bool requires_gain_db_vals =
+          eq.has_supported_controls() && (fuchsia::hardware::audio::signalprocessing::
+                                              EqualizerSupportedControls::SUPPORTS_TYPE_PEAK ||
+                                          fuchsia::hardware::audio::signalprocessing::
+                                              EqualizerSupportedControls::SUPPORTS_TYPE_LOW_SHELF ||
+                                          fuchsia::hardware::audio::signalprocessing::
+                                              EqualizerSupportedControls::SUPPORTS_TYPE_HIGH_SHELF);
+      ASSERT_TRUE(
+          !requires_gain_db_vals ||
+          (eq.has_min_gain_db() && std::isfinite(eq.min_gain_db()) && eq.min_gain_db() > 0.0f));
+      ASSERT_TRUE(
+          !requires_gain_db_vals ||
+          (eq.has_max_gain_db() && std::isfinite(eq.max_gain_db()) && eq.max_gain_db() > 0.0f));
+      ASSERT_TRUE(!eq.has_min_gain_db() || !eq.has_max_gain_db() ||
+                  eq.min_gain_db() <= eq.max_gain_db());
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No EQUALIZER elements found";
+  }
+}
+
+void AdminTest::ValidateGainElements() {
+  ASSERT_FALSE(elements().empty());
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::GAIN) {
+      ASSERT_TRUE(element.has_type_specific());
+      ASSERT_TRUE(element.type_specific().is_gain());
+      ASSERT_TRUE(element.type_specific().gain().has_type());
+
+      ASSERT_TRUE(element.type_specific().gain().has_min_gain());
+      ASSERT_TRUE(std::isfinite(element.type_specific().gain().min_gain()));
+
+      ASSERT_TRUE(element.type_specific().gain().has_max_gain());
+      ASSERT_TRUE(std::isfinite(element.type_specific().gain().max_gain()));
+      ASSERT_LE(element.type_specific().gain().min_gain(),
+                element.type_specific().gain().max_gain());
+
+      ASSERT_TRUE(element.type_specific().gain().has_min_gain_step());
+      ASSERT_TRUE(std::isfinite(element.type_specific().gain().min_gain_step()));
+      ASSERT_LE(
+          element.type_specific().gain().min_gain_step(),
+          element.type_specific().gain().max_gain() - element.type_specific().gain().min_gain());
+      ASSERT_GE(element.type_specific().gain().min_gain_step(), 0.0f);
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No GAIN elements found";
+  }
+}
+
+void AdminTest::ValidateVendorSpecificElements() {
+  ASSERT_FALSE(elements().empty());
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() ==
+        fuchsia::hardware::audio::signalprocessing::ElementType::VENDOR_SPECIFIC) {
+      ASSERT_TRUE(element.has_type_specific());
+      ASSERT_TRUE(element.type_specific().is_vendor_specific());
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No VENDOR_SPECIFIC elements found";
+  }
+}
+
+void AdminTest::ValidateElements() {
+  ASSERT_FALSE(elements().empty());
+  for (const auto& element : elements()) {
+    if (!ValidateElement(element)) {
+      break;
+    }
+  }
+}
+
 #define DEFINE_ADMIN_TEST_CLASS(CLASS_NAME, CODE)                               \
   class CLASS_NAME : public AdminTest {                                         \
    public:                                                                      \
@@ -577,10 +1156,41 @@ DEFINE_ADMIN_TEST_CLASS(CompositeProperties, {
 
 // Verify that a valid element list is successfully received.
 DEFINE_ADMIN_TEST_CLASS(GetElements, {
-  RequestElements();
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
   if (kDisplayElementsAndTopologies) {
     DisplayElements(elements());
   }
+  ASSERT_NO_FAILURE_OR_SKIP(ValidateElements());
+  WaitForError();
+});
+
+DEFINE_ADMIN_TEST_CLASS(DaiElements, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(ValidateDaiElements());
+  WaitForError();
+});
+
+DEFINE_ADMIN_TEST_CLASS(DynamicsElements, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(ValidateDynamicsElements());
+  WaitForError();
+});
+
+DEFINE_ADMIN_TEST_CLASS(EqualizerElements, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(ValidateEqualizerElements());
+  WaitForError();
+});
+
+DEFINE_ADMIN_TEST_CLASS(GainElements, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(ValidateGainElements());
+  WaitForError();
+});
+
+DEFINE_ADMIN_TEST_CLASS(VendorSpecificElements, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(ValidateVendorSpecificElements());
   WaitForError();
 });
 
@@ -594,9 +1204,18 @@ DEFINE_ADMIN_TEST_CLASS(GetTopologies, {
 });
 
 // Verify that a valid topology is successfully received.
-DEFINE_ADMIN_TEST_CLASS(GetTopology, {
+DEFINE_ADMIN_TEST_CLASS(InitialTopology, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
-  RequestTopology();
+  RetrieveInitialTopology();
+  WaitForError();
+});
+
+// Verify that a valid topology is successfully received.
+DEFINE_ADMIN_TEST_CLASS(SetTopology, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+
+  SetAllTopologies();
   WaitForError();
 });
 
@@ -607,6 +1226,26 @@ DEFINE_ADMIN_TEST_CLASS(ElementTopologyClosure, {
 
   ValidateElementTopologyClosure();
   WaitForError();
+});
+
+// Verify that an unknown topology causes an error but does not disconnect.
+DEFINE_ADMIN_TEST_CLASS(SetUnknownTopologyShouldError, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+
+  SetUnknownTopologyAndExpectError();  // ... but we should remain connected.
+  WaitForError();
+});
+
+// Verify that an unknown topology causes an error but does not disconnect.
+DEFINE_ADMIN_TEST_CLASS(WatchTopologyWhilePendingShouldDisconnect, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+
+  ASSERT_NO_FAILURE_OR_SKIP(FailOnWatchTopologyCompletion());
+  ASSERT_NO_FAILURE_OR_SKIP(WaitForError());
+
+  WatchTopologyAndExpectDisconnect(ZX_ERR_BAD_STATE);
 });
 
 // Verify that format-retrieval responses are successfully received and are complete and valid.
@@ -1001,21 +1640,6 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
     REGISTER_ADMIN_TEST(CodecStop, device_entry);
     REGISTER_ADMIN_TEST(CodecStart, device_entry);
   } else if (device_entry.isComposite()) {
-    // signalprocessing element test cases
-    //
-    REGISTER_ADMIN_TEST(GetElements, device_entry);
-    // TODO(https://fxbug.dev/42077405): Add testing for SignalProcessing methods.
-    // REGISTER_ADMIN_TEST(GetElementStates, device_entry);
-    // REGISTER_ADMIN_TEST(SetElementState, device_entry);
-
-    // signalprocessing topology test cases
-    //
-    REGISTER_ADMIN_TEST(GetTopologies, device_entry);
-    REGISTER_ADMIN_TEST(ElementTopologyClosure, device_entry);
-    REGISTER_ADMIN_TEST(GetTopology, device_entry);
-    // TODO(https://fxbug.dev/42077405): Add testing for SignalProcessing methods.
-    // REGISTER_ADMIN_TEST(SetTopology, device_entry);
-
     // Composite test cases
     //
     REGISTER_ADMIN_TEST(CompositeHealth, device_entry);
@@ -1026,6 +1650,28 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
     // REGISTER_ADMIN_TEST(SetDaiFormat, device_entry); // test all DAIs, not just the first.
     // Reset should close RingBuffers and revert SetTopology, SetElementState and SetDaiFormat.
     // REGISTER_ADMIN_TEST(CompositeReset, device_entry);
+
+    // signalprocessing Element test cases
+    //
+    REGISTER_ADMIN_TEST(GetElements, device_entry);
+    REGISTER_ADMIN_TEST(DaiElements, device_entry);
+    REGISTER_ADMIN_TEST(DynamicsElements, device_entry);
+    REGISTER_ADMIN_TEST(EqualizerElements, device_entry);
+    REGISTER_ADMIN_TEST(GainElements, device_entry);
+    REGISTER_ADMIN_TEST(VendorSpecificElements, device_entry);
+
+    // signalprocessing Topology test cases
+    //
+    REGISTER_ADMIN_TEST(GetTopologies, device_entry);
+    REGISTER_ADMIN_TEST(ElementTopologyClosure, device_entry);
+    REGISTER_ADMIN_TEST(InitialTopology, device_entry);
+    REGISTER_ADMIN_TEST(SetTopology, device_entry);
+    REGISTER_ADMIN_TEST(SetUnknownTopologyShouldError, device_entry);
+    REGISTER_ADMIN_TEST(WatchTopologyWhilePendingShouldDisconnect, device_entry);
+
+    // signalprocessing ElementState test cases
+    //
+    // TODO(https://fxbug.dev/42077405): Add testing for SignalProcessing ElementState methods.
 
     // RingBuffer test cases
     //
@@ -1059,6 +1705,7 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
     REGISTER_ADMIN_TEST(GetRingBufferPropertiesAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(SetActiveChannelsAfterDroppingFirstRingBuffer, device_entry);
+
   } else if (device_entry.isDai()) {
     REGISTER_ADMIN_TEST(GetRingBufferProperties, device_entry);
     REGISTER_ADMIN_TEST(GetBuffer, device_entry);
@@ -1124,13 +1771,77 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
   }
 }
 
-// TODO(https://fxbug.dev/302704556): Add Watch-while-still-pending tests (delay and position).
-
 // TODO(https://fxbug.dev/42075676): Add remaining tests for Codec protocol methods.
 //
 // SetDaiFormatUnsupported
 //    Codec::SetDaiFormat with bad format returns the expected ZX_ERR_INVALID_ARGS.
 //    Codec should still be usable (protocol channel still open), after an error is returned.
 // SetDaiFormatWhileUnplugged (not testable in automated environment)
+
+// TODO(https://fxbug.dev/302704556): Add Watch-while-still-pending tests for delay and position.
+
+// TODO(https://fxbug.dev/42075676): Add testing for Composite protocol methods.
+
+// TODO(https://fxbug.dev/42077405): Add remaining testing for SignalProcessing methods.
+//
+// Proposed test cases for fuchsia.hardware.audio.signalprocessing listed below:
+//
+// SetTopologyInvalidated
+//    First make a change that invalidates the SignalProcessing configuration, then
+//    (hanging) WatchTopology should ... return ZX_ERR_BAD_STATE and not close channel?
+//    SetTopology should return ZX_ERR_BAD_STATE and not close channel.
+// SetTopologyReconfigured
+//    First invalidate the SignalProcessing configuration, then retrieve the new topologies.
+//    SetTopology returns callback (does not fail or close channel).
+//    WatchTopology acknowledges the change made by SetTopology.
+
+// InitialElementState
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    If WatchElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other
+//    error. Else set a static var for this driver instance that SignalProcessing is supported.
+//    WatchElementState immediately returns when initially called.
+//    Callback contains a valid complete ElementState that matches the ElementType.
+// WatchElementStateBadId
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    WatchElementState(badId) returns ZX_ERR_INVALID_ARGS and does not close. Fail on other
+//    error.
+// TODO(https://fxbug.dev/302704556): Add Watch-while-still-pending test for WatchElementState.
+// WatchElementStateWhilePending
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    If WatchElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other
+//    error. Else set a static var for this driver instance that SignalProcessing is supported.
+//    WatchElementState immediately returns when initially called.
+//    WatchElementState (again) closes the protocol channel with ZX_ERR_BAD_STATE
+
+// SetElementState
+//    If SetElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    Else set a static var for this driver instance that SignalProcessing is supported.
+//    SetElementState returns callback.  Any other observable state?
+// SetElementStateElementSpecific
+//    Detailed checks of specific input or output fields that are unique to the element type.
+//    ... likely multiple test cases here, one for each ElementType
+// SetElementStateNoChange
+//    If SetElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    Else set a static var for this driver instance that SignalProcessing is supported.
+//    SetElementState does not returns callback, trigger WatchElementStateChange or close channel.
+// SetElementStateBadId
+//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    SetElementState(badId) returns ZX_ERR_INVALID_ARGS, not close channel. Fail on other error.
+// SetElementStateBadValues
+//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    SetElementState(badVal) returns ZX_ERR_INVALID_ARGS, not close channel. Fail on other error.
+// SetElementStateInvalidated
+//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    First make a change that invalidates the SignalProcessing configuration, then
+//    SetElementState should return ZX_ERR_BAD_STATE and not close channel.
+// SetElementStateReconfigured
+//    First invalidate the SignalProcessing configuration, then retrieve new elements/topologies.
+//    SetElementState returns callback (does not fail or close channel).
+// WatchElementStateChange
+//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    Else set a static var for this driver instance that SignalProcessing is supported.
+//    WatchElementState pends until SetElementState is called.
+//    Upon change, returns callback with values that match SetElementState.
 
 }  // namespace media::audio::drivers::test

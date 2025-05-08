@@ -59,6 +59,9 @@ class AdminTest : public TestBase {
   void ActivateChannelsAndExpectOutcome(uint64_t active_channels_bitmask,
                                         SetActiveChannelsOutcome expected_outcome);
 
+  void RetrieveRingBufferFormats() override;
+  void RetrieveDaiFormats() override;
+
   zx::time RequestRingBufferStart();
   void RequestRingBufferStartAndExpectCallback();
   void RequestRingBufferStartAndExpectDisconnect(zx_status_t expected_error);
@@ -82,6 +85,25 @@ class AdminTest : public TestBase {
   void ValidateInternalDelay();
   void ValidateExternalDelay();
 
+  void SignalProcessingConnect();
+  void RequestElements();
+  static bool ValidateElement(const fuchsia::hardware::audio::signalprocessing::Element& element);
+  void ValidateElements();
+  void ValidateDaiElements();
+  void ValidateDynamicsElements();
+  void ValidateEqualizerElements();
+  void ValidateGainElements();
+  void ValidateVendorSpecificElements();
+
+  void RequestTopologies();
+  void RetrieveInitialTopology();
+  void SetAllTopologies();
+  void SetTopologyAndExpectCallback(fuchsia::hardware::audio::signalprocessing::TopologyId id);
+  void SetUnknownTopologyAndExpectError();
+  void WatchForTopology(fuchsia::hardware::audio::signalprocessing::TopologyId id);
+  void FailOnWatchTopologyCompletion();
+  void WatchTopologyAndExpectDisconnect(zx_status_t expected_error);
+
   fidl::InterfacePtr<fuchsia::hardware::audio::RingBuffer>& ring_buffer() { return ring_buffer_; }
   uint32_t ring_buffer_frames() const { return ring_buffer_frames_; }
   fuchsia::hardware::audio::PcmFormat ring_buffer_pcm_format() const {
@@ -90,16 +112,36 @@ class AdminTest : public TestBase {
   void SetRingBufferIncoming(std::optional<bool> is_incoming) {
     ring_buffer_is_incoming_ = is_incoming;
   }
+  bool ElementIsRingBuffer(fuchsia::hardware::audio::ElementId element_id);
+  bool RingBufferElementIsIncoming(fuchsia::hardware::audio::ElementId element_id);
+  std::optional<bool> ElementIsIncoming(
+      std::optional<fuchsia::hardware::audio::ElementId> ring_buffer_element_id);
 
   uint32_t notifications_per_ring() const { return notifications_per_ring_; }
   const zx::time& start_time() const { return start_time_; }
   uint16_t frame_size() const { return frame_size_; }
 
+  std::optional<uint64_t>& ring_buffer_id() { return ring_buffer_id_; }
+
+  fidl::InterfacePtr<fuchsia::hardware::audio::signalprocessing::SignalProcessing>&
+  signal_processing() {
+    return sp_;
+  }
+  const std::vector<fuchsia::hardware::audio::signalprocessing::Topology>& topologies() const {
+    return topologies_;
+  }
+  const std::vector<fuchsia::hardware::audio::signalprocessing::Element>& elements() const {
+    return elements_;
+  }
+
  private:
   static constexpr zx::duration kRingBufferDisconnectCooldownDuration = zx::msec(100);
-
   static void CooldownAfterRingBufferDisconnect();
   void RequestRingBufferChannel();
+
+  // This is not needed at this point (cooldown is set to 0), but the mechanism is in place.
+  static constexpr zx::duration kSignalProcessingDisconnectCooldownDuration = zx::msec(0);
+  static void CooldownAfterSignalProcessingDisconnect();
 
   fidl::InterfacePtr<fuchsia::hardware::audio::RingBuffer> ring_buffer_;
   std::optional<bool> ring_buffer_is_incoming_ = std::nullopt;
@@ -120,6 +162,19 @@ class AdminTest : public TestBase {
 
   // Position notifications are hanging-gets. On receipt, should we register the next one or fail?
   bool fail_on_position_notification_ = false;
+
+  fidl::InterfacePtr<fuchsia::hardware::audio::signalprocessing::SignalProcessing> sp_;
+  std::optional<bool> signalprocessing_is_supported_ = std::nullopt;
+  std::vector<fuchsia::hardware::audio::signalprocessing::Topology> topologies_;
+  std::vector<fuchsia::hardware::audio::signalprocessing::Element> elements_;
+  std::optional<fuchsia::hardware::audio::signalprocessing::TopologyId> initial_topology_id_ =
+      std::nullopt;
+  std::optional<fuchsia::hardware::audio::signalprocessing::TopologyId> pending_set_topology_id_;
+  std::optional<fuchsia::hardware::audio::signalprocessing::TopologyId> current_topology_id_ =
+      std::nullopt;
+
+  std::optional<uint64_t> ring_buffer_id_;  // Ring buffer process element id.
+  std::optional<uint64_t> dai_id_;          // DAI interconnect process element id.
 };
 
 }  // namespace media::audio::drivers::test
