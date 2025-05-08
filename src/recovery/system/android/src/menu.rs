@@ -11,6 +11,8 @@ pub const MAIN_MENU: &[MenuItem] = &[
     MenuItem::PowerOff,
 ];
 
+pub const WIPE_DATA_MENU: &[MenuItem] = &[MenuItem::WipeDataCancel, MenuItem::WipeDataConfirm];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MenuItem {
     Reboot,
@@ -19,6 +21,8 @@ pub enum MenuItem {
     Sideload,
     WipeData,
     PowerOff,
+    WipeDataConfirm,
+    WipeDataCancel,
 }
 
 impl MenuItem {
@@ -30,6 +34,8 @@ impl MenuItem {
             MenuItem::Sideload => "Apply update from ADB",
             MenuItem::WipeData => "Wipe data/factory reset",
             MenuItem::PowerOff => "Power off",
+            MenuItem::WipeDataConfirm => "Factory data reset",
+            MenuItem::WipeDataCancel => "Cancel",
         }
     }
 }

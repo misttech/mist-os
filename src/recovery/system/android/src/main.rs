@@ -23,11 +23,13 @@ use fuchsia_async as fasync;
 
 mod menu;
 use menu::Menu;
+mod fdr;
 mod power;
 
 const LOGO_IMAGE_PATH: &str = "/system-recovery-config/logo.riv";
 const BG_COLOR: Color = Color::new(); // Black
 const HEADER_COLOR: Color = Color { r: 249, g: 194, b: 0, a: 255 };
+const MESSAGE_COLOR: Color = Color { r: 247, g: 0, b: 6, a: 255 };
 const MENU_COLOR: Color = Color { r: 0, g: 106, b: 157, a: 255 };
 const MENU_ACTIVE_BG_COLOR: Color = Color { r: 0, g: 156, b: 100, a: 255 };
 const MENU_SELECTED_COLOR: Color = Color::white();
@@ -65,6 +67,7 @@ struct RecoveryViewAssistant {
     menu: Menu,
     logs: Option<Vec<String>>,
     wheel_diff: i32,
+    message: Option<&'static str>,
 }
 
 impl RecoveryViewAssistant {
@@ -81,6 +84,7 @@ impl RecoveryViewAssistant {
             menu,
             logs: None,
             wheel_diff: 0,
+            message: None,
         })
     }
 
@@ -158,6 +162,29 @@ impl ViewAssistant for RecoveryViewAssistant {
                                     },
                                 );
                                 return;
+                            }
+
+                            if let Some(message) = &self.message {
+                                builder
+                                    .group()
+                                    .row()
+                                    .max_size()
+                                    .cross_align(CrossAxisAlignment::Start)
+                                    .contents(|builder| {
+                                        // padding on the left of the message
+                                        builder.space(size2(size.width * 0.1, text_size));
+                                        builder.text(
+                                            self.font_face.clone(),
+                                            message,
+                                            text_size,
+                                            Point::zero(),
+                                            TextFacetOptions {
+                                                color: MESSAGE_COLOR,
+                                                horizontal_alignment: TextHorizontalAlignment::Left,
+                                                ..TextFacetOptions::default()
+                                            },
+                                        );
+                                    });
                             }
 
                             const MENU_ITEM_HEIGHT: f32 = 30.0;
@@ -301,6 +328,25 @@ impl ViewAssistant for RecoveryViewAssistant {
                         fasync::Timer::new(std::time::Duration::from_millis(50)).await;
                         if let Err(e) = power::power_off().await {
                             log::error!("Failed to power off: {e:#}");
+                        }
+                    })
+                    .detach();
+                }
+                menu::MenuItem::WipeData => {
+                    self.menu = Menu::new(menu::WIPE_DATA_MENU);
+                    self.message = Some("Wipe all user data?\n  THIS CAN NOT BE UNDONE!")
+                }
+                menu::MenuItem::WipeDataCancel => {
+                    self.menu = Menu::new(menu::MAIN_MENU);
+                    self.message = None;
+                }
+                menu::MenuItem::WipeDataConfirm => {
+                    self.log("Wiping data...");
+                    fasync::Task::local(async {
+                        // give UI some time to show the log above
+                        fasync::Timer::new(std::time::Duration::from_millis(50)).await;
+                        if let Err(e) = fdr::factory_data_reset().await {
+                            log::error!("Failed to factory data reset: {e:#}");
                         }
                     })
                     .detach();
