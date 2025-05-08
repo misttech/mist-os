@@ -6,13 +6,15 @@ use crate::power::{SuspendState, SuspendStats};
 use crate::task::CurrentTask;
 use crate::vfs::EpollKey;
 
+use std::cmp::min;
 use std::collections::HashSet;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
 use fuchsia_component::client::connect_to_protocol_sync;
-use fuchsia_inspect::ArrayProperty;
+use fuchsia_inspect::{ArrayProperty, NumericProperty, StringArrayProperty, UintProperty};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
+use itertools::Itertools;
 use starnix_logging::log_warn;
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
@@ -36,7 +38,8 @@ pub struct SuspendResumeManagerInner {
     suspend_stats: SuspendStats,
     sync_on_suspend_enabled: bool,
 
-    inspect_node: BoundedListNode,
+    suspend_events_node: BoundedListNode,
+    wake_locks_inspect: WakeLocksInspect,
 
     /// The currently active wake locks in the system. If non-empty, this prevents
     /// the container from suspending.
@@ -57,17 +60,37 @@ pub struct SuspendResumeManagerInner {
     active_lock_writer: zx::EventPair,
 }
 
+/// State associated with logging wake lock information in Inspect.
+struct WakeLocksInspect {
+    /// List of active locks.
+    active_wake_locks: StringArrayProperty,
+
+    /// List of inactive locks.
+    inactive_wake_locks: StringArrayProperty,
+
+    /// Number of active epolls.
+    active_epolls_count: UintProperty,
+
+    /// Parent node of the above properties.
+    root: inspect::Node,
+}
+
 /// The inspect node ring buffer will keep at most this many entries.
 const INSPECT_RING_BUFFER_CAPACITY: usize = 128;
+
+/// The inspect wakelock nodes will keep at most this many entries.
+const INSPECT_MAX_WAKE_LOCK_NAMES: usize = 64;
 
 impl Default for SuspendResumeManagerInner {
     fn default() -> Self {
         let (active_lock_reader, active_lock_writer) = zx::EventPair::create();
+        let root = inspect::component::inspector().root();
         Self {
-            inspect_node: BoundedListNode::new(
-                inspect::component::inspector().root().create_child("suspend_events"),
+            suspend_events_node: BoundedListNode::new(
+                root.create_child("suspend_events"),
                 INSPECT_RING_BUFFER_CAPACITY,
             ),
+            wake_locks_inspect: WakeLocksInspect::new(&root),
             suspend_stats: Default::default(),
             sync_on_suspend_enabled: Default::default(),
             active_locks: Default::default(),
@@ -89,6 +112,42 @@ impl SuspendResumeManagerInner {
                 (zx::Signals::empty(), zx::Signals::EVENT_SIGNALED)
             };
         self.active_lock_writer.signal_peer(clear_mask, set_mask).expect("Failed to signal peer");
+    }
+
+    /// Records the first INSPECT_MAX_WAKE_LOCK_NAMES active wake locks, sorted lexicographically.
+    fn record_active_locks(&mut self) {
+        let inspect = &mut self.wake_locks_inspect;
+        let active_locks = &self.active_locks;
+
+        let len = min(active_locks.len(), INSPECT_MAX_WAKE_LOCK_NAMES);
+        inspect.active_wake_locks =
+            inspect.root.create_string_array(fobs::ACTIVE_WAKE_LOCK_NAMES, len);
+        for (i, name) in active_locks.iter().sorted().take(len).enumerate() {
+            inspect.active_wake_locks.set(i, name);
+        }
+    }
+
+    /// Records the first INSPECT_MAX_WAKE_LOCK_NAMES inactive wake locks, sorted lexicographically.
+    fn record_inactive_locks(&mut self) {
+        let inspect = &mut self.wake_locks_inspect;
+        let inactive_locks = &self.inactive_locks;
+
+        let len = min(self.inactive_locks.len(), INSPECT_MAX_WAKE_LOCK_NAMES);
+        inspect.inactive_wake_locks =
+            inspect.root.create_string_array(fobs::INACTIVE_WAKE_LOCK_NAMES, len);
+        for (i, name) in inactive_locks.iter().sorted().take(len).enumerate() {
+            inspect.inactive_wake_locks.set(i, name);
+        }
+    }
+
+    /// Increments the count of active epolls by 1.
+    fn increment_active_epolls(&self) {
+        self.wake_locks_inspect.active_epolls_count.add(1);
+    }
+
+    /// Decrements the count of active epolls by 1.
+    fn decrement_active_epolls(&self) {
+        self.wake_locks_inspect.active_epolls_count.subtract(1);
     }
 }
 
@@ -131,6 +190,7 @@ impl SuspendResumeManager {
         let mut state = self.lock();
         let res = state.active_locks.insert(String::from(name));
         state.signal_wake_events();
+        state.record_active_locks();
         res
     }
 
@@ -144,6 +204,8 @@ impl SuspendResumeManager {
 
         state.inactive_locks.insert(String::from(name));
         state.signal_wake_events();
+        state.record_active_locks();
+        state.record_inactive_locks();
         res
     }
 
@@ -152,6 +214,7 @@ impl SuspendResumeManager {
         let mut state = self.lock();
         state.active_epolls.insert(key);
         state.signal_wake_events();
+        state.increment_active_epolls();
     }
 
     /// Removes a wake lock `key` from the active epoll wake locks.
@@ -159,6 +222,7 @@ impl SuspendResumeManager {
         let mut state = self.lock();
         state.active_epolls.remove(&key);
         state.signal_wake_events();
+        state.decrement_active_epolls();
     }
 
     pub fn active_wake_locks(&self) -> Vec<String> {
@@ -214,7 +278,7 @@ impl SuspendResumeManager {
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
         let suspend_start_time = zx::BootInstant::get();
 
-        self.lock().inspect_node.add_entry(|node| {
+        self.lock().suspend_events_node.add_entry(|node| {
             node.record_int(fobs::SUSPEND_ATTEMPTED_AT, suspend_start_time.clone().into_nanos());
             node.record_string(fobs::SUSPEND_REQUESTED_STATE, state.to_string());
         });
@@ -247,7 +311,7 @@ impl SuspendResumeManager {
                     suspend_stats.last_resume_reason =
                         res.resume_reason.map(|s| format!("0 {}", s));
                 });
-                self.lock().inspect_node.add_entry(|node| {
+                self.lock().suspend_events_node.add_entry(|node| {
                     node.record_int(fobs::SUSPEND_RESUMED_AT, wake_time.into_nanos());
                 });
                 fuchsia_trace::instant!(
@@ -279,7 +343,7 @@ impl SuspendResumeManager {
                 {
                     let mut state = self.lock();
                     let active_epolls_count = state.active_epolls.len();
-                    state.inspect_node.add_entry(|node| {
+                    state.suspend_events_node.add_entry(|node| {
                         node.record_int(fobs::SUSPEND_FAILED_AT, wake_time.into_nanos());
                         if let Some(names) = wake_lock_names {
                             node.record_uint(
@@ -305,6 +369,18 @@ impl SuspendResumeManager {
         }
 
         Ok(())
+    }
+}
+
+impl WakeLocksInspect {
+    fn new(parent: &inspect::Node) -> Self {
+        let root = parent.create_child("wake_locks");
+        Self {
+            active_wake_locks: root.create_string_array(fobs::ACTIVE_WAKE_LOCK_NAMES, 0),
+            inactive_wake_locks: root.create_string_array(fobs::INACTIVE_WAKE_LOCK_NAMES, 0),
+            active_epolls_count: root.create_uint(fobs::ACTIVE_EPOLLS_COUNT, 0),
+            root,
+        }
     }
 }
 
