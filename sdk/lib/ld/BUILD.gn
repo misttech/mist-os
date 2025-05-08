@@ -371,7 +371,7 @@ static_library("standalone") {
     "./*",
     "//src/devices/bin/driver_manager/tests/modules/*",
     "//src/devices/lib/driver-host-passive-abi/*",
-    "//zircon/kernel/lib/userabi/vdso/*",
+    "//zircon/kernel/lib/userabi/*",
   ]
 
   complete_static_lib = true

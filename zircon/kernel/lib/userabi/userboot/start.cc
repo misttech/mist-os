@@ -21,6 +21,7 @@
 #include <sys/param.h>
 #include <zircon/fidl.h>
 #include <zircon/processargs.h>
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/log.h>
 #include <zircon/syscalls/resource.h>
@@ -39,6 +40,7 @@
 
 #include "bootfs.h"
 #include "fidl.h"
+#include "fuchsia-static-pie.h"
 #include "loader-service.h"
 #include "option.h"
 #include "userboot-elf.h"
@@ -458,9 +460,12 @@ struct TerminationInfo {
   }
   zx::vmar vmar_loaded{std::exchange(handles[kVmarLoaded], ZX_HANDLE_INVALID)};
   if (!vmar_loaded) {
-    // This would be used if userboot had normal static PIE RELRO handling.
     fail(log, "no PA_VMAR_LOADED handle");
   }
+  // Once the RELRO is protected, drop the VMAR handle so it can never be
+  // unprotected.
+  status = StaticPieRelro(std::exchange(vmar_loaded, {}).get());
+  check(log, status, "cannot protect userboot RELRO: %s", zx_status_get_string(status));
 
   auto [power, vmex] = CreateResources(log, handles);
 
@@ -576,4 +581,7 @@ struct TerminationInfo {
 
 // This is the entry point for the whole show, the very first bit of code
 // to run in user mode.
-extern "C" [[noreturn]] void _start(zx_handle_t arg) { Bootstrap(zx::channel{arg}); }
+extern "C" [[noreturn]] void _start(zx_handle_t arg, const void* vdso) {
+  StaticPieSetup(vdso);
+  Bootstrap(zx::channel{arg});
+}
