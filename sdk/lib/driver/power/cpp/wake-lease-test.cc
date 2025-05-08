@@ -123,7 +123,7 @@ void DoOperationAfterSuspend(
     const std::shared_ptr<fdf_power::ManualWakeLease>& op, async::Loop& loop,
     const std::function<void(const std::shared_ptr<fdf_power::ManualWakeLease>&, async::Loop&)>&
         do_after_suspend) {
-  if (op->IsResumed()) {
+  if (!op->IsSuspended()) {
     async::PostDelayedTask(
         loop.dispatcher(),
         [op, &loop, do_after_suspend]() { DoOperationAfterSuspend(op, loop, do_after_suspend); },
@@ -144,7 +144,7 @@ void StartOperationWhenResumedThenSuspend(
     const std::shared_ptr<SystemActivityGovernor>& sag, async::Loop& server_loop,
     const std::function<void(std::shared_ptr<fdf_power::ManualWakeLease>, async::Loop&)>&
         do_after_suspended) {
-  if (!op->IsResumed()) {
+  if (op->IsSuspended()) {
     async::PostDelayedTask(
         client_loop.dispatcher(),
         [op, &client_loop, sag, &server_loop, do_after_suspended]() {
@@ -173,7 +173,7 @@ TEST_F(WakeLeaseTest, TestManualWakeLeaseWhenResumed) {
   const std::function<void(const std::shared_ptr<fdf_power::ManualWakeLease>&, async::Loop&)>
       test_func = [&test_func](const std::shared_ptr<fdf_power::ManualWakeLease>& op,
                                async::Loop& loop) {
-        if (!op->IsResumed()) {
+        if (op->IsSuspended()) {
           async::PostDelayedTask(
               loop.dispatcher(), [op, &loop, &test_func]() { test_func(op, loop); }, zx::msec(100));
           return;
@@ -194,7 +194,7 @@ TEST_F(WakeLeaseTest, TestManualWakeLeaseStartAndEndAfterResumeIsObserved) {
       [&test_func](const std::shared_ptr<fdf_power::ManualWakeLease>& op, async::Loop& loop) {
         // Wait for us to be in a resumed state so the atomic op obesrved the
         // system state change
-        if (!op->IsResumed()) {
+        if (op->IsSuspended()) {
           async::PostDelayedTask(
               loop.dispatcher(), [op, &loop, &test_func]() { test_func(op, loop); }, zx::msec(100));
           return;
@@ -217,7 +217,7 @@ TEST_F(WakeLeaseTest, TestManualWakeLeaseStartAndEndAfterResumeIsObserved) {
 TEST_F(WakeLeaseTest, TestManualWakeLeaseWhenSuspended) {
   std::function<void(std::shared_ptr<fdf_power::ManualWakeLease>, async::Loop&)> test_func =
       [](const std::shared_ptr<fdf_power::ManualWakeLease>& op, async::Loop& loop) {
-        EXPECT_FALSE(op->IsResumed());
+        EXPECT_TRUE(op->IsSuspended());
         EXPECT_TRUE(op->Start());
         EXPECT_FALSE(op->Start());
         loop.Quit();
@@ -230,7 +230,7 @@ TEST_F(WakeLeaseTest, TestManualWakeLeaseWhenSuspended) {
 TEST_F(WakeLeaseTest, TestManualWakeLeaseStartAndEndWhileSuspended) {
   std::function<void(std::shared_ptr<fdf_power::ManualWakeLease>, async::Loop&)> test_func =
       [](const std::shared_ptr<fdf_power::ManualWakeLease>& op, async::Loop& loop) {
-        EXPECT_FALSE(op->IsResumed());
+        EXPECT_TRUE(op->IsSuspended());
         EXPECT_TRUE(op->Start());
         EXPECT_TRUE(op->End().is_ok());
         loop.Quit();
@@ -353,7 +353,7 @@ TEST_F(WakeLeaseTest, WakeLeaseProviderTest) {
       // the WakeLease after all strong pointers to it were
       // dropped.
       fdf_power::WakeLease* old_addr = op1.get();
-      std::shared_ptr<fdf_power::TimeoutWakeLease> first_lease = op1->GetWakeLease();
+      std::shared_ptr<fdf_power::ManualWakeLease> first_lease = op1->GetWakeLease();
       op1.reset();
       op2.reset();
 
@@ -368,7 +368,7 @@ TEST_F(WakeLeaseTest, WakeLeaseProviderTest) {
 
       // The fdf_power::WakeLease should be the same, even though the
       // WakeLease changed.
-      std::shared_ptr<fdf_power::TimeoutWakeLease> second_lease = op3->GetWakeLease();
+      std::shared_ptr<fdf_power::ManualWakeLease> second_lease = op3->GetWakeLease();
       EXPECT_EQ(first_lease, second_lease);
 
       client_loop.Quit();
@@ -455,13 +455,7 @@ TEST_F(WakeLeaseTest, TestWakeLeaseTimeouts) {
   // testing indicates tens of microseconds of skew.
   after = zx::clock::get_monotonic() + zx::sec(2);
 
-  // Right now we expect no reclamation task for the eventpair because the wake
-  // lease considers the system awake.
-  EXPECT_EQ(test_lease.GetNextTimeout(), next_timeout);
-
-  // Now, let's "suspend", which should trigger a lease, and therefore a
-  // task to reclaim it.
-  test_lease.SetSuspended(true);
+  // Check that we still get the right timeout
   next_timeout = test_lease.GetNextTimeout();
   EXPECT_GE(next_timeout, (before + timeout).get());
   EXPECT_LE(next_timeout, (after + timeout).get());
