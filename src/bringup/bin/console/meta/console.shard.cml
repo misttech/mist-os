@@ -290,6 +290,11 @@
             to: "#console-launcher",
         },
         {
+            service: "fuchsia.hardware.power.suspend.SuspendService",
+            from: "#boot-drivers",
+            to: "#console-launcher",
+        },
+        {
             protocol: "fuchsia.paver.Paver",
             from: "#paver",
             to: "#console-launcher",
