@@ -118,8 +118,8 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         let index = Self { classes, permissions, parsed_policy, cached_object_r_role };
 
         // Verify that the initial Security Contexts are all defined, and valid.
-        for id in crate::InitialSid::all_variants() {
-            index.resolve_initial_context(id);
+        for initial_sids in crate::InitialSid::all_variants() {
+            index.resolve_initial_context(*initial_sids);
         }
 
         // Validate the contexts used in fs_use statements.

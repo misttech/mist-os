@@ -154,7 +154,7 @@ impl SeLinuxFs {
                 dir.entry(
                     current_task,
                     initial_sid.name(),
-                    InitialContextFile::new_node(security_server.clone(), initial_sid),
+                    InitialContextFile::new_node(security_server.clone(), *initial_sid),
                     mode!(IFREG, 0o444),
                 );
             }

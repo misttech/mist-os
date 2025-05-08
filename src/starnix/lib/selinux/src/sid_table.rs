@@ -119,8 +119,8 @@ impl SidTable {
 
     fn new_from(policy: Arc<Policy<ByValue<Vec<u8>>>>, mut new_entries: Vec<Entry>) -> Self {
         for initial_sid in InitialSid::all_variants() {
-            let initial_context = policy.initial_context(initial_sid);
-            new_entries[initial_sid as usize] =
+            let initial_context = policy.initial_context(*initial_sid);
+            new_entries[*initial_sid as usize] =
                 Entry::Valid { security_context: initial_context.clone() };
         }
 

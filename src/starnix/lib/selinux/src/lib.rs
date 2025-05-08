@@ -1368,8 +1368,8 @@ macro_rules! initial_sid_enum {
         }
 
         impl $name {
-            pub fn all_variants() -> Vec<Self> {
-                vec![
+            pub fn all_variants() -> &'static [Self] {
+                &[
                     $($name::$variant),*
                 ]
             }
