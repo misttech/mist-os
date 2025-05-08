@@ -102,23 +102,30 @@ void ParseNextProcessArguments(const zx::debuglog& log, std::string_view next, u
   argv[index] = '\0';
 }
 
-// We don't need our own thread handle, but the child does. In addition we pass on a decompressed
-// BOOTFS VMO, and a debuglog handle (tied to stdout).
-//
-// In total we're passing along three more handles than we got.
-constexpr uint32_t kThreadSelf = kHandleCount;
-constexpr uint32_t kBootfsVmo = kHandleCount + 1;
-constexpr uint32_t kDebugLog = kHandleCount + 2;
+// Children get almost all the handles the kernel gave to userboot, and more.
+// The indices match HandleIndex for convenience.
+static_assert(kVmarLoaded == kHandleCount - 1);
+enum ChildHandleIndex : uint32_t {
+  // We pass on a decompressed BOOTFS VMO, and a debuglog handle (tied to
+  // stdout).  The first handle replaces the PA_VMAR_LOADED slot, which we
+  // don't pass in the main bootstrap message; instead it's in the separate,
+  // first bootstrap message sent by stuff_loader_bootstrap().
+  kBootfsVmo = kVmarLoaded,
+  kDebugLog,
 
-// Hand a svc channel to the child process to be launched.
-// Fuchsia C runtime will pull this handle and automatically create the endpoint on process startup.
-constexpr uint32_t kSvcStub = kHandleCount + 3;
+  // Hand over a /svc channel to the child process to be launched.  Fuchsia C
+  // runtime will pull this handle and automatically create the endpoint on
+  // process startup.
+  kSvcStub,
+
+  // A channel containing all the pipelined messages through the
+  // `fuchsia.boot.Userboot` protocol.
+  kUserbootProtocol,
+
+  kChildHandleCount,
+};
+
 constexpr uint32_t kSvcNameIndex = 0;
-
-// A channel containing all the pipelined messages through `fuchsia.boot.Userboot` protocol.
-constexpr uint32_t kUserbootProtocol = kHandleCount + 4;
-
-constexpr uint32_t kChildHandleCount = kHandleCount + 5;
 
 // This is the processargs message the child will receive.
 struct ChildMessageLayout {
@@ -137,6 +144,7 @@ constexpr std::array<uint32_t, kChildHandleCount> HandleInfoTable() {
   // Fill in the handle info table.
   info[kBootfsVmo] = PA_HND(PA_VMO_BOOTFS, 0);
   info[kProcSelf] = PA_HND(PA_PROC_SELF, 0);
+  info[kThreadSelf] = PA_HND(PA_THREAD_SELF, 0);
   info[kRootJob] = PA_HND(PA_JOB_DEFAULT, 0);
   info[kMmioResource] = PA_HND(PA_MMIO_RESOURCE, 0);
   info[kIrqResource] = PA_HND(PA_IRQ_RESOURCE, 0);
@@ -152,7 +160,7 @@ constexpr std::array<uint32_t, kChildHandleCount> HandleInfoTable() {
   for (uint32_t i = kFirstVdso; i <= kLastVdso; ++i) {
     info[i] = PA_HND(PA_VMO_VDSO, i - kFirstVdso);
   }
-  for (uint32_t i = kFirstKernelFile; i < kHandleCount; ++i) {
+  for (uint32_t i = kFirstKernelFile; i <= kLastKernelFile; ++i) {
     info[i] = PA_HND(PA_VMO_KERNEL_FILE, i - kFirstKernelFile);
   }
   info[kDebugLog] = PA_HND(PA_FD, kFdioFlagUseForStdio);
@@ -187,8 +195,8 @@ std::array<zx_handle_t, kChildHandleCount> ExtractHandles(zx::channel bootstrap)
   uint32_t actual_handles;
   zx_status_t status =
       bootstrap.read(0, nullptr, handles.data(), 0, handles.size(), nullptr, &actual_handles);
-
   check(log, status, "cannot read bootstrap message");
+
   if (actual_handles != kHandleCount) {
     fail(log, "read %u handles instead of %u", actual_handles, kHandleCount);
   }
@@ -202,10 +210,11 @@ std::array<zx_handle_t, kChildHandleCount> ExtractHandles(zx::channel bootstrap)
   (std::decay_t<decltype(handle)>{RawDuplicateOrDie((log), (handle).get())})
 #define RawDuplicateOrDie(log, handle)                                              \
   ({                                                                                \
-    zx_handle_t dup;                                                                \
-    zx_status_t status = zx_handle_duplicate((handle), ZX_RIGHT_SAME_RIGHTS, &dup); \
-    check(log, status, "[%s:%d]: Failed to duplicate handle.", __FILE__, __LINE__); \
-    dup;                                                                            \
+    zx_handle_t _orig = (handle);                                                   \
+    zx_handle_t _dup;                                                               \
+    zx_status_t status = zx_handle_duplicate(_orig, ZX_RIGHT_SAME_RIGHTS, &_dup);   \
+    check(log, status, "[%s:%u]: Failed to duplicate handle.", __FILE__, __LINE__); \
+    _dup;                                                                           \
   })
 
 struct ChildContext {
@@ -215,7 +224,7 @@ struct ChildContext {
 
   // Process creation handles
   zx::process process;
-  zx::vmar vmar;
+  zx::vmar root_vmar;
   zx::vmar reserved_vmar;
   zx::thread thread;
 
@@ -230,12 +239,12 @@ ChildContext CreateChildContext(const zx::debuglog& log, std::string_view name,
   ChildContext child;
   auto status =
       zx::process::create(*zx::unowned_job{handles[kRootJob]}, name.data(),
-                          static_cast<uint32_t>(name.size()), 0, &child.process, &child.vmar);
+                          static_cast<uint32_t>(name.size()), 0, &child.process, &child.root_vmar);
   check(log, status, "Failed to create child process(%.*s).", static_cast<int>(name.length()),
         name.data());
 
   // Squat on some address space before we start loading it up.
-  child.reserved_vmar = {ReserveLowAddressSpace(log, child.vmar)};
+  child.reserved_vmar = ReserveLowAddressSpace(log, child.root_vmar);
 
   // Create the initial thread in the new process
   status = zx::thread::create(child.process, name.data(), static_cast<uint32_t>(name.size()), 0,
@@ -248,19 +257,15 @@ ChildContext CreateChildContext(const zx::debuglog& log, std::string_view name,
 
   // Copy all resources that are not explicitly duplicated in SetChildHandles.
   for (size_t i = 0; i < handles.size() && i < kHandleCount; ++i) {
-    if (i == kProcSelf) {
-      continue;
+    switch (i) {
+      case kProcSelf:
+      case kVmarRootSelf:
+        continue;
+      default:
+        if (handles[i] != ZX_HANDLE_INVALID) {
+          child.handles[i] = RawDuplicateOrDie(log, handles[i]);
+        }
     }
-
-    if (i == kVmarRootSelf) {
-      continue;
-    }
-
-    if (handles[i] == ZX_HANDLE_INVALID) {
-      continue;
-    }
-
-    child.handles[i] = RawDuplicateOrDie(log, handles[i]);
   }
 
   return child;
@@ -270,7 +275,7 @@ void SetChildHandles(const zx::debuglog& log, const zx::vmo& bootfs_vmo, ChildCo
   child.handles[kBootfsVmo] = DuplicateOrDie(log, bootfs_vmo).release();
   child.handles[kDebugLog] = DuplicateOrDie(log, log).release();
   child.handles[kProcSelf] = DuplicateOrDie(log, child.process).release();
-  child.handles[kVmarRootSelf] = DuplicateOrDie(log, child.vmar).release();
+  child.handles[kVmarRootSelf] = DuplicateOrDie(log, child.root_vmar).release();
   child.handles[kThreadSelf] = DuplicateOrDie(log, child.thread).release();
   child.handles[kSvcStub] = child.svc_client.release();
 
@@ -334,17 +339,17 @@ zx::channel StartChildProcess(const zx::debuglog& log, const Options::ProgramInf
   auto status = zx::channel::create(0, &to_child, &bootstrap);
   check(log, status, "zx_channel_create failed for child stack");
 
-  zx::channel loader_svc;
-
   // Examine the bootfs image and find the requested file in it.
   // This will handle a PT_INTERP by doing a second lookup in bootfs.
+  // In that case, it already sent the first processargs message.
+  zx::channel loader_svc;
   zx_vaddr_t entry =
-      elf_load_bootfs(log, bootfs, elf_entry.root, child.process, child.vmar, child.thread,
-                      elf_entry.filename(), to_child, &stack_size, &loader_svc);
+      elf_load_bootfs(log, bootfs, elf_entry.root, child.process, child.root_vmar, child.thread,
+                      elf_entry.filename(), to_child, nullptr, &stack_size, &loader_svc);
 
   // Now load the vDSO into the child, so it has access to system calls.
   zx_vaddr_t vdso_base =
-      elf_load_vdso(log, child.vmar, *zx::unowned_vmo{child.handles[kFirstVdso]});
+      elf_load_vdso(log, child.root_vmar, *zx::unowned_vmo{child.handles[kFirstVdso]});
 
   stack_size = (stack_size + zx_system_get_page_size() - 1) &
                -static_cast<uint64_t>(zx_system_get_page_size());
@@ -353,8 +358,8 @@ zx::channel StartChildProcess(const zx::debuglog& log, const Options::ProgramInf
   check(log, status, "zx_vmo_create failed for child stack");
   stack_vmo.set_property(ZX_PROP_NAME, kStackVmoName, sizeof(kStackVmoName) - 1);
   zx_vaddr_t stack_base;
-  status =
-      child.vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, stack_vmo, 0, stack_size, &stack_base);
+  status = child.root_vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, stack_vmo, 0, stack_size,
+                               &stack_base);
   check(log, status, "zx_vmar_map failed for child stack");
 
   // Allocate the stack for the child.
@@ -444,11 +449,18 @@ struct TerminationInfo {
   auto status = zx::debuglog::create({}, 0, &log);
   check(log, status, "zx_debuglog_create failed: %d", status);
 
-  zx::vmar vmar_self{handles[kVmarRootSelf]};
-  handles[kVmarRootSelf] = ZX_HANDLE_INVALID;
-
-  zx::process proc_self{handles[kProcSelf]};
-  handles[kProcSelf] = ZX_HANDLE_INVALID;
+  zx::vmar vmar_self{std::exchange(handles[kVmarRootSelf], ZX_HANDLE_INVALID)};
+  zx::process proc_self{std::exchange(handles[kProcSelf], ZX_HANDLE_INVALID)};
+  zx::thread thread_self{std::exchange(handles[kThreadSelf], ZX_HANDLE_INVALID)};
+  if (!thread_self) {
+    // This would be used if userboot had a normal thread library.
+    fail(log, "no PA_THREAD_SELF handle");
+  }
+  zx::vmar vmar_loaded{std::exchange(handles[kVmarLoaded], ZX_HANDLE_INVALID)};
+  if (!vmar_loaded) {
+    // This would be used if userboot had normal static PIE RELRO handling.
+    fail(log, "no PA_VMAR_LOADED handle");
+  }
 
   auto [power, vmex] = CreateResources(log, handles);
 

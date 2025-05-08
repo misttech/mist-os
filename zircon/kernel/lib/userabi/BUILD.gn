@@ -73,18 +73,13 @@ config("userabi.user.config") {
 # Parameters
 #
 #   name
-#     - Required: "USERBOOT" or "VDSO", used in generated macro names
+#     - Required: "VDSO", used in generated macro names
 #     - Type: string
 #
 #   deps
 #     - Required; Should reach the loadable_module() or library() target
 #     and no other linking targets; see link_output_rspfile().
 #     - Type: list(label)
-#
-#   writable
-#     - Optional: Writable segments allowed (not for userboot or vDSO!).
-#     - Type: bool
-#     - Default: false
 #
 template("rodso") {
   rspfile_target = "$target_name.rsp"
@@ -128,9 +123,6 @@ template("rodso") {
         rebase_path(depfile, root_build_dir),
         rebase_path(header, root_build_dir),
       ]
-      if (defined(invoker.writable) && invoker.writable) {
-        args += [ "--writable" ]
-      }
       args += [
         invoker.name,
         "@" + rebase_path(rspfile, root_build_dir),
@@ -226,6 +218,8 @@ if (is_kernel) {
   source_set("userboot") {
     visibility = [ ":*" ]
     sources = [
+      "elf.cc",
+      "elf.h",
       "resource.cc",
       "userboot.cc",
     ]
@@ -233,7 +227,6 @@ if (is_kernel) {
     deps = [
       ":headers",
       ":rodso",
-      ":userboot-code.h",
       "//src/lib/elfldltl",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/console",
@@ -244,11 +237,5 @@ if (is_kernel) {
       "//zircon/kernel/phys:handoff",
       "//zircon/system/ulib/zircon-internal",
     ]
-  }
-
-  rodso("userboot") {
-    visibility = [ ":*" ]
-    name = "USERBOOT"
-    deps = [ "userboot" ]
   }
 }

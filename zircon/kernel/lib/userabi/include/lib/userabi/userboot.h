@@ -30,6 +30,7 @@ enum HandleIndex : uint32_t {
   // These describe userboot itself.
   kProcSelf,
   kVmarRootSelf,
+  kThreadSelf,
 
   // Essential job and resource handles.
   kRootJob,
@@ -65,7 +66,12 @@ enum HandleIndex : uint32_t {
 
   kFirstInstrumentationData,
   kFirstExtraPhysVmo = kFirstInstrumentationData + InstrumentationData::vmo_count(),
-  kHandleCount = kFirstExtraPhysVmo + PhysVmo::kMaxExtraHandoffPhysVmos,
+  kLastExtraPhysVmo = kFirstExtraPhysVmo + PhysVmo::kMaxExtraHandoffPhysVmos - 1,
+  kLastKernelFile = kLastExtraPhysVmo,
+
+  // userboot relies on kVmarLoaded being the last one.
+  kVmarLoaded,
+  kHandleCount,
 };
 
 // Copied from sdk/lib/fdio/include/lib/fdio/io.h to avoid the dependency. When this is passed

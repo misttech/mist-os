@@ -35,6 +35,6 @@ zx_vaddr_t elf_load_vdso(const zx::debuglog& log, const zx::vmar& vmar, const zx
 zx_vaddr_t elf_load_bootfs(const zx::debuglog& log, Bootfs& fs, std::string_view root,
                            const zx::process& proc, const zx::vmar& vmar, const zx::thread& thread,
                            std::string_view filename, const zx::channel& to_child,
-                           size_t* stack_size, zx::channel* loader_svc);
+                           zx::vmar* segments_vmar, size_t* stack_size, zx::channel* loader_svc);
 
 #endif  // ZIRCON_KERNEL_LIB_USERABI_USERBOOT_USERBOOT_ELF_H_

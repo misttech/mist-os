@@ -39,7 +39,7 @@ zx_status_t RoDso::MapSegment(fbl::RefPtr<VmAddressRegionDispatcher> vmar, bool 
             mapping_result.status_value());
   } else {
     DEBUG_ASSERT(mapping_result->base == vmar->vmar()->base() + vmar_offset);
-    dprintf(SPEW, "userboot: %-8s %-6s %#7zx @ [%#" PRIxPTR ",%#" PRIxPTR ")\n", name.data(),
+    dprintf(SPEW, "userboot: %-12s ELF %-6s %#7zx @ [%#" PRIxPTR ",%#" PRIxPTR ")\n", name.data(),
             segment_name, start_offset, mapping_result->base, mapping_result->base + len);
   }
 
