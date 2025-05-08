@@ -28,6 +28,7 @@ ffx_plugin("ffx_list") {
     "//third_party/rust_crates:tracing",
   ]
   test_deps = [
+    "//src/developer/ffx/command:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:regex",

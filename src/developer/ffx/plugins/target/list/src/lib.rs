@@ -37,6 +37,7 @@ pub struct ListTool {
     #[with(deferred(daemon_protocol()))]
     tc_proxy: Deferred<ffx::TargetCollectionProxy>,
     context: EnvironmentContext,
+    fho_env: fho::FhoEnvironment,
 }
 
 fho::embedded_plugin!(ListTool);
@@ -45,16 +46,32 @@ fho::embedded_plugin!(ListTool);
 impl FfxMain for ListTool {
     type Writer = VerifiedMachineWriter<Vec<JsonTarget>>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        let cmd = self.update_from_target();
         // XXX Shouldn't check `is_strict()`. Eventually we'll _always_ do local discovery,
         // at which point this check goes away.
         let infos =
             if !self.context.is_strict() && ffx_target::is_discovery_enabled(&self.context).await {
-                list_targets(self.tc_proxy.await?, &self.cmd).await?
+                list_targets(self.tc_proxy.await?, &cmd).await?
             } else {
-                local_list_targets(&self.context, &self.cmd).await?
+                local_list_targets(&self.context, &cmd).await?
             };
-        show_targets(self.cmd, infos, &mut writer, &self.context).await?;
+        show_targets(cmd, infos, &mut writer, &self.context).await?;
         Ok(())
+    }
+}
+
+impl ListTool {
+    // Users might reasonable expect that they can say `ffx -t foo target list`, rather
+    // than `ffx target list foo`. Update the ListCommand as though they had typed the
+    // command "correctly". (If they use both, the positional argument at the end takes
+    // precedence over the "-t" argument.)
+    fn update_from_target(&self) -> ListCommand {
+        let cmd = self.cmd.clone();
+        if cmd.nodename.is_some() {
+            cmd
+        } else {
+            ListCommand { nodename: self.fho_env.ffx_command().global.target.clone(), ..cmd }
+        }
     }
 }
 
@@ -630,5 +647,44 @@ mod test {
         let targets = handles_to_infos(stream, &env.context, true).await;
         let targets = targets.unwrap();
         assert_ne!(targets[0].addresses, None);
+    }
+
+    async fn build_list_tool(
+        cmd: ListCommand,
+        env: &ffx_config::TestEnv,
+        fho_env: fho::FhoEnvironment,
+    ) -> ListTool {
+        ListTool {
+            cmd,
+            tc_proxy: fho::TryFromEnvWith::try_from_env_with(deferred(daemon_protocol()), &fho_env)
+                .await
+                .expect("deferred tc_proxy failed"),
+            fho_env,
+            context: env.context.clone(),
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_command_target() {
+        let ffx_cmd =
+            ffx_command::Ffx { target: Some(String::from("mytarget")), ..Default::default() };
+        let ffx_cmd_line = ffx_command::FfxCommandLine { global: ffx_cmd, ..Default::default() };
+        let env = ffx_config::test_init().await.unwrap();
+        let fho_env = fho::FhoEnvironment::new(&env.context, &ffx_cmd_line);
+        let tool = build_list_tool(ListCommand::default(), &env, fho_env).await;
+        let cmd = tool.update_from_target();
+        assert_eq!(cmd.nodename, Some(String::from("mytarget")));
+    }
+
+    #[fuchsia::test]
+    async fn test_command_target_preserves_arg() {
+        let ffx_cmd_line = ffx_command::FfxCommandLine::default();
+        let env = ffx_config::test_init().await.unwrap();
+        let fho_env = fho::FhoEnvironment::new(&env.context, &ffx_cmd_line);
+        let list_cmd =
+            ListCommand { nodename: Some(String::from("mytarget")), ..Default::default() };
+        let tool = build_list_tool(list_cmd, &env, fho_env).await;
+        let cmd = tool.update_from_target();
+        assert_eq!(cmd.nodename, Some(String::from("mytarget")));
     }
 }

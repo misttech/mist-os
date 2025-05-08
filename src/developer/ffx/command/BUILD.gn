@@ -29,6 +29,9 @@ rustc_library("lib") {
 
     # Reference doc generation based on JSON
     "//tools/clidoc:*",
+
+    # ffx-target-list depends on the FfxCommandLine directly
+    "//src/developer/ffx/plugins/target/list:*",
   ]
 
   deps = [
