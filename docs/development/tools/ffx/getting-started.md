@@ -83,8 +83,10 @@ NAME                    SERIAL       TYPE       STATE      ADDRS/IP             
 fuchsia-emulator  <unknown>    Unknown    Product    [fe80::5054:ff:fe63:5e7a%4]    N
 ```
 
-`RCS`: Indicates whether there is a reachable instance of the Remote Control
-Service (RCS) running on the device.
+`RCS`: Indicates whether we have connected to the Remote Control Service on the
+device. This connection is vital to all other `ffx` operations, but it is
+established lazily, so it's not unusual to see an `N` here when we haven't
+interacted with the device yet.
 
 If multiple devices are connected, you must follow the steps in
 [Interacting with multiple devices](#interacting-with-multiple-devices) to
@@ -115,15 +117,35 @@ the logs:
 
 ## Interacting with multiple devices
 
-When multiple targets are visible in `ffx target list`, you must set a target
-as the default or explicitly set the target.
+When multiple targets are visible in `ffx target list`, you must specify which
+target to use. Most `ffx` commands will fail if it is ambiguous which device
+they should operate on.
 
-Otherwise, `ffx` commands requiring a target interaction will fail since it's
-ambiguous which device to use.
+The easiest way to specify the target is with a default target.
 
-Note: If the default or explicit target has been specified, and you are unable
-to run that command against the target, [reach out](#contacting_the_ffx_team)
-to the `ffx` team.
+### Referring to a target
+
+Whether setting a default target or explicitly specifying a target for a single
+command, you will need some way to refer to targets on the command line.
+
+Where `ffx` accepts a target on the command line it may be specified as:
+- The target nodename.
+- The target's IP address (any address mentioned in `ffx target list`).
+- The target's serial number.
+
+For node name and serial number, `ffx` will find partial matches.
+
+IPv6 and IPv4 addresses are both acceptable. If the address being
+queried is ipv6 and includes a port number, the address (and
+scope id if present) must be enclosed in square brackets. Scope and port
+number are both optional, but may be present.
+
+If a port number is specified, it will match only with targets with
+that same port number (with no port set on the target being treated as
+the default ssh port, 22).
+
+Specifying 0 for the port will match specifically with hosts with
+no port specified.
 
 ### Setting a default target
 
