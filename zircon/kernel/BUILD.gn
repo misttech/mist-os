@@ -509,7 +509,7 @@ if (is_kernel) {
   }
 
   kernel_elf_binary("physzircon") {
-    visibility = [ ":*" ]
+    visibility = [ "./*" ]
 
     configs += [ ":kernel.config" ]
     deps = [
@@ -688,7 +688,7 @@ if (!is_efi_toolchain) {
       ":kernel-unittests-boot-test",
       ":kernel-unittests-boot-test-bypass-debuglog",
       "phys:boot_tests",
-      "//zircon/kernel/lib/userabi/userboot/tests:boot_tests",
+      "//zircon/kernel/lib/userabi:boot_tests",
     ]
     if (all_cpu_kernel_boot_tests) {
       foreach(cpu, standard_fuchsia_cpus) {

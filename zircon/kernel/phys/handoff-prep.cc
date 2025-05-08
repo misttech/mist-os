@@ -269,27 +269,35 @@ void HandoffPrep::PublishLog(ktl::string_view name, Log&& log) {
 
 void HandoffPrep::UsePackageFiles(KernelStorage::Bootfs kernel_package) {
   auto& pool = Allocation::GetPool();
+  const ktl::string_view userboot = gBootOptions->userboot.data();
   for (auto it = kernel_package.begin(); it != kernel_package.end(); ++it) {
     ktl::span data = it->data;
     uintptr_t start = reinterpret_cast<uintptr_t>(data.data());
     // These are decompressed BOOTFS payloads, so there is only padding up to
     // the next page boundary.
     ktl::span aligned_data{data.data(), (data.size_bytes() + ZX_PAGE_SIZE - 1) & -ZX_PAGE_SIZE};
+    if (it->name == userboot) {
+      ZX_ASSERT(
+          pool.UpdateRamSubranges(memalloc::Type::kUserboot, start, aligned_data.size()).is_ok());
+      handoff_->userboot = MakePhysElfImage(it, it->name);
+    }
     if (it->name == "version-string.txt"sv) {
       ktl::string_view version{reinterpret_cast<const char*>(data.data()), data.size()};
       SetVersionString(version);
     } else if (it->name == "vdso"sv) {
       ZX_ASSERT(pool.UpdateRamSubranges(memalloc::Type::kVdso, start, aligned_data.size()).is_ok());
       handoff_->vdso = MakePhysVmo(aligned_data, "vdso/next"sv, data.size());
-    } else if (it->name == "userboot"sv) {
-      ZX_ASSERT(
-          pool.UpdateRamSubranges(memalloc::Type::kUserboot, start, aligned_data.size()).is_ok());
-      handoff_->userboot = MakePhysElfImage(it, it->name);
     }
   }
   if (auto result = kernel_package.take_error(); result.is_error()) {
     zbitl::PrintBootfsError(result.error_value());
   }
+  ZX_ASSERT_MSG(handoff_->userboot.vmar != PhysVmar{},
+                "\n*** kernel.select.userboot=%.*s but no such ELF file"
+                " in kernel package %.*s (VMO size %#zx) ***",
+                static_cast<int>(userboot.size()), userboot.data(),
+                static_cast<int>(kernel_package.directory().size()),
+                kernel_package.directory().data(), handoff_->userboot.vmo.content_size);
   ZX_ASSERT_MSG(!handoff_->version_string.empty(), "no version.txt file in kernel package");
 }
 
@@ -326,13 +334,15 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
                                            ktl::string_view name) {
   ElfImage elf;
   if (auto result = elf.InitFromFile(file, false); result.is_error()) {
-    printf("%s: Cannot decode ELF file \"%.*s/%.*s\" from STORAGE_KERNEL item BOOTFS: ",
-           gSymbolize->name(), static_cast<int>(file.view().directory().size()),
-           file.view().directory().data(), static_cast<int>(file->name.size()), file->name.data());
-    zbitl::PrintBootfsError(result.error_value());
+    elf.Printf(result.error_value());
     abort();
   }
   elf.set_load_address(0);
+
+  if (auto result = elf.SeparateZeroFill(); result.is_error()) {
+    elf.Printf(result.error_value());
+    abort();
+  }
 
   PhysElfImage handoff_elf = {
       .vmo = MakePhysVmo(elf.aligned_memory_image(), name, file->data.size()),
@@ -357,7 +367,7 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
             "",
             segment.vaddr() + load_bias,
             segment.memsz(),
-            segment.offset(),
+            segment.filesz() == 0 ? PhysElfImage::kZeroFill : segment.offset(),
             PhysMapping::Permissions::FromSegment(segment),
         };
         return true;

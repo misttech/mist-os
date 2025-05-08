@@ -35,7 +35,7 @@ class ElfImage {
  public:
   static constexpr ktl::string_view kImageName = "image.elf";
 
-  static constexpr size_t kMaxLoad = 4;  // RODATA, CODE, RELRO, DATA
+  static constexpr size_t kMaxLoad = 5;  // RODATA, CODE, RELRO, DATA, BSS
 
   static constexpr size_t kMaxBuildIdLen = 32;
 
@@ -131,6 +131,12 @@ class ElfImage {
     return load_info_.vaddr_size() <= ZBI_BOOTFS_PAGE_ALIGN(image_.image().size_bytes());
   }
 
+  // Rewrite the load_info().segments() list after Init() so that each
+  // DataWithZeroFillSegment is replaced with a separate DataSegment and
+  // ZeroFillSegment.  Any partial page after the filesz is zero-filled in
+  // place in the file image.
+  fit::result<Error> SeparateZeroFill();
+
   // Load in place if possible, or else copy into a new Allocation
   // A virtual load address at which relocation is expected to occur may be
   // provided; if not, the image will be loaded within the current address
@@ -218,6 +224,11 @@ class ElfImage {
   // instrumentation data.
   void OnHandoff() { publish_self_ = PublishSelf; }
 
+  // Describes the file before ": " and then does printf.
+  [[gnu::format(printf, 2, 3)]] void Printf(const char* fmt, ...) const;
+  void Printf() const;  // Same as Printf("").
+  void Printf(Error error) const;
+
  private:
   // PublishSelf takes one of these for each particular kind of per-module
   // instrumentation VMO supported.  The callback knows what kind of data it's
@@ -249,6 +260,7 @@ class ElfImage {
                   ktl::initializer_list<ktl::string_view> strings) const;
 
   ktl::string_view name_;
+  ktl::string_view package_;
   elfldltl::DirectMemory image_{{}};
   LoadInfo load_info_;
   uint64_t entry_ = 0;

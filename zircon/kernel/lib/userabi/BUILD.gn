@@ -4,13 +4,28 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
+import("//build/cpp/library_headers.gni")
 import("//build/zircon/c_utils.gni")
-import("//build/zircon/migrated_targets.gni")
 import("//build/zircon/zircon_cpu.gni")
 import("//zircon/kernel/params.gni")
 
-zx_library("userabi") {
-  sources = []
+static_library("userabi") {
+  public_deps = [ ":headers" ]
+  if (is_kernel && !kernel_no_userabi) {
+    deps = [
+      ":userboot",
+      ":vdso",
+      "//zircon/kernel/lib/instrumentation",
+    ]
+  }
+}
+
+library_headers("headers") {
+  headers = [
+    "lib/userabi/userboot.h",
+    "lib/userabi/vdso-constants.h",
+    "lib/userabi/vdso.h",
+  ]
   public_deps = [
     # <lib/userabi/vdso.h> has #include <lib/fasttime/internal/abi.h>.
     "//zircon/kernel/lib/fasttime:headers",
@@ -28,11 +43,6 @@ zx_library("userabi") {
       "//zircon/kernel/object",
     ]
     if (!kernel_no_userabi) {
-      deps = [
-        ":userboot",
-        ":vdso",
-        "//zircon/kernel/lib/instrumentation",
-      ]
       public_configs = [
         ":sysret-offsets",
         ":vdso-valid-sysret",
@@ -93,6 +103,10 @@ template("rodso") {
                              "visibility",
                            ])
     outputs = [ rspfile ]
+
+    metadata = {
+      distribution_entries_barrier = []
+    }
   }
 
   if (is_kernel) {
@@ -132,7 +146,7 @@ template("rodso") {
         generated_sources = rebase_path(outputs, root_build_dir)
 
         # Prevent deps from propagating up to code that uses this action.
-        manifest_barrier = []
+        distribution_entries_barrier = []
       }
     }
   } else {
@@ -238,4 +252,12 @@ if (is_kernel) {
       "//zircon/system/ulib/zircon-internal",
     ]
   }
+}
+
+group("boot_tests") {
+  testonly = true
+  deps = [
+    "trivial-test-userboot:boot_tests",
+    "userboot/tests:boot_tests",
+  ]
 }

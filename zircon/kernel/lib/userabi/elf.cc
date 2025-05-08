@@ -50,6 +50,27 @@ zx::result<MappedElf> MapHandoffElf(  //
           static_cast<int>(vmo_name.size()), vmo_name.data(), mapped_elf.vaddr_start,
           mapped_elf.vaddr_start + mapped_elf.vaddr_size);
 
+  // Mappings marked with kZeroFill need anonymous VMO pages rather than file
+  // VMO pages.  Sum those and make a single VMO for all the pages needed.
+  size_t bss_total = 0;
+  for (const PhysMapping& mapping : elf.mappings) {
+    if (mapping.paddr == PhysElfImage::kZeroFill) {
+      bss_total += mapping.size;
+    }
+  }
+  fbl::RefPtr<VmObjectPaged> bss_vmo;
+  if (bss_total > 0) {
+    DEBUG_ASSERT(bss_total % ZX_PAGE_SIZE == 0);
+    status =
+        VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT, 0, bss_total, &bss_vmo);
+    if (status != ZX_OK) {
+      dprintf(CRITICAL,
+              "userboot: failed to allocate VMO of %zu bss bytes for %.*s ELF image: %d\n",
+              bss_total, static_cast<int>(vmo_name.size()), vmo_name.data(), status);
+      return zx::error{status};
+    }
+  }
+
   const char* segment_name = "???";
   for (const PhysMapping& mapping : elf.mappings) {
     zx_vm_option_t map_flags = ZX_VM_SPECIFIC;
@@ -69,8 +90,15 @@ zx::result<MappedElf> MapHandoffElf(  //
       }
       segment_name = "code";
     }
+    if (mapping.paddr == PhysElfImage::kZeroFill) {
+      // Map from bss_vmo instead of elf.vmo; consume its pages from the end.
+      bss_total -= mapping.size;
+      segment_name = "bss";
+    }
     zx::result<VmAddressRegion::MapResult> map_result =
-        vmar.Map(mapping.vaddr, elf.vmo, mapping.paddr, mapping.size, map_flags);
+        mapping.paddr == PhysElfImage::kZeroFill
+            ? vmar.Map(mapping.vaddr, bss_vmo, bss_total, mapping.size, map_flags)
+            : vmar.Map(mapping.vaddr, elf.vmo, mapping.paddr, mapping.size, map_flags);
     if (map_result.is_error()) {
       dprintf(CRITICAL, "userboot: %.*s ELF %s mapping %#zx @ %#" PRIxPTR " size %#zx failed %d\n",
               static_cast<int>(vmo_name.size()), vmo_name.data(), segment_name, mapping.paddr,
@@ -82,6 +110,7 @@ zx::result<MappedElf> MapHandoffElf(  //
             static_cast<int>(vmo_name.size()), vmo_name.data(), segment_name, mapping.paddr,
             map_result->base, map_result->base + mapping.size);
   }
+  DEBUG_ASSERT(bss_total == 0);
 
   return zx::ok(ktl::move(mapped_elf));
 }

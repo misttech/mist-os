@@ -106,6 +106,8 @@ class PhysHandoffPtr {
     return *this;
   }
 
+  constexpr auto operator<=>(const PhysHandoffPtr& other) const = default;
+
 #if HANDOFF_PTR_DEREF
   // Handoff pointers can only be dereferenced in the kernel proper.
 
@@ -140,6 +142,8 @@ class PhysHandoffSpan {
       : ptr_(ptr), size_(size) {}
 
   PhysHandoffSpan& operator=(PhysHandoffSpan&&) noexcept = default;
+
+  constexpr auto operator<=>(const PhysHandoffSpan& other) const = default;
 
   size_t size() const { return size_; }
 

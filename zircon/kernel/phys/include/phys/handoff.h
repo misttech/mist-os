@@ -83,6 +83,8 @@ class PhysBootTimes {
 struct PhysVmObject {
   using Name = std::array<char, ZX_MAX_NAME_LEN>;
 
+  constexpr auto operator<=>(const PhysVmObject& other) const = default;
+
   constexpr void set_name(std::string_view new_name) {
     ZX_DEBUG_ASSERT(new_name.size() < name.size());
     new_name.copy(name.data(), name.size() - 1);
@@ -198,6 +200,8 @@ static_assert(std::is_default_constructible_v<PhysMapping>);
 // logical grouping of mappings, to be realized as a proper VMAR during VM
 // initialization.
 struct PhysVmar : public PhysVmObject {
+  constexpr bool operator==(const PhysVmar& other) const = default;
+
   // It's useful to normalize VMAR order on base address for more readable
   // kernel start-up logging.
   constexpr auto operator<=>(const PhysVmar& other) const { return base <=> other.base; }
@@ -231,6 +235,10 @@ struct PhysElfImage {
     uintptr_t relative_entry_point = 0;  // Add to VMAR base address.
     std::optional<size_t> stack_size;
   };
+
+  // This value in .vmar.mappings[n].paddr indicates the mapping is for
+  // zero-fill pages rather than pages from the PhysVmo.
+  static constexpr uintptr_t kZeroFill = -1;
 
   PhysVmo vmo;
   PhysVmar vmar;

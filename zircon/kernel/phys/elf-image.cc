@@ -12,10 +12,13 @@
 #include <lib/elfldltl/dynamic.h>
 #include <lib/elfldltl/link.h>
 #include <lib/fit/defer.h>
+#include <lib/zbitl/error-stdio.h>
+#include <string.h>
 #include <zircon/assert.h>
 #include <zircon/limits.h>
 
 #include <ktl/atomic.h>
+#include <ktl/span.h>
 #include <ktl/utility.h>
 #include <ktl/variant.h>
 #include <phys/address-space.h>
@@ -56,6 +59,7 @@ fit::result<ElfImage::Error> ElfImage::Init(ElfImage::BootfsDir dir, ktl::string
     // Singleton ELF file, no patches.
     dir.ignore_error();
     auto result = InitFromFile(found, relocated);
+    package_ = dir.directory();
     name_ = name;
     return result;
   }
@@ -94,6 +98,7 @@ fit::result<ElfImage::Error> ElfImage::InitFromDir(ElfImage::BootfsDir subdir,
 
 fit::result<ElfImage::Error> ElfImage::InitFromFile(ElfImage::BootfsDir::iterator file,
                                                     bool relocated) {
+  package_ = file.view().directory();
   name_ = file->name;
   image_.set_image(file->data);
 
@@ -294,4 +299,67 @@ void ElfImage::PrintPatch(const code_patching::Directive& patch,
   }
   printf(": [%#" PRIx64 ", %#" PRIx64 ")\n", patch.range_start,
          patch.range_start + patch.range_size);
+}
+
+fit::result<ElfImage::Error> ElfImage::SeparateZeroFill() {
+  for (auto it = load_info_.segments().begin(); it != load_info_.segments().end(); ++it) {
+    auto* segment = ktl::get_if<LoadInfo::DataWithZeroFillSegment>(&*it);
+    if (!segment) {  // Not a DataWithZeroFillSegment.
+      continue;
+    }
+
+    size_t partial_page = segment->filesz() % ZX_PAGE_SIZE;
+    if (partial_page > 0) {
+      // Zero the partial page that is part of the zero-fill area but will
+      // remain in the original segment transformed into plain DataSegment.
+      partial_page = ZX_PAGE_SIZE - partial_page;
+      size_t fill_start = segment->offset() + segment->filesz();
+      ktl::span fill_bytes = image_.image().subspan(fill_start, partial_page);
+      memset(fill_bytes.data(), 0, fill_bytes.size_bytes());
+    }
+
+    size_t new_filesz = segment->filesz() + partial_page;
+    size_t zero_fill_vaddr = segment->vaddr() + new_filesz;
+    size_t zero_fill_size = segment->memsz() - new_filesz;
+
+    // Recharacterize the original segment as a shorter plain DataSegment.
+    *it = LoadInfo::DataSegment{
+        segment->offset(),
+        segment->vaddr(),
+        new_filesz,
+        new_filesz,
+    };
+
+    if (zero_fill_size > 0) {
+      // Insert a second segment for the whole pages of zero-fill.
+      auto diagnostics = GetDiagnostics();
+      auto inserted = load_info_.segments().insert(
+          diagnostics, "ELF segments for zero-fill normalization", ++it,
+          LoadInfo::ZeroFillSegment{zero_fill_vaddr, zero_fill_size});
+      if (!inserted) {
+        return fit::error{ElfImage::Error{"allocation failure"}};
+      }
+      it = *inserted;
+    }
+  }
+  return fit::ok();
+}
+
+void ElfImage::Printf() const {
+  printf("%s: In ELF file \"%.*s/%.*s\" from STORAGE_KERNEL item BOOTFS: ", gSymbolize->name(),
+         static_cast<int>(package_.size()), package_.data(), static_cast<int>(name_.size()),
+         name_.data());
+}
+
+void ElfImage::Printf(const char* fmt, ...) const {
+  Printf();
+  va_list args;
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+}
+
+void ElfImage::Printf(Error error) const {
+  Printf();
+  zbitl::PrintBootfsError(error);
 }

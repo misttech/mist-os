@@ -159,7 +159,7 @@ class UserbootImage {
     return zx::ok(Mapped{
         .userboot_vmar = ktl::move(userboot->vmar),
         .userboot_entry = userboot->entry,
-        .vdso_base = userboot->vaddr_start + userboot->vaddr_start,
+        .vdso_base = userboot->vaddr_start + userboot->vaddr_size,
         .stack_size = *userboot->stack_size,
     });
   }
@@ -172,7 +172,8 @@ class UserbootImage {
 // Map the stack anywhere, in its own VMAR with a one-page guard region below.
 zx::result<uintptr_t> MapStack(VmAddressRegionDispatcher& root_vmar, size_t stack_size) {
   fbl::RefPtr<VmObjectPaged> stack_vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, stack_size, &stack_vmo);
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT, 0u,
+                                             stack_size, &stack_vmo);
   if (status != ZX_OK) {
     dprintf(CRITICAL, "userboot: failed to create stack VMO of %zu bytes: %d\n", stack_size,
             status);

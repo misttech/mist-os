@@ -1007,6 +1007,16 @@ before they impact the system.
 
 The name of the kernel package to boot from the STORAGE_KERNEL item in the ZBI.
 
+### kernel.select.userboot=\<string>
+
+**Default:** `userboot`
+
+Program to run in the first (and only) user process the kernel creates: an ELF
+static PIE file inside the package chosen by `kernel.select`.  The first user
+process starts with a handle to a channel on which it receives a single message
+containing initial handles holding all the privileged and essential
+capabilities for the initial process itself and for the system.
+
 ### kernel.scheduler.prefer-little-cpus=\<bool>
 
 **Default:** `false`

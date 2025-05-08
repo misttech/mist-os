@@ -870,6 +870,15 @@ DEFINE_OPTION("kernel.select", SmallString, select, {"zircon"}, R"""(
 The name of the kernel package to boot from the STORAGE_KERNEL item in the ZBI.
 )""")
 
+DEFINE_OPTION("kernel.select.userboot", SmallString, userboot, {"userboot"},
+              R"""(
+Program to run in the first (and only) user process the kernel creates: an ELF
+static PIE file inside the package chosen by `kernel.select`.  The first user
+process starts with a handle to a channel on which it receives a single message
+containing initial handles holding all the privileged and essential
+capabilities for the initial process itself and for the system.
+)""")
+
 DEFINE_OPTION("kernel.scheduler.prefer-little-cpus", bool, scheduler_prefer_little_cpus, {false},
               R"""(
 When searching for a CPU on which to place a task, prefer little cores over big cores.  Enabling

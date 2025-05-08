@@ -4,6 +4,7 @@
 
 import("//build/components/fuchsia_unittest_package.gni")
 import("//build/cpp/cpp_fuzzer.gni")
+import("//build/cpp/library_headers.gni")
 import("//build/fuzz.gni")
 import("//build/test.gni")
 import("//build/testing/boot_tests/zbi_test.gni")
@@ -143,9 +144,14 @@ if (current_os == "linux") {
 }
 
 if (is_fuchsia) {
+  library_headers("static-pie.headers") {
+    include_dir = "."
+    headers = [ "fuchsia-static-pie.h" ]
+  }
+
   static_library("static-pie") {
     sources = [ "fuchsia-static-pie.cc" ]
-    public = [ "fuchsia-static-pie.h" ]
+    public_deps = [ ":static-pie.headers" ]
     deps = [
       "..",
       "//src/zircon/lib/zircon",

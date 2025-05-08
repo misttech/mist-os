@@ -607,6 +607,7 @@ if (toolchain_environment == "kernel.phys" ||
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/instrumentation",
       "//zircon/kernel/phys/lib/memalloc",
+      "//zircon/system/ulib/fbl",
     ]
   }
 
@@ -792,6 +793,19 @@ kernel_elf_interp("physload.interp") {
   deps = [ ":physload" ]
 }
 
+# The GNU linkers don't do page-aligned segments by default like LLD,
+# so a linker script is required.
+config("phys-elf-module.config") {
+  if (is_gcc) {
+    ldflags = [ "-Wl,-z,relro" ]
+    if (toolchain_environment != "kernel") {
+      # The kernel has its own linker script, so don't pass two -T switches.
+      inputs = [ "phys-elf-module.ld" ]
+      ldflags += [ "-Wl,-T," + rebase_path(inputs[0], root_build_dir) ]
+    }
+  }
+}
+
 if (is_kernel) {
   source_set("physload.header") {
     visibility = [
@@ -832,20 +846,6 @@ if (is_kernel) {
     visibility = [ ":*" ]
     ldflags = [ "-Wl,-e,PhysLoadHandoff" ]
     configs = [ ":phys-elf-module.config" ]
-  }
-
-  # The GNU linkers don't do page-aligned segments by default like LLD,
-  # so a linker script is required.
-  config("phys-elf-module.config") {
-    visibility = [ "./*" ]
-    if (is_gcc) {
-      ldflags = [ "-Wl,-z,relro" ]
-      if (toolchain_environment != "kernel") {
-        # The kernel has its own linker script, so don't pass two -T switches.
-        inputs = [ "phys-elf-module.ld" ]
-        ldflags += [ "-Wl,-T," + rebase_path(inputs[0], root_build_dir) ]
-      }
-    }
   }
 
   source_set("physboot.h") {
