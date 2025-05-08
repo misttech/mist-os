@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use component_events::events::*;
+use component_events::matcher::*;
 use diagnostics_reader::{ArchiveReader, RetryConfig};
 use fidl_fuchsia_component::BinderMarker;
 use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
@@ -10,7 +12,9 @@ use fidl_fuchsia_diagnostics_persist::{
 };
 use fidl_fuchsia_samplertestcontroller::{SamplerTestControllerMarker, SamplerTestControllerProxy};
 use fidl_test_persistence_factory::{ControllerMarker, ControllerProxy};
-use fuchsia_component_test::RealmInstance;
+use fuchsia_async as fasync;
+use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, RealmInstance};
+use futures::{select, FutureExt};
 use log::*;
 use pretty_assertions::{assert_eq, StrComparison};
 use rand::Rng;
@@ -395,6 +399,36 @@ async fn persist_across_boot() {
     realm.set_update_completed().await;
     verify_diagnostics_persistence_publication(&realm.instance, Published::Int(TAG_PERSISTED, 8))
         .await;
+}
+
+/// Verify Persistence starts and never stops.
+#[fuchsia::test]
+async fn never_idles() {
+    let builder = RealmBuilder::with_params(
+        RealmBuilderParams::new().from_relative_url("#meta/test_root.cm"),
+    )
+    .await
+    .unwrap();
+    let instance = builder.build().await.unwrap();
+
+    let mut event_stream = EventStream::open().await.unwrap();
+    let moniker = format!(".*{}.*persistence$", instance.root.child_name());
+
+    // Wait for the start event.
+    EventMatcher::ok()
+        .moniker_regex(moniker.clone())
+        .wait::<Started>(&mut event_stream)
+        .await
+        .unwrap();
+
+    // Wait for the absence of the stop event.
+    let mut stop_event = Box::pin(
+        EventMatcher::ok().moniker_regex(moniker.clone()).wait::<Stopped>(&mut event_stream).fuse(),
+    );
+    select! {
+        event = &mut stop_event => panic!("Unexpected stop event {event:?}"),
+        _ = fasync::Timer::new(MonotonicDuration::from_seconds(1)).fuse() => {},
+    };
 }
 
 /// The Inspect source may not publish Inspect (via take_and_serve_directory_handle()) until

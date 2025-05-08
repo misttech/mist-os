@@ -25,12 +25,14 @@ rustc_test("integration-bin") {
     "//src/diagnostics/sampler/tests/fidl:fuchsia.samplertestcontroller_rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-sync",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/lib/cm_rust",
+    "//src/sys/lib/component-events",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
@@ -60,6 +62,11 @@ fuchsia_unittest_component("persistence-integration-test") {
   deps = [ ":integration-bin" ]
 }
 
+fuchsia_component("test_root") {
+  testonly = true
+  manifest = "meta/test_root.cml"
+}
+
 # Rules defining the Persistence component.
 fuchsia_component_manifest("persistence-manifest-for-test") {
   component_name = "persistence"
@@ -79,7 +86,9 @@ fuchsia_test_package("persistence-integration-tests") {
   ]
   deps = [
     ":persistence-component-for-test",
+    ":test_root",
     "//src/diagnostics/sampler/tests/test_component:single_counter_test_component",
+    "//src/sys/component_manager:component-manager-realm-builder-debug-cmp",
   ]
   subpackages = [ "//src/diagnostics/archivist:archivist-for-embedding" ]
 }

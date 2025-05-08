@@ -15,6 +15,12 @@
             storage: "tmp",
             path: "/tmp",
         },
+        {
+            event_stream: [
+                "started",
+                "stopped",
+            ],
+        },
     ],
     offer: [
         {
@@ -23,10 +29,12 @@
             to: [ "#realm_builder" ],
         },
         {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            protocol: [
+                "fuchsia.process.Launcher",
+                "fuchsia.tracing.provider.Registry",
+            ],
             from: "parent",
             to: "#realm_builder",
-            availability: "optional",
         },
     ],
 }
