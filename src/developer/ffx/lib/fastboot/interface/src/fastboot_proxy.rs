@@ -194,7 +194,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         let size = file_to_flash.metadata().map_err(FlashError::from)?.len();
         let size = u32::try_from(size).map_err(|e| FlashError::InvalidFileSize(e))?;
         let progress_listener = ProgressListener::new(listener)?;
-        let span = tracing::span!(tracing::Level::INFO, "device_flash_upload").entered();
         let upload_reply = upload_with_read_timeout(
             size,
             &mut file_to_flash,
@@ -204,7 +203,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         )
         .await
         .context(format!("uploading {}", path))?;
-        drop(span);
         match upload_reply {
             Reply::Okay(s) => tracing::debug!("Received response from download command: {}", s),
             Reply::Fail(s) => {
@@ -222,12 +220,10 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         };
 
         // Flash the uploaded file
-        let span = tracing::span!(tracing::Level::INFO, "device_flash").entered();
         let command = Command::Flash(partition_name.to_string());
         let send_reply = send_with_timeout(command.clone(), self.interface().await?, timeout)
             .await
             .context("sending flash");
-        drop(span);
         match send_reply {
             Ok(reply) => match reply {
                 Reply::Okay(_) => Ok(()),
