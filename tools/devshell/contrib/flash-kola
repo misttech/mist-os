@@ -100,8 +100,15 @@ function push_ssh_keys {
     return 1
   }
 
-  ${FASTBOOT} stage "${AUTH_KEYS}" oem add-staged-bootloader-file ssh.authorized_keys || {
-    fx-warn "Failed to push SSH keys to fastboot"
+  # Split this into two commands for clarity on which command fails.
+  # Staging a file failing is very different from the oem command failing
+  ${FASTBOOT} stage "${AUTH_KEYS}" || {
+    fx-warn "Failed to upload authorized keys"
+    return 1
+  }
+
+  ${FASTBOOT} oem add-staged-bootloader-file ssh.authorized_keys || {
+    fx-warn "Failed to stage SSH keys to fastboot"
     fx-warn "Device bootloader may not support it"
     return 1
   }
