@@ -14,7 +14,6 @@ static int print_dm_help() {
   printf(
       "poweroff             - power off the system\n"
       "shutdown             - power off the system\n"
-      "suspend              - suspend the system to RAM\n"
       "reboot               - reboot the system\n"
       "reboot-bootloader/rb - reboot the system into bootloader\n"
       "reboot-recovery/rr   - reboot the system into recovery\n"
@@ -177,18 +176,6 @@ int zxc_dm(int argc, char** argv) {
         [](fidl::WireSyncClient<fuchsia_hardware_power_statecontrol::Admin> client) {
           return client->RebootToRecovery();
         });
-
-  } else if (command_cmp("suspend", NULL, argv[1], &command_length)) {
-#ifdef ENABLE_SUSPEND
-    return send_statecontrol_admin_command(
-        [](fidl::WireSyncClient<fuchsia_hardware_power_statecontrol::Admin> client) {
-          return client->SuspendToRam();
-        });
-#else
-    printf("Suspend is not supported on this device\n");
-    return -1;
-#endif
-
   } else if (command_cmp("poweroff", NULL, argv[1], &command_length) ||
              command_cmp("shutdown", NULL, argv[1], &command_length)) {
     return send_statecontrol_admin_command(

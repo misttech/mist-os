@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/suspend/config.gni")
 import("//build/zbi/kernel_cmdline.gni")
 
 # This serves as an anchor point. By expressing a dependency on
@@ -19,26 +18,6 @@ kernel_cmdline("serial-legacy") {
 kernel_cmdline("disable-blobfs-compression") {
   args = [ "blobfs.write-compression-algorithm=UNCOMPRESSED" ]
   deps = [ "//build/validate:non_production_tag" ]
-}
-
-kernel_cmdline("enable-suspend") {
-  args = [
-    "kernel.enable_suspend=true",
-
-    # Force ticks_get to use the syscall where we can apply an offset to ensure continuity of the
-    # monotonic clock over suspend and resume. This has a significant time cost and is only
-    # intended as a temporary measure to enable testing of suspend as it is introduced.
-    "vdso.ticks_get_force_syscall=true",
-  ]
-  deps = [ "//build/validate:non_production_tag" ]
-}
-
-# This group is defined in this way so that it can be included in the board before the
-# `enable_suspend` flag is set as a build argument by developers.
-group("enable-suspend-from-board") {
-  if (enable_suspend) {
-    deps = [ ":enable-suspend" ]
-  }
 }
 
 # This collects settings not specific to any particular machine that are
