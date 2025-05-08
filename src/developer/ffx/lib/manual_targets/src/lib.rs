@@ -36,9 +36,11 @@ pub trait ManualTargets: Sync {
             .unwrap_or_default()
     }
 
-    async fn add(&self, target: String, expiry: Option<u64>) -> Result<()> {
+    async fn add(&self, target: String) -> Result<()> {
         let mut targets = self.get_or_default().await;
-        targets.insert(target, json!(expiry));
+        // We always insert None so that we retain backwards-compatibility for manual targets,
+        // which previously were stored as a map of addr->expiration-time
+        targets.insert(target, json!(None::<Option<u64>>));
         self.storage_set(targets.into()).await
     }
 
@@ -136,16 +138,13 @@ mod test {
             let _env = ffx_config::test_init().await.unwrap();
 
             let mt = Config::default();
-            mt.add("127.0.0.1:8022".to_string(), None).await.unwrap();
-            mt.add("127.0.0.1:8023".to_string(), Some(12345)).await.unwrap();
+            mt.add("127.0.0.1:8022".to_string()).await.unwrap();
             // duplicate additions are ignored
-            mt.add("127.0.0.1:8022".to_string(), None).await.unwrap();
-            mt.add("127.0.0.1:8023".to_string(), Some(12345)).await.unwrap();
+            mt.add("127.0.0.1:8022".to_string()).await.unwrap();
 
             let value = mt.get().await.unwrap();
             let targets = value.as_object().unwrap();
             assert!(targets.contains_key("127.0.0.1:8022"));
-            assert!(targets.contains_key("127.0.0.1:8023"));
         }
 
         #[fuchsia_async::run_singlethreaded(test)]
@@ -155,7 +154,7 @@ mod test {
 
             ffx_config::query(MANUAL_TARGETS)
                 .level(Some(ConfigLevel::User))
-                .set(json!({"127.0.0.1:8022": 0, "127.0.0.1:8023": 12345}))
+                .set(json!({"127.0.0.1:8022": 0, "127.0.0.1:8023": 0}))
                 .await
                 .unwrap();
 
@@ -207,31 +206,25 @@ mod test {
         #[fuchsia_async::run_singlethreaded(test)]
         async fn test_add_manual_target() {
             let mt = Mock::default();
-            mt.add("127.0.0.1:8022".to_string(), None).await.unwrap();
-            mt.add("127.0.0.1:8023".to_string(), Some(12345)).await.unwrap();
+            mt.add("127.0.0.1:8022".to_string()).await.unwrap();
             // duplicate additions are ignored
-            mt.add("127.0.0.1:8022".to_string(), None).await.unwrap();
-            mt.add("127.0.0.1:8023".to_string(), Some(12345)).await.unwrap();
+            mt.add("127.0.0.1:8022".to_string()).await.unwrap();
 
             let value = mt.get().await.unwrap();
             let targets = value.as_object().unwrap();
             assert!(targets.contains_key("127.0.0.1:8022"));
-            assert!(targets.contains_key("127.0.0.1:8023"));
         }
 
         #[fuchsia_async::run_singlethreaded(test)]
         async fn test_remove_manual_target() {
             let mut map = Map::new();
             map.insert("127.0.0.1:8022".to_string(), json!(0));
-            map.insert("127.0.0.1:8023".to_string(), json!(12345));
             let mt = Mock::new(map);
             let value = mt.get().await.unwrap();
             let targets = value.as_object().unwrap();
             assert!(targets.contains_key("127.0.0.1:8022"));
-            assert!(targets.contains_key("127.0.0.1:8023"));
 
             mt.remove("127.0.0.1:8022".to_string()).await.unwrap();
-            mt.remove("127.0.0.1:8023".to_string()).await.unwrap();
 
             let targets = mt.get_or_default().await;
             assert!(targets.is_empty());
@@ -242,13 +235,9 @@ mod test {
     #[serial]
     async fn test_repeated_adds_do_not_rewrite_storage() {
         let mt = Mock::new(Map::new());
-        mt.add("127.0.0.1:8022".to_string(), None).await.unwrap();
+        mt.add("127.0.0.1:8022".to_string()).await.unwrap();
         assert_eq!(mt.set_count.load(Ordering::SeqCst), 1);
-        mt.add("127.0.0.1:8022".to_string(), None).await.unwrap();
+        mt.add("127.0.0.1:8022".to_string()).await.unwrap();
         assert_eq!(mt.set_count.load(Ordering::SeqCst), 1);
-        mt.add("127.0.0.1:8023".to_string(), Some(12345)).await.unwrap();
-        assert_eq!(mt.set_count.load(Ordering::SeqCst), 2);
-        mt.add("127.0.0.1:8023".to_string(), Some(12345)).await.unwrap();
-        assert_eq!(mt.set_count.load(Ordering::SeqCst), 2);
     }
 }

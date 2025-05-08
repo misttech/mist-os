@@ -363,7 +363,7 @@ mod test {
             }
         }
 
-        async fn add(&self, _target: String, _expiry: Option<u64>) -> Result<()> {
+        async fn add(&self, _target: String) -> Result<()> {
             unimplemented!()
         }
 
