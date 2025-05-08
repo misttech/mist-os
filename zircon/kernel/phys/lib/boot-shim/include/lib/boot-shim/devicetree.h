@@ -34,6 +34,7 @@
 #include <cstdint>
 #include <optional>
 #include <source_location>
+#include <span>
 #include <string_view>
 #include <type_traits>
 
@@ -1073,6 +1074,34 @@ class DevicetreeSerialNumberItem : public DevicetreeItemBase<DevicetreeSerialNum
 
  private:
   std::string_view cmdline_;
+};
+
+// Extracts randomness from the bootloader provided bytes in the devicetree.
+//
+// `/chosen` may contain two properties that provide random bytes:
+//    * 'kaslr-seed` see
+//    https://github.com/devicetree-org/dt-schema/blob/main/dtschema/schemas/chosen.yaml#L35
+//    * `rng-seed` see
+//    https://github.com/devicetree-org/dt-schema/blob/main/dtschema/schemas/chosen.yaml#L55C1-L56C1
+//
+// When extracted, the devicetree bytes are cleared.
+class DevicetreeSecureEntropyItem : public DevicetreeItemBase<DevicetreeSecureEntropyItem, 1>,
+                                    public ItemBase {
+ public:
+  static constexpr uint8_t kFillPattern = 0xAD;
+
+  size_t size_bytes() const {
+    return ItemSize(rng_bytes_.size_bytes()) + ItemSize(kaslr_bytes_.size_bytes());
+  }
+
+  fit::result<DataZbi::Error> AppendItems(DataZbi& zbi);
+
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+
+ private:
+  std::span<std::byte> rng_bytes_;
+  std::span<std::byte> kaslr_bytes_;
 };
 
 }  // namespace boot_shim

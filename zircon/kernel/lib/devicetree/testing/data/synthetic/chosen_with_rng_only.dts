@@ -27,6 +27,7 @@
         linux,initrd-start = <0x0 0x48000000>;
         bootargs = "-foo=bar -bar=baz";
         stdout-path = "my-favorite-uart";
+        rng-seed= <0xDEAD 0xBEEF>;
     };
 
     aliases {
