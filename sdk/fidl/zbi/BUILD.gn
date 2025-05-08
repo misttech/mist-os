@@ -15,6 +15,7 @@ zbi_sources = [
   "overview.fidl",
   "partition.fidl",
   "reboot.fidl",
+  "secure-entropy.fidl",
   "zbi.fidl",
 ]
 
