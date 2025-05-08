@@ -4228,9 +4228,11 @@ impl BinderDriver {
                         // must be a Sender role.
                         assert!(
                             matches!(transaction, TransactionRole::Sender),
-                            "{:?}, {:?}",
+                            "Active Transaction: {:?}, Pending Transactions {:?}, Command: {:?}, Pending Commands: {:?}",
                             transaction,
-                            thread_state.transactions
+                            thread_state.transactions,
+                            command,
+                            thread_state.command_queue,
                         );
                     }
                     Command::TransactionComplete
