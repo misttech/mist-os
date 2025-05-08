@@ -91,6 +91,7 @@ load(
     _INPUT_DEVICE_TYPE = "INPUT_DEVICE_TYPE",
     _fuchsia_hybrid_product_configuration = "fuchsia_hybrid_product_configuration",
     _fuchsia_prebuilt_product_configuration = "fuchsia_prebuilt_product_configuration",
+    _fuchsia_prebuilt_product_configuration_extract_package = "fuchsia_prebuilt_product_configuration_extract_package",
     _fuchsia_product_configuration = "fuchsia_product_configuration",
 )
 load(
@@ -140,6 +141,7 @@ fuchsia_package_directory = _fuchsia_package_directory
 fuchsia_package_with_configs = _fuchsia_package_with_configs
 fuchsia_product_configuration = _fuchsia_product_configuration
 fuchsia_prebuilt_product_configuration = _fuchsia_prebuilt_product_configuration
+fuchsia_prebuilt_product_configuration_extract_package = _fuchsia_prebuilt_product_configuration_extract_package
 fuchsia_product_ota_config = _fuchsia_product_ota_config
 fuchsia_virtual_device = _fuchsia_virtual_device
 fuchsia_board_configuration = _fuchsia_board_configuration

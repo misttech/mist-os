@@ -22,6 +22,7 @@ load(
     "fuchsia_prebuilt_board_input_bundle",
     "fuchsia_prebuilt_package",
     "fuchsia_prebuilt_product_configuration",
+    "fuchsia_prebuilt_product_configuration_extract_package",
     "fuchsia_product_configuration",
     "fuchsia_product_ota_config",
     "fuchsia_virtual_device",
@@ -52,6 +53,8 @@ HEAD_ABI_REVISION = [
     for level in get_fuchsia_api_levels()
     if level.api_level == "HEAD"
 ][0]
+
+AMS_LIGHT_TEST_ABI_REVISION = "0xECCEA2F70ACD6FC0"
 
 fuchsia_prebuilt_package(
     name = "prebuilt_ams_light",
@@ -561,5 +564,45 @@ fuchsia_package_checker_test(
         "meta/empty_component.cm",
     ],
     package_under_test = ":fuchsia_android_starnix_container_for_test",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_product_configuration(
+    name = "product_config_for_package_extraction",
+    base_packages = [
+        ":prebuilt_ams_light",  # This package is named "ams-light"
+    ],
+    product_config_json = {
+        "platform": {
+            "build_type": "eng",
+        },
+        "product": {},
+    },
+)
+
+fuchsia_prebuilt_product_configuration_extract_package(
+    name = "extracted_ams_light_from_product_config",
+    package_name = "ams-light-test",  # Name of the package inside its manifest
+    product_configuration = ":product_config_for_package_extraction",
+)
+
+fuchsia_package_checker_test(
+    name = "prebuilt_product_config_extract_package_test",
+    package_name = "ams-light-test",
+    expected_abi_revision = AMS_LIGHT_TEST_ABI_REVISION,
+    expected_generated_blobs = {
+        ":test_data/ams-light-test/bee300a0aa26d798723ca029842a4b3f32ae02637d207f49b620fc4f371a0368": "lib/ld.so.1",
+        ":test_data/ams-light-test/9cd2c26907d4a75a75d96d790358643266e02da97dd417c0ddfaa84f8751d33a": "lib/libasync-default.so",
+        ":test_data/ams-light-test/ec8fec8d882d921269cb10895e6ef64838448a655dff87c4252359abbb9b4dee": "lib/libbackend_fuchsia_globals.so",
+        ":test_data/ams-light-test/9fd9afd733a93aed961e3d0236d8d4db90fa4acff84d7148eacf379102875b2f": "lib/libc++.so.2",
+        ":test_data/ams-light-test/a0bb87c87dcc662940b42826f0ba3e58a94348ca2c2f9a3fbdf299c82e53e789": "lib/libc++abi.so.1",
+        ":test_data/ams-light-test/a282191611eccbf36c83a8d3d910807be279b41ecd3fb25a055e9286b0e6ba17": "lib/libfdio.so",
+        ":test_data/ams-light-test/5cdf7cb150111850719bdf5aca1d2ca7ecf8e00b38fd86c351887c81a50e2745": "lib/libsyslog.so",
+        ":test_data/ams-light-test/b35567ee375ed98c030fd2801a7bac1d3d0be34908be2d2266fc78e9a1dd0bb3": "lib/libtrace-engine.so",
+        ":test_data/ams-light-test/bcbef09a907952bfaae44405e5aaff5e79d6388c5325e4d2c51e0fbfab4ed53c": "lib/libunwind.so.1",
+        ":test_data/ams-light-test/b26642e3d5892d6cb8c64f940e1177c6db2893ec3f617f92c47fca0ab2520450": "test/ams-light-test",
+    },
+    manifests = ["meta/ams-light-test.cm"],
+    package_under_test = ":extracted_ams_light_from_product_config",
     visibility = ["//visibility:public"],
 )

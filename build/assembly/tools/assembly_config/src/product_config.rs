@@ -58,7 +58,8 @@ pub fn extract_package(args: &ExtractProductPackageArgs) -> Result<()> {
         let mut builder = PackageBuilder::from_manifest(manifest, &args.outdir)
             .with_context(|| format!("Loading package to extract: {}", &args.package_name))?;
 
-        let metafar_path = args.outdir.join("meta.far");
+        let metafar_path =
+            args.output_package_manifest.parent().context("Invalid outdir")?.join("meta.far");
         builder.manifest_path(args.output_package_manifest.clone());
         builder
             .build(&args.outdir, &metafar_path)
