@@ -24,6 +24,7 @@ executable("dash") {
     "src/arith_yacc.c",
     "src/arith_yylex.c",
     "src/bltin/dm_fuchsia.cc",
+    "src/bltin/power_fuchsia.cc",
     "src/bltin/printf.c",
     "src/bltin/test.c",
     "src/bltin/times.c",
