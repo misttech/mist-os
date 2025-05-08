@@ -146,7 +146,7 @@ fs_test_config("f2fs") {
       use_fvm = false
       has_min_volume_size = true
 
-      # f2fs requires a minimum of 100mb volume
+      # f2fs requires a minimum of 50mb volume
       device_block_count = 102400
       device_block_size = 512
     },

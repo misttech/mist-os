@@ -494,7 +494,6 @@ fshost_integration_test_package("fshost_integration_tests_fxfs_no_fxblob") {
 }
 
 fshost_integration_test_package("fshost_integration_tests_f2fs") {
-  enable_wipe_storage_tests = false
   options = {
     data_filesystem_format = "f2fs"
     fxfs_blob = false
@@ -509,7 +508,6 @@ fshost_integration_test_package("fshost_integration_tests_minfs") {
 }
 
 fshost_integration_test_package("fshost_integration_tests_f2fs_no_zxcrypt") {
-  enable_wipe_storage_tests = false
   data_filesystem_variant = "f2fs-no-zxcrypt"
   options = {
     no_zxcrypt = true
