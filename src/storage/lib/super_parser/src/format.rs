@@ -163,7 +163,6 @@ impl MetadataHeader {
             .validate_table_bounds(self.tables_size)
             .map_err(|_| anyhow!("block_devices tables failed table bounds check."))?;
 
-        // TODO(https://fxbug.dev/404952286): Validate entry size for groups.
         ensure!(
             self.partitions.entry_size == std::mem::size_of::<MetadataPartition>() as u32,
             "Invalid partition table entry size."
@@ -172,6 +171,11 @@ impl MetadataHeader {
             self.extents.entry_size == std::mem::size_of::<MetadataExtent>() as u32,
             "Invalid extent table entry size."
         );
+        ensure!(
+            self.groups.entry_size == std::mem::size_of::<MetadataPartitionGroup>() as u32,
+            "Invalid partition group table entry size."
+        );
+        // TODO(https://fxbug.dev/404952286): Validate entry size for block device.
 
         Ok(())
     }
@@ -208,9 +212,10 @@ bitflags! {
     impl PartitionAttributes: u32 {
         /// This partition is not writable.
         const READONLY = 1 << 0;
-        /// If set, indicates that the partition name has a slot suffix applied. The slot suffix is
-        /// determined by the metadata slot number (e.g. slot 0 will have suffix "_a", and slot 1
+        /// If set, indicates that the partition name needs a slot suffix applied. The slot suffix
+        /// is determined by the metadata slot number (e.g. slot 0 will have suffix "_a", and slot 1
         /// will have suffix "_b").
+        // TODO(https://fxbug.dev/404952286): Adjust partition name to have suffix applied if set.
         const SLOT_SUFFIXED = 1 << 1;
         /// If set, indicates the the partition was created (or modified) for a snapshot-based
         /// update. If not present, the partition was likely flashed via fastboot.
@@ -241,6 +246,7 @@ pub const PARTITION_ATTRIBUTE_MASK: PartitionAttributes =
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable)]
 pub struct MetadataPartition {
+    /// Name of this partition in ASCII characters. Unused characters in the buffer are set to zero.
     pub name: [u8; 36],
     pub attributes: PartitionAttributes,
     pub first_extent_index: u32,
@@ -309,6 +315,32 @@ impl ValidateTable for MetadataExtent {
                 return Err(anyhow!("Extent has invalid target type."));
             }
         }
+        Ok(())
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Immutable, FromBytes, IntoBytes)]
+pub struct PartitionGroupFlags(u32);
+bitflags! {
+    impl PartitionGroupFlags: u32 {
+        /// If this is set, then the group needs the slot suffix to be interpreted correctly.
+        // TODO(https://fxbug.dev/404952286): Adjust group name to have suffix applied if set.
+        const SLOT_SUFFIXED = 1 << 0;
+    }
+}
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable)]
+pub struct MetadataPartitionGroup {
+    /// Name of this group in ASCII characters. Unused characters in the buffer are set to zero.
+    pub name: [u8; 36],
+    pub flags: PartitionGroupFlags,
+    /// Maximum size in bytes. If 0, indicates that this group has no maximum size.
+    pub maximum_size: u64,
+}
+
+impl ValidateTable for MetadataPartitionGroup {
+    fn validate(&self, _header: &MetadataHeader) -> Result<(), Error> {
+        // Nothing to validate
         Ok(())
     }
 }
@@ -594,5 +626,22 @@ mod tests {
                 .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
                 .expect_err("metadata extent passed validation unexpectedly");
         }
+    }
+
+    const VALID_PARTITION_GROUP: MetadataPartitionGroup = MetadataPartitionGroup {
+        name: [
+            115, 121, 115, 116, 101, 109, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ],
+        flags: PartitionGroupFlags(0),
+        maximum_size: 0,
+    };
+
+    #[fuchsia::test]
+    async fn test_valid_partition_group() {
+        let group = VALID_PARTITION_GROUP;
+        group
+            .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+            .expect("metadata partition group failed validation");
     }
 }

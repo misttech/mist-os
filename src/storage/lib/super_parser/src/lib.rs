@@ -9,7 +9,7 @@ use crate::format::{
     PARTITION_RESERVED_BYTES,
 };
 use anyhow::{anyhow, ensure, Error};
-use format::{MetadataPartition, MetadataTableDescriptor, ValidateTable};
+use format::{MetadataPartition, MetadataPartitionGroup, MetadataTableDescriptor, ValidateTable};
 use sha2::Digest;
 use storage_device::fake_device::FakeDevice;
 use storage_device::Device;
@@ -29,7 +29,8 @@ pub struct SuperParser {
     metadata_header: MetadataHeader,
     partitions: Vec<MetadataPartition>,
     extents: Vec<MetadataExtent>,
-    // TODO(https://fxbug.dev/404952286): parse groups, and block devices.
+    partition_groups: Vec<MetadataPartitionGroup>,
+    // TODO(https://fxbug.dev/404952286): parse block devices.
 }
 
 impl SuperParser {
@@ -92,7 +93,20 @@ impl SuperParser {
         .await
         .unwrap();
 
-        Ok(Self { metadata_geometry, metadata_header, partitions, extents })
+        // Parse partition group table entries.
+        let tables_offset = tables_offset
+            .checked_add(metadata_header.extents.num_entries * metadata_header.extents.entry_size)
+            .ok_or_else(|| anyhow!("Adding offset + num_entries * entry_size overflowed."))?;
+        let partition_groups = Self::parse_table::<MetadataPartitionGroup>(
+            tables_bytes,
+            tables_offset,
+            &metadata_header,
+            &metadata_header.groups,
+        )
+        .await
+        .unwrap();
+
+        Ok(Self { metadata_geometry, metadata_header, partitions, extents, partition_groups })
     }
 
     async fn parse_metadata_geometry(device: &FakeDevice) -> Result<MetadataGeometry, Error> {
@@ -216,5 +230,15 @@ mod tests {
         // Check extents - the simple super image has a "system" partition of size 4096 bytes.
         let num_sectors = super_partition.extents[0].num_sectors;
         assert_eq!(num_sectors * SECTOR_SIZE as u64, 4096);
+
+        // Expect to see one group "default" of unlimited maximum size.
+        assert_eq!(super_partition.partition_groups.len(), 1);
+        let group = super_partition.partition_groups[0];
+        let expected_group_name = "default".to_string();
+        let group_name = String::from_utf8(group.name.to_vec())
+            .expect("failed to convert partition group name to string");
+        assert_eq!(group_name[..expected_group_name.len()], expected_group_name);
+        let maximum_size = group.maximum_size;
+        assert_eq!(maximum_size, 0);
     }
 }
