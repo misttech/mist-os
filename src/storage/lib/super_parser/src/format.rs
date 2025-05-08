@@ -163,10 +163,14 @@ impl MetadataHeader {
             .validate_table_bounds(self.tables_size)
             .map_err(|_| anyhow!("block_devices tables failed table bounds check."))?;
 
-        // TODO(https://fxbug.dev/404952286): Validate entry size for extents, groups.
+        // TODO(https://fxbug.dev/404952286): Validate entry size for groups.
         ensure!(
             self.partitions.entry_size == std::mem::size_of::<MetadataPartition>() as u32,
             "Invalid partition table entry size."
+        );
+        ensure!(
+            self.extents.entry_size == std::mem::size_of::<MetadataExtent>() as u32,
+            "Invalid extent table entry size."
         );
 
         Ok(())
@@ -189,7 +193,11 @@ pub struct MetadataTableDescriptor {
 impl MetadataTableDescriptor {
     fn validate_table_bounds(&self, total_tables_size: u32) -> Result<(), Error> {
         ensure!(self.offset < total_tables_size, "Invalid table bounds.");
-        ensure!(self.num_entries * self.entry_size < total_tables_size, "Invalid table bounds.");
+        let table_size = self
+            .num_entries
+            .checked_mul(self.entry_size)
+            .ok_or_else(|| anyhow!("Invalid table bounds. num_entries * entry_size overflowed."))?;
+        ensure!(table_size < total_tables_size, "Invalid table bounds.");
         Ok(())
     }
 }
@@ -212,6 +220,17 @@ bitflags! {
     }
 }
 
+/// The metadata table entries should implement this trait to validate its contents. Useful when
+/// parsing the table entries from the super image.
+pub trait ValidateTable {
+    // Metadata contains four different types of table entries - MetadataPartition, MetadataExtent,
+    // MetadataPartitionGroup, and MetadataBlockDevice (see `MetadataHeader`). Call this function to
+    // check if the table entries are valid. The checks will be dependent on the type of table
+    // entry, for example, `MetadataPartition` table entry has `attributes` and we check that it
+    // only contains the allowed attributes.
+    fn validate(&self, header: &MetadataHeader) -> Result<(), Error>;
+}
+
 pub const PARTITION_ATTRIBUTE_MASK_V0: PartitionAttributes =
     PartitionAttributes::READONLY.union(PartitionAttributes::SLOT_SUFFIXED);
 pub const PARTITION_ATTRIBUTE_MASK_V1: PartitionAttributes =
@@ -229,8 +248,8 @@ pub struct MetadataPartition {
     pub group_index: u32,
 }
 
-impl MetadataPartition {
-    pub fn validate(&self, header: &MetadataHeader) -> Result<(), Error> {
+impl ValidateTable for MetadataPartition {
+    fn validate(&self, header: &MetadataHeader) -> Result<(), Error> {
         if header.minor_version < METADATA_VERSION_FOR_UPDATED_ATTRIBUTES_MIN {
             ensure!(self.attributes.difference(PARTITION_ATTRIBUTE_MASK_V0).is_empty());
         } else {
@@ -248,6 +267,48 @@ impl MetadataPartition {
             self.group_index < header.groups.num_entries,
             "Logical partition has invalid group index."
         );
+        Ok(())
+    }
+}
+
+pub const TARGET_TYPE_LINEAR: u32 = 0;
+pub const TARGET_TYPE_ZERO: u32 = 1;
+
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable)]
+pub struct MetadataExtent {
+    /// Length of the extent, in 512-byte sectors.
+    pub num_sectors: u64,
+    /// Target type for device-mapper. See constants `TARGET_TYPE_*` for possible values.
+    pub target_type: u32,
+    /// If `target_type` is:
+    ///   * `TARGET_TYPE_LINEAR`: this is the sector on the physical partition that this extent maps
+    ///     onto.
+    ///   * `TARGET_TYPE_ZERO`: this must be zero.
+    pub target_data: u64,
+    /// If `target_type` is:
+    ///   * `TARGET_TYPE_LINEAR`: this must be an index into the block devices table.
+    ///   * `TARGET_TYPE_ZERO`: this must be zero.
+    pub target_source: u32,
+}
+
+impl ValidateTable for MetadataExtent {
+    fn validate(&self, header: &MetadataHeader) -> Result<(), Error> {
+        match self.target_type {
+            TARGET_TYPE_LINEAR => {
+                ensure!(
+                    self.target_source < header.block_devices.num_entries,
+                    "Extent has invalid block device."
+                );
+            }
+            TARGET_TYPE_ZERO => {
+                ensure!(self.target_data == 0, "Extent has invalid target data.");
+                ensure!(self.target_source == 0, "Extent has invalid target source.");
+            }
+            _ => {
+                return Err(anyhow!("Extent has invalid target type."));
+            }
+        }
         Ok(())
     }
 }
@@ -450,7 +511,7 @@ mod tests {
         let partition = VALID_PARTITION_TABLE_ENTRY;
         partition
             .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
-            .expect("metadata partition passed validation unexpectedly");
+            .expect("metadata partition failed validation");
     }
 
     #[fuchsia::test]
@@ -484,6 +545,54 @@ mod tests {
             invalid_partition
                 .validate(&header)
                 .expect_err("metadata partition passed validation unexpectedly");
+        }
+    }
+
+    const VALID_EXTENT: MetadataExtent = MetadataExtent {
+        num_sectors: 4,
+        target_type: TARGET_TYPE_LINEAR,
+        target_data: 1,
+        target_source: 0,
+    };
+
+    #[fuchsia::test]
+    async fn test_valid_extent() {
+        let extent = VALID_EXTENT;
+        extent
+            .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+            .expect("metadata extent failed validation");
+    }
+
+    #[fuchsia::test]
+    async fn test_invalid_extent() {
+        let mut invalid_extent = VALID_EXTENT;
+
+        // Check that target_source is validated
+        {
+            invalid_extent.target_source = 10;
+            assert!(
+                invalid_extent.target_source
+                    >= VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM.block_devices.num_entries
+            );
+            invalid_extent
+                .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+                .expect_err("metadata extent passed validation unexpectedly");
+        }
+
+        // Check that TARGET_TYPE_ZERO must have target_data and target_source as zero.
+        {
+            invalid_extent.target_type = TARGET_TYPE_ZERO;
+            invalid_extent.target_data = 1;
+            invalid_extent
+                .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+                .expect_err("metadata extent passed validation unexpectedly");
+        }
+        {
+            invalid_extent.target_type = TARGET_TYPE_ZERO;
+            invalid_extent.target_source = 1;
+            invalid_extent
+                .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+                .expect_err("metadata extent passed validation unexpectedly");
         }
     }
 }
