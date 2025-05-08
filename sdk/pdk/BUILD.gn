@@ -59,7 +59,10 @@ sdk_collection("pdk_collection_do_not_use") {
 
 sdk_molecule("all_atoms") {
   category = "partner"
-  deps = [ "//sdk:host_tools_for_configured_host_cpus" ]
+  deps = [
+    "//sdk:host_tools_for_configured_host_cpus",
+    "//sdk:version_history_sdk($default_toolchain)",
+  ]
 }
 
 group("tests") {

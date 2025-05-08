@@ -379,4 +379,3 @@ package://packages/vkloop-test
 package://packages/vkproto-driver-test
 package://packages/vkreadback_test
 sysroot://pkg/sysroot
-version_history://version_history.json
