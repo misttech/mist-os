@@ -47,7 +47,7 @@ class MagmaSystemDevice final : public internal::PrimaryFidlServerHolder::Connec
   // to be passed to the client.
   std::unique_ptr<msd::internal::PrimaryFidlServer> Open(
       msd_client_id_t client_id, fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
-      fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification);
+      fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification, MagmaClientType client_type);
 
   msd::Device* msd_dev() { return msd_dev_.get(); }
   msd::Driver* driver() override { return driver_; }

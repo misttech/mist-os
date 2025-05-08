@@ -42,6 +42,11 @@ class PerfCountPoolServer {
                                                          uint32_t result_flags) = 0;
 };
 
+enum class MagmaClientType {
+  kUntrusted = 0,
+  kTrusted = 1,
+};
+
 namespace internal {
 
 class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
@@ -99,12 +104,14 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   static std::unique_ptr<PrimaryFidlServer> Create(
       std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
       fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
-      fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification);
+      fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification, MagmaClientType client_type);
 
   PrimaryFidlServer(std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
                     fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
-                    fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification)
+                    fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification,
+                    MagmaClientType client_type)
       : client_id_(client_id),
+        client_type_(client_type),
         primary_(std::move(primary)),
         delegate_(std::move(delegate)),
         server_notification_endpoint_(notification.TakeChannel()),
@@ -187,6 +194,7 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   void FlowControl(uint64_t size = 0);
 
   msd_client_id_t client_id_;
+  MagmaClientType client_type_;
   std::atomic_uint request_count_{};
 
   // Only valid up until Bind() is called.

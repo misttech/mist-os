@@ -78,7 +78,8 @@ TEST(MagmaNotification, NotAfterShutdown) {
   auto notification_endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Notification>();
   ASSERT_TRUE(notification_endpoints.is_ok());
   auto zircon_connection =
-      dev->Open(0, std::move(endpoints.server), std::move(notification_endpoints->server));
+      dev->Open(0, std::move(endpoints.server), std::move(notification_endpoints->server),
+                MagmaClientType::kUntrusted);
 
   dev->StartConnectionThread(std::move(zircon_connection), [](const char* role_profile) {});
   auto completion = connection_ptr->completion();
@@ -102,7 +103,8 @@ TEST(MagmaNotification, NotAfterConnectionTeardown) {
   auto notification_endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Notification>();
   ASSERT_TRUE(notification_endpoints.is_ok());
   auto zircon_connection =
-      dev->Open(0, std::move(endpoints.server), std::move(notification_endpoints->server));
+      dev->Open(0, std::move(endpoints.server), std::move(notification_endpoints->server),
+                MagmaClientType::kUntrusted);
 
   dev->StartConnectionThread(std::move(zircon_connection), [](const char* role_profile) {});
   auto completion = connection_ptr->completion();

@@ -157,23 +157,52 @@ zx::result<> MagmaDriverBase::CreateDevfsNode() {
                                                    std::move(node_endpoints->server));
   gpu_node_controller_.Bind(std::move(controller_endpoints.client));
   gpu_node_.Bind(std::move(node_endpoints->client));
-  auto power_protocol =
-      [this](fidl::ServerEnd<fuchsia_gpu_magma::PowerElementProvider> server_end) mutable {
-        fidl::BindServer(dispatcher(), std::move(server_end), this);
-      };
-  auto device_protocol =
-      [this](fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server_end) mutable {
-        fidl::BindServer(dispatcher(), std::move(server_end), &combined_device_server_);
-      };
-
-  fuchsia_gpu_magma::Service::InstanceHandler handler(
-      {.device = std::move(device_protocol), .power_element_provider = std::move(power_protocol)});
+  // Add the gpu service.
   {
-    auto status = outgoing()->template AddService<fuchsia_gpu_magma::Service>(std::move(handler));
-    if (status.is_error()) {
-      FDF_LOG(ERROR, "%s(): Failed to add service to outgoing directory: %s\n", __func__,
-              status.status_string());
-      return status.take_error();
+    auto power_protocol =
+        [this](fidl::ServerEnd<fuchsia_gpu_magma::PowerElementProvider> server_end) mutable {
+          fidl::BindServer(dispatcher(), std::move(server_end), this);
+        };
+    auto device_protocol =
+        [this](fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server_end) mutable {
+          fidl::BindServer(dispatcher(), std::move(server_end), &combined_device_server_);
+        };
+
+    fuchsia_gpu_magma::Service::InstanceHandler handler(
+        {.device = std::move(device_protocol),
+         .power_element_provider = std::move(power_protocol)});
+    {
+      auto status = outgoing()->template AddService<fuchsia_gpu_magma::Service>(std::move(handler));
+      if (status.is_error()) {
+        FDF_LOG(ERROR, "%s(): Failed to add service to outgoing directory: %s\n", __func__,
+                status.status_string());
+        return status.take_error();
+      }
+    }
+  }
+
+  // Add the trusted gpu service.
+  {
+    auto power_protocol =
+        [this](fidl::ServerEnd<fuchsia_gpu_magma::PowerElementProvider> server_end) mutable {
+          fidl::BindServer(dispatcher(), std::move(server_end), this);
+        };
+    auto device_protocol =
+        [this](fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server_end) mutable {
+          fidl::BindServer(dispatcher(), std::move(server_end), &trusted_combined_device_server_);
+        };
+
+    fuchsia_gpu_magma::Service::InstanceHandler handler(
+        {.device = std::move(device_protocol),
+         .power_element_provider = std::move(power_protocol)});
+    {
+      auto status =
+          outgoing()->template AddService<fuchsia_gpu_magma::TrustedService>(std::move(handler));
+      if (status.is_error()) {
+        FDF_LOG(ERROR, "%s(): Failed to add service to outgoing directory: %s\n", __func__,
+                status.status_string());
+        return status.take_error();
+      }
     }
   }
   return zx::ok();
@@ -227,7 +256,7 @@ void MagmaCombinedDeviceServer::Connect2(Connect2RequestView request,
 
   auto connection =
       magma_->magma_system_device->Open(request->client_id, std::move(request->primary_channel),
-                                        std::move(request->notification_channel));
+                                        std::move(request->notification_channel), client_type_);
 
   if (!connection) {
     MAGMA_DLOG("MagmaSystemDevice::Open failed");

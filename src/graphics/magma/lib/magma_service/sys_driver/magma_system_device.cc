@@ -28,14 +28,14 @@ MagmaSystemDevice::~MagmaSystemDevice() {
 
 std::unique_ptr<msd::internal::PrimaryFidlServer> MagmaSystemDevice::Open(
     msd_client_id_t client_id, fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
-    fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification) {
+    fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification, MagmaClientType client_type) {
   std::unique_ptr<msd::Connection> msd_connection = msd_dev()->Open(client_id);
   if (!msd_connection)
     return MAGMA_DRETP(nullptr, "msd_device_open failed");
 
   return msd::internal::PrimaryFidlServer::Create(
       std::make_unique<MagmaSystemConnection>(this, std::move(msd_connection)), client_id,
-      std::move(primary), std::move(notification));
+      std::move(primary), std::move(notification), client_type);
 }
 
 void MagmaSystemDevice::StartConnectionThread(

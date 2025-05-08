@@ -13,7 +13,12 @@
         fallback: "false",
     },
     capabilities: [
-        { service: "fuchsia.gpu.magma.Service" },
+        {
+            service: [
+                "fuchsia.gpu.magma.Service",
+                "fuchsia.gpu.magma.TrustedService",
+            ],
+        },
     ],
     use: [
         { service: 'fuchsia.driver.compat.Service' },
@@ -23,7 +28,10 @@
     ],
     expose: [
         {
-            service: "fuchsia.gpu.magma.Service",
+            service: [
+                "fuchsia.gpu.magma.Service",
+                "fuchsia.gpu.magma.TrustedService",
+            ],
             from: "self",
         },
     ],

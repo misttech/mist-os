@@ -108,6 +108,7 @@ struct SharedData {
   uint32_t test_context_id = 0xdeadbeef;
   uint64_t test_semaphore_id = ~0u;
   bool got_null_notification = false;
+  bool is_trusted = false;
   magma_status_t test_error = 0x12345678;
   bool test_complete = false;
   std::unique_ptr<magma::PlatformSemaphore> test_semaphore;
@@ -270,11 +271,26 @@ class TestPlatformConnection {
   void TestCreateContext2() {
     FlowControlInit();
     uint32_t context_id;
-    constexpr uint64_t kMediumPriority = 256;
-    client_connection_->CreateContext2(&context_id, kMediumPriority);
+    client_connection_->CreateContext2(&context_id, MAGMA_PRIORITY_MEDIUM);
     EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheckOneMessage();
     EXPECT_EQ(shared_data_->test_context_id, context_id);
+  }
+
+  void TestCreateContext2HighPriorityTrusted() {
+    FlowControlInit();
+    uint32_t context_id;
+    client_connection_->CreateContext2(&context_id, MAGMA_PRIORITY_HIGH);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
+    FlowControlCheckOneMessage();
+  }
+
+  void TestCreateContext2HighPriorityUntrusted() {
+    FlowControlSkip();
+    uint32_t context_id;
+    client_connection_->CreateContext2(&context_id, MAGMA_PRIORITY_HIGH);
+    ASSERT_EQ(client_connection_->Flush(), MAGMA_STATUS_ACCESS_DENIED);
+    shared_data_->test_complete = true;
   }
 
   void TestDestroyContext() {
@@ -762,7 +778,8 @@ std::unique_ptr<TestPlatformConnection> TestPlatformConnection::Create(
 
   auto connection = msd::internal::PrimaryFidlServer::Create(
       std::move(delegate), 1u, std::move(endpoints->server),
-      std::move(notification_endpoints->server));
+      std::move(notification_endpoints->server),
+      shared_data->is_trusted ? MagmaClientType::kTrusted : MagmaClientType::kUntrusted);
   if (!connection)
     return MAGMA_DRETP(nullptr, "failed to create PlatformConnection");
 
@@ -832,6 +849,20 @@ TEST(PlatformConnection, CreateContext2) {
   auto Test = TestPlatformConnection::Create();
   ASSERT_NE(Test, nullptr);
   Test->TestCreateContext2();
+}
+
+TEST(PlatformConnection, CreateContext2HighPriorityUntrusted) {
+  auto Test = TestPlatformConnection::Create();
+  ASSERT_NE(Test, nullptr);
+  Test->TestCreateContext2HighPriorityUntrusted();
+}
+
+TEST(PlatformConnection, CreateContext2HighPriorityTrusted) {
+  std::shared_ptr shared_data = std::make_shared<SharedData>();
+  shared_data->is_trusted = true;
+  auto Test = TestPlatformConnection::Create(shared_data);
+  ASSERT_NE(Test, nullptr);
+  Test->TestCreateContext2HighPriorityTrusted();
 }
 
 TEST(PlatformConnection, DestroyContext) {

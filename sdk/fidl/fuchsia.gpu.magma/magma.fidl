@@ -593,6 +593,13 @@ service Service {
     power_element_provider client_end:PowerElementProvider;
 };
 
+/// This service has additional abilities above the normal service.
+@available(added=HEAD)
+service TrustedService {
+    device client_end:CombinedDevice;
+    power_element_provider client_end:PowerElementProvider;
+};
+
 /// Additional methods for reporting tests run in the MSD.
 @available(added=HEAD)
 closed protocol TestDevice2 {

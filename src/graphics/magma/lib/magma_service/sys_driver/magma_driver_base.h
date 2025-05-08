@@ -35,8 +35,9 @@ struct MagmaObjects {
 
 class MagmaCombinedDeviceServer : public fidl::WireServer<fuchsia_gpu_magma::CombinedDevice> {
  public:
-  explicit MagmaCombinedDeviceServer(std::shared_ptr<MagmaObjects> magma)
-      : magma_(std::move(magma)) {}
+  explicit MagmaCombinedDeviceServer(std::shared_ptr<MagmaObjects> magma,
+                                     MagmaClientType client_type = MagmaClientType::kUntrusted)
+      : magma_(std::move(magma)), client_type_(client_type) {}
   void Query(QueryRequestView request, QueryCompleter::Sync& completer) override;
 
   void Connect2(Connect2RequestView request, Connect2Completer::Sync& completer) override;
@@ -55,6 +56,7 @@ class MagmaCombinedDeviceServer : public fidl::WireServer<fuchsia_gpu_magma::Com
   }
 
   std::shared_ptr<MagmaObjects> magma_;
+  MagmaClientType client_type_;
 };
 
 class MagmaDriverBase : public fdf::DriverBase,
@@ -65,7 +67,8 @@ class MagmaDriverBase : public fdf::DriverBase,
                   fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase(name, std::move(start_args), std::move(driver_dispatcher)),
         magma_(std::make_shared<MagmaObjects>()),
-        combined_device_server_(magma_),
+        combined_device_server_(magma_, MagmaClientType::kUntrusted),
+        trusted_combined_device_server_(magma_, MagmaClientType::kTrusted),
         magma_devfs_connector_(fit::bind_member<&MagmaDriverBase::BindConnector>(this)) {}
 
   zx::result<> Start() override;
@@ -128,6 +131,7 @@ class MagmaDriverBase : public fdf::DriverBase,
 
   std::shared_ptr<MagmaObjects> magma_;
   MagmaCombinedDeviceServer combined_device_server_;
+  MagmaCombinedDeviceServer trusted_combined_device_server_;
   driver_devfs::Connector<fuchsia_gpu_magma::CombinedDevice> magma_devfs_connector_;
   // Node representing /dev/class/gpu/<id>.
   fidl::WireSyncClient<fuchsia_driver_framework::Node> gpu_node_;
