@@ -77,7 +77,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t HarvestAccessed(vaddr_t vaddr, size_t count, NonTerminalAction non_terminal_action,
                               TerminalAction terminal_action) override;
 
-  bool ActiveSinceLastCheck(bool clear) override;
+  bool AccessedSinceLastCheck(bool clear) override;
 
   paddr_t arch_table_phys() const override { return tt_phys_; }
   uint16_t arch_asid() const { return asid_; }
@@ -180,15 +180,6 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
 
   uint MmuFlagsFromPte(pte_t pte);
 
-  // Helper method to mark this aspace active.
-  // This exists for clarity of call sites so that the comment explaining why this is done can be in
-  // one location.
-  void MarkAspaceModified() {
-    // If an aspace has been manipulated via a direction operation, then we want to try it
-    // equivalent to if it had been active on a CPU, since it may now have active/dirty information.
-    active_since_last_check_.store(true, ktl::memory_order_relaxed);
-  }
-
   // Panic if the page table is not empty.
   //
   // The caller must be holding |lock_|.
@@ -268,8 +259,9 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   // Number of CPUs this aspace is currently active on.
   ktl::atomic<uint32_t> num_active_cpus_ = 0;
 
-  // Whether not this has been active since |ActiveSinceLastCheck| was called.
-  ktl::atomic<bool> active_since_last_check_ = false;
+  // Whether not this has been accessed since |AccessedSinceLastCheck| was called. This is updated
+  // by MarkAccessed, and anywhere a mapping is installed with the AF flag set.
+  bool accessed_since_last_check_ TA_GUARDED(lock_) = false;
 
   // The number of times entries in the top level page are referenced by other page tables.
   // Unified page tables increment and decrement this value on their associated shared and

@@ -187,20 +187,21 @@ class ArchVmAspaceInterface {
   // Marks any pages in the given virtual address range as being accessed.
   virtual zx_status_t MarkAccessed(vaddr_t vaddr, size_t count) = 0;
 
-  // Returns whether or not this aspace has been active since the last time this method was called
-  // with clear=true.
+  // Returns whether or not this aspace might have additional accessed information since the last
+  // time this method was called with clear=true. If this returns |false| then, modulo races,
+  // HarvestAccessed is defined to not find any set bits and not call PageQueues::MarkAccessed.
   //
   // This is intended for use by the harvester to avoid scanning for any accessed or dirty bits if
-  // the aspace has not been active in the mmu, since an aspace that has not been active cannot
-  // generate new information.
+  // the aspace has not been accessed at all.
   //
-  // Note that restricted and shared ArchVmAspace's will report that they have been active if an
-  // associated unified ArchVmAspace has been run. However, the reverse is not true; the unified
-  // ArchVmAspace will not return true if the associated shared/restricted aspaces have been run.
+  // Note that restricted and shared ArchVmAspace's will report that they have been accessed if an
+  // associated unified ArchVmAspace has been accessed. However, the reverse is not true; the
+  // unified ArchVmAspace will not return true if the associated shared/restricted aspaces have been
+  // accessed.
   //
-  // The |clear| flag controls whether the aspace having been active should be cleared or not. Not
+  // The |clear| flag controls whether the aspace having been accessed should be cleared or not. Not
   // clearing makes this function const and not modify any state.
-  virtual bool ActiveSinceLastCheck(bool clear) = 0;
+  virtual bool AccessedSinceLastCheck(bool clear) = 0;
 
   // Physical address of the backing data structure used for translation.
   //

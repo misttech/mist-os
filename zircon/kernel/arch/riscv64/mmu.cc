@@ -1117,6 +1117,7 @@ zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, siz
   const bool ro = (mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK) == ARCH_MMU_FLAG_PERM_READ;
   zx_status_t result = MapPageTable(attrs, ro, RISCV64_MMU_PT_LEVELS - 1, tt_virt_,
                                     ExistingEntryAction::Error, cursor, cm);
+  accessed_since_last_check_ = true;
   mb();
   if (result != ZX_OK) {
     if (cursor.vaddr() > vaddr) {
@@ -1182,6 +1183,7 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
     const bool ro = (mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK) == ARCH_MMU_FLAG_PERM_READ;
     zx_status_t result =
         MapPageTable(attrs, ro, RISCV64_MMU_PT_LEVELS - 1, tt_virt_, existing_action, cursor, cm);
+    accessed_since_last_check_ = true;
     mb();
     if (result != ZX_OK) {
       if (cursor.vaddr() > vaddr) {
@@ -1317,25 +1319,24 @@ zx_status_t Riscv64ArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
   ConsistencyManager cm(*this);
 
   MarkAccessedPageTable(vaddr, vaddr, size, RISCV64_MMU_PT_LEVELS - 1, tt_virt_, cm);
+  accessed_since_last_check_ = true;
 
   return ZX_OK;
 }
 
-bool Riscv64ArchVmAspace::ActiveSinceLastCheck(bool clear) {
+bool Riscv64ArchVmAspace::AccessedSinceLastCheck(bool clear) {
   // Read whether any CPUs are presently executing.
   bool currently_active = num_active_cpus_.load(ktl::memory_order_relaxed) != 0;
-  // Exchange the current notion of active, with the previously active information. This is the only
-  // time a |false| value can potentially be written to active_since_last_check_, and doing an
-  // exchange means we can never 'lose' a |true| value.
-  bool previously_active =
-      clear ? active_since_last_check_.exchange(currently_active, ktl::memory_order_relaxed)
-            : active_since_last_check_.load(ktl::memory_order_relaxed);
-  // Return whether we had previously been active. It is not necessary to also consider whether we
-  // are currently active, since activating would also have active_since_last_check_ to true. In the
-  // scenario where we race and currently_active is true, but we observe previously_active to be
-  // false, this means that as of the start of this function ::ContextSwitch had not completed, and
-  // so this aspace is still not actually active.
-  return previously_active;
+  // When clearing |accessed_since_last_check_| we cannot just exchange with 'false' since the
+  // hardware page table walker can directly update accessed information asynchronously and so new
+  // accessed information could become available without any further aspace calls. Therefore if
+  // there are presently any CPUs executing this aspace we must assume that they could be generating
+  // new accesses. This is equivalent to the idea that we set accessed_since_last_check_ whenever we
+  // context switch to, i.e. being executing, an aspace.
+  bool previously_accessed =
+      clear ? accessed_since_last_check_.exchange(currently_active, ktl::memory_order_relaxed)
+            : accessed_since_last_check_.load(ktl::memory_order_relaxed);
+  return previously_accessed;
 }
 
 zx_status_t Riscv64ArchVmAspace::Init() {
@@ -1632,13 +1633,14 @@ void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
     [[maybe_unused]] uint32_t prev =
         aspace->num_active_cpus_.fetch_add(1, ktl::memory_order_relaxed);
     DEBUG_ASSERT(prev < SMP_MAX_CPUS);
-    aspace->active_since_last_check_.store(true, ktl::memory_order_relaxed);
+    aspace->accessed_since_last_check_.store(true, ktl::memory_order_relaxed);
     // If the aspace we are context switching to is unified, we need to mark the associated shared
-    // and restricted aspaces as active since we may access their mappings indirectly.
+    // and restricted aspaces as accessed since we may access their mappings indirectly.
     if (aspace->IsUnified()) {
-      aspace->get_shared_aspace()->active_since_last_check_.store(true, ktl::memory_order_relaxed);
-      aspace->get_restricted_aspace()->active_since_last_check_.store(true,
-                                                                      ktl::memory_order_relaxed);
+      aspace->get_shared_aspace()->accessed_since_last_check_.store(true,
+                                                                    ktl::memory_order_relaxed);
+      aspace->get_restricted_aspace()->accessed_since_last_check_.store(true,
+                                                                        ktl::memory_order_relaxed);
     }
   } else {
     // Switching to the null aspace, which means kernel address space only.

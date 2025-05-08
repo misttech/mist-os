@@ -121,7 +121,7 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t HarvestAccessed(vaddr_t vaddr, size_t count, NonTerminalAction non_terminal_action,
                               TerminalAction terminal_action) override;
 
-  bool ActiveSinceLastCheck(bool clear) override;
+  bool AccessedSinceLastCheck(bool clear) override;
 
   paddr_t arch_table_phys() const override { return pt_->phys(); }
   paddr_t pt_phys() const { return pt_->phys(); }
@@ -157,15 +157,6 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   // Helper method to allocate a PCID for this ArchVmAspace.
   zx_status_t AllocatePCID();
 
-  // Helper method to mark this aspace active.
-  // This exists for clarity of call sites so that the comment explaining why this is done can be in
-  // one location.
-  void MarkAspaceModified() {
-    // If an aspace has been manipulated via a direction operation, then we want to try it
-    // equivalent to if it had been active on a CPU, since it may now have active/dirty information.
-    active_since_last_check_.store(true, ktl::memory_order_relaxed);
-  }
-
   bool IsUnified() const { return pt_->IsUnified(); }
 
   fbl::Canary<fbl::magic("VAAS")> canary_;
@@ -196,8 +187,8 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   // CPUs that are currently executing in this aspace.
   ktl::atomic<cpu_mask_t> active_cpus_{0};
 
-  // Whether not this has been active since |ActiveSinceLastCheck| was called.
-  ktl::atomic<bool> active_since_last_check_ = false;
+  // Whether not this has been accessed since |AccessedSinceLastCheck| was called.
+  ktl::atomic<bool> accessed_since_last_check_ = false;
 
   // A bitmap of cpus where the current PCID that was assigned is now dirty and should
   // be flushed on the next context switch.

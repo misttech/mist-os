@@ -1494,7 +1494,7 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
     auto [status, lower_mapped] =
         MapPageTable(attrs, ro, top_index_shift_, tt_virt_, ExistingEntryAction::Error, cursor, cm);
     tt_page_->mmu.num_mappings += lower_mapped;
-    MarkAspaceModified();
+    accessed_since_last_check_ = true;
     if (status != ZX_OK) {
       VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
       if (unmap_cursor.size() > 0) {
@@ -1579,7 +1579,7 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
     auto [status, lower_mapped] =
         MapPageTable(attrs, ro, top_index_shift_, tt_virt_, existing_action, cursor, cm);
     tt_page_->mmu.num_mappings += lower_mapped;
-    MarkAspaceModified();
+    accessed_since_last_check_ = true;
     if (status != ZX_OK) {
       VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
       if (unmap_cursor.size() > 0) {
@@ -1639,7 +1639,6 @@ zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions
   auto [ret, lower_unmapped] = UnmapPageTable(cursor, unmap_options, CheckForEmptyPt::No,
                                               top_index_shift_, tt_virt_, cm, Reclaim::No);
   tt_page_->mmu.num_mappings -= lower_unmapped;
-  MarkAspaceModified();
 
   DEBUG_ASSERT(cursor.size() == 0 || ret != ZX_OK);
 
@@ -1704,7 +1703,6 @@ zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags
 
     ConsistencyManager cm(*this);
     ret = ProtectPages(vaddr, count * PAGE_SIZE, attrs, enlarge, vaddr_base_, cm);
-    MarkAspaceModified();
   }
 
   return ret;
@@ -1799,26 +1797,18 @@ zx_status_t ArmArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
   ConsistencyManager cm(*this);
 
   MarkAccessedPageTable(vaddr, vaddr_rel, size, top_index_shift_, tt_virt_, cm);
-  MarkAspaceModified();
+  accessed_since_last_check_ = true;
 
   return ZX_OK;
 }
 
-bool ArmArchVmAspace::ActiveSinceLastCheck(bool clear) {
-  // Read whether any CPUs are presently executing.
-  bool currently_active = num_active_cpus_.load(ktl::memory_order_relaxed) != 0;
-  // Exchange the current notion of active, with the previously active information. This is the only
-  // time a |false| value can potentially be written to active_since_last_check_, and doing an
-  // exchange means we can never 'lose' a |true| value.
-  bool previously_active =
-      clear ? active_since_last_check_.exchange(currently_active, ktl::memory_order_relaxed)
-            : active_since_last_check_.load(ktl::memory_order_relaxed);
-  // Return whether we had previously been active. It is not necessary to also consider whether we
-  // are currently active, since activating would also have active_since_last_check_ to true. In the
-  // scenario where we race and currently_active is true, but we observe previously_active to be
-  // false, this means that as of the start of this function ::ContextSwitch had not completed, and
-  // so this aspace is still not actually active.
-  return previously_active;
+bool ArmArchVmAspace::AccessedSinceLastCheck(bool clear) {
+  Guard<CriticalMutex> guard{&lock_};
+  const bool accessed = accessed_since_last_check_;
+  if (clear) {
+    accessed_since_last_check_ = false;
+  }
+  return accessed;
 }
 
 zx_status_t ArmArchVmAspace::Init() {
@@ -2269,13 +2259,6 @@ void ArmArchVmAspace::ContextSwitch(ArmArchVmAspace* old_aspace, ArmArchVmAspace
     [[maybe_unused]] uint32_t prev =
         aspace->num_active_cpus_.fetch_add(1, ktl::memory_order_relaxed);
     DEBUG_ASSERT(prev < SMP_MAX_CPUS);
-    aspace->active_since_last_check_.store(true, ktl::memory_order_relaxed);
-    // If we are switching to a unified aspace, we need to mark the associated shared and
-    // restricted aspaces as active since the last check as well.
-    if (aspace->IsUnified()) {
-      aspace->shared_aspace_->MarkAspaceModified();
-      aspace->restricted_aspace_->MarkAspaceModified();
-    }
   } else {
     // Switching to the null aspace, which means kernel address space only.
     // Load a null TTBR0 and disable page table walking for user space.

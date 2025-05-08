@@ -838,10 +838,10 @@ void VmAspace::HarvestAllUserAccessedBits(NonTerminalAction non_terminal_action,
       // First we always check ActiveSinceLastCheck (even if we could separately infer that we have
       // to do a harvest) in order to clear the state from it.
       bool harvest = true;
-      if (a.arch_aspace().ActiveSinceLastCheck(
+      if (a.arch_aspace().AccessedSinceLastCheck(
               apply_terminal_action == TerminalAction::UpdateAgeAndHarvest ? true : false)) {
-        // The aspace has been active since some kind of harvest last happened, so we must do a new
-        // one. Reset our counter of how many pt reclamations we've done based on what kind scan
+        // The aspace has been accessed since some kind of harvest last happened, so we must do a
+        // new one. Reset our counter of how many pt reclamations we've done based on what kind scan
         // this is.
         if (apply_non_terminal_action == NonTerminalAction::FreeUnaccessed) {
           // This is set to one since we haven't yet performed the harvest, and so if next time the

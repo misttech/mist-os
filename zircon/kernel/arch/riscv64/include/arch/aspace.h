@@ -75,7 +75,7 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t HarvestAccessed(vaddr_t vaddr, size_t count, NonTerminalAction non_terminal_action,
                               TerminalAction terminal_action) override;
 
-  bool ActiveSinceLastCheck(bool clear) override;
+  bool AccessedSinceLastCheck(bool clear) override;
 
   paddr_t arch_table_phys() const override { return 0; }
   uint16_t arch_asid() const { return 0; }
@@ -242,8 +242,8 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   // Number of CPUs this aspace is currently active on.
   ktl::atomic<uint32_t> num_active_cpus_ = 0;
 
-  // Whether not this has been active since |ActiveSinceLastCheck| was called.
-  ktl::atomic<bool> active_since_last_check_ = false;
+  // Whether not this has been accessed since |AccessedSinceLastCheck| was called.
+  ktl::atomic<bool> accessed_since_last_check_ = false;
 };
 
 class Riscv64VmICacheConsistencyManager final : public ArchVmICacheConsistencyManagerInterface {
