@@ -240,6 +240,8 @@ source "${cmd_locator_sh}" || exit $?
 declare -r features_sh="${fuchsia_dir}/tools/devshell/lib/fx-optional-features.sh"
 source "${features_sh}" || exit $?
 
+declare -r suggest_py="${fuchsia_dir}/tools/devshell/lib/fx-cmd-suggestions.py"
+
 while [[ $# -ne 0 ]]; do
   case $1 in
     --dir=*|-d=*|-t=*|--target=*|--disable=*|--enable=*)
@@ -390,9 +392,22 @@ if [[ $? -ne 0 || ! -x "${command_path[0]}" ]]; then
   if [[ -n "${command_path}" ]]; then
     _path_message=" in the expected location $(_relative "${command_path}")"
   fi
-  fx-error "Cannot find executable for ${command_name}${_path_message}."\
+
+  _commands=$(commands)
+  _host_tools=$(find_host_tools)
+
+  # If the command is not found look for suggestions to help direct to the correct command.
+  _suggestion=$(echo "${_commands}\n${_host_tools}" | "${suggest_py}" ${command_name})
+
+  # If no suggestions are found fall back to the old error message.
+  if [ -z "$_suggestion" ]; then
+    fx-error "Cannot find executable for ${command_name}${_path_message}."\
     "If this is a tool produced by the build, make sure your"\
     "\`fx set\` config produces it in the $(_relative "$(get_host_tools_dir)") directory."
+  else
+    fx-error "${_suggestion}"
+  fi
+
   exit 1
 fi
 
