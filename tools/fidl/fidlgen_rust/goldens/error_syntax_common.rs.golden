@@ -25,6 +25,11 @@ pub struct ExampleUseOfErrorSyntaxCallWhichMayFailResponse {
 
 impl fidl::Persistable for ExampleUseOfErrorSyntaxCallWhichMayFailResponse {}
 
+pub mod example_use_of_error_syntax_ordinals {
+    pub const COMPOSED_CALL_WHICH_MAY_FAIL: u64 = 0x3179cf8f46814221;
+    pub const CALL_WHICH_MAY_FAIL: u64 = 0x3424ff83ce3004a2;
+}
+
 mod internal {
     use super::*;
 

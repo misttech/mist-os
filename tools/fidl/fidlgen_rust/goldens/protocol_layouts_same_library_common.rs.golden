@@ -293,6 +293,36 @@ impl UnionPayload {
 
 impl fidl::Persistable for UnionPayload {}
 
+pub mod composed_protocol_ordinals {
+    pub const ONE_WAY_ANON_COMPOSED: u64 = 0x6e7a205bdad7941f;
+    pub const TWO_WAY_ANON_COMPOSED: u64 = 0x7083713dee9435f4;
+    pub const TWO_WAY_ANON_COMPOSED_WITH_ERROR: u64 = 0x4fd32c5e2ffa6828;
+    pub const ON_ANON_COMPOSED: u64 = 0x49a6eee3a0300e28;
+    pub const ONE_WAY_NAMED_COMPOSED: u64 = 0x101636a8fa3e69b8;
+    pub const TWO_WAY_NAMED_COMPOSED: u64 = 0x45b4d3d31b374054;
+    pub const TWO_WAY_NAMED_COMPOSED_WITH_ERROR: u64 = 0x450531e2d20c52ef;
+    pub const ON_NAMED_COMPOSED: u64 = 0x17c4edb4a4a36d7b;
+}
+
+pub mod main_protocol_ordinals {
+    pub const ONE_WAY_ANON_COMPOSED: u64 = 0x6e7a205bdad7941f;
+    pub const TWO_WAY_ANON_COMPOSED: u64 = 0x7083713dee9435f4;
+    pub const TWO_WAY_ANON_COMPOSED_WITH_ERROR: u64 = 0x4fd32c5e2ffa6828;
+    pub const ON_ANON_COMPOSED: u64 = 0x49a6eee3a0300e28;
+    pub const ONE_WAY_NAMED_COMPOSED: u64 = 0x101636a8fa3e69b8;
+    pub const TWO_WAY_NAMED_COMPOSED: u64 = 0x45b4d3d31b374054;
+    pub const TWO_WAY_NAMED_COMPOSED_WITH_ERROR: u64 = 0x450531e2d20c52ef;
+    pub const ON_NAMED_COMPOSED: u64 = 0x17c4edb4a4a36d7b;
+    pub const ONE_WAY_LOCAL: u64 = 0x3954b4c6b80956c1;
+    pub const TWO_WAY_LOCAL: u64 = 0x26998b4c1e8a9a57;
+    pub const TWO_WAY_LOCAL_WITH_ERROR: u64 = 0x4a7bf9ce881afde7;
+    pub const ON_LOCAL: u64 = 0x71e90a3d364d2e8d;
+    pub const ONE_WAY_ANON: u64 = 0x774bf445f584ce2c;
+    pub const TWO_WAY_ANON: u64 = 0x3fd7ad8e52b07e2e;
+    pub const TWO_WAY_ANON_WITH_ERROR: u64 = 0x1d33061a424eb245;
+    pub const ON_ANON: u64 = 0xd8fa6d0f5fabb94;
+}
+
 mod internal {
     use super::*;
 

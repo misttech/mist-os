@@ -10,6 +10,15 @@ use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
 
+pub mod child_ordinals {
+    pub const FIRST: u64 = 0x3723835775b3455b;
+    pub const SECOND: u64 = 0x23521821ca109865;
+}
+
+pub mod parent_ordinals {
+    pub const FIRST: u64 = 0x3723835775b3455b;
+}
+
 mod internal {
     use super::*;
 }

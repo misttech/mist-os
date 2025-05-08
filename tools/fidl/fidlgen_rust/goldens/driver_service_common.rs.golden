@@ -10,6 +10,8 @@ use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
 
+pub mod some_driver_protocol_ordinals {}
+
 mod internal {
     use super::*;
 }

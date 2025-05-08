@@ -109,6 +109,21 @@ pub struct OnlyRust {
 
 impl fidl::Persistable for OnlyRust {}
 
+pub mod allowed_ordinals {}
+
+pub mod deny_each_binding_ordinals {
+    pub const ONLY_DENY_CPP: u64 = 0x290bad96051b1b92;
+    pub const ONLY_DENY_DART: u64 = 0x75384066a26d87d7;
+    pub const ONLY_DENY_GO: u64 = 0x657655b981478d99;
+    pub const ONLY_DENY_PYTHON: u64 = 0x29c852a00c5a1982;
+    pub const ONLY_DENY_SYZKALLER: u64 = 0x202ee614a749e98a;
+}
+
+pub mod imports_same_name_context_ordinals {
+    pub const UNATTRIBUTED: u64 = 0x698380acfd29e8f;
+    pub const ALWAYS_APPEARS_IN_IMPORTING_LIBRARY: u64 = 0x2874096c521236f8;
+}
+
 mod internal {
     use super::*;
 

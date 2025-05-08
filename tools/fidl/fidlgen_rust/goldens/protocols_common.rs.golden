@@ -207,6 +207,60 @@ impl TheUnion {
 
 impl fidl::Persistable for TheUnion {}
 
+pub mod another_discoverable_protocol_ordinals {}
+
+pub mod channel_protocol_ordinals {
+    pub const METHOD_A: u64 = 0x2bc8d7d32bc66ba2;
+    pub const EVENT_A: u64 = 0x1ed0a220297145ce;
+    pub const METHOD_B: u64 = 0x7b8dd3d6c741c9c6;
+    pub const TAKE_HANDLE: u64 = 0x836fa31201a0a65;
+    pub const MUTATE_SOCKET: u64 = 0x66dbcccc06f7f14f;
+}
+
+pub mod discoverable_protocol_ordinals {
+    pub const METHOD: u64 = 0x2ff5ba3a2bd170eb;
+}
+
+pub mod handle_rights_protocol_ordinals {
+    pub const NO_RESPONSE_METHOD: u64 = 0x10078afd320d2bfd;
+    pub const RESPONSE_METHOD: u64 = 0x52a8f194ac143547;
+    pub const AN_EVENT: u64 = 0x69dad41418eb133;
+}
+
+pub mod many_parameters_ordinals {
+    pub const FIFTEEN: u64 = 0x59233bcecd338967;
+}
+
+pub mod method_with_union_ordinals {
+    pub const UNION_METHOD: u64 = 0x393e7f5b2b821218;
+}
+
+pub mod platform_server__ordinals {}
+
+pub mod with_and_without_request_response_ordinals {
+    pub const NO_REQUEST_NO_RESPONSE: u64 = 0x4b212a6c8c5f7bab;
+    pub const NO_REQUEST_EMPTY_RESPONSE: u64 = 0x16a329d17f458668;
+    pub const NO_REQUEST_WITH_RESPONSE: u64 = 0x7d6b2fcf0e2a65bd;
+    pub const WITH_REQUEST_NO_RESPONSE: u64 = 0x65ab625138c50a77;
+    pub const WITH_REQUEST_EMPTY_RESPONSE: u64 = 0x27ee4d2bd405df5f;
+    pub const WITH_REQUEST_WITH_RESPONSE: u64 = 0x590e91945d58f5b1;
+    pub const ON_EMPTY_RESPONSE: u64 = 0x4ae85a2b8d7c2e56;
+    pub const ON_WITH_RESPONSE: u64 = 0x50a6f21a322f31a8;
+}
+
+pub mod with_error_syntax_ordinals {
+    pub const RESPONSE_AS_STRUCT: u64 = 0x3b902a6d8d24693;
+    pub const ERROR_AS_PRIMITIVE: u64 = 0x602fd6bd920135e7;
+    pub const ERROR_AS_ENUM: u64 = 0x4c371e1673212f43;
+    pub const HANDLE_IN_RESULT: u64 = 0x13092c5b835b0cbf;
+}
+
+pub mod with_protocol_ends_ordinals {
+    pub const CLIENT_ENDS: u64 = 0x51780563edb15042;
+    pub const SERVER_ENDS: u64 = 0x70a02c2ba2228a33;
+    pub const STRUCT_CONTAINING_ENDS: u64 = 0x3893f0baad26f5d5;
+}
+
 mod internal {
     use super::*;
     unsafe impl fidl::encoding::TypeMarker for ErrorEnum {

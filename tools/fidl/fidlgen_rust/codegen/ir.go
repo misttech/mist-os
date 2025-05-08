@@ -174,6 +174,8 @@ type Protocol struct {
 	EventStream string
 	// Name of the protocol's ControlHandle struct.
 	ControlHandle string
+	// Name of the namespace of protocol ordinal constants.
+	Ordinals string
 	// List of methods that are part of this protocol.
 	Methods []Method
 }
@@ -187,6 +189,9 @@ type Method struct {
 	// rust-methods associated with this method, such as proxy methods and
 	// encoder methods.
 	Name string
+	// Name of the method converted to UPPER_SNAKE_CASE. Used to generate the
+	// ordinal constants.
+	UpperSnakeName string
 	// Name of the method converted to CamelCase. Used when generating
 	// rust-types associated with this method, such as responders.
 	CamelName string
@@ -1441,6 +1446,7 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 		Event:            name + "Event",
 		EventStream:      name + "EventStream",
 		ControlHandle:    name + "ControlHandle",
+		Ordinals:         fidlgen.ToSnakeCase(name) + "_ordinals",
 	}
 	if discoverableName := strings.Trim(val.GetProtocolName(), "\""); discoverableName != "" {
 		r.Discoverable = true
@@ -1456,12 +1462,14 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 	}
 
 	for _, v := range val.Methods {
+		snake_name := compileSnakeIdentifier(v.Name)
 		m := Method{
-			Method:    v,
-			Name:      compileSnakeIdentifier(v.Name),
-			CamelName: compileCamelIdentifier(v.Name),
-			Request:   c.compileRequest(v),
-			Response:  c.compileResponse(v),
+			Method:         v,
+			Name:           snake_name,
+			UpperSnakeName: strings.ToUpper(snake_name),
+			CamelName:      compileCamelIdentifier(v.Name),
+			Request:        c.compileRequest(v),
+			Response:       c.compileResponse(v),
 		}
 		if v.HasRequest && v.HasResponse {
 			m.Responder = name + m.CamelName + "Responder"

@@ -345,6 +345,10 @@ impl UnionMember {
 
 impl fidl::Persistable for UnionMember {}
 
+pub mod some_protocol_ordinals {
+    pub const SOME_METHOD: u64 = 0x22ea52ec7a5146d8;
+}
+
 mod internal {
     use super::*;
     unsafe impl fidl::encoding::TypeMarker for BitsMember {

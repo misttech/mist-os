@@ -111,6 +111,11 @@ impl StrictFoo {
 
 impl fidl::Persistable for StrictFoo {}
 
+pub mod protocol_ordinals {
+    pub const REQUEST_STRICT_RESPONSE_FLEXIBLE: u64 = 0x9b8c7d3d118df13;
+    pub const REQUEST_FLEXIBLE_RESPONSE_STRICT: u64 = 0x480c77690533acb7;
+}
+
 mod internal {
     use super::*;
 

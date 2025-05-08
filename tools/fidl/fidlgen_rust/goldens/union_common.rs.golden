@@ -828,6 +828,11 @@ impl UnionWithAttributes {
 
 impl fidl::Persistable for UnionWithAttributes {}
 
+pub mod test_protocol_ordinals {
+    pub const STRICT_UNION_HENCE_RESPONSE_MAY_BE_STACK_ALLOCATED: u64 = 0x5bfca9479251b9c3;
+    pub const FLEXIBLE_UNION_HENCE_RESPONSE_MUST_BE_HEAP_ALLOCATED: u64 = 0x694fede3b8829ce2;
+}
+
 mod internal {
     use super::*;
 

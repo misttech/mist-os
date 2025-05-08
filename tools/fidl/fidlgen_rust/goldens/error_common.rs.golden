@@ -25,6 +25,10 @@ pub struct ExampleFooResponse {
 
 impl fidl::Persistable for ExampleFooResponse {}
 
+pub mod example_ordinals {
+    pub const FOO: u64 = 0xf5f1179dc411e44;
+}
+
 mod internal {
     use super::*;
 

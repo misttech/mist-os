@@ -1459,6 +1459,118 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
 
 impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {}
 
+pub mod unknown_interactions_ajar_driver_protocol_ordinals {
+    pub const STRICT_ONE_WAY: u64 = 0x2c98c07246851dd;
+    pub const FLEXIBLE_ONE_WAY: u64 = 0x349c2bccad7bb7de;
+    pub const STRICT_TWO_WAY: u64 = 0x7425718300ee74d;
+    pub const STRICT_TWO_WAY_FIELDS: u64 = 0xc851a0402fa4b84;
+    pub const STRICT_TWO_WAY_UNION: u64 = 0x7c3cfc6995dc5409;
+    pub const STRICT_TWO_WAY_TABLE: u64 = 0x2b3761549bfc3e9d;
+    pub const STRICT_TWO_WAY_ERR: u64 = 0x61f06cf6be8289b5;
+    pub const STRICT_TWO_WAY_FIELDS_ERR: u64 = 0x5a12fee3285d4aff;
+    pub const STRICT_TWO_WAY_UNION_ERR: u64 = 0x20306f4020a7cd83;
+    pub const STRICT_TWO_WAY_TABLE_ERR: u64 = 0x5f85b4b7b9f47b39;
+}
+
+pub mod unknown_interactions_ajar_protocol_ordinals {
+    pub const STRICT_ONE_WAY: u64 = 0xd4663d6b2b5048b;
+    pub const FLEXIBLE_ONE_WAY: u64 = 0x2275b8171ae4834f;
+    pub const STRICT_TWO_WAY: u64 = 0x50e66d328336038;
+    pub const STRICT_TWO_WAY_FIELDS: u64 = 0x1947e36d61e4493a;
+    pub const STRICT_TWO_WAY_UNION: u64 = 0x5177371967e0e6d1;
+    pub const STRICT_TWO_WAY_TABLE: u64 = 0x6f8f9343b34e2ed4;
+    pub const STRICT_TWO_WAY_ERR: u64 = 0x5b47637577c69006;
+    pub const STRICT_TWO_WAY_FIELDS_ERR: u64 = 0x844ff7bb3f186d9;
+    pub const STRICT_TWO_WAY_UNION_ERR: u64 = 0x2cbfd5a859d4ac95;
+    pub const STRICT_TWO_WAY_TABLE_ERR: u64 = 0x30c9e1b3da57dc37;
+    pub const STRICT_EVENT: u64 = 0x6022ae999e9dc2b0;
+    pub const STRICT_EVENT_FIELDS: u64 = 0x510586752445c769;
+    pub const STRICT_EVENT_UNION: u64 = 0x57794b4cc91f816f;
+    pub const STRICT_EVENT_TABLE: u64 = 0x92639249201f89d;
+    pub const FLEXIBLE_EVENT: u64 = 0x11c9ba570ce71df3;
+    pub const FLEXIBLE_EVENT_FIELDS: u64 = 0x3ba8fd32bf87d862;
+    pub const FLEXIBLE_EVENT_UNION: u64 = 0x7c3823f47ce0fcad;
+    pub const FLEXIBLE_EVENT_TABLE: u64 = 0x9ca944d1d6436b0;
+}
+
+pub mod unknown_interactions_closed_driver_protocol_ordinals {
+    pub const STRICT_ONE_WAY: u64 = 0x7e73c20dcb0f8182;
+    pub const STRICT_TWO_WAY: u64 = 0x271357bcfbec7203;
+    pub const STRICT_TWO_WAY_FIELDS: u64 = 0x4ff44f0dbaab1b86;
+    pub const STRICT_TWO_WAY_UNION: u64 = 0x646921d63346317c;
+    pub const STRICT_TWO_WAY_TABLE: u64 = 0x19873317e6b13f7f;
+    pub const STRICT_TWO_WAY_ERR: u64 = 0x3c614a3f9bf14ca1;
+    pub const STRICT_TWO_WAY_FIELDS_ERR: u64 = 0x36953d7cfe797456;
+    pub const STRICT_TWO_WAY_UNION_ERR: u64 = 0x3fd2c0b0083e518d;
+    pub const STRICT_TWO_WAY_TABLE_ERR: u64 = 0x1437ccf963f1db5d;
+}
+
+pub mod unknown_interactions_closed_protocol_ordinals {
+    pub const STRICT_ONE_WAY: u64 = 0x59282385962da24;
+    pub const STRICT_TWO_WAY: u64 = 0x5eda305d6b22f1f7;
+    pub const STRICT_TWO_WAY_FIELDS: u64 = 0x1323afa3e0541253;
+    pub const STRICT_TWO_WAY_UNION: u64 = 0x68b32554eb0f6fa7;
+    pub const STRICT_TWO_WAY_TABLE: u64 = 0x6e4a94d44b69e785;
+    pub const STRICT_TWO_WAY_ERR: u64 = 0x4fa35d5433db4d3a;
+    pub const STRICT_TWO_WAY_FIELDS_ERR: u64 = 0xb22aebf23bb58fd;
+    pub const STRICT_TWO_WAY_UNION_ERR: u64 = 0xcd65d4d29a43c80;
+    pub const STRICT_TWO_WAY_TABLE_ERR: u64 = 0x117dde20b92f7b90;
+    pub const STRICT_EVENT: u64 = 0xa8ee6ee302f693b;
+    pub const STRICT_EVENT_FIELDS: u64 = 0x5d7c57b62e9c3a74;
+    pub const STRICT_EVENT_UNION: u64 = 0x3b8475deeb4a9d64;
+    pub const STRICT_EVENT_TABLE: u64 = 0x27da43fc85a7f5be;
+}
+
+pub mod unknown_interactions_driver_protocol_ordinals {
+    pub const STRICT_ONE_WAY: u64 = 0x60e807d9431ac7e0;
+    pub const FLEXIBLE_ONE_WAY: u64 = 0xf09caab5582ac0e;
+    pub const STRICT_TWO_WAY: u64 = 0x148df9fe343291c4;
+    pub const STRICT_TWO_WAY_FIELDS: u64 = 0x5ef2f222b2e8265f;
+    pub const STRICT_TWO_WAY_UNION: u64 = 0x1424d0bfc4ad422f;
+    pub const STRICT_TWO_WAY_TABLE: u64 = 0x2e38ffb6ffd00589;
+    pub const STRICT_TWO_WAY_ERR: u64 = 0x721dd2e04164f9a6;
+    pub const STRICT_TWO_WAY_FIELDS_ERR: u64 = 0x320bc9cd6dbe676;
+    pub const STRICT_TWO_WAY_UNION_ERR: u64 = 0x2a8fbf5a7a35ebc0;
+    pub const STRICT_TWO_WAY_TABLE_ERR: u64 = 0x9d3ecd1422145f1;
+    pub const FLEXIBLE_TWO_WAY: u64 = 0x28a750be43bf7672;
+    pub const FLEXIBLE_TWO_WAY_FIELDS: u64 = 0x74e6dd972dfccce8;
+    pub const FLEXIBLE_TWO_WAY_UNION: u64 = 0x7206b28ef106b6b9;
+    pub const FLEXIBLE_TWO_WAY_TABLE: u64 = 0xe8fbdd377f4c602;
+    pub const FLEXIBLE_TWO_WAY_ERR: u64 = 0x4d7c8a333ffaee22;
+    pub const FLEXIBLE_TWO_WAY_FIELDS_ERR: u64 = 0x53ba2455cd2352ab;
+    pub const FLEXIBLE_TWO_WAY_UNION_ERR: u64 = 0x56879a1bda713fef;
+    pub const FLEXIBLE_TWO_WAY_TABLE_ERR: u64 = 0xd0eb47700038400;
+}
+
+pub mod unknown_interactions_protocol_ordinals {
+    pub const STRICT_ONE_WAY: u64 = 0x4e7273b964d117a6;
+    pub const FLEXIBLE_ONE_WAY: u64 = 0x818bb3a7a910446;
+    pub const STRICT_TWO_WAY: u64 = 0x734c996b0f37b942;
+    pub const STRICT_TWO_WAY_FIELDS: u64 = 0x334f4e7fff460ae3;
+    pub const STRICT_TWO_WAY_UNION: u64 = 0x2212805eca592cad;
+    pub const STRICT_TWO_WAY_TABLE: u64 = 0x746ebf8659ff23b7;
+    pub const STRICT_TWO_WAY_ERR: u64 = 0x6d1c6002c51bb967;
+    pub const STRICT_TWO_WAY_FIELDS_ERR: u64 = 0x2182a49480e5bd2b;
+    pub const STRICT_TWO_WAY_UNION_ERR: u64 = 0x453af745d38b20ca;
+    pub const STRICT_TWO_WAY_TABLE_ERR: u64 = 0x4c26c7ab89cb68d8;
+    pub const FLEXIBLE_TWO_WAY: u64 = 0x4a5bb3397008b7c;
+    pub const FLEXIBLE_TWO_WAY_FIELDS: u64 = 0x3b13f82f44813a32;
+    pub const FLEXIBLE_TWO_WAY_UNION: u64 = 0x44301e4e8d514fb6;
+    pub const FLEXIBLE_TWO_WAY_TABLE: u64 = 0x7f492934b6c76187;
+    pub const FLEXIBLE_TWO_WAY_ERR: u64 = 0x61240f878cc37c07;
+    pub const FLEXIBLE_TWO_WAY_FIELDS_ERR: u64 = 0xf2b9611a9089b05;
+    pub const FLEXIBLE_TWO_WAY_UNION_ERR: u64 = 0x2172940a75f107d7;
+    pub const FLEXIBLE_TWO_WAY_TABLE_ERR: u64 = 0x6d8aab48e1693bf2;
+    pub const STRICT_EVENT: u64 = 0x9842669255c4fc1;
+    pub const STRICT_EVENT_FIELDS: u64 = 0x7b75ae46520ee732;
+    pub const STRICT_EVENT_UNION: u64 = 0x3663b5197598cbda;
+    pub const STRICT_EVENT_TABLE: u64 = 0x25a10039a9f96910;
+    pub const FLEXIBLE_EVENT: u64 = 0x61bb1fab7d767866;
+    pub const FLEXIBLE_EVENT_FIELDS: u64 = 0x3226dff9b0c1d801;
+    pub const FLEXIBLE_EVENT_UNION: u64 = 0x22afd161ca71e467;
+    pub const FLEXIBLE_EVENT_TABLE: u64 = 0x4f72dd46888b89e0;
+}
+
 mod internal {
     use super::*;
 

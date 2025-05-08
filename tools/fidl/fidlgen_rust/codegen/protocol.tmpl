@@ -4,6 +4,15 @@
 // found in the LICENSE file.
 */}}
 
+{{- define "ProtocolOrdinals" }}
+{{- $protocol := . }}
+pub mod {{ $protocol.Ordinals }} {
+{{- range $method := $protocol.Methods }}
+pub const {{ $method.UpperSnakeName }} : u64 = {{ $method.Ordinal | printf "%#x" }};
+{{- end }}
+}
+{{- end }}
+
 {{- define "ProtocolDeclaration" }}
 {{- $protocol := . }}
 {{- if eq $protocol.OverTransport "Channel" }}

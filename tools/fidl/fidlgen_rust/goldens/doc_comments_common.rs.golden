@@ -274,6 +274,11 @@ impl StrictUnion {
 
 impl fidl::Persistable for StrictUnion {}
 
+pub mod interface_ordinals {
+    pub const METHOD: u64 = 0x45a0257b7cd8f999;
+    pub const ON_EVENT: u64 = 0x663f6d5971bef0;
+}
+
 mod internal {
     use super::*;
     unsafe impl fidl::encoding::TypeMarker for MyFlexibleBits {

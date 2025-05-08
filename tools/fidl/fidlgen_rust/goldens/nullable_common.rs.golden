@@ -81,6 +81,10 @@ impl SimpleUnion {
 
 impl fidl::Persistable for SimpleUnion {}
 
+pub mod simple_protocol_ordinals {
+    pub const ADD: u64 = 0x7ee19cf19ae30276;
+}
+
 mod internal {
     use super::*;
 

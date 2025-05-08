@@ -57,7 +57,11 @@ use fidl::{
 {{- range .Unions }}
 {{ template "UnionDeclaration" . }}
 {{- end }}
-{{- if not IsCommon }}
+{{- if  IsCommon }}
+{{- range .Protocols }}
+{{ template "ProtocolOrdinals" . }}
+{{- end }}
+{{- else }}
 {{- range .Protocols }}
 {{ template "ProtocolDeclaration" . }}
 {{ template "DriverProtocolDeclaration" . }}

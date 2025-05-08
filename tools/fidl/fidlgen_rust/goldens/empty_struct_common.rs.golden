@@ -43,6 +43,12 @@ pub struct EmptyProtocolSendRequest {
 
 impl fidl::Persistable for EmptyProtocolSendRequest {}
 
+pub mod empty_protocol_ordinals {
+    pub const SEND_: u64 = 0x132262fd8b200708;
+    pub const RECEIVE: u64 = 0x1ff0ccf9b710e23f;
+    pub const SEND_AND_RECEIVE: u64 = 0x76a931254962cea;
+}
+
 mod internal {
     use super::*;
 

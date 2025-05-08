@@ -84,6 +84,10 @@ impl ExampleUnion {
 
 impl fidl::Persistable for ExampleUnion {}
 
+pub mod example_protocol_ordinals {
+    pub const METHOD: u64 = 0x53978e6fc7476749;
+}
+
 mod internal {
     use super::*;
     unsafe impl fidl::encoding::TypeMarker for ExampleBits {

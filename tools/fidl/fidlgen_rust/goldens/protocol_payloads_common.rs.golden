@@ -73,6 +73,25 @@ pub struct MainProtocolTwoWayAnonWithErrorResponse {
 
 impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorResponse {}
 
+pub mod main_protocol_ordinals {
+    pub const ONE_WAY_COMPOSED: u64 = 0x241e4384443ccb10;
+    pub const TWO_WAY_COMPOSED: u64 = 0x2348a1331ca4cfb0;
+    pub const TWO_WAY_COMPOSED_WITH_ERROR: u64 = 0x6a9be48b574d1557;
+    pub const ON_COMPOSED: u64 = 0x19fbe2b2f6f9273a;
+    pub const ONE_WAY_LOCAL: u64 = 0x6b9feaf9305b0715;
+    pub const TWO_WAY_LOCAL: u64 = 0x743776548de3af0f;
+    pub const TWO_WAY_LOCAL_WITH_ERROR: u64 = 0x2839c029915cb8fc;
+    pub const ON_LOCAL: u64 = 0x4745f7438cd80819;
+    pub const ONE_WAY_IMPORT: u64 = 0x2e6b091ae4cee40c;
+    pub const TWO_WAY_IMPORT: u64 = 0x20f4a8f65ff69473;
+    pub const TWO_WAY_IMPORT_WITH_ERROR: u64 = 0x3b7b706d42eb9bbd;
+    pub const ON_IMPORT: u64 = 0x1bb4f4c30b6f8909;
+    pub const ONE_WAY_ANON: u64 = 0xb43565c01ab54ac;
+    pub const TWO_WAY_ANON: u64 = 0x8bdc969ff7dd759;
+    pub const TWO_WAY_ANON_WITH_ERROR: u64 = 0x5862bf8170c87a36;
+    pub const ON_ANON: u64 = 0x42d321dacc4df000;
+}
+
 mod internal {
     use super::*;
 

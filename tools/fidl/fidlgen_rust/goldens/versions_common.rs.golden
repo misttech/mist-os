@@ -98,6 +98,12 @@ impl Enum {
     }
 }
 
+pub mod other_protocol_ordinals {}
+
+pub mod protocol_ordinals {
+    pub const FOO: u64 = 0x567a8096af6e6139;
+}
+
 mod internal {
     use super::*;
     unsafe impl fidl::encoding::TypeMarker for Bits {
