@@ -34,7 +34,7 @@ use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::Signal;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use starnix_uapi::{bpf_cmd, errno, error, rlimit, BPF_F_RDONLY, BPF_F_WRONLY};
+use starnix_uapi::{bpf_cmd, error, rlimit, BPF_F_RDONLY, BPF_F_WRONLY};
 use std::sync::Arc;
 use syncio::zxio_node_attr_has_t;
 use zerocopy::FromBytes;
@@ -767,23 +767,18 @@ pub fn task_to_fs_node(current_task: &CurrentTask, task: &TempRef<'_, Task>, fs_
 }
 
 /// Returns `TaskState` for a new `Task`, based on that of the provided `context`.
-/// Corresponds to a combination of the `task_alloc()` and `setprocattr()` LSM hooks.
-/// The difference from those hooks is that this one bypasses the access-checks that would be
-/// performed by `set_procattr()`.
+/// The effect is similar to combining the `task_alloc()` and `setprocattr()` LSM hooks, with the
+/// difference that no access-checks are performed, and the "#<name>" syntax may be used to
+/// have the `Task` assigned one of the "initial" Security Contexts, to allow components to be run
+/// prior to a policy being loaded.
 pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno> {
     track_hook_duration!(c"security.hooks.task_for_context");
     Ok(TaskState(
-        if_selinux_else(
-            task,
-            |security_server| {
-                Ok(selinux_hooks::TaskAttrs::for_sid(
-                    security_server
-                        .security_context_to_sid(context.into())
-                        .map_err(|e| errno!(EINVAL, format!("{:?}", e)))?,
-                ))
-            },
-            || Ok(selinux_hooks::TaskAttrs::for_selinux_disabled()),
-        )?
+        if let Some(kernel_state) = task.kernel().security_state.state.as_ref() {
+            selinux_hooks::task::task_alloc_from_context(&kernel_state.server, context)
+        } else {
+            Ok(selinux_hooks::TaskAttrs::for_selinux_disabled())
+        }?
         .into(),
     ))
 }

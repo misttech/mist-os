@@ -1330,7 +1330,10 @@ impl CurrentTask {
         } else if let Some(default_seclabel) = kernel.features.default_seclabel.as_ref() {
             security::task_for_context(&init_task, default_seclabel.as_bytes().into())?
         } else {
-            security::task_alloc(&init_task, 0)
+            // If SELinux is enabled then this call will fail with `EINVAL`.
+            security::task_for_context(&init_task, b"".into()).map_err(|_| {
+                errno!(EINVAL, "Container has SELinux enabled but no Security Context specified")
+            })?
         };
 
         let task = Self::create_task(

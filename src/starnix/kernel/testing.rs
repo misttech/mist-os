@@ -251,7 +251,7 @@ pub fn create_task(
         locked,
         kernel,
         &CString::new(task_name).unwrap(),
-        None,
+        Some(&CString::new("#kernel").unwrap()),
     )
     .expect("failed to create second task");
     task.mm().unwrap().initialize_mmap_layout_for_test(ArchWidth::Arch64);

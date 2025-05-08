@@ -9,11 +9,11 @@ use crate::security::selinux_hooks::{
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
-use crate::vfs::FsNode;
+use crate::vfs::{FsNode, FsStr};
 use crate::TODO_DENY;
 use selinux::{
-    Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, KernelClass,
-    NullessByteStr,
+    Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, InitialSid,
+    KernelClass, NullessByteStr,
 };
 use starnix_types::ownership::TempRef;
 use starnix_uapi::errors::Errno;
@@ -139,6 +139,24 @@ fn maybe_reset_rlimits(
 /// Returns `TaskAttrs` for a new `Task`, based on the `parent` state, and the specified clone flags.
 pub(in crate::security) fn task_alloc(parent: &Task, _clone_flags: u64) -> TaskAttrs {
     parent.security_state.lock().clone()
+}
+
+/// Returns `TaskAttrs` for a new `Task` that will run in the specified `context`.
+pub(in crate::security) fn task_alloc_from_context(
+    security_server: &SecurityServer,
+    context: &FsStr,
+) -> Result<TaskAttrs, Errno> {
+    const INITIAL_PREFIX: &[u8] = b"#";
+    let sid = if context.starts_with(INITIAL_PREFIX) {
+        let name = &*context[INITIAL_PREFIX.len()..];
+        let initial_sid = InitialSid::all_variants().iter().find(|x| x.name().as_bytes() == name);
+        SecurityId::initial(*initial_sid.ok_or_else(|| errno!(EINVAL))?)
+    } else {
+        security_server
+            .security_context_to_sid(context.into())
+            .map_err(|e| errno!(EINVAL, format!("{:?}", e)))?
+    };
+    Ok(TaskAttrs::for_sid(sid))
 }
 
 /// Checks if creating a task is allowed.
