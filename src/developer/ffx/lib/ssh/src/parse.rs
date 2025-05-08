@@ -311,7 +311,7 @@ async fn parse_ssh_error<R: AsyncBufRead + Unpin>(
         return if l.contains("Unrecognized argument: --abi-revision") {
             // It is an older image, so use the legacy command.
             tracing::info!(
-                "Target does not support abi compatibility check, reverting to legacy connection"
+                "Target does not support abi compatibility check"
             );
             PipeError::NoCompatibilityCheck
         } else {

@@ -73,10 +73,7 @@ rustc_library("lib") {
     "src/zedboot.rs",
   ]
 
-  inputs = [
-    "test_data/supported_host_pipe.sh",
-    "test_data/legacy_host_pipe.sh",
-  ]
+  inputs = [ "test_data/supported_host_pipe.sh" ]
 }
 
 group("target") {

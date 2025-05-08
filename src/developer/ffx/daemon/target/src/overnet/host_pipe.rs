@@ -201,44 +201,6 @@ impl HostPipeChild {
     }
 
     #[tracing::instrument(skip(stderr_buf, event_queue))]
-    async fn new_inner_legacy(
-        ssh_path: &str,
-        addr: SocketAddr,
-        id: u64,
-        stderr_buf: Rc<LogBuffer>,
-        event_queue: events::Queue<TargetEvent>,
-        watchdogs: bool,
-        ssh_timeout: u16,
-        verbose_ssh: bool,
-        node: Arc<overnet_core::Router>,
-        ctx: EnvironmentContext,
-    ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
-        let id_string = format!("{}", id);
-        let args = vec![
-            "echo",
-            "++ $SSH_CONNECTION ++",
-            "&&",
-            "remote_control_runner",
-            "--circuit",
-            &id_string,
-        ];
-
-        Self::start_ssh_connection(
-            ssh_path,
-            addr,
-            args,
-            stderr_buf,
-            event_queue,
-            watchdogs,
-            ssh_timeout,
-            verbose_ssh,
-            node,
-            ctx,
-        )
-        .await
-    }
-
-    #[tracing::instrument(skip(stderr_buf, event_queue))]
     async fn new_inner(
         ssh_path: &str,
         addr: SocketAddr,
@@ -260,7 +222,7 @@ impl HostPipeChild {
         let args =
             vec!["remote_control_runner", "--circuit", &id_string, "--abi-revision", &abi_revision];
 
-        match Self::start_ssh_connection(
+        Self::start_ssh_connection(
             ssh_path,
             addr,
             args,
@@ -273,25 +235,6 @@ impl HostPipeChild {
             ctx.clone(),
         )
         .await
-        {
-            Ok((addr, pipe)) => Ok((addr, pipe)),
-            Err(PipeError::NoCompatibilityCheck) => {
-                Self::new_inner_legacy(
-                    ssh_path,
-                    addr,
-                    id,
-                    stderr_buf,
-                    event_queue,
-                    watchdogs,
-                    ssh_timeout,
-                    verbose_ssh,
-                    node,
-                    ctx,
-                )
-                .await
-            }
-            Err(e) => Err(e),
-        }
     }
 
     async fn start_ssh_connection(
@@ -1019,39 +962,6 @@ mod test {
         const SUPPORTED_HOST_PIPE_SH: &str = include_str!("../../test_data/supported_host_pipe.sh");
 
         let ssh_path = env.isolate_root.path().join("supported_host_pipe.sh");
-        fs::write(&ssh_path, SUPPORTED_HOST_PIPE_SH).expect("writing test script");
-        fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o770))
-            .expect("setting permissions");
-
-        write_test_ssh_keys(&env).await;
-
-        let target = crate::target::Target::new_with_addrs(
-            Some("test_target"),
-            [TargetIpAddr::from_str("192.168.1.1:22").unwrap()].into(),
-        );
-        let ssh_path_str: String = ssh_path.to_string_lossy().to_string();
-        let node = overnet_core::Router::new(None).unwrap();
-        let _res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
-            Rc::downgrade(&target),
-            FakeHostPipeChildBuilder {
-                operation_type: ChildOperationType::DefaultBuilder,
-                ssh_path: &ssh_path_str,
-            },
-            30,
-            Duration::default(),
-            false,
-            node,
-        )
-        .await
-        .expect("host connection");
-    }
-
-    #[fuchsia::test]
-    async fn test_start_legacy_ok() {
-        let env = ffx_config::test_init().await.unwrap();
-        const SUPPORTED_HOST_PIPE_SH: &str = include_str!("../../test_data/legacy_host_pipe.sh");
-
-        let ssh_path = env.isolate_root.path().join("legacy_host_pipe.sh");
         fs::write(&ssh_path, SUPPORTED_HOST_PIPE_SH).expect("writing test script");
         fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o770))
             .expect("setting permissions");
