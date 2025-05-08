@@ -279,11 +279,12 @@ void HandoffPrep::UsePackageFiles(KernelStorage::Bootfs kernel_package) {
       ktl::string_view version{reinterpret_cast<const char*>(data.data()), data.size()};
       SetVersionString(version);
     } else if (it->name == "vdso"sv) {
-      ZX_ASSERT(pool.UpdateRamSubranges(memalloc::Type::kVdso, start, data.size()).is_ok());
+      ZX_ASSERT(pool.UpdateRamSubranges(memalloc::Type::kVdso, start, aligned_data.size()).is_ok());
       handoff_->vdso = MakePhysVmo(aligned_data, "vdso/next"sv, data.size());
     } else if (it->name == "userboot"sv) {
-      ZX_ASSERT(pool.UpdateRamSubranges(memalloc::Type::kUserboot, start, data.size()).is_ok());
-      handoff_->userboot = MakePhysVmo(aligned_data, "userboot"sv, data.size());
+      ZX_ASSERT(
+          pool.UpdateRamSubranges(memalloc::Type::kUserboot, start, aligned_data.size()).is_ok());
+      handoff_->userboot = MakePhysElfImage(it, it->name);
     }
   }
   if (auto result = kernel_package.take_error(); result.is_error()) {
@@ -319,6 +320,51 @@ void HandoffPrep::SetVersionString(ktl::string_view version) {
              version.data());
     }
   }
+}
+
+PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
+                                           ktl::string_view name) {
+  ElfImage elf;
+  if (auto result = elf.InitFromFile(file, false); result.is_error()) {
+    printf("%s: Cannot decode ELF file \"%.*s/%.*s\" from STORAGE_KERNEL item BOOTFS: ",
+           gSymbolize->name(), static_cast<int>(file.view().directory().size()),
+           file.view().directory().data(), static_cast<int>(file->name.size()), file->name.data());
+    zbitl::PrintBootfsError(result.error_value());
+    abort();
+  }
+  elf.set_load_address(0);
+
+  PhysElfImage handoff_elf = {
+      .vmo = MakePhysVmo(elf.aligned_memory_image(), name, file->data.size()),
+      .vmar = {.size = elf.vaddr_size()},
+      .info = {
+          .relative_entry_point = elf.entry(),
+          .stack_size = elf.stack_size(),
+      }};
+
+  fbl::AllocChecker ac;
+  ktl::span<PhysMapping> mappings =
+      New(handoff_elf.vmar.mappings, ac, elf.load_info().segments().size());
+  if (!ac.check()) {
+    ZX_PANIC("cannot allocate %zu bytes of handoff space for ELF image details",
+             sizeof(PhysMapping) * elf.load_info().segments().size());
+  }
+  elf.load_info().VisitSegments(
+      [load_bias = elf.load_bias(), &mappings](const auto& segment) -> bool {
+        PhysMapping& mapping = mappings.front();
+        mappings = mappings.subspan(1);
+        mapping = PhysMapping{
+            "",
+            segment.vaddr() + load_bias,
+            segment.memsz(),
+            segment.offset(),
+            PhysMapping::Permissions::FromSegment(segment),
+        };
+        return true;
+      });
+  ZX_DEBUG_ASSERT(mappings.empty());
+
+  return handoff_elf;
 }
 
 [[noreturn]] void HandoffPrep::DoHandoff(const ElfImage& kernel, UartDriver& uart,

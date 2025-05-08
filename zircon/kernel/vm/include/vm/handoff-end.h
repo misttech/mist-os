@@ -12,6 +12,7 @@
 #include <stddef.h>
 
 #include <fbl/ref_ptr.h>
+#include <fbl/vector.h>
 #include <object/handle.h>
 #include <phys/handoff.h>
 
@@ -27,11 +28,20 @@ paddr_t KernelPhysicalLoadAddress();
 // The remaining hand-off data to be consumed at the end of the hand-off phase
 // (see EndHandoff()).
 struct HandoffEnd {
+  // Culled from PhysElfImage.
+  struct Elf {
+    fbl::RefPtr<VmObject> vmo;
+    size_t vmar_size;
+    fbl::Vector<PhysMapping> mappings;
+    PhysElfImage::Info info;
+  };
+
   // The data ZBI.
   HandleOwner zbi;
 
   fbl::RefPtr<VmObject> vdso;
-  fbl::RefPtr<VmObject> userboot;
+
+  Elf userboot;
 
   // The VMOs deriving from the phys environment. As returned by EndHandoff(),
   // the entirety of the array will be populated by real handles (if only by

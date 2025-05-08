@@ -278,6 +278,9 @@ class HandoffPrep {
   // Publishes a PhysVmar with a single mapping covering its extent.
   void PublishSingleMappingVmar(PhysMapping mapping, MappingType type);
 
+  // This constructs a PhysElfImage from an ELF file in the KernelStorage.
+  PhysElfImage MakePhysElfImage(KernelStorage::Bootfs::iterator file, ktl::string_view name);
+
   // Do final handoff of the VM object lists.  The contents are already in
   // place so this does not invalidate any pointers to the objects (e.g., from
   // PublishExtraVmo).

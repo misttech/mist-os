@@ -117,9 +117,24 @@ static_assert(std::is_default_constructible_v<PhysVmo>);
 struct PhysMapping : public PhysVmObject {
   class Permissions {
    public:
+    static Permissions Ro() { return Permissions{}.set_readable(); }
     static Permissions Rw() { return Permissions{}.set_readable().set_writable(); }
+    static Permissions Rx() { return Permissions{}.set_readable().set_executable(); }
+    static Permissions Xom() { return Permissions{}.set_executable(); }
+
+    // This works on anything with .readable(), .writable(), and .executable()
+    // methods, which includes this class itself as well as elfldltl::LoadInfo
+    // segment types.
+    static Permissions FromSegment(const auto& segment) {
+      return Permissions{}
+          .set_readable(segment.readable())
+          .set_writable(segment.writable())
+          .set_executable(segment.executable());
+    }
 
     constexpr Permissions() = default;
+
+    bool operator==(const Permissions&) const = default;
 
     constexpr bool readable() const { return perms_[kReadable]; }
     constexpr bool writable() const { return perms_[kWritable]; }
@@ -206,6 +221,22 @@ struct PhysVmar : public PhysVmObject {
 };
 static_assert(std::is_default_constructible_v<PhysVmar>);
 
+// This combines a PhysVmo containing an ELF image with information on how to
+// perform ELF loading for it.  The PhysVmar is repurposed to describe a VMAR
+// that should be created at an arbitrary address (its .base is always 0).  The
+// mappings within use vaddr relative to that base, and each PhysMapping::paddr
+// is in fact an offset into the VMO rather than a physical address.
+struct PhysElfImage {
+  struct Info {
+    uintptr_t relative_entry_point = 0;  // Add to VMAR base address.
+    std::optional<size_t> stack_size;
+  };
+
+  PhysVmo vmo;
+  PhysVmar vmar;
+  Info info;
+};
+
 // This holds (or points to) everything that is handed off from physboot to the
 // kernel proper at boot time.
 struct PhysHandoff {
@@ -255,7 +286,7 @@ struct PhysHandoff {
   PhysVmo vdso;
 
   // Userboot.
-  PhysVmo userboot;
+  PhysElfImage userboot;
 
   // Additional VMOs to be published to userland as-is and not otherwise used by
   // the kernel proper.

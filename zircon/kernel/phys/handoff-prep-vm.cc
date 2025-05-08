@@ -61,10 +61,7 @@ void HandoffPrep::ConstructKernelAddressSpace(const ElfImage& kernel) {
       uintptr_t vaddr = segment.vaddr() + kernel.load_bias();
       uintptr_t paddr = kernel.physical_load_address() + segment.offset();
 
-      PhysMapping::Permissions perms = PhysMapping::Permissions{}
-                                           .set_readable(segment.readable())
-                                           .set_writable(segment.writable())
-                                           .set_executable(segment.executable());
+      PhysMapping::Permissions perms = PhysMapping::Permissions::FromSegment(segment);
       // If the segment is executable and the hardware doesn't support
       // executable-only mappings, we fix up the permissions as also readable.
       if constexpr (!AddressSpace::kExecuteOnlyAllowed) {

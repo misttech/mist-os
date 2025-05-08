@@ -106,8 +106,27 @@ KCOUNTER(init_time, "init.userboot.time.msec")
 
 class UserbootImage : private RoDso {
  public:
-  UserbootImage(fbl::RefPtr<VmObject> vmo, const VDso* vdso)
-      : RoDso(ktl::move(vmo), USERBOOT_CODE_END, USERBOOT_CODE_START), vdso_(vdso) {}
+  UserbootImage(HandoffEnd::Elf userboot, const VDso* vdso)
+      : RoDso(ktl::move(userboot.vmo), USERBOOT_CODE_END, USERBOOT_CODE_START), vdso_(vdso) {
+    ZX_ASSERT_MSG(userboot.mappings.size() == 2,
+                  "userboot ELF has %zu mappings, expected exactly 2", userboot.mappings.size());
+    ZX_ASSERT(userboot.mappings[0].perms == PhysMapping::Permissions::Ro());
+    ZX_ASSERT(userboot.mappings[0].vaddr == 0);
+    ZX_ASSERT(userboot.mappings[0].size == USERBOOT_CODE_START);
+    ZX_ASSERT(userboot.mappings[1].perms == PhysMapping::Permissions::Rx() ||
+              userboot.mappings[1].perms == PhysMapping::Permissions::Xom());
+    ZX_ASSERT(userboot.mappings[1].vaddr == USERBOOT_CODE_START);
+    ZX_ASSERT(userboot.mappings[1].size == USERBOOT_CODE_END - USERBOOT_CODE_START);
+    ZX_ASSERT(userboot.info.relative_entry_point == USERBOOT_ENTRY);
+    if (!userboot.info.stack_size) {
+      // TODO(mcgrathr): rodso.ld makes it impossible to set the stack-size
+      // right in userboot right now.  But soon that won't be an issue and this
+      // can be required.
+      userboot.info.stack_size = ZIRCON_DEFAULT_STACK_SIZE;
+    }
+    ZX_ASSERT(userboot.info.stack_size);
+    ZX_ASSERT(*userboot.info.stack_size == stack_size);
+  }
 
   // The whole userboot image consists of the userboot rodso image
   // immediately followed by the vDSO image.  This returns the size

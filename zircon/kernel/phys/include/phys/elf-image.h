@@ -39,7 +39,8 @@ class ElfImage {
 
   static constexpr size_t kMaxBuildIdLen = 32;
 
-  using LoadInfo = elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StaticVector<kMaxLoad>::Container,
+  using Elf = elfldltl::Elf<>;
+  using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StaticVector<kMaxLoad>::Container,
                                       elfldltl::PhdrLoadPolicy::kContiguous>;
 
   using BootfsDir = zbitl::BootfsView<ktl::span<ktl::byte>>;
@@ -56,6 +57,12 @@ class ElfImage {
   // singleton file will be treated as the image with no patches to apply.
   fit::result<Error> Init(BootfsDir dir, ktl::string_view name, bool relocated);
 
+  // This does the same with a singleton file already located in the BootfsDir.
+  fit::result<Error> InitFromFile(BootfsDir::iterator file, bool relocated);
+
+  // This does the same with an ELF image subdirectory already located.
+  fit::result<Error> InitFromDir(BootfsDir subdir, ktl::string_view name, bool relocated);
+
   ktl::string_view name() const { return name_; }
 
   LoadInfo& load_info() { return load_info_; }
@@ -68,9 +75,20 @@ class ElfImage {
 
   // Return the memory image within the current address space. Must be called
   // after Init().
-  cpp20::span<const std::byte> memory_image() const { return image_.image(); }
+  ktl::span<const ktl::byte> memory_image() const { return image_.image(); }
+
+  // This aligns the size up to include the page-alignment padding always
+  // present in the filesystem image.
+  ktl::span<const ktl::byte> aligned_memory_image() const {
+    return {
+        image_.image().data(),
+        ZBI_BOOTFS_PAGE_ALIGN(image_.image().size_bytes()),
+    };
+  }
 
   uint64_t entry() const { return entry_ + load_bias(); }
+
+  ktl::optional<size_t> stack_size() const { return stack_size_; }
 
   ktl::optional<ktl::string_view> interp() const { return interp_; }
 
@@ -161,8 +179,7 @@ class ElfImage {
 
   // Set up state to describe the running phys executable.
   void InitSelf(ktl::string_view name, elfldltl::DirectMemory& memory, uintptr_t load_bias,
-                const elfldltl::Elf<>::Phdr& load_segment,
-                ktl::span<const ktl::byte> build_id_note);
+                const Elf::Phdr& load_segment, ktl::span<const ktl::byte> build_id_note);
 
   // This uses the symbolizer_markup::Writer API to emit the contextual
   // elements describing this ELF module.  The ID number should be unique among
@@ -235,11 +252,12 @@ class ElfImage {
   elfldltl::DirectMemory image_{{}};
   LoadInfo load_info_;
   uint64_t entry_ = 0;
-  ktl::span<const elfldltl::Elf<>::Dyn> dynamic_;
+  ktl::span<const Elf::Dyn> dynamic_;
   ktl::optional<elfldltl::ElfNote> build_id_;
   ktl::optional<ktl::string_view> interp_;
   code_patching::Patcher patcher_;
   ktl::optional<uintptr_t> load_bias_;
+  ktl::optional<Elf::size_type> stack_size_;
   decltype(PublishSelf)* publish_self_ = nullptr;
 };
 

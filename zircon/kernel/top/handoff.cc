@@ -154,6 +154,24 @@ HandleOwner CreateStubVmoHandle() {
   return CreateHandle(ktl::move(vmo), 0);
 }
 
+HandoffEnd::Elf CreatePhysElf(const PhysElfImage& image) {
+  ZX_DEBUG_ASSERT(image.vmar.base == 0);
+  HandoffEnd::Elf elf = {
+      .vmo = CreatePhysVmo(image.vmo),
+      .vmar_size = image.vmar.size,
+      .info = image.info,
+  };
+  fbl::AllocChecker ac;
+  elf.mappings.reserve(image.vmar.mappings.size(), &ac);
+  ZX_ASSERT_MSG(ac.check(), "no kernel heap space for ELF %zu mappings in %s",
+                image.vmar.mappings.size(), image.vmo.name.data());
+  for (const PhysMapping& mapping : image.vmar.mappings.get()) {
+    elf.mappings.push_back(mapping, &ac);
+    ZX_ASSERT(ac.check());
+  }
+  return elf;
+}
+
 }  // namespace
 
 template <>
@@ -187,7 +205,7 @@ HandoffEnd EndHandoff() {
       // Userboot expects the ZBI as writable.
       .zbi = CreatePhysVmoHandle(gPhysHandoff->zbi, /*writable=*/true),
       .vdso = CreatePhysVmo(gPhysHandoff->vdso),
-      .userboot = CreatePhysVmo(gPhysHandoff->userboot),
+      .userboot = CreatePhysElf(gPhysHandoff->userboot),
   };
 
   // If the number of extra VMOs from physboot is less than the number of VMOs
