@@ -11,7 +11,6 @@ use assert_matches::assert_matches;
 use blobfs_ramdisk::BlobfsRamdisk;
 use diagnostics_assertions::TreeAssertion;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
-use fidl_fuchsia_hardware_power_statecontrol::RebootOptions;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_inspect::reader::DiagnosticsHierarchy;
 use fuchsia_merkle::Hash;
@@ -23,7 +22,6 @@ use mock_boot_arguments::MockBootArgumentsService;
 use mock_health_verification::MockHealthVerificationService;
 use mock_metrics::MockMetricEventLoggerFactory;
 use mock_paver::{MockPaverService, MockPaverServiceBuilder};
-use mock_reboot::MockRebootService;
 use std::collections::HashMap;
 use std::sync::Arc;
 use vfs::directory::helper::DirectlyMutable as _;
@@ -45,7 +43,6 @@ mod inspect;
 mod pkgfs;
 mod retained_packages;
 mod space;
-mod startup;
 mod sync;
 
 static SHELL_COMMANDS_BIN_PATH: &str = "shell-commands-bin";
@@ -518,28 +515,6 @@ where
                 .unwrap();
         }
 
-        let reboot_options = Arc::new(Mutex::new(vec![]));
-        let reboot_service = Arc::new(MockRebootService::new(Box::new({
-            let reboot_options = Arc::clone(&reboot_options);
-            move |options| {
-                reboot_options.lock().push(options);
-                Ok(())
-            }
-        })));
-        {
-            let reboot_service = Arc::clone(&reboot_service);
-            local_child_svc_dir
-                .add_entry(
-                    fidl_fuchsia_hardware_power_statecontrol::AdminMarker::PROTOCOL_NAME,
-                    vfs::service::host(move |stream| {
-                        Arc::clone(&reboot_service).run_reboot_service(stream).unwrap_or_else(|e| {
-                            panic!("error running reboot service: {:#}", anyhow!(e))
-                        })
-                    }),
-                )
-                .unwrap();
-        }
-
         // Paver service, so we can verify that we submit the expected requests and so that
         // we can verify if the paver service returns errors, that we handle them correctly.
         let paver_service = Arc::new(
@@ -735,9 +710,6 @@ where
                     .capability(
                         Capability::protocol::<fidl_fuchsia_tracing_provider::RegistryMarker>(),
                     )
-                    .capability(Capability::protocol::<
-                        fidl_fuchsia_hardware_power_statecontrol::AdminMarker,
-                    >())
                     .capability(
                         Capability::directory("blob-exec")
                             .path("/blob")
@@ -882,11 +854,9 @@ where
             apps: Apps { realm_instance },
             blobfs,
             system_image,
-            reboot_options,
             proxies,
             mocks: Mocks {
                 logger_factory,
-                reboot_service,
                 _paver_service: paver_service,
                 _verifier_service: verifier_service,
             },
@@ -904,7 +874,6 @@ struct Proxies {
 
 pub struct Mocks {
     pub logger_factory: Arc<MockMetricEventLoggerFactory>,
-    pub reboot_service: Arc<MockRebootService>,
     _paver_service: Arc<MockPaverService>,
     _verifier_service: Arc<MockHealthVerificationService>,
 }
@@ -917,7 +886,6 @@ struct TestEnv<B = BlobfsRamdisk> {
     apps: Apps,
     blobfs: B,
     system_image: Option<Hash>,
-    reboot_options: Arc<Mutex<Vec<RebootOptions>>>,
     proxies: Proxies,
     pub mocks: Mocks,
 }
@@ -1037,9 +1005,5 @@ impl<B: Blobfs> TestEnv<B> {
         let () = compress_and_write_blob(contents, blobfs.open_blob_for_write(hash).await.unwrap())
             .await
             .unwrap();
-    }
-
-    fn take_reboot_options(&self) -> Vec<RebootOptions> {
-        std::mem::take(&mut *self.reboot_options.lock())
     }
 }

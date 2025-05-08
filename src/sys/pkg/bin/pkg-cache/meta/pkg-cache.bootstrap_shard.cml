@@ -56,11 +56,6 @@
             dependency: "weak",
         },
         {
-            protocol: "fuchsia.hardware.power.statecontrol.Admin",
-            from: "#shutdown_shim",
-            to: "#pkg-cache",
-        },
-        {
             directory: "blob-exec",
             from: "#fshost",
             to: [ "#pkg-cache" ],

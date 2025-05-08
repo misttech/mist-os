@@ -38,7 +38,6 @@ mod cache_service;
 mod compat;
 mod gc_service;
 mod index;
-mod reboot;
 mod required_blobs;
 mod retained_packages_service;
 mod root_dir;
@@ -100,8 +99,7 @@ pub fn main() -> Result<(), Error> {
         match main_inner().await {
             Err(err) => {
                 let err = anyhow!(err);
-                error!("error running pkg-cache: {:#}", err);
-                let () = reboot::reboot().await;
+                error!("error running pkg-cache: {err:#}");
                 Err(err)
             }
             ok => ok,
