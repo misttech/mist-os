@@ -299,13 +299,14 @@ class AmlCpuTest : public ::testing::Test {
       ASSERT_EQ(env.power_server_.max_supported_voltage(), fastest.volt_uv);
     });
 
-    driver_test().RunInNodeContext(
-        [](fdf_testing::TestNode& node) { ASSERT_EQ(node.children().size(), 0u); });
+    driver_test().RunInNodeContext([&perf_domains](fdf_testing::TestNode& node) {
+      ASSERT_EQ(node.children().size(), perf_domains.size());
+    });
   }
 
   void ConnectToCpuCtrl(const perf_domain_t& perf_domain) {
     auto device =
-        driver_test().Connect<fuchsia_hardware_cpu_ctrl::Service::Device>(perf_domain.name);
+        driver_test().ConnectThroughDevfs<fuchsia_hardware_cpu_ctrl::Device>(perf_domain.name);
     EXPECT_OK(device.status_value());
     cpu_ctrl_.Bind(std::move(device.value()));
   }

@@ -45,6 +45,7 @@ source_set("common") {
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp",
     "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/amlogic",
   ]

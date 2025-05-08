@@ -6,6 +6,7 @@
 #define SRC_DEVICES_CPU_DRIVERS_AML_CPU_AML_CPU_DRIVER_H_
 
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <lib/fit/function.h>
 
 #include "src/devices/cpu/drivers/aml-cpu/aml-cpu.h"
@@ -17,15 +18,20 @@ class AmlCpuPerformanceDomain : public AmlCpu {
   AmlCpuPerformanceDomain(async_dispatcher_t* dispatcher,
                           const std::vector<operating_point_t>& operating_points,
                           const perf_domain_t& perf_domain, inspect::ComponentInspector& inspect)
-      : AmlCpu(operating_points, perf_domain, inspect) {}
+      : AmlCpu(operating_points, perf_domain, inspect),
+        dispatcher_(dispatcher),
+        devfs_connector_(fit::bind_member<&AmlCpuPerformanceDomain::CpuCtrlConnector>(this)) {}
 
-  fidl::ProtocolHandler<fuchsia_hardware_cpu_ctrl::Device> GetHandler(
-      async_dispatcher_t* dispatcher) {
-    return bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure);
-  }
+  zx::result<> AddChild(fidl::WireSyncClient<fuchsia_driver_framework::Node>& node);
+
+  void CpuCtrlConnector(fidl::ServerEnd<fuchsia_hardware_cpu_ctrl::Device> server);
 
  private:
+  async_dispatcher_t* dispatcher_;
   fidl::ServerBindingGroup<fuchsia_hardware_cpu_ctrl::Device> bindings_;
+  driver_devfs::Connector<fuchsia_hardware_cpu_ctrl::Device> devfs_connector_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 };
 
 class AmlCpuDriver : public fdf::DriverBase {
