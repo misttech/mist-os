@@ -7,7 +7,6 @@ use std::pin::pin;
 use std::sync::Arc;
 
 use assert_matches::assert_matches;
-use async_utils::event::Event;
 use fidl::endpoints::{ControlHandle as _, ProtocolMarker, RequestStream, Responder as _};
 use fidl_fuchsia_net_interfaces_admin::ProofOfInterfaceAuthorization;
 use fnet_routes_ext::admin::{FidlRouteAdminIpExt, RouteSetRequest, RouteTableRequest};
@@ -64,6 +63,32 @@ pub(crate) async fn serve_route_set<
             },
         }
     }
+}
+
+pub(crate) fn spawn_user_route_set<
+    I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    F: FnOnce() -> UserRouteSet<I>,
+>(
+    scope: &fasync::ScopeHandle,
+    stream: I::RouteSetRequestStream,
+    create_route_set: F,
+) {
+    let Some(guard) = scope.active_guard() else {
+        warn!("aborted serving user route set because scope is finished");
+        stream.control_handle().shutdown_with_epitaph(zx::Status::UNAVAILABLE);
+        return;
+    };
+    let mut user_route_set = create_route_set();
+    scope.spawn_request_stream_handler(stream, |stream| async move {
+        // Stop serving and hold the guard until we've been able to close
+        // the route set.
+        let stop = guard.on_cancel();
+        let result =
+            serve_route_set::<I, UserRouteSet<I>, _>(stream, &mut user_route_set, stop).await;
+        user_route_set.close().await;
+        std::mem::drop(guard);
+        result
+    });
 }
 
 pub(crate) async fn serve_route_table_provider_v4(
@@ -138,46 +163,70 @@ pub(crate) async fn serve_route_table<
     mut stream: <I as FidlRouteAdminIpExt>::RouteTableRequestStream,
     mut route_table: R,
 ) -> Result<(), fidl::Error> {
-    while let Some(request) = stream.try_next().await? {
-        match I::into_route_table_request(request) {
-            RouteTableRequest::NewRouteSet { route_set, control_handle: _ } => {
-                let set_request_stream = route_set.into_stream();
-                route_table.serve_user_route_set(set_request_stream);
-            }
-            RouteTableRequest::GetTableId { responder } => {
-                responder.send(route_table.id().into())?;
-            }
-            RouteTableRequest::Detach { control_handle: _ } => {
-                route_table.detach();
-            }
-            RouteTableRequest::Remove { responder } => {
-                let fidl_result = match route_table.remove().await {
-                    Ok(()) | Err(TableRemoveError::Removed) => Ok(()),
-                    Err(TableRemoveError::InvalidOp) => {
-                        Err(fnet_routes_admin::BaseRouteTableRemoveError::InvalidOpOnMainTable)
-                    }
-                };
-                responder.send(fidl_result)?;
-                return Ok(());
-            }
-            RouteTableRequest::GetAuthorizationForRouteTable { responder } => {
-                responder.send(fnet_routes_admin::GrantForRouteTableAuthorization {
-                    table_id: route_table.id().into(),
-                    token: route_table.token(),
-                })?;
+    let route_table_ref = &mut route_table;
+    let serve = || async move {
+        while let Some(request) = stream.try_next().await? {
+            match I::into_route_table_request(request) {
+                RouteTableRequest::NewRouteSet { route_set, control_handle: _ } => {
+                    let set_request_stream = route_set.into_stream();
+                    route_table_ref.serve_user_route_set(set_request_stream);
+                }
+                RouteTableRequest::GetTableId { responder } => {
+                    responder.send(route_table_ref.id().into())?;
+                }
+                RouteTableRequest::Detach { control_handle: _ } => {
+                    route_table_ref.detach();
+                }
+                RouteTableRequest::Remove { responder } => {
+                    return Ok(Some(responder));
+                }
+                RouteTableRequest::GetAuthorizationForRouteTable { responder } => {
+                    responder.send(fnet_routes_admin::GrantForRouteTableAuthorization {
+                        table_id: route_table_ref.id().into(),
+                        token: route_table_ref.token(),
+                    })?;
+                }
             }
         }
-    }
+        Ok(None)
+    };
 
-    if route_table.detached() {
+    let (result, remove_responder) = match serve().await {
+        Ok(responder) => (Ok(()), responder),
+        Err(e) => (Err(e), None),
+    };
+
+    if route_table.detached() && remove_responder.is_none() {
         debug!(
             "RouteTable protocol for {:?} is shutting down, but the table is detached",
             route_table.id()
         );
-    } else {
-        assert_matches!(route_table.remove().await, Ok(()) | Err(TableRemoveError::Removed));
+        return result;
     }
-    Ok(())
+    // Remove the route table.
+    let removed = route_table.remove().await;
+    match remove_responder {
+        Some(responder) => {
+            let fidl_result = match removed {
+                Ok(()) | Err(TableRemoveError::Removed) => Ok(()),
+                Err(TableRemoveError::InvalidOp) => {
+                    Err(fnet_routes_admin::BaseRouteTableRemoveError::InvalidOpOnMainTable)
+                }
+            };
+            responder.send(fidl_result)
+        }
+        None => {
+            match removed {
+                Ok(()) | Err(TableRemoveError::Removed) => {}
+                // Tables that do not support removing should be `detached` by
+                // default.
+                Err(e @ TableRemoveError::InvalidOp) => {
+                    panic!("unexpected error removing non-detached table: {e:?}");
+                }
+            }
+            result
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -236,17 +285,9 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for MainRouteTable {
         true
     }
     fn serve_user_route_set(&self, stream: I::RouteSetRequestStream) {
-        let mut user_route_set = UserRouteSet::from_main_table(self.ctx.clone());
-        fasync::Scope::current().spawn_request_stream_handler(stream, |stream| async move {
-            let result = serve_route_set::<I, UserRouteSet<I>, _>(
-                stream,
-                &mut user_route_set,
-                std::future::pending(), /* never cancelled */
-            )
-            .await;
-            user_route_set.close().await;
-            result
-        });
+        spawn_user_route_set::<I, _>(&fasync::Scope::current(), stream, || {
+            UserRouteSet::from_main_table(self.ctx.clone())
+        })
     }
 }
 
@@ -255,7 +296,7 @@ pub(crate) struct UserRouteTable<I: Ip> {
     token: Arc<zx::Event>,
     table_id: TableId<I>,
     route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
-    cancel_event: Event,
+    route_set_scope: fasync::ScopeHandle,
     detached: bool,
 }
 
@@ -266,7 +307,17 @@ impl<I: Ip> UserRouteTable<I> {
         table_id: TableId<I>,
         route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
     ) -> Self {
-        Self { ctx, token, table_id, route_work_sink, cancel_event: Event::new(), detached: false }
+        Self {
+            ctx,
+            token,
+            table_id,
+            route_work_sink,
+            // Use a detached child for route set so we can just drop
+            // `UserRouteTable` and let the parent scope handle joining the
+            // route sets.
+            route_set_scope: fasync::Scope::current().new_detached_child(format!("{table_id:?}")),
+            detached: false,
+        }
     }
 }
 
@@ -280,19 +331,21 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for UserRouteTable<I
             .expect("failed to duplicate")
     }
     async fn remove(self) -> Result<(), TableRemoveError> {
+        let Self { ctx: _, token: _, table_id, route_work_sink, route_set_scope, detached: _ } =
+            self;
         let (responder, receiver) = oneshot::channel();
         let work_item = RouteWorkItem {
-            change: routes::Change::RemoveTable(self.table_id),
+            change: routes::Change::RemoveTable(table_id),
             responder: Some(responder),
         };
-        match self.route_work_sink.unbounded_send(work_item) {
+        match route_work_sink.unbounded_send(work_item) {
             Ok(()) => {
                 let result = receiver.await.expect("responder should not be dropped");
                 assert_matches!(
                     result,
                     Ok(routes::ChangeOutcome::Changed | routes::ChangeOutcome::NoChange)
                 );
-                assert!(self.cancel_event.signal());
+                route_set_scope.cancel().await;
                 Ok(())
             }
             Err(e) => {
@@ -308,19 +361,9 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for UserRouteTable<I
         self.detached
     }
     fn serve_user_route_set(&self, stream: I::RouteSetRequestStream) {
-        let mut user_route_set =
-            UserRouteSet::new(self.ctx.clone(), self.table_id, self.route_work_sink.clone());
-        // Wait on the event to be signaled, if the signaler was dropped without
-        // signalling, this means the table was detached and we don't cancel
-        // serving the user route sets.
-        let cancel_token = self.cancel_event.wait();
-        fasync::Scope::current().spawn_request_stream_handler(stream, |stream| async move {
-            let result =
-                serve_route_set::<I, UserRouteSet<I>, _>(stream, &mut user_route_set, cancel_token)
-                    .await;
-            user_route_set.close().await;
-            result
-        });
+        spawn_user_route_set::<I, _>(&self.route_set_scope, stream, || {
+            UserRouteSet::new(self.ctx.clone(), self.table_id, self.route_work_sink.clone())
+        })
     }
 }
 
