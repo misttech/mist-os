@@ -8,8 +8,6 @@ use futures::{AsyncReadExt, StreamExt, TryFutureExt};
 
 mod util;
 
-// TODO(b/296910480) -- re-enable when daemon start race is fixed
-#[ignore]
 #[fixture(setup_and_teardown_fixture)]
 #[fuchsia::test]
 async fn test_stuff_socket(connector: LaunchedComponentConnector) {
@@ -27,7 +25,6 @@ async fn test_stuff_socket(connector: LaunchedComponentConnector) {
     assert_eq!(socket_data, vec![0xFF; bytes_written as usize]);
 }
 
-#[ignore]
 #[fixture(setup_and_teardown_fixture)]
 #[fuchsia::test]
 async fn test_parallel_connections(connector: LaunchedComponentConnector) {
@@ -56,7 +53,6 @@ async fn test_parallel_connections(connector: LaunchedComponentConnector) {
         .await;
 }
 
-#[ignore]
 #[fixture(setup_and_teardown_fixture)]
 #[fuchsia::test]
 async fn test_pipelined_connections(connector: LaunchedComponentConnector) {

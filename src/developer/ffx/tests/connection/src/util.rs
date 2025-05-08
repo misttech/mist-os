@@ -107,7 +107,8 @@ async fn launch(
     let moniker = format!("/core/ffx-laboratory:{}", name);
 
     let env_context = isolate.env_context().clone();
-    let create_output = isolate.ffx(&["component", "create", &moniker, STRESSOR_URL]).await?;
+    let create_output =
+        isolate.ffx(&["-t", nodename, "component", "create", &moniker, STRESSOR_URL]).await?;
     if !create_output.status.success() {
         return Err(anyhow!("Failed to create component: {:?}", create_output));
     }
@@ -115,7 +116,7 @@ async fn launch(
     let component = LaunchedComponent { moniker: moniker.clone() };
 
     let start_and_launch_result = async move {
-        let output = isolate.ffx(&["component", "start", &moniker]).await?;
+        let output = isolate.ffx(&["-t", nodename, "component", "start", &moniker]).await?;
         if !output.status.success() {
             Err(anyhow!("Failed to start component: {:?}", output))
         } else {
