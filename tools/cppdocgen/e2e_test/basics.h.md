@@ -97,6 +97,12 @@ This enum should have the declaration omitted because of the  annotation.
 <span class="kwd">typedef</span> <span class="typ">struct tagged_struct</span> <span class="typ">tagged_struct_t</span>;
 </pre>
 
+This one has a name for the struct that's separate from the typedef, yet still defined in the
+same declaration.
+
+TODO https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=119281 the struct definition and the
+typedef should be grouped togeher.
+
 
 ## tagged_struct_separate_t typedef {:#tagged_struct_separate_t}
 
