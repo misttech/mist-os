@@ -139,18 +139,6 @@ int zxc_dm(int argc, char** argv) {
   } else if (command_cmp("help", NULL, argv[1], &command_length)) {
     return print_dm_help();
 
-  } else if (command_cmp("dump", NULL, argv[1], &command_length)) {
-    printf("`dm dump` is deprecated. Please use `driver dump` instead\n");
-    return -1;
-
-  } else if (command_cmp("drivers", NULL, argv[1], &command_length)) {
-    printf("`dm drivers` is deprecated. Please use `driver list --verbose` instead\n");
-    return -1;
-
-  } else if (command_cmp("devprops", NULL, argv[1], &command_length)) {
-    printf("`dm devprops` is deprecated. Please use `driver list-devices --verbose` instead\n");
-    return -1;
-
   } else if (command_cmp("reboot", NULL, argv[1], &command_length)) {
     return send_statecontrol_admin_command(
         [](fidl::WireSyncClient<fuchsia_hardware_power_statecontrol::Admin> client) {
