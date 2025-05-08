@@ -61,8 +61,14 @@ pub enum TargetConnectionState {
     Vsock(Instant),
     /// Contains an actual connection to RCS.
     Rcs(RcsConnection),
-    /// Target was manually added.
-    Manual,
+    /// Target was manually added. A Manual target may have an associated
+    /// timeout, which is a time after which the target is allowed to
+    /// expire. A Manual target with no timeout will never enter the
+    /// "disconnected" state, as they are not discoverable, instead
+    /// they return to the "manual" state on disconnection. A Manual target
+    /// with a timeout will only enter the disconnected state after that
+    /// timeout has elapsed and the target has become non-responsive.
+    Manual(Option<Instant>),
     /// Contains the last known interface update with a Fastboot serial number.
     Fastboot(Instant),
     /// Contains the last known interface update with a Fastboot serial number.
@@ -91,7 +97,7 @@ impl TargetConnectionState {
     }
 
     pub fn is_manual(&self) -> bool {
-        *self == Self::Manual
+        matches!(self, Self::Manual(_))
     }
 
     pub fn is_product(&self) -> bool {
@@ -110,10 +116,10 @@ mod tests {
 
     #[test]
     fn test_target_connection_state_impl() {
-        assert!(TargetConnectionState::Manual.is_connected());
-        assert!(TargetConnectionState::Manual.is_manual());
-        assert!(!TargetConnectionState::Manual.is_product());
-        assert!(!TargetConnectionState::Manual.is_rcs());
+        assert!(TargetConnectionState::Manual(None).is_connected());
+        assert!(TargetConnectionState::Manual(None).is_manual());
+        assert!(!TargetConnectionState::Manual(None).is_product());
+        assert!(!TargetConnectionState::Manual(None).is_rcs());
 
         assert!(TargetConnectionState::Mdns(Instant::now()).is_connected());
         assert!(TargetConnectionState::Mdns(Instant::now()).is_product());

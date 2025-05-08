@@ -331,19 +331,49 @@ impl TargetCollection {
         }
     }
 
+    pub fn remove_ephemeral_target(&self, target: Rc<Target>) -> bool {
+        let Some(target) = self.targets.borrow_mut().remove(&target.id()) else { return false };
+        target.disable();
+        true
+    }
+
     /// Checks and expires stale targets.
     ///
     /// Returns the list of expired manual addresses.
-    pub fn expire_targets(&self, overnet_node: &Arc<overnet_core::Router>) {
+    pub fn expire_targets(&self, overnet_node: &Arc<overnet_core::Router>) -> Vec<SocketAddr> {
+        let mut expired_manual_addrs = Vec::new();
+        let mut expired = Vec::new();
         for target in Vec::from_iter(self.targets.borrow().values()) {
             target.expire_state();
-            if target.is_manual() {
+            if target.is_manual() && !target.is_connected() {
+                // If a manual target has been allowed to transition to the
+                // "disconnected" state, it should be removed from the collection.
+                let ssh_port = target.ssh_port();
+                for addr in target.manual_addrs() {
+                    let Ok(mut sockaddr) = TargetIpAddr::try_from(addr).map(SocketAddr::from)
+                    else {
+                        continue;
+                    };
+                    ssh_port.map(|p| sockaddr.set_port(p));
+                    expired_manual_addrs.push(sockaddr);
+                }
+                expired.push(target.clone());
+            } else if target.is_manual() {
                 // Manually-added remote targets will not be discovered by mDNS,
                 // and as a result will not have host-pipe triggered automatically
                 // by the mDNS event handler.
                 target.run_host_pipe(overnet_node);
             }
         }
+
+        for target in expired {
+            self.remove_ephemeral_target(target);
+        }
+
+        if !expired_manual_addrs.is_empty() {
+            tracing::debug!("Expired manual addresses: {expired_manual_addrs:?}");
+        }
+        expired_manual_addrs
     }
 
     // Merge intersecting identities.
