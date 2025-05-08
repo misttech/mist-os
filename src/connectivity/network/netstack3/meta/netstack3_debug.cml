@@ -8,5 +8,9 @@
     ],
     program: {
         binary: "bin/netstack3-instrumented",
+
+        // TODO(https://fxbug.dev/380897722): Move this to the common shard once
+        // we're satisfied with shutdown stability from integration tests.
+        lifecycle: { stop_event: "notify" },
     },
 }
