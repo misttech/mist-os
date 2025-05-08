@@ -271,7 +271,7 @@ impl CurrentTask {
 
     pub fn set_creds(&self, creds: Credentials) {
         *self.temp_task().persistent_info.lock().creds_mut() = creds;
-        // The /proc/pid direectory's ownership is updated when the task's euid
+        // The /proc/pid directory's ownership is updated when the task's euid
         // or egid changes. See proc(5).
         let mut state = self.proc_pid_directory_cache.lock();
         TaskDirectory::maybe_force_chown(&mut state, &self.creds());

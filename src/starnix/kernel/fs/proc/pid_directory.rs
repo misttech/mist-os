@@ -8,6 +8,7 @@ use crate::task::{
     path_from_root, CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::stub_empty_file::StubEmptyFile;
 use crate::vfs::{
     default_seek, emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
     fileops_impl_noop_sync, fs_node_impl_dir_readonly, parse_i32_file, parse_unsigned_file,
@@ -15,7 +16,7 @@ use crate::vfs::{
     DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FdNumber,
     FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
     FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget, SimpleFileNode,
-    StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget, VecDirectory, VecDirectoryEntry,
+    StaticDirectoryBuilder, SymlinkTarget, VecDirectory, VecDirectoryEntry,
 };
 
 use itertools::Itertools;

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::proc::ProcSysNetDev;
+use crate::fs::proc::sys_net::ProcSysNetDev;
 use crate::task::CurrentTask;
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,

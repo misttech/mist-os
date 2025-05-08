@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::task::CurrentTask;
-use crate::vfs::{FileSystemHandle, FsNodeHandle, StaticDirectoryBuilder, StubEmptyFile};
+use crate::vfs::stub_empty_file::StubEmptyFile;
+use crate::vfs::{FileSystemHandle, FsNodeHandle, StaticDirectoryBuilder};
 use starnix_logging::bug_ref;
 use starnix_uapi::mode;
 

@@ -27,11 +27,12 @@ use crate::fs::proc::uptime::UptimeFile;
 use crate::fs::proc::vmstat::VmStatFile;
 use crate::fs::proc::zoneinfo::ZoneInfoFile;
 use crate::task::CurrentTask;
+use crate::vfs::stub_empty_file::StubEmptyFile;
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
     unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, FileObject, FileOps,
     FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget,
-    SimpleFileNode, StubEmptyFile,
+    SimpleFileNode,
 };
 
 use maplit::btreemap;

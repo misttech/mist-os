@@ -2,32 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod cgroups;
-pub mod config_gz;
-pub mod cpuinfo;
-pub mod device_tree;
-pub mod devices;
+mod cgroups;
+mod config_gz;
+mod cpuinfo;
+mod device_tree;
+mod devices;
 mod fs;
-pub mod kmsg;
-pub mod loadavg;
-pub mod meminfo;
-pub mod misc;
-pub mod mounts_symlink;
+mod kmsg;
+mod loadavg;
+mod meminfo;
+mod misc;
+mod mounts_symlink;
 pub mod pid_directory;
 mod pressure_directory;
 mod proc_directory;
-pub mod self_symlink;
-pub mod stat;
-pub mod swaps;
+mod self_symlink;
+mod stat;
+mod swaps;
+pub mod sys_net;
 mod sysctl;
 mod sysrq;
-pub mod thread_self;
-pub mod uid_cputime;
-pub mod uid_io;
-pub mod uid_procstat;
-pub mod uptime;
-pub mod vmstat;
-pub mod zoneinfo;
+mod thread_self;
+mod uid_cputime;
+mod uid_io;
+mod uid_procstat;
+mod uptime;
+mod vmstat;
+mod zoneinfo;
 
 pub use fs::{get_proc_fs, proc_fs};
-pub use sysctl::{ProcSysNetDev, SystemLimits};

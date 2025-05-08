@@ -7,11 +7,12 @@ use crate::fs::sysfs::{
     sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, KObjectDirectory,
     VulnerabilitiesClassDirectory,
 };
-use crate::task::{CurrentTask, Kernel, NetstackDevicesDirectory};
+use crate::task::net::NetstackDevicesDirectory;
+use crate::task::{CurrentTask, Kernel};
+use crate::vfs::stub_empty_file::StubEmptyFile;
 use crate::vfs::{
     BytesFile, CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNodeInfo, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile,
-    SymlinkNode,
+    FileSystemOptions, FsNodeInfo, FsStr, PathBuilder, StaticDirectoryBuilder, SymlinkNode,
 };
 use ebpf_api::BPF_PROG_TYPE_FUSE;
 use starnix_logging::bug_ref;
