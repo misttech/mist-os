@@ -53,6 +53,13 @@ impl Symbolizer {
         Ok(Self { next_id: 0, inner, _global_init })
     }
 
+    /// Reset the symbolizer, clear cached module and mapping information.
+    pub fn reset(&mut self) {
+        unsafe {
+            symbolizer_sys::symbolizer_reset(self.inner.as_ptr());
+        }
+    }
+
     /// Add a new module from the process, returning a unique ID that can be used to associate
     /// multiple mappings with the same module.
     pub fn add_module(&mut self, name: &str, build_id: &[u8]) -> ModuleId {

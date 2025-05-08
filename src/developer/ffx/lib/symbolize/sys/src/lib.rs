@@ -34,6 +34,9 @@ unsafe extern "C" {
     pub fn symbolizer_free(symbolizer: *mut symbolizer_SymbolizerImpl);
 }
 unsafe extern "C" {
+    pub fn symbolizer_reset(symbolizer: *mut symbolizer_SymbolizerImpl);
+}
+unsafe extern "C" {
     pub fn symbolizer_add_module(
         symbolizer: *mut symbolizer_SymbolizerImpl,
         id: u64,

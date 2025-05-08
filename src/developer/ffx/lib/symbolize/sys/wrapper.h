@@ -21,6 +21,7 @@ void symbolizer_global_cleanup();
 symbolizer::SymbolizerImpl* symbolizer_new();
 void symbolizer_free(symbolizer::SymbolizerImpl* symbolizer);
 
+void symbolizer_reset(symbolizer::SymbolizerImpl* symbolizer);
 void symbolizer_add_module(symbolizer::SymbolizerImpl* symbolizer, uint64_t id, const char* name,
                            size_t name_len, const char* build_id, size_t build_id_len);
 

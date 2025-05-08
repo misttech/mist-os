@@ -36,6 +36,7 @@ bindgen.function_allowlist = [
     "symbolizer_global_cleanup",
     "symbolizer_new",
     "symbolizer_free",
+    "symbolizer_reset",
     "symbolizer_add_module",
     "symbolizer_add_mapping",
     "symbolizer_resolve_address",
