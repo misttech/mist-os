@@ -16,23 +16,7 @@ static int print_dm_help() {
       "shutdown             - power off the system\n"
       "reboot               - reboot the system\n"
       "reboot-bootloader/rb - reboot the system into bootloader\n"
-      "reboot-recovery/rr   - reboot the system into recovery\n"
-      "ktraceoff            - stop kernel tracing\n"
-      "ktraceon             - start kernel tracing\n");
-  return 0;
-}
-
-static int send_kernel_tracing_enabled(bool enabled) {
-  auto client_end = component::Connect<fuchsia_kernel::DebugBroker>();
-  if (client_end.is_error()) {
-    return client_end.status_value();
-  }
-
-  auto result = fidl::WireSyncClient(std::move(*client_end))->SetTracingEnabled(enabled);
-  if (result.status() != ZX_OK || result->status != ZX_OK) {
-    return -1;
-  }
-
+      "reboot-recovery/rr   - reboot the system into recovery\n");
   return 0;
 }
 
@@ -91,13 +75,7 @@ int zxc_dm(int argc, char** argv) {
 
   // Handle service backed commands.
   int command_length = 0;
-  if (command_cmp("ktraceon", NULL, argv[1], &command_length)) {
-    return send_kernel_tracing_enabled(true);
-
-  } else if (command_cmp("ktraceoff", NULL, argv[1], &command_length)) {
-    return send_kernel_tracing_enabled(false);
-
-  } else if (command_cmp("help", NULL, argv[1], &command_length)) {
+  if (command_cmp("help", NULL, argv[1], &command_length)) {
     return print_dm_help();
 
   } else if (command_cmp("reboot", NULL, argv[1], &command_length)) {
