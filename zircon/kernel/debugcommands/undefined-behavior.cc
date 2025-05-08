@@ -247,7 +247,7 @@ int cmd_ub(int argc, const cmd_args* argv, uint32_t flags) {
 
 STATIC_COMMAND_START
 STATIC_COMMAND("ub", "trigger undefined behavior", &cmd_ub)
-STATIC_COMMAND_END(mem)
+STATIC_COMMAND_END(ub)
 
 }  // namespace
 

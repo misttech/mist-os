@@ -675,4 +675,4 @@ static int cmd_timers(int argc, const cmd_args* argv, uint32_t flags) {
 STATIC_COMMAND_START
 STATIC_COMMAND_MASKED("timers", "dump the current kernel timer queues", &cmd_timers,
                       CMD_AVAIL_NORMAL)
-STATIC_COMMAND_END(kernel)
+STATIC_COMMAND_END(timer)

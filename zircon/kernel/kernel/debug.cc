@@ -36,23 +36,6 @@
 #include <kernel/thread.h>
 #include <vm/vm.h>
 
-static int cmd_thread(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_threadstats(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_threadload(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_threadq(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_zmips(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_rppm(int argc, const cmd_args* argv, uint32_t flags);
-
-STATIC_COMMAND_START
-STATIC_COMMAND_MASKED("thread", "manipulate kernel threads", &cmd_thread, CMD_AVAIL_ALWAYS)
-STATIC_COMMAND("threadstats", "thread level statistics", &cmd_threadstats)
-STATIC_COMMAND("threadload", "toggle thread load display", &cmd_threadload)
-STATIC_COMMAND("threadq", "toggle thread queue display", &cmd_threadq)
-STATIC_COMMAND("zmips", "compute zmips of a cpu", &cmd_zmips)
-STATIC_COMMAND_MASKED("rppm", "runtime processor power management commands", &cmd_rppm,
-                      CMD_AVAIL_ALWAYS)
-STATIC_COMMAND_END(kernel)
-
 static int cmd_thread(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {
   notenoughargs:
@@ -458,3 +441,13 @@ static int cmd_rppm(int argc, const cmd_args* argv, uint32_t flags) {
 
   return 0;
 }
+
+STATIC_COMMAND_START
+STATIC_COMMAND_MASKED("thread", "manipulate kernel threads", &cmd_thread, CMD_AVAIL_ALWAYS)
+STATIC_COMMAND("threadstats", "thread level statistics", &cmd_threadstats)
+STATIC_COMMAND("threadload", "toggle thread load display", &cmd_threadload)
+STATIC_COMMAND("threadq", "toggle thread queue display", &cmd_threadq)
+STATIC_COMMAND("zmips", "compute zmips of a cpu", &cmd_zmips)
+STATIC_COMMAND_MASKED("rppm", "runtime processor power management commands", &cmd_rppm,
+                      CMD_AVAIL_ALWAYS)
+STATIC_COMMAND_END(thread)

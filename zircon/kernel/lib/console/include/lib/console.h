@@ -19,16 +19,15 @@
 #include <kernel/spinlock.h>
 #include <kernel/timer.h>
 
-/* command args */
-typedef struct {
+struct cmd_args {
   const char* str;
-  unsigned long u;
+  uint64_t u;
   void* p;
-  long i;
+  int64_t i;
   bool b;
-} cmd_args;
+};
 
-typedef int console_cmd(int argc, const cmd_args* argv, uint32_t flags);
+using console_cmd = int(int argc, const cmd_args* argv, uint32_t flags);
 
 #define CMD_AVAIL_NORMAL (0x1 << 0)
 #define CMD_AVAIL_PANIC (0x1 << 1)
@@ -38,12 +37,12 @@ typedef int console_cmd(int argc, const cmd_args* argv, uint32_t flags);
 #define CMD_FLAG_PANIC (0x1 << 0)
 
 /* a block of commands to register */
-typedef struct {
+struct cmd {
   const char* cmd_str;
   const char* help_str;
   console_cmd* cmd_callback;
   uint8_t availability_mask;
-} cmd;
+};
 
 /* register a static block of commands at init time */
 
@@ -54,7 +53,7 @@ typedef struct {
 
 #if LK_DEBUGLEVEL == 0
 
-#define STATIC_COMMAND_START [[maybe_unused]] static void _cmd_list() {
+#define STATIC_COMMAND_START [[maybe_unused]] static void _lk_cmd_list() {
 #define STATIC_COMMAND_END(name) }
 #define STATIC_COMMAND(command_str, help_str, func) (void)(func);
 #define STATIC_COMMAND_MASKED(command_str, help_str, func, availability_mask) (void)(func);
@@ -62,7 +61,7 @@ typedef struct {
 #else  // LK_DEBUGLEVEL != 0
 
 #define STATIC_COMMAND_START \
-  static const cmd _cmd_list SPECIAL_SECTION(".data.rel.ro.commands", cmd)[] = {
+  static const cmd _lk_cmd_list SPECIAL_SECTION(".data.rel.ro.commands", cmd)[] = {
 #define STATIC_COMMAND_END(name) \
   }                              \
   ;
@@ -73,7 +72,7 @@ typedef struct {
 
 #endif  // LK_DEBUGLEVEL == 0
 
-// TODO: move somewhere else
+// TODO(cpu): move somewhere else.
 class RecurringCallback {
  public:
   using CallbackFunc = void (*)();

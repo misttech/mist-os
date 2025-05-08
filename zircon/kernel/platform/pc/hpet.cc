@@ -269,4 +269,4 @@ int cmd_hpet(int argc, const cmd_args* argv, uint32_t flags) {
 
 STATIC_COMMAND_START
 STATIC_COMMAND_MASKED("hpet", "HPET commands", &cmd_hpet, CMD_AVAIL_ALWAYS)
-STATIC_COMMAND_END(kernel)
+STATIC_COMMAND_END(hpet)

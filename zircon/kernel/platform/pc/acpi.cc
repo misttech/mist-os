@@ -73,4 +73,4 @@ LK_INIT_HOOK(platform_init_acpi, platform_init_acpi, LK_INIT_LEVEL_VM)
 
 STATIC_COMMAND_START
 STATIC_COMMAND("acpidump", "dump ACPI tables to console", &ConsoleAcpiDump)
-STATIC_COMMAND_END(vm)
+STATIC_COMMAND_END(acpi)

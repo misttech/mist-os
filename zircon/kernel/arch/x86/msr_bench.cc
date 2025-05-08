@@ -498,8 +498,8 @@ int msr_bench(int argc, const cmd_args* argv, uint32_t flags) {
   return benchmark->Run();
 }
 
+}  // namespace
+
 STATIC_COMMAND_START
 STATIC_COMMAND("msr_bench", "MSR bechmarks", msr_bench)
 STATIC_COMMAND_END(msr_x64)
-
-}  // namespace

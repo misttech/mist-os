@@ -283,4 +283,4 @@ static int cmd_crashlog(int argc, const cmd_args* argv, uint32_t flags) {
 
 STATIC_COMMAND_START
 STATIC_COMMAND_MASKED("crashlog", "crashlog", &cmd_crashlog, CMD_AVAIL_ALWAYS)
-STATIC_COMMAND_END(pmm)
+STATIC_COMMAND_END(crashlog)

@@ -291,10 +291,6 @@ int cmd_peripheral_map(int argc, const cmd_args* argv, uint32_t flags) {
 
 }  // namespace
 
-STATIC_COMMAND_START
-STATIC_COMMAND_MASKED("pm", "peripheral mapping commands", &cmd_peripheral_map, CMD_AVAIL_ALWAYS)
-STATIC_COMMAND_END(pm)
-
 zx_status_t add_periph_range(paddr_t base_phys, size_t length) {
   // peripheral ranges are allocated below the kernel image.
   uintptr_t base_virt = (uintptr_t)__executable_start;
@@ -369,3 +365,7 @@ vaddr_t periph_paddr_to_vaddr(paddr_t paddr) {
   auto ret = Phys2Virt::Map(paddr);
   return ret.has_value() ? ret.value() : 0;
 }
+
+STATIC_COMMAND_START
+STATIC_COMMAND_MASKED("pm", "peripheral mapping commands", &cmd_peripheral_map, CMD_AVAIL_ALWAYS)
+STATIC_COMMAND_END(pmap)

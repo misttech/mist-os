@@ -21,12 +21,6 @@
 
 #include <ktl/enforce.h>
 
-static int cmd_ppb(int argc, const cmd_args* argv, uint32_t flags);
-
-STATIC_COMMAND_START
-STATIC_COMMAND("ppb", "control contiguous physical page borrowing", &cmd_ppb)
-STATIC_COMMAND_END(kernel)
-
 DECLARE_SINGLETON_MUTEX(ppb_stats_lock);
 static Thread* ppb_stats_thread TA_GUARDED(ppb_stats_lock::Get()) = nullptr;
 static Event ppb_stats_thread_stop_event(false);
@@ -97,13 +91,13 @@ struct Cmd {
 };
 
 static Cmd commands[] = {
-    {"borrowing_on", cmd_ppb_borrowing_on},
-    {"borrowing_off", cmd_ppb_borrowing_off},
-    {"loaning_on", cmd_ppb_loaning_on},
-    {"loaning_off", cmd_ppb_loaning_off},
-    {"stats", cmd_ppb_stats},
-    {"stats_on", cmd_ppb_stats_on},
-    {"stats_off", cmd_ppb_stats_off},
+    {.name = "borrowing_on", .func = cmd_ppb_borrowing_on},
+    {.name = "borrowing_off", .func = cmd_ppb_borrowing_off},
+    {.name = "loaning_on", .func = cmd_ppb_loaning_on},
+    {.name = "loaning_off", .func = cmd_ppb_loaning_off},
+    {.name = "stats", .func = cmd_ppb_stats},
+    {.name = "stats_on", .func = cmd_ppb_stats_on},
+    {.name = "stats_off", .func = cmd_ppb_stats_off},
 };
 
 // k ppb borrowing_on
@@ -147,3 +141,7 @@ static int cmd_ppb(int argc, const cmd_args* argv, uint32_t flags) {
   }
   return -1;
 }
+
+STATIC_COMMAND_START
+STATIC_COMMAND("ppb", "control contiguous physical page borrowing", &cmd_ppb)
+STATIC_COMMAND_END(ppb)
