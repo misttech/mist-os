@@ -169,7 +169,6 @@ impl Injection {
             target_spec,
             daemon_proxy.clone(),
             self.env_context.get_proxy_timeout().await?,
-            &self.env_context,
         )?;
         target_proxy_fut.await?;
         Ok(target_proxy)

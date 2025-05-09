@@ -510,19 +510,6 @@ impl FidlProtocol for TargetCollectionProtocol {
                 .await;
                 responder.send(result).map_err(Into::into)
             }
-            ffx::TargetCollectionRequest::AddInlineFastbootTarget { serial_number, responder } => {
-                let update = TargetUpdateBuilder::new()
-                    .identity(target::Identity::from_serial(&serial_number))
-                    .discovered(TargetProtocol::Fastboot, TargetTransport::Usb)
-                    .transient_target();
-                target_collection.update_target(
-                    &[TargetUpdateFilter::Serial(&serial_number)],
-                    update.build(),
-                    true,
-                );
-                tracing::info!("Added inline target: {}", serial_number);
-                responder.send().map_err(Into::into)
-            }
         }
     }
 

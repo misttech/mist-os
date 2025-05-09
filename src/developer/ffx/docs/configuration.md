@@ -109,10 +109,6 @@ When updating, please add the value in alphabetical order.
     | `ffx.daemon_timeout`                    | How long to wait in milliseconds   |
     |                                         | when attempting to connect to the  |
     |                                         | daemon. Defaults to `15000`        |
-    | `ffx.fastboot.inline_target`            | Boolean value to signal that the   |
-    |                                         | target is in fastboot, and to      |
-    |                                         | communicate directly with it as    |
-    |                                         | opposed to doing discovery.        |
     |                                         | Defaults to `false`                |
     | `ffx.isolated`                          | "Alias" for encapsulation of       |
     |                                         | config options used to request     |

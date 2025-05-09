@@ -819,10 +819,6 @@ func (f *FFXInstance) BootloaderBoot(ctx context.Context, target, productBundle 
 		"discovery.timeout":      12000,
 	}
 
-	if !tcpFlash {
-		configs["ffx.fastboot.inline_target"] = true
-	}
-
 	return f.invoker([]string{"target", "bootloader", "--product-bundle", productBundle, "boot"}).setTarget(target).setStrict().setTimeout(0).setConfigs(configs).run(ctx)
 }
 

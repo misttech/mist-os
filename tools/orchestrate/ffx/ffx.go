@@ -299,7 +299,6 @@ func (f *Ffx) WaitForDaemon(ctx context.Context) error {
 func (f *Ffx) Flash(fastbootSerial, productDir, pubKeyPath string) error {
 	ffxArgs := []string{
 		"--target", fastbootSerial,
-		"--config", "{\"ffx\": {\"fastboot\": {\"inline_target\": true}}}",
 		"target", "flash",
 		"--product-bundle", productDir}
 	if pubKeyPath != "" {

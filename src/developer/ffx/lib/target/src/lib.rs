@@ -52,8 +52,6 @@ pub use target_connector::{
 /// Re-export of [`fidl_fuchsia_developer_ffx::TargetProxy`] for ease of use
 pub use fidl_fuchsia_developer_ffx::TargetProxy;
 
-const FASTBOOT_INLINE_TARGET: &str = "ffx.fastboot.inline_target";
-
 /// The default target name if no target spec is given (for debugging, reporting to the user, etc).
 /// TODO(b/371222096): Use this everywhere (will require a bit of digging).
 pub const UNSPECIFIED_TARGET_NAME: &str = "[unspecified]";
@@ -122,7 +120,7 @@ async fn get_remote_proxy_impl(
     let mut target_spec =
         resolve::maybe_locally_resolve_target_spec(target_spec.clone(), context).await?;
     let (target_proxy, target_proxy_fut) =
-        open_target_with_fut(target_spec.clone(), daemon_proxy.clone(), *proxy_timeout, context)?;
+        open_target_with_fut(target_spec.clone(), daemon_proxy.clone(), *proxy_timeout)?;
     let mut target_proxy_fut = target_proxy_fut.boxed_local().fuse();
     let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>();
     let mut open_remote_control_fut =
@@ -181,7 +179,6 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
     target: Option<String>,
     daemon_proxy: DaemonProxy,
     target_timeout: Duration,
-    env_context: &'b EnvironmentContext,
 ) -> Result<(TargetProxy, impl Future<Output = Result<()>> + 'a)> {
     let (tc_proxy, tc_server_end) = create_proxy::<TargetCollectionMarker>();
     let (target_proxy, target_server_end) = create_proxy::<TargetMarker>();
@@ -198,14 +195,6 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
     };
     let t_clone = target.clone();
     let target_handle_fut = async move {
-        let is_fastboot_inline = env_context.get(FASTBOOT_INLINE_TARGET).unwrap_or(false);
-        if is_fastboot_inline {
-            if let Some(ref serial_number) = target {
-                tracing::trace!("got serial number: {serial_number}");
-                timeout(target_timeout, tc_proxy.add_inline_fastboot_target(&serial_number))
-                    .await??;
-            }
-        }
         timeout(
             target_timeout,
             tc_proxy.open_target(
