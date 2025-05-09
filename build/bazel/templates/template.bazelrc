@@ -62,6 +62,8 @@ common:exec_log --experimental_enable_execution_graph_log
 
 # Prevent repository downloads with custom downloader config file.
 common --experimental_downloader_config=build/bazel/config/no_downloads_allowed.config
+build --vendor_dir=third_party/bazel_vendor
+build --registry=file://%workspace%/third_party/bazel_vendor/_registries/bcr.bazel.build
 
 # Disable verbose Bazel output with --config=quiet
 # Note that --show_result=0 is not supported by `bazel query`.
@@ -115,7 +117,7 @@ build --output_groups=+clippy_checks
 build --@rules_rust//rust/settings:clippy_flag=-Wclippy::all
 
 # Disable bzlmod by default.
-common --enable_bzlmod=false
+common --enable_bzlmod=true
 common --enable_workspace=true
 
 ### FUCHSIA_SDK_CUTOFF

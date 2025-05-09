@@ -815,7 +815,7 @@ def record_fuchsia_workspace(
     if enable_bzlmod:
         bazelrc_content = bazelrc_content.replace(
             "--enable_bzlmod=false", "--enable_bzlmod=true"
-        ).replace("--enable_workspace=true", "--enable_workspace=false")
+        )
 
     variants_generator.add_content(
         ".bazelrc", bazelrc_content, templates_dir / "template.bazelrc"
@@ -978,7 +978,7 @@ def generate_fuchsia_workspace(
         gn_output_dir=build_dir,
         git_bin_path=Path(git_bin_path),
         log=log,
-        enable_bzlmod=False,
+        enable_bzlmod=True,
     )
 
     # Remove the old workspace's content, which is just a set

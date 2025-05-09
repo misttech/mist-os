@@ -34,7 +34,7 @@ GnTargetsManifest: T.TypeAlias = list[dict[str, T.Any]]
 
 # The name of the root Bazel workspace as it appears in its WORKSPACE.bazel file.
 # LINT.IfChange
-_BAZEL_ROOT_WORKSPACE_NAME = "main"
+_BAZEL_ROOT_WORKSPACE_NAME = "_main"
 # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
 
 # A list of built-in Bazel workspaces like @bazel_tools// which are actually
@@ -59,6 +59,15 @@ _BAZEL_BUILTIN_REPOSITORIES = (
     "internal_platforms_do_not_use",
     # Created and used internally by @rules_python
     "rules_python_internal",
+    # Introduced by bzlmod
+    "bazel_skylib",
+    "bazel_skylib~",
+    "bazel_tools~cc_configure_extension~local_config_cc",
+    "platforms",
+    "platforms~host_platform~host_platform",
+    "rules_license~",
+    "rules_python~",
+    "rules_python~~internal_deps~rules_python_internal",
 )
 
 # A list of file extensions for files that should be ignored from depfiles.

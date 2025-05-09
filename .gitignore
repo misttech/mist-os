@@ -218,6 +218,12 @@ tables_generator_tests_*.txt
 /bazel-out
 /bazel-repos
 /bazel-workspace
+/third_party/bazel_vendor/bazel-external
+
+# The Bazel vendor directory
+!/third_party/bazel_vendor
+!/third_party/bazel_vendor/*~
+!/tools/check-licenses/assets/readmes/third_party/bazel_vendor/*~
 
 # The Bazel vendor directory
 !/third_party/bazel_vendor
