@@ -12,6 +12,7 @@ pub enum ScopedLoggerError {
     PublishError(#[source] PublishError),
 }
 
+#[derive(Clone)]
 pub struct ScopedLogger {
     publisher: Publisher,
 }

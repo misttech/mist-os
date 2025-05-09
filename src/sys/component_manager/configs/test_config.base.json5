@@ -26,6 +26,9 @@
             runner: "builtin_devfs",
         },
         {
+            runner: "builtin_dispatcher",
+        },
+        {
             runner: "realm_builder",
         },
         {

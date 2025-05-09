@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::builtin::dispatcher::Dispatcher;
 use ::routing::capability_source::InternalCapability;
 use async_trait::async_trait;
 use cm_config::SecurityPolicy;
@@ -174,6 +175,21 @@ impl BuiltinRunner {
                         program.wait_for_shutdown(lifecycle_server).await;
                     }
                     .boxed()
+                },
+            )
+        })
+    }
+
+    pub fn get_dispatcher_program() -> BuiltinProgramGen {
+        Box::new(|| {
+            Box::new(
+                move |_job: zx::Job,
+                      namespace: Namespace,
+                      outgoing_dir: ServerEnd<fio::DirectoryMarker>,
+                      _lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
+                      _program: Option<Dictionary>,
+                      config: Option<zx::Vmo>| {
+                    Dispatcher::run(namespace, outgoing_dir, config).boxed()
                 },
             )
         })

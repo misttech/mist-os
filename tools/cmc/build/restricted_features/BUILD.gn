@@ -15,6 +15,7 @@ group("dynamic_dictionaries") {
     "//src/diagnostics/archivist/tests/integration/realm_factory:*",
     "//src/diagnostics/persistence:*",
     "//src/diagnostics/persistence/tests:*",
+    "//src/sys/component_manager:dispatcher_cm",
     "//src/sys/component_manager/tests/*",
   ]
 }

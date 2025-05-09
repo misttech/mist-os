@@ -56,7 +56,8 @@ use moniker::{ChildName, Moniker};
 use router_error::{Explain, RouterError};
 use runner::component::StopInfo;
 use sandbox::{
-    Capability, Connector, Data, Dict, DirEntry, Message, Request, Routable, Router, RouterResponse,
+    Capability, Connector, Data, Dict, DirConnector, DirEntry, Message, Request, Routable, Router,
+    RouterResponse,
 };
 use std::clone::Clone;
 use std::collections::{HashMap, HashSet};
@@ -542,17 +543,12 @@ impl ComponentInstance {
             };
             let child_dict_entries = child_input.capabilities();
             for (key, value) in dict.drain() {
-                // The child/collection Dict normally contains Routers created by component manager.
-                // ChildArgs.dict may contain capabilities created by an external client.
-                //
-                // Currently there is no way to create a Router externally, so assume these
-                // are Connector capabilities and convert them to Router here.
-                //
-                // TODO(https://fxbug.dev/319542502): Consider using the external router types
                 let router: Capability = match value {
                     Capability::Connector(s) => Router::<Connector>::new_ok(s).into(),
+                    Capability::DirConnector(s) => Router::<DirConnector>::new_ok(s).into(),
+                    Capability::Dictionary(s) => Router::<Dict>::new_ok(s).into(),
                     Capability::Data(d) => Router::<Data>::new_ok(d).into(),
-                    _ => return Err(AddDynamicChildError::InvalidDictionary),
+                    c => c,
                 };
 
                 if let Err(_) = child_dict_entries.insert(key.clone(), router) {

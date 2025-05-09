@@ -35,6 +35,7 @@ _component_manager_bin = {
   forward_variables_from(_concurrent_jobs.vars, "*")
 
   deps = [
+    ":dispatcher_config",
     ":measure_tape_for_events",
     ":measure_tape_for_instance",
     "lib/errors",
@@ -163,6 +164,7 @@ _component_manager_bin = {
     "src/builtin/builtin_resolver.rs",
     "src/builtin/builtin_runner.rs",
     "src/builtin/crash_introspect.rs",
+    "src/builtin/dispatcher.rs",
     "src/builtin/fuchsia_boot_resolver.rs",
     "src/builtin/log.rs",
     "src/builtin/mod.rs",
@@ -271,6 +273,14 @@ _component_manager_bin = {
   deps += [ ":elf_runner_cm($default_toolchain)" ]
   rustenv = [ "ELF_RUNNER_CM_PATH=$elf_runner_cm_path" ]
 
+  dispatcher_cm_out_dir =
+      get_label_info(":dispatcher_cm($default_toolchain)", "target_out_dir")
+  dispatcher_cm = "$dispatcher_cm_out_dir/cml/dispatcher_cm/dispatcher.cm"
+  dispatcher_cm_path = rebase_path(dispatcher_cm, root_build_dir)
+  inputs += [ dispatcher_cm ]
+  deps += [ ":dispatcher_cm($default_toolchain)" ]
+  rustenv += [ "DISPATCHER_CM_PATH=$dispatcher_cm_path" ]
+
   # component_manager should not depend on json5
   assert_no_deps = [
     # regex crate is large
@@ -338,6 +348,16 @@ fuchsia_component("component-manager-realm-builder-debug-cmp") {
 cm("elf_runner_cm") {
   output_name = "cml/elf_runner_cm/elf_runner.cm"
   manifest = "meta/elf_runner.cml"
+}
+
+cm("dispatcher_cm") {
+  output_name = "cml/dispatcher_cm/dispatcher.cm"
+  manifest = "meta/dispatcher.cml"
+  restricted_features = [ "dynamic_dictionaries" ]
+}
+
+fuchsia_structured_config_rust_lib("dispatcher_config") {
+  cm_label = ":dispatcher_cm"
 }
 
 fuchsia_component("elf_runner") {

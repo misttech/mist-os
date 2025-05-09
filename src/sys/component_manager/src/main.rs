@@ -152,6 +152,7 @@ async fn build_environment(
     bootfs_svc: Option<BootfsSvc>,
 ) -> Result<BuiltinEnvironment, Error> {
     let service_broker = BuiltinRunner::get_service_broker_program();
+    let dispatcher = BuiltinRunner::get_dispatcher_program();
     let devfs = BuiltinRunner::get_devfs_program();
     let shutdown_shim = BuiltinRunner::get_shutdown_shim_program();
     let add_to_env = true;
@@ -161,6 +162,7 @@ async fn build_environment(
         .await?
         .add_builtin_elf_runner(add_to_env)?
         .add_builtin_runner("builtin_service_broker", service_broker, add_to_env)?
+        .add_builtin_runner("builtin_dispatcher", dispatcher, add_to_env)?
         .add_builtin_runner("builtin_devfs", devfs, !add_to_env)?
         .add_builtin_runner("builtin_shutdown_shim", shutdown_shim, !add_to_env)?
         .include_namespace_resolvers();

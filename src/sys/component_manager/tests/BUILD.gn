@@ -25,6 +25,7 @@ group("hermetic_tests") {
     "abi_compatibility:tests",
     "attributed_logging:attributed-logging-test",
     "binder:tests",
+    "builtin_dispatcher_component:tests",
     "builtin_runner:tests",
     "collections:collections_integration_test",
     "component-time:tests",

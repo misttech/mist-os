@@ -5,6 +5,7 @@
 pub mod builtin_resolver;
 pub mod builtin_runner;
 pub mod crash_introspect;
+pub mod dispatcher;
 pub mod fuchsia_boot_resolver;
 pub mod log;
 pub mod ota_health_verification;
