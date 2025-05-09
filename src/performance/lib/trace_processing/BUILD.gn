@@ -98,6 +98,31 @@ python_binary("run_suspend_metrics_bin") {
   output_name = "run_suspend_metrics.pyz"
 }
 
+# Graphics metrics tooling
+
+python_binary("run_graphics_metrics_bin") {
+  testonly = true
+  main_source = "run_graphics_metrics.py"
+  deps = [
+    ":trace_processing",
+    "//src/performance/trace2json",
+  ]
+  output_name = "run_graphics_metrics.pyz"
+}
+
+copy("copy_graphics_metrics_pyz") {
+  testonly = true
+  deps = [ ":run_graphics_metrics_bin" ]
+  sources = [ "${target_out_dir}/run_graphics_metrics.pyz" ]
+  outputs = [ "${root_out_dir}/run_graphics_metrics" ]
+}
+
+install_host_tools("run_graphics_metrics") {
+  testonly = true
+  deps = [ ":copy_graphics_metrics_pyz" ]
+  outputs = [ "run_graphics_metrics" ]
+}
+
 # Rename the resulting .pyz for the host tool
 copy("copy_suspend_metrics_pyz") {
   testonly = true
