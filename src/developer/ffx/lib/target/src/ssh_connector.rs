@@ -33,11 +33,25 @@ impl From<SshError> for TargetConnectionError {
             // a device is actively rebooting while trying to reconnect to it.
             Unknown(_) | Timeout | ConnectionRefused | UnknownNameOrService | NoRouteToHost
             | NetworkUnreachable => TargetConnectionError::NonFatal(ssh_err.into()),
+            // Note: this error is encountered as a side-effect of trying to `ssh` into a device
+            // that is actively rebooting, and a user is invoking `ffx target wait`. The issue here
+            // is that the scope ID of the network interface for the device, if it is IPv6
+            // link-local, is deemed an invalid argument, because `ssh` thinks it cannot exist
+            // (since there is no interface available during reboot). Since this is working from a
+            // cached address, this causes this kind of error.
+            //
+            // This could be potentially hazardous, however, as it is not clear if all cases in
+            // which this error surfaces are the same. It should be made clear to the user _why_
+            // this continues to attempt connecting ot the device. We can presume we're going to
+            // reasonably not encounter this error since we have an array of tests for `ssh`
+            // connections, but this does not guarantee a lack of regression later on. That being
+            // said, we would like to move away from `ssh` as a transport layer altogether, so
+            // so hopefully this won't present itself as an issue.
+            InvalidArgument => TargetConnectionError::NonFatal(ssh_err.into()),
             // These errors are unrecoverable, as they are fundamental errors in an existing
             // configuration.
             PermissionDenied
             | KeyVerificationFailure
-            | InvalidArgument
             | TargetIncompatible
             | ConnectionClosedByRemoteHost => TargetConnectionError::Fatal(ssh_err.into()),
         }
@@ -347,7 +361,7 @@ mod test {
         let err = NetworkUnreachable;
         assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::NonFatal(_)));
         let err = InvalidArgument;
-        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::Fatal(_)));
+        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::NonFatal(_)));
         let err = TargetIncompatible;
         assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::Fatal(_)));
         let err = Timeout;
