@@ -53,7 +53,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
 
       // CPU Device.
       "dev.sys.platform.aml-cpu",
-      "dev.sys.platform.aml-power-impl-composite.aml-power-impl-composite.power-impl.power-core.power-0.aml_cpu.s905d2-arm-a53",
+      "dev.sys.platform.aml-power-impl-composite.aml-power-impl-composite.power-impl.power-core.power-0.aml_cpu",
       // LED.
       "dev.sys.platform.gpio-light.aml_light",
       // RAM (DDR) control.
