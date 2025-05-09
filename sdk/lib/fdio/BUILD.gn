@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/zircon/zx_library.gni")
-import("//tools/cppdocgen/cpp_docgen.gni")
 
 group("tests") {
   testonly = true
@@ -40,18 +39,6 @@ source_set("constants") {
   public = fdio_constants
 }
 
-# Headers exposed by fdio that we also want to use for the documentation target.
-fdio_public_headers = [
-                        "include/lib/fdio/directory.h",
-                        "include/lib/fdio/fd.h",
-                        "include/lib/fdio/fdio.h",
-                        "include/lib/fdio/io.h",
-                        "include/lib/fdio/namespace.h",
-                        "include/lib/fdio/spawn.h",
-                        "include/lib/fdio/unsafe.h",
-                        "include/lib/fdio/watcher.h",
-                      ] + fdio_constants
-
 # TODO(https://fxbug.dev/42113953): This is a kludge to make "foosan-fuzzer" builds actually just use
 # the plain "foosan" build of libfdio.  This works around the problem that
 # libfuzzer itself calls into libfdio and so its own calls pollute the data
@@ -77,6 +64,18 @@ if (is_fuzzer) {
     # Note symbols_api is implicit in zx_library() with sdk set.
     sdk = "shared"
     sdk_publishable = "partner"
+
+    # Headers exposed by fdio that we also want to use for the documentation target.
+    fdio_public_headers = [
+                            "include/lib/fdio/directory.h",
+                            "include/lib/fdio/fd.h",
+                            "include/lib/fdio/fdio.h",
+                            "include/lib/fdio/io.h",
+                            "include/lib/fdio/namespace.h",
+                            "include/lib/fdio/spawn.h",
+                            "include/lib/fdio/unsafe.h",
+                            "include/lib/fdio/watcher.h",
+                          ] + fdio_constants
 
     # This list is relative to the include/ directory.
     sdk_headers = rebase_path(fdio_public_headers, "include")
@@ -170,13 +169,5 @@ source_set("cleanpath") {
   ]
   deps = [ "//zircon/system/ulib/fbl" ]
 }
-
-cpp_docgen("docs") {
-  headers = fdio_public_headers
-  overview = "README.md"
-
-  include_dir = "include"
-  library_name = "fdio"
-  reference_repo_path = "sdk/lib/fdio"
-  deps = [ ":fdio" ]
-}
+# TODO(https://fxbug.dev/416327784): Eventually reintroduce this with clangdoc
+# once we get a working version of that.
