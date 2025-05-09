@@ -407,15 +407,6 @@ impl Target {
         target
     }
 
-    pub fn new_with_boot_timestamp<S>(nodename: S, boot_timestamp_nanos: u64) -> Rc<Self>
-    where
-        S: Into<String>,
-    {
-        let target = Self::new_named(nodename);
-        target.boot_timestamp_nanos.replace(Some(boot_timestamp_nanos));
-        target
-    }
-
     pub fn new_with_addrs<S>(nodename: Option<S>, addrs: BTreeSet<TargetIpAddr>) -> Rc<Self>
     where
         S: Into<String>,
@@ -539,22 +530,6 @@ impl Target {
             *res.ssh_port.borrow_mut() = t.ssh_port;
             res
         }
-    }
-
-    pub fn from_netsvc_target_info(mut t: Description) -> Rc<Self> {
-        Self::new_with_netsvc_addrs(
-            t.nodename.take(),
-            t.addresses.drain(..).filter_map(|x| x.try_into().ok()).collect(),
-        )
-    }
-
-    pub fn from_fastboot_target_info(mut t: Description) -> Result<Rc<Self>> {
-        Ok(Self::new_with_fastboot_addrs(
-            t.nodename.take(),
-            t.serial.take(),
-            t.addresses.drain(..).filter_map(|x| x.try_into().ok()).collect(),
-            t.fastboot_interface.ok_or_else(|| anyhow!("No fastboot mode?"))?,
-        ))
     }
 
     fn infer_fastboot_interface(&self) -> Option<FastbootInterface> {

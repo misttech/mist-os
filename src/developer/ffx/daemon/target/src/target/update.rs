@@ -419,7 +419,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl_fuchsia_overnet_protocol::NodeId;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn update_simple() {
         let target = Target::new();
 
@@ -489,7 +489,7 @@ mod tests {
         assert_eq!(*target.compatibility_status.borrow(), None);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn update_discovered() {
         let now = Instant::now();
 
@@ -588,7 +588,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn update_disconnect() {
         let now = Instant::now();
 
@@ -608,7 +608,7 @@ mod tests {
         assert_eq!(target.get_connection_state(), TargetConnectionState::Disconnected);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn update_rcs() {
         let now = Instant::now();
 
@@ -635,7 +635,7 @@ mod tests {
         assert_eq!(target.get_connection_state(), TargetConnectionState::Rcs(conn));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn from_rcs_identify() {
         use fidl_fuchsia_developer_remotecontrol as rcs;
 
