@@ -28,11 +28,13 @@ std::vector<trace::KnownCategory> GetKnownCategories();
 
 struct DrainContext {
   DrainContext(zx::time start, trace_prolonged_context_t* context, zx::resource tracing_resource,
-               zx::duration poll_period)
+               zx::duration poll_period, std::unique_ptr<uint64_t[]> buffer, size_t buffer_size)
       : start(start),
         reader(std::move(tracing_resource)),
         context(context),
-        poll_period(poll_period) {}
+        poll_period(poll_period),
+        buffer(std::move(buffer)),
+        buffer_size(buffer_size) {}
 
   // We have a buffer allocated as part of the struct which we don't want to copy or move.
   DrainContext(const DrainContext& other) = delete;
@@ -54,8 +56,23 @@ struct DrainContext {
     if (res != ZX_OK) {
       return nullptr;
     }
+
+    std::unique_ptr<uint64_t[]> buffer;
+    size_t buffer_size = 0;
+    // In streaming mode, we need to ask how big our buffer to copy data into needs to be.
+    // In non-streaming mode, this buffer isn't used and we defer to the device reader
+    if constexpr (kKernelStreamingSupport) {
+      // We ask the kernel using zx_ktrace_read with a nullptr;
+      zx_status_t status = zx_ktrace_read(tracing_resource.get(), nullptr, 0, 0, &buffer_size);
+      if (status != ZX_OK) {
+        return nullptr;
+      }
+      buffer = std::make_unique<uint64_t[]>(buffer_size / sizeof(uint64_t));
+    }
+
     return std::make_unique<DrainContext>(zx::clock::get_monotonic(), context,
-                                          std::move(cloned_resource), poll_period);
+                                          std::move(cloned_resource), poll_period,
+                                          std::move(buffer), buffer_size);
   }
 
   ~DrainContext() {
@@ -69,8 +86,8 @@ struct DrainContext {
   zx::duration poll_period;
 
   // For kernel streaming, we don't use the DeviceReader, we just do all the data management here.
-  static constexpr size_t kChunkSize{size_t{1} * 1024 * 1024 / 8};
-  uint64_t buffer_[kChunkSize];
+  std::unique_ptr<uint64_t[]> buffer;
+  size_t buffer_size;
 };
 
 class App {

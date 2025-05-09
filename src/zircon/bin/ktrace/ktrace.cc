@@ -94,8 +94,13 @@ int DoStream(const zx::resource& tracing_resource, uint32_t group_mask,
   auto start_time = std::chrono::steady_clock::now();
   auto end_time = start_time + duration;
 
-  constexpr size_t read_size = size_t{1024} * 1024;
-  std::unique_ptr<uint8_t[]> buf(new uint8_t[read_size]);
+  size_t read_size;
+  if (zx_status_t status = zx_ktrace_read(tracing_resource.get(), nullptr, 0, 0, &read_size);
+      status != ZX_OK) {
+    fprintf(stderr, "Failed to query expected ktrace buffer size\n");
+    return EXIT_FAILURE;
+  }
+  std::unique_ptr buf = std::make_unique<uint8_t[]>(read_size);
   if (zx_status_t status =
           zx_ktrace_control(tracing_resource.get(), KTRACE_ACTION_REWIND, 0, nullptr);
       status != ZX_OK) {

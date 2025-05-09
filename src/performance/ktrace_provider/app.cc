@@ -111,29 +111,29 @@ void ForwardBuffer(std::unique_ptr<DrainContext> drain_context) {
     // call to zx_ktrace_read to get the latest data.
     size_t actual;
     if (zx_status_t status =
-            zx_ktrace_read(drain_context->reader.Resource().get(), drain_context->buffer_, 0,
-                           sizeof(drain_context->buffer_), &actual);
+            zx_ktrace_read(drain_context->reader.Resource().get(), drain_context->buffer.get(), 0,
+                           drain_context->buffer_size, &actual);
         status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Failed to read from zx_ktrace open";
       return;
     }
-    size_t percent = actual * 100 / sizeof(drain_context->buffer_);
-    if (actual == sizeof(drain_context->buffer_)) {
-      FX_LOGS(ERROR) << "[ 100% ] Read " << actual << " / " << sizeof(drain_context->buffer_)
+    size_t percent = actual * 100 / drain_context->buffer_size;
+    if (actual == drain_context->buffer_size) {
+      FX_LOGS(ERROR) << "[ 100% ] Read " << actual << " / " << drain_context->buffer_size
                      << " bytes. May have dropped trace data!";
     } else if (percent > 75) {
       FX_LOGS(WARNING) << "[ " << percent << "% ] Read " << actual << " / "
-                       << sizeof(drain_context->buffer_) << " bytes";
+                       << drain_context->buffer_size << " bytes";
     }
 
     size_t offset = 0;
     const size_t num_words = actual / 8;
     while (offset < num_words) {
-      uint64_t header = drain_context->buffer_[offset];
+      uint64_t header = drain_context->buffer[offset];
       size_t record_size_words = fxt::RecordFields::RecordSize::Get<size_t>(header);
       if (void* dst = trace_context_alloc_record(buffer_context, record_size_words * 8);
           dst != nullptr) {
-        memcpy(dst, reinterpret_cast<const char*>(drain_context->buffer_ + offset),
+        memcpy(dst, reinterpret_cast<const char*>(drain_context->buffer.get() + offset),
                record_size_words * 8);
         offset += record_size_words;
       } else {
