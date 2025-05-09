@@ -182,6 +182,66 @@ zx::result<PhysVmo> GetTestPhysVmo(size_t size = 0);
 zx::bti CreateNamedBti(const zx::iommu& fake_iommu, uint32_t options, uint64_t bti_id,
                        const char* name);
 
+// There are a few tests in this suite which attempt to perform a _large_ number
+// of iterations of the test, typically looking for something like a race
+// condition regression.  This can lead to problems in some worst case
+// scenarios.  If the test is running in non KVM assisted emulation (as it would
+// on RISC-V, currently), and the test harness machine is very overloaded
+// (something which does happen, unfortunately), it is possible for a test to
+// not be able to perform its 1000 (for example) iterations before timing out,
+// even if everything is working correctly.
+//
+// Since these tests tend to be looking for non-deterministic repros of races in
+// the case of regression, there really is no good number of iterations to pick
+// here.  1000 is a lot, but it does not mean that the test is guaranteed to
+// catch a regression (there is no number large enough to guarantee that).  This
+// said, in worst case scenarios, the test can end up timing out and generating
+// flake.
+//
+// So, add a small helper class in an attempt to balance these two issues.  We'd
+// _like_ to run the test through X cycles, but if it is taking longer than Y
+// second to do so, we should probably simply print a warning call the test
+// done early.  This way, we are still getting a lot of iterations in CI/CQ, but
+// hopefully not causing any false positive flake when things are not running
+// quickly in the test environment.
+//
+class TestLimiter {
+ public:
+  TestLimiter(uint32_t iterations, zx::duration time_limit)
+      : iterations_{iterations}, time_limit_{time_limit} {}
+  ~TestLimiter() {}
+
+  TestLimiter(const TestLimiter&) = delete;
+  TestLimiter& operator=(const TestLimiter&) = delete;
+  TestLimiter(TestLimiter&&) = delete;
+  TestLimiter& operator=(TestLimiter&&) = delete;
+
+  uint32_t iteration() const { return iteration_; }
+  void next() { ++iteration_; }
+
+  bool Finished() const {
+    if (iteration_ >= iterations_) {
+      return true;
+    }
+
+    zx::duration test_time = zx::clock::get_monotonic() - start_time_;
+    if (test_time >= time_limit_) {
+      printf("\nWARNING - Things seem to be running slowly, exiting test early.\n");
+      printf("%u/%u iterations were successfully completed in ~%lu mSec.\n", iteration_,
+             iterations_, test_time.to_msecs());
+      return true;
+    }
+
+    return false;
+  }
+
+ private:
+  uint32_t iteration_{0};
+  const uint32_t iterations_;
+  const zx::duration time_limit_;
+  const zx::time_monotonic start_time_{zx::clock::get_monotonic()};
+};
+
 }  // namespace vmo_test
 
 #endif  // ZIRCON_SYSTEM_UTEST_CORE_VMO_HELPERS_H_
