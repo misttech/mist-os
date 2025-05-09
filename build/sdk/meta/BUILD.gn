@@ -27,7 +27,6 @@ schemas = [
   "loadable_module.json",
   "manifest.json",  # IDK manifest - no associated atom type.
   "package.json",
-  "rust_3p_library.json",
   "sysroot.json",
   "version_history.json",
 

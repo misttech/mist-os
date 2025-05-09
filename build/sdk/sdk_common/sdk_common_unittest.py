@@ -12,7 +12,7 @@ from sdk_common import Atom, Validator, detect_category_violations
 
 _TYPE_REQURING_AREA = "fidl_library"
 _TYPE_NOT_REQURING_AREA = "data"
-_VALID_TYPE_ARRAY_STRING = "['bind_library', 'cc_prebuilt_library', 'cc_source_library', 'companion_host_tool', 'dart_library', 'data', 'documentation', 'experimental_python_e2e_test', 'ffx_tool', 'fidl_library', 'host_tool', 'loadable_module', 'package', 'rust_3p_library', 'sysroot', 'version_history']"
+_VALID_TYPE_ARRAY_STRING = "['bind_library', 'cc_prebuilt_library', 'cc_source_library', 'companion_host_tool', 'dart_library', 'data', 'documentation', 'experimental_python_e2e_test', 'ffx_tool', 'fidl_library', 'host_tool', 'loadable_module', 'package', 'sysroot', 'version_history']"
 
 
 def _atom(

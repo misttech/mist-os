@@ -144,7 +144,6 @@ _VALID_ATOM_TYPES = [
     "host_tool",
     "loadable_module",
     "package",
-    "rust_3p_library",
     "sysroot",
     "version_history",
     # LINT.ThenChange(//build/sdk/generate_prebuild_idk/generate_prebuild_idk.py, //build/sdk/manifest_schema.json, //build/sdk/meta/BUILD.gn:schema_in_idk)

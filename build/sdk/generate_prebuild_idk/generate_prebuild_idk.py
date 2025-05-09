@@ -206,7 +206,6 @@ class PrebuildMap(object):
             #   "host_tool"
             #   "loadable_module"
             #   "sysroot"
-            # "rust_3p_library" does not support prebuild data.
             return (value, [])
 
         generator = {
