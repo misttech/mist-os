@@ -5,7 +5,9 @@
 include /src/developer/ffx/OWNERS
 include /src/developer/ffx/lib/emulator_instance/OWNERS
 include /src/developer/ffx/lib/pkg/OWNERS
+include /src/developer/ffx/lib/symbol-index/OWNERS
 include /src/developer/ffx/plugins/component/OWNERS
+include /src/developer/ffx/plugins/debug/OWNERS
 include /src/developer/ffx/plugins/emulator/OWNERS
 include /src/developer/ffx/plugins/log/OWNERS
 include /src/developer/ffx/plugins/package/OWNERS
