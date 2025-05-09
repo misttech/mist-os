@@ -464,16 +464,16 @@ TEST_F(DebugAgentServerTestWithClient, AttachToJobOnFilterInstalled) {
   filter.type(fuchsia_debugger::FilterType::kMonikerSuffix);
   filter.options().job_only(true);
 
-  client().AttachTo(
-      filter, [=, this](fidl::Result<fuchsia_debugger::DebugAgent::AttachTo>& result) mutable {
-        ASSERT_TRUE(result.is_ok());
-        EXPECT_EQ(result->num_matches(), 4u);
-        for (auto koid : kExpectedJobKoids) {
-          EXPECT_NE(agent()->GetDebuggedJob(koid), nullptr);
-        }
+  client().AttachTo(filter,
+                    [=](fidl::Result<fuchsia_debugger::DebugAgent::AttachTo>& result) mutable {
+                      ASSERT_TRUE(result.is_ok());
+                      EXPECT_EQ(result->num_matches(), 4u);
+                      for (auto koid : kExpectedJobKoids) {
+                        EXPECT_NE(agent()->GetDebuggedJob(koid), nullptr);
+                      }
 
-        loop().QuitNow();
-      });
+                      loop().QuitNow();
+                    });
 
   loop().Run();
 }
