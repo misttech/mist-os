@@ -15,7 +15,7 @@ pub struct AllInstants {
 }
 
 impl ::fidl_next::Encodable for AllInstants {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireAllInstants> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
                 && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
@@ -91,11 +91,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<AllInstants> {
-    type EncodedOption = ::fidl_next::WireBox<WireAllInstants>;
+impl ::fidl_next::EncodableOption for AllInstants {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireAllInstants>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<AllInstants>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for AllInstants
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     AllInstants: ::fidl_next::Encode<___E>,
@@ -107,7 +107,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -117,7 +117,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<AllInstants>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for AllInstants
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     AllInstants: ::fidl_next::EncodeRef<___E>,
@@ -139,26 +139,30 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireAllInstants> for AllInstants {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+impl ::fidl_next::FromWire<WireAllInstants> for AllInstants {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireAllInstants, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true && <i64 as ::fidl_next::FromWire<::fidl_next::WireI64>>::COPY_OPTIMIZATION
+                .is_enabled()
+                && <i64 as ::fidl_next::FromWire<::fidl_next::WireI64>>::COPY_OPTIMIZATION
+                    .is_enabled()
+                && <i64 as ::fidl_next::FromWire<::fidl_next::WireI64>>::COPY_OPTIMIZATION
+                    .is_enabled()
+                && <i64 as ::fidl_next::FromWire<::fidl_next::WireI64>>::COPY_OPTIMIZATION
+                    .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireAllInstants) -> Self {
+    fn from_wire(wire: WireAllInstants) -> Self {
         Self {
-            monotonic: ::fidl_next::TakeFrom::take_from(&from.monotonic),
+            monotonic: ::fidl_next::FromWire::from_wire(wire.monotonic),
 
-            boot: ::fidl_next::TakeFrom::take_from(&from.boot),
+            boot: ::fidl_next::FromWire::from_wire(wire.boot),
 
-            monotonic_ticks: ::fidl_next::TakeFrom::take_from(&from.monotonic_ticks),
+            monotonic_ticks: ::fidl_next::FromWire::from_wire(wire.monotonic_ticks),
 
-            boot_ticks: ::fidl_next::TakeFrom::take_from(&from.boot_ticks),
+            boot_ticks: ::fidl_next::FromWire::from_wire(wire.boot_ticks),
         }
     }
 }
@@ -176,7 +180,9 @@ pub struct WireAllInstants {
     pub boot_ticks: ::fidl_next::WireI64,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireAllInstants {
+unsafe impl ::fidl_next::Wire for WireAllInstants {
+    type Decoded<'de> = WireAllInstants;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -245,7 +251,7 @@ impl ComplexInstants {
 }
 
 impl ::fidl_next::Encodable for ComplexInstants {
-    type Encoded = WireComplexInstants;
+    type Encoded = WireComplexInstants<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for ComplexInstants
@@ -263,7 +269,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -346,7 +352,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -414,28 +420,56 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireComplexInstants> for ComplexInstants {
+impl<'de> ::fidl_next::FromWire<WireComplexInstants<'de>> for ComplexInstants {
     #[inline]
-    fn take_from(from: &WireComplexInstants) -> Self {
+    fn from_wire(wire: WireComplexInstants<'de>) -> Self {
+        let table = ::core::mem::ManuallyDrop::new(wire.table);
+
+        let monotonic = table.get(1);
+
+        let boot = table.get(2);
+
+        let monotonic_ticks = table.get(3);
+
+        let boot_ticks = table.get(4);
+
         Self {
-            monotonic: from.monotonic().map(::fidl_next::TakeFrom::take_from),
+            monotonic: monotonic.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<[::fidl_next::WireI64; 10]>()
+                })
+            }),
 
-            boot: from.boot().map(::fidl_next::TakeFrom::take_from),
+            boot: boot.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireVector<'de, ::fidl_next::WireI64>>()
+                })
+            }),
 
-            monotonic_ticks: from.monotonic_ticks().map(::fidl_next::TakeFrom::take_from),
+            monotonic_ticks: monotonic_ticks.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<[::fidl_next::WireI64; 10]>()
+                })
+            }),
 
-            boot_ticks: from.boot_ticks().map(::fidl_next::TakeFrom::take_from),
+            boot_ticks: boot_ticks.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<[::fidl_next::WireI64; 10]>()
+                })
+            }),
         }
     }
 }
 
 /// The wire type corresponding to [`ComplexInstants`].
 #[repr(C)]
-pub struct WireComplexInstants {
-    table: ::fidl_next::WireTable,
+pub struct WireComplexInstants<'de> {
+    table: ::fidl_next::WireTable<'de>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireComplexInstants {
+unsafe impl ::fidl_next::Wire for WireComplexInstants<'static> {
+    type Decoded<'de> = WireComplexInstants<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         ::fidl_next::munge!(let Self { table } = out);
@@ -443,7 +477,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireComplexInstants {
     }
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireComplexInstants
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireComplexInstants<'static>
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -469,7 +503,7 @@ where
                 2 => {
                     ::fidl_next::WireEnvelope::decode_as::<
                         ___D,
-                        ::fidl_next::WireVector<::fidl_next::WireI64>,
+                        ::fidl_next::WireVector<'static, ::fidl_next::WireI64>,
                     >(slot.as_mut(), decoder)?;
 
                     Ok(())
@@ -499,12 +533,12 @@ where
     }
 }
 
-impl WireComplexInstants {
+impl<'de> WireComplexInstants<'de> {
     pub fn monotonic(&self) -> Option<&[::fidl_next::WireI64; 10]> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 
-    pub fn boot(&self) -> Option<&::fidl_next::WireVector<::fidl_next::WireI64>> {
+    pub fn boot(&self) -> Option<&::fidl_next::WireVector<'de, ::fidl_next::WireI64>> {
         unsafe { Some(self.table.get(2)?.deref_unchecked()) }
     }
 
@@ -517,7 +551,7 @@ impl WireComplexInstants {
     }
 }
 
-impl ::core::fmt::Debug for WireComplexInstants {
+impl<'de> ::core::fmt::Debug for WireComplexInstants<'de> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("ComplexInstants")
             .field("monotonic", &self.monotonic())
@@ -529,37 +563,4 @@ impl ::core::fmt::Debug for WireComplexInstants {
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {
-
-    impl ::fidl_next::TakeFrom<crate::WireAllInstants> for ::fidl_test_time::AllInstants {
-        #[inline]
-        fn take_from(from: &crate::WireAllInstants) -> Self {
-            Self {
-                monotonic: ::fidl_next::TakeFrom::take_from(&from.monotonic),
-
-                boot: ::fidl_next::TakeFrom::take_from(&from.boot),
-
-                monotonic_ticks: ::fidl_next::TakeFrom::take_from(&from.monotonic_ticks),
-
-                boot_ticks: ::fidl_next::TakeFrom::take_from(&from.boot_ticks),
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireComplexInstants> for ::fidl_test_time::ComplexInstants {
-        #[inline]
-        fn take_from(from: &crate::WireComplexInstants) -> Self {
-            Self {
-                monotonic: from.monotonic().map(::fidl_next::TakeFrom::take_from),
-
-                boot: from.boot().map(::fidl_next::TakeFrom::take_from),
-
-                monotonic_ticks: from.monotonic_ticks().map(::fidl_next::TakeFrom::take_from),
-
-                boot_ticks: from.boot_ticks().map(::fidl_next::TakeFrom::take_from),
-
-                __source_breaking: ::fidl::marker::SourceBreaking,
-            }
-        }
-    }
-}
+pub mod compat {}

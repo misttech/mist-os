@@ -7,6 +7,8 @@ use core::mem::{forget, ManuallyDrop};
 use core::ops::Deref;
 use core::ptr::NonNull;
 
+use crate::{FromWire, Wire};
+
 /// A decoded value and the decoder which contains it.
 pub struct Decoded<T: ?Sized, D> {
     ptr: NonNull<T>,
@@ -57,6 +59,31 @@ impl<T: ?Sized, D> Decoded<T, D> {
         let decoder = unsafe { ManuallyDrop::take(&mut self.decoder) };
         forget(self);
         (ptr, decoder)
+    }
+
+    /// Takes the value out of this `Decoded` and calls `From::from` on the taken value.
+    ///
+    /// This consumes the `Decoded`.
+    pub fn take<U>(self) -> U
+    where
+        T: Wire,
+        U: for<'de> FromWire<T::Decoded<'de>>,
+    {
+        self.take_with(|wire| U::from_wire(wire))
+    }
+
+    /// Takes the value out of this `Decoded` and passes it to the given function.
+    ///
+    /// This consumes the `Decoded`.
+    pub fn take_with<U>(self, f: impl FnOnce(T::Decoded<'_>) -> U) -> U
+    where
+        T: Wire,
+    {
+        let (ptr, decoder) = self.into_raw_parts();
+        let value = unsafe { ptr.cast::<T::Decoded<'_>>().read() };
+        let result = f(value);
+        drop(decoder);
+        result
     }
 }
 

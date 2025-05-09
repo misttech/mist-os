@@ -9,7 +9,7 @@ pub struct Foo {
 }
 
 impl ::fidl_next::Encodable for Foo {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireFoo> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true
 
@@ -69,11 +69,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<Foo> {
-    type EncodedOption = ::fidl_next::WireBox<WireFoo>;
+impl ::fidl_next::EncodableOption for Foo {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireFoo>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<Foo>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Foo
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     Foo: ::fidl_next::Encode<___E>,
@@ -85,7 +85,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -95,7 +95,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<Foo>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Foo
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     Foo: ::fidl_next::EncodeRef<___E>,
@@ -117,21 +117,19 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireFoo> for Foo {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+impl ::fidl_next::FromWire<WireFoo> for Foo {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireFoo, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true
-
-                && <
-                    ::fidl_next_test_dependent::MyEnum as ::fidl_next::Encodable
-                >::COPY_OPTIMIZATION.is_enabled()
-
+            true && <::fidl_next_test_dependent::MyEnum as ::fidl_next::FromWire<
+                ::fidl_next_test_dependent::WireMyEnum,
+            >>::COPY_OPTIMIZATION
+                .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireFoo) -> Self {
-        Self { field: ::fidl_next::TakeFrom::take_from(&from.field) }
+    fn from_wire(wire: WireFoo) -> Self {
+        Self { field: ::fidl_next::FromWire::from_wire(wire.field) }
     }
 }
 
@@ -142,7 +140,9 @@ pub struct WireFoo {
     pub field: ::fidl_next_test_dependent::WireMyEnum,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireFoo {
+unsafe impl ::fidl_next::Wire for WireFoo {
+    type Decoded<'de> = WireFoo;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -169,14 +169,4 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {
-
-    impl ::fidl_next::TakeFrom<crate::WireFoo>
-        for ::fidl_test_structdefaultvalueenumlibraryreference::Foo
-    {
-        #[inline]
-        fn take_from(from: &crate::WireFoo) -> Self {
-            Self { field: ::fidl_next::TakeFrom::take_from(&from.field) }
-        }
-    }
-}
+pub mod compat {}

@@ -468,8 +468,13 @@ mod test {
             }
 
             {
-                let res = client_sender.get_event().unwrap().await.unwrap();
-                let event = Event::from_handle(res.event.take());
+                let res = client_sender
+                    .get_event()
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .take::<DeviceGetEventResponse>();
+                let event = Event::from_handle(res.event);
 
                 // wait for the event on a fuchsia_async executor
                 let mut executor = fuchsia_async::LocalExecutor::new();

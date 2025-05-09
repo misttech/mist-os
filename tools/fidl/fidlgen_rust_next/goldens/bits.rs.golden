@@ -56,10 +56,10 @@ impl ::core::convert::From<WireEmptyBits> for EmptyBits {
     }
 }
 
-impl ::fidl_next::TakeFrom<WireEmptyBits> for EmptyBits {
+impl ::fidl_next::FromWire<WireEmptyBits> for EmptyBits {
     #[inline]
-    fn take_from(from: &WireEmptyBits) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: WireEmptyBits) -> Self {
+        Self::from(wire)
     }
 }
 
@@ -70,7 +70,9 @@ pub struct WireEmptyBits {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireEmptyBits {
+unsafe impl ::fidl_next::Wire for WireEmptyBits {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
@@ -151,10 +153,10 @@ impl ::core::convert::From<WireFlexibleBits> for FlexibleBits {
     }
 }
 
-impl ::fidl_next::TakeFrom<WireFlexibleBits> for FlexibleBits {
+impl ::fidl_next::FromWire<WireFlexibleBits> for FlexibleBits {
     #[inline]
-    fn take_from(from: &WireFlexibleBits) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: WireFlexibleBits) -> Self {
+        Self::from(wire)
     }
 }
 
@@ -165,7 +167,9 @@ pub struct WireFlexibleBits {
     value: ::fidl_next::WireU64,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireFlexibleBits {
+unsafe impl ::fidl_next::Wire for WireFlexibleBits {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
@@ -247,10 +251,10 @@ impl ::core::convert::From<WireMyBits> for MyBits {
     }
 }
 
-impl ::fidl_next::TakeFrom<WireMyBits> for MyBits {
+impl ::fidl_next::FromWire<WireMyBits> for MyBits {
     #[inline]
-    fn take_from(from: &WireMyBits) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: WireMyBits) -> Self {
+        Self::from(wire)
     }
 }
 
@@ -261,7 +265,9 @@ pub struct WireMyBits {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMyBits {
+unsafe impl ::fidl_next::Wire for WireMyBits {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
@@ -351,10 +357,10 @@ impl ::core::convert::From<WireStrictBits> for StrictBits {
     }
 }
 
-impl ::fidl_next::TakeFrom<WireStrictBits> for StrictBits {
+impl ::fidl_next::FromWire<WireStrictBits> for StrictBits {
     #[inline]
-    fn take_from(from: &WireStrictBits) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: WireStrictBits) -> Self {
+        Self::from(wire)
     }
 }
 
@@ -365,7 +371,9 @@ pub struct WireStrictBits {
     value: ::fidl_next::WireU64,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireStrictBits {
+unsafe impl ::fidl_next::Wire for WireStrictBits {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
@@ -402,31 +410,31 @@ impl ::core::convert::From<StrictBits> for WireStrictBits {
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::fidl_next::TakeFrom<crate::WireEmptyBits> for ::fidl_test_bits::EmptyBits {
+    impl ::core::convert::From<crate::EmptyBits> for ::fidl_test_bits::EmptyBits {
         #[inline]
-        fn take_from(from: &crate::WireEmptyBits) -> Self {
-            Self::from_bits_retain(from.value.into())
+        fn from(from: crate::EmptyBits) -> Self {
+            Self::from_bits_retain(from.bits())
         }
     }
 
-    impl ::fidl_next::TakeFrom<crate::WireFlexibleBits> for ::fidl_test_bits::FlexibleBits {
+    impl ::core::convert::From<crate::FlexibleBits> for ::fidl_test_bits::FlexibleBits {
         #[inline]
-        fn take_from(from: &crate::WireFlexibleBits) -> Self {
-            Self::from_bits_retain(from.value.into())
+        fn from(from: crate::FlexibleBits) -> Self {
+            Self::from_bits_retain(from.bits())
         }
     }
 
-    impl ::fidl_next::TakeFrom<crate::WireMyBits> for ::fidl_test_bits::MyBits {
+    impl ::core::convert::From<crate::MyBits> for ::fidl_test_bits::MyBits {
         #[inline]
-        fn take_from(from: &crate::WireMyBits) -> Self {
-            Self::from_bits_retain(from.value.into())
+        fn from(from: crate::MyBits) -> Self {
+            Self::from_bits_retain(from.bits())
         }
     }
 
-    impl ::fidl_next::TakeFrom<crate::WireStrictBits> for ::fidl_test_bits::StrictBits {
+    impl ::core::convert::From<crate::StrictBits> for ::fidl_test_bits::StrictBits {
         #[inline]
-        fn take_from(from: &crate::WireStrictBits) -> Self {
-            Self::from_bits_retain(from.value.into())
+        fn from(from: crate::StrictBits) -> Self {
+            Self::from_bits_retain(from.bits())
         }
     }
 }

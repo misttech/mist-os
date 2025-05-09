@@ -17,7 +17,7 @@ pub const ENUM_MEMBER_PRIMITIVE: u8 = 1;
 pub struct MyStruct {}
 
 impl ::fidl_next::Encodable for MyStruct {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireMyStruct> =
         unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
 
     type Encoded = WireMyStruct;
@@ -63,11 +63,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<MyStruct> {
-    type EncodedOption = ::fidl_next::WireBox<WireMyStruct>;
+impl ::fidl_next::EncodableOption for MyStruct {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireMyStruct>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<MyStruct>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for MyStruct
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MyStruct: ::fidl_next::Encode<___E>,
@@ -79,7 +79,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -89,7 +89,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<MyStruct>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for MyStruct
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MyStruct: ::fidl_next::EncodeRef<___E>,
@@ -111,12 +111,12 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireMyStruct> for MyStruct {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+impl ::fidl_next::FromWire<WireMyStruct> for MyStruct {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireMyStruct, Self> =
         unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
 
     #[inline]
-    fn take_from(from: &WireMyStruct) -> Self {
+    fn from_wire(wire: WireMyStruct) -> Self {
         Self {}
     }
 }
@@ -126,7 +126,9 @@ impl ::fidl_next::TakeFrom<WireMyStruct> for MyStruct {
 #[repr(C)]
 pub struct WireMyStruct {}
 
-unsafe impl ::fidl_next::ZeroPadding for WireMyStruct {
+unsafe impl ::fidl_next::Wire for WireMyStruct {
+    type Decoded<'de> = WireMyStruct;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -150,12 +152,4 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {
-
-    impl ::fidl_next::TakeFrom<crate::WireMyStruct> for ::fidl_test_importedconstvalues::MyStruct {
-        #[inline]
-        fn take_from(from: &crate::WireMyStruct) -> Self {
-            Self {}
-        }
-    }
-}
+pub mod compat {}

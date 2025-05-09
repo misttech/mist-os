@@ -7,25 +7,26 @@ use core::mem::MaybeUninit;
 use munge::munge;
 
 use crate::{
-    DecodeError, Decoder, DecoderExt as _, Owned, Slot, WireEnvelope, WirePointer, WireU64,
-    ZeroPadding,
+    DecodeError, Decoder, DecoderExt as _, Slot, Wire, WireEnvelope, WirePointer, WireU64,
 };
 
 /// A FIDL table
 #[repr(C)]
-pub struct WireTable {
+pub struct WireTable<'de> {
     len: WireU64,
-    ptr: WirePointer<WireEnvelope>,
+    ptr: WirePointer<'de, WireEnvelope>,
 }
 
-unsafe impl ZeroPadding for WireTable {
+unsafe impl Wire for WireTable<'static> {
+    type Decoded<'de> = WireTable<'de>;
+
     #[inline]
     fn zero_padding(_: &mut MaybeUninit<Self>) {
         // Wire tables have no padding
     }
 }
 
-impl WireTable {
+impl WireTable<'static> {
     /// Encodes that a table contains `len` values in a slot.
     #[inline]
     pub fn encode_len(out: &mut MaybeUninit<Self>, len: usize) {
@@ -56,15 +57,16 @@ impl WireTable {
                 }
             }
 
-            let envelopes = unsafe { Owned::new_unchecked(envelopes_ptr) };
-            WirePointer::set_decoded(ptr, envelopes.into_raw());
+            WirePointer::set_decoded(ptr, envelopes_ptr);
         } else if **len != 0 {
             return Err(DecodeError::InvalidOptionalSize(**len));
         }
 
         Ok(())
     }
+}
 
+impl WireTable<'_> {
     /// Returns a reference to the envelope for the given ordinal, if any.
     #[inline]
     pub fn get(&self, ordinal: usize) -> Option<&WireEnvelope> {

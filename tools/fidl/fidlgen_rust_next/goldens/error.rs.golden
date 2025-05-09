@@ -8,7 +8,7 @@ pub struct ExampleFooRequest {
 }
 
 impl ::fidl_next::Encodable for ExampleFooRequest {
-    type Encoded = WireExampleFooRequest;
+    type Encoded = WireExampleFooRequest<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for ExampleFooRequest
@@ -61,11 +61,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<ExampleFooRequest> {
-    type EncodedOption = ::fidl_next::WireBox<WireExampleFooRequest>;
+impl ::fidl_next::EncodableOption for ExampleFooRequest {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireExampleFooRequest<'static>>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleFooRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for ExampleFooRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ExampleFooRequest: ::fidl_next::Encode<___E>,
@@ -77,7 +77,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -87,7 +87,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<ExampleFooRequest>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for ExampleFooRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ExampleFooRequest: ::fidl_next::EncodeRef<___E>,
@@ -109,26 +109,28 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireExampleFooRequest> for ExampleFooRequest {
+impl<'de> ::fidl_next::FromWire<WireExampleFooRequest<'de>> for ExampleFooRequest {
     #[inline]
-    fn take_from(from: &WireExampleFooRequest) -> Self {
-        Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
+    fn from_wire(wire: WireExampleFooRequest<'de>) -> Self {
+        Self { s: ::fidl_next::FromWire::from_wire(wire.s) }
     }
 }
 
 /// The wire type corresponding to [`ExampleFooRequest`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireExampleFooRequest {
-    pub s: ::fidl_next::WireString,
+pub struct WireExampleFooRequest<'de> {
+    pub s: ::fidl_next::WireString<'de>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireExampleFooRequest {
+unsafe impl ::fidl_next::Wire for WireExampleFooRequest<'static> {
+    type Decoded<'de> = WireExampleFooRequest<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleFooRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleFooRequest<'static>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -158,7 +160,7 @@ pub struct ExampleFooResponse {
 }
 
 impl ::fidl_next::Encodable for ExampleFooResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireExampleFooResponse> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
         )
@@ -213,11 +215,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<ExampleFooResponse> {
-    type EncodedOption = ::fidl_next::WireBox<WireExampleFooResponse>;
+impl ::fidl_next::EncodableOption for ExampleFooResponse {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireExampleFooResponse>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleFooResponse>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for ExampleFooResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ExampleFooResponse: ::fidl_next::Encode<___E>,
@@ -229,7 +231,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -239,7 +241,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<ExampleFooResponse>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for ExampleFooResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ExampleFooResponse: ::fidl_next::EncodeRef<___E>,
@@ -261,16 +263,17 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireExampleFooResponse> for ExampleFooResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+impl ::fidl_next::FromWire<WireExampleFooResponse> for ExampleFooResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireExampleFooResponse, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true && <i64 as ::fidl_next::FromWire<::fidl_next::WireI64>>::COPY_OPTIMIZATION
+                .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireExampleFooResponse) -> Self {
-        Self { y: ::fidl_next::TakeFrom::take_from(&from.y) }
+    fn from_wire(wire: WireExampleFooResponse) -> Self {
+        Self { y: ::fidl_next::FromWire::from_wire(wire.y) }
     }
 }
 
@@ -281,7 +284,9 @@ pub struct WireExampleFooResponse {
     pub y: ::fidl_next::WireI64,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireExampleFooResponse {
+unsafe impl ::fidl_next::Wire for WireExampleFooResponse {
+    type Decoded<'de> = WireExampleFooResponse;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -330,10 +335,10 @@ pub mod example {
 
         type Protocol = crate::Example;
 
-        type Request = crate::WireExampleFooRequest;
+        type Request = crate::WireExampleFooRequest<'static>;
 
         type Response =
-            ::fidl_next::WireResult<crate::WireExampleFooResponse, ::fidl_next::WireU32>;
+            ::fidl_next::WireResult<'static, crate::WireExampleFooResponse, ::fidl_next::WireU32>;
     }
 }
 
@@ -351,7 +356,7 @@ pub trait ExampleClientSender {
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireExampleFooRequest,
+            Encoded = crate::WireExampleFooRequest<'static>,
         >;
 }
 
@@ -371,7 +376,7 @@ where
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireExampleFooRequest,
+            Encoded = crate::WireExampleFooRequest<'static>,
         >,
     {
         self.as_untyped()
@@ -438,7 +443,8 @@ where
     ___T: ::fidl_next::Transport,
     ___H: ExampleServerHandler<___T>,
 
-    crate::WireExampleFooRequest: ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
+    <example::Foo as ::fidl_next::Method>::Request:
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,
@@ -482,31 +488,15 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::fidl_next::TakeFrom<crate::WireExampleFooRequest> for ::fidl_test_error::ExampleFooRequest {
-        #[inline]
-        fn take_from(from: &crate::WireExampleFooRequest) -> Self {
-            Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireExampleFooResponse>
-        for ::fidl_test_error::ExampleFooResponse
-    {
-        #[inline]
-        fn take_from(from: &crate::WireExampleFooResponse) -> Self {
-            Self { y: ::fidl_next::TakeFrom::take_from(&from.y) }
-        }
-    }
-
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Example`
     /// protocol.
     pub type ExampleProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Example>;
 
-    impl ::fidl_next::TakeFrom<crate::Example> for ::fidl_test_error::ExampleMarker {
+    impl ::core::convert::From<crate::Example> for ::fidl_test_error::ExampleMarker {
         #[inline]
-        fn take_from(from: &crate::Example) -> Self {
+        fn from(_: crate::Example) -> Self {
             Self
         }
     }

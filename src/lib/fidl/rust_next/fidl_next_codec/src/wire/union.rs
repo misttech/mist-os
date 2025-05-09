@@ -9,8 +9,7 @@ use munge::munge;
 use crate::decoder::InternalHandleDecoder;
 use crate::encoder::InternalHandleEncoder;
 use crate::{
-    Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Slot, WireEnvelope, WireU64,
-    ZeroPadding,
+    Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Slot, Wire, WireEnvelope, WireU64,
 };
 
 /// A raw FIDL union
@@ -20,7 +19,9 @@ pub struct RawWireUnion {
     envelope: WireEnvelope,
 }
 
-unsafe impl ZeroPadding for RawWireUnion {
+unsafe impl Wire for RawWireUnion {
+    type Decoded<'de> = RawWireUnion;
+
     #[inline]
     fn zero_padding(_: &mut MaybeUninit<Self>) {
         // Wire unions have no padding
@@ -160,9 +161,12 @@ impl RawWireUnion {
     ///
     /// # Safety
     ///
-    /// The union must have been successfully decoded as a `T`.
+    /// The union must have been successfully decoded inline as a `T`.
     #[inline]
-    pub unsafe fn clone_unchecked<T: Clone>(&self) -> Self {
-        Self { ordinal: self.ordinal, envelope: unsafe { self.envelope.clone_unchecked::<T>() } }
+    pub unsafe fn clone_inline_unchecked<T: Clone>(&self) -> Self {
+        Self {
+            ordinal: self.ordinal,
+            envelope: unsafe { self.envelope.clone_inline_unchecked::<T>() },
+        }
     }
 }

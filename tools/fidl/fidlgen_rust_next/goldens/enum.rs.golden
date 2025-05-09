@@ -60,10 +60,10 @@ impl ::core::convert::From<WireMyEmptyFlexibleEnum> for MyEmptyFlexibleEnum {
     }
 }
 
-impl ::fidl_next::TakeFrom<WireMyEmptyFlexibleEnum> for MyEmptyFlexibleEnum {
+impl ::fidl_next::FromWire<WireMyEmptyFlexibleEnum> for MyEmptyFlexibleEnum {
     #[inline]
-    fn take_from(from: &WireMyEmptyFlexibleEnum) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: WireMyEmptyFlexibleEnum) -> Self {
+        Self::from(wire)
     }
 }
 
@@ -74,7 +74,9 @@ pub struct WireMyEmptyFlexibleEnum {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMyEmptyFlexibleEnum {
+unsafe impl ::fidl_next::Wire for WireMyEmptyFlexibleEnum {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
@@ -176,10 +178,10 @@ impl ::core::convert::From<WireMyFlexibleEnum> for MyFlexibleEnum {
     }
 }
 
-impl ::fidl_next::TakeFrom<WireMyFlexibleEnum> for MyFlexibleEnum {
+impl ::fidl_next::FromWire<WireMyFlexibleEnum> for MyFlexibleEnum {
     #[inline]
-    fn take_from(from: &WireMyFlexibleEnum) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: WireMyFlexibleEnum) -> Self {
+        Self::from(wire)
     }
 }
 
@@ -190,7 +192,9 @@ pub struct WireMyFlexibleEnum {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMyFlexibleEnum {
+unsafe impl ::fidl_next::Wire for WireMyFlexibleEnum {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
@@ -308,12 +312,12 @@ impl ::core::convert::From<WireMyFlexibleEnumWithCustomUnknown>
     }
 }
 
-impl ::fidl_next::TakeFrom<WireMyFlexibleEnumWithCustomUnknown>
+impl ::fidl_next::FromWire<WireMyFlexibleEnumWithCustomUnknown>
     for MyFlexibleEnumWithCustomUnknown
 {
     #[inline]
-    fn take_from(from: &WireMyFlexibleEnumWithCustomUnknown) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: WireMyFlexibleEnumWithCustomUnknown) -> Self {
+        Self::from(wire)
     }
 }
 
@@ -324,7 +328,9 @@ pub struct WireMyFlexibleEnumWithCustomUnknown {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMyFlexibleEnumWithCustomUnknown {
+unsafe impl ::fidl_next::Wire for WireMyFlexibleEnumWithCustomUnknown {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
@@ -443,10 +449,10 @@ impl ::core::convert::From<WireMyStrictEnum> for MyStrictEnum {
     }
 }
 
-impl ::fidl_next::TakeFrom<WireMyStrictEnum> for MyStrictEnum {
+impl ::fidl_next::FromWire<WireMyStrictEnum> for MyStrictEnum {
     #[inline]
-    fn take_from(from: &WireMyStrictEnum) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: WireMyStrictEnum) -> Self {
+        Self::from(wire)
     }
 }
 
@@ -457,7 +463,9 @@ pub struct WireMyStrictEnum {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMyStrictEnum {
+unsafe impl ::fidl_next::Wire for WireMyStrictEnum {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
@@ -502,12 +510,10 @@ impl ::core::convert::From<MyStrictEnum> for WireMyStrictEnum {
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::fidl_next::TakeFrom<crate::WireMyEmptyFlexibleEnum>
-        for ::fidl_test_enum::MyEmptyFlexibleEnum
-    {
+    impl ::core::convert::From<crate::MyEmptyFlexibleEnum> for ::fidl_test_enum::MyEmptyFlexibleEnum {
         #[inline]
-        fn take_from(from: &crate::WireMyEmptyFlexibleEnum) -> Self {
-            match crate::MyEmptyFlexibleEnum::from(*from) {
+        fn from(from: crate::MyEmptyFlexibleEnum) -> Self {
+            match crate::MyEmptyFlexibleEnum::from(from) {
                 crate::MyEmptyFlexibleEnum::UnknownOrdinal_(value) => {
                     Self::__SourceBreaking { unknown_ordinal: value }
                 }
@@ -515,10 +521,10 @@ pub mod compat {
         }
     }
 
-    impl ::fidl_next::TakeFrom<crate::WireMyFlexibleEnum> for ::fidl_test_enum::MyFlexibleEnum {
+    impl ::core::convert::From<crate::MyFlexibleEnum> for ::fidl_test_enum::MyFlexibleEnum {
         #[inline]
-        fn take_from(from: &crate::WireMyFlexibleEnum) -> Self {
-            match crate::MyFlexibleEnum::from(*from) {
+        fn from(from: crate::MyFlexibleEnum) -> Self {
+            match crate::MyFlexibleEnum::from(from) {
                 crate::MyFlexibleEnum::Foo => Self::Foo,
 
                 crate::MyFlexibleEnum::Bar => Self::Bar,
@@ -530,12 +536,12 @@ pub mod compat {
         }
     }
 
-    impl ::fidl_next::TakeFrom<crate::WireMyFlexibleEnumWithCustomUnknown>
+    impl ::core::convert::From<crate::MyFlexibleEnumWithCustomUnknown>
         for ::fidl_test_enum::MyFlexibleEnumWithCustomUnknown
     {
         #[inline]
-        fn take_from(from: &crate::WireMyFlexibleEnumWithCustomUnknown) -> Self {
-            match crate::MyFlexibleEnumWithCustomUnknown::from(*from) {
+        fn from(from: crate::MyFlexibleEnumWithCustomUnknown) -> Self {
+            match crate::MyFlexibleEnumWithCustomUnknown::from(from) {
                 crate::MyFlexibleEnumWithCustomUnknown::Foo => Self::Foo,
 
                 crate::MyFlexibleEnumWithCustomUnknown::Bar => Self::Bar,
@@ -549,10 +555,10 @@ pub mod compat {
         }
     }
 
-    impl ::fidl_next::TakeFrom<crate::WireMyStrictEnum> for ::fidl_test_enum::MyStrictEnum {
+    impl ::core::convert::From<crate::MyStrictEnum> for ::fidl_test_enum::MyStrictEnum {
         #[inline]
-        fn take_from(from: &crate::WireMyStrictEnum) -> Self {
-            match crate::MyStrictEnum::from(*from) {
+        fn from(from: crate::MyStrictEnum) -> Self {
+            match crate::MyStrictEnum::from(from) {
                 crate::MyStrictEnum::Foo => Self::Foo,
 
                 crate::MyStrictEnum::Bar => Self::Bar,

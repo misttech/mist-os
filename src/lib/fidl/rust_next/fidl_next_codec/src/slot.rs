@@ -17,14 +17,14 @@ use zerocopy::{FromBytes, IntoBytes};
 /// valid value of its type. For example, a `Slot<'_, bool>` may not be set to
 /// 0 or 1.
 #[repr(transparent)]
-pub struct Slot<'buf, T: ?Sized> {
+pub struct Slot<'de, T: ?Sized> {
     ptr: *mut T,
-    _phantom: PhantomData<&'buf mut [u8]>,
+    _phantom: PhantomData<&'de mut [u8]>,
 }
 
-impl<'buf, T: ?Sized> Slot<'buf, T> {
+impl<'de, T: ?Sized> Slot<'de, T> {
     /// Returns a new `Slot` backed by the given `MaybeUninit`.
-    pub fn new(backing: &'buf mut MaybeUninit<T>) -> Self
+    pub fn new(backing: &'de mut MaybeUninit<T>) -> Self
     where
         T: Sized,
     {
@@ -137,8 +137,8 @@ impl<T: FromBytes> DerefMut for Slot<'_, T> {
     }
 }
 
-impl<'buf, T> Iterator for Slot<'buf, [T]> {
-    type Item = Slot<'buf, T>;
+impl<'de, T> Iterator for Slot<'de, [T]> {
+    type Item = Slot<'de, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.ptr.len() == 0 {
@@ -163,8 +163,8 @@ unsafe impl<T> Destructure for Slot<'_, T> {
     }
 }
 
-unsafe impl<'buf, T, U: 'buf> Restructure<U> for Slot<'buf, T> {
-    type Restructured = Slot<'buf, U>;
+unsafe impl<'de, T, U: 'de> Restructure<U> for Slot<'de, T> {
+    type Restructured = Slot<'de, U>;
 
     unsafe fn restructure(&self, ptr: *mut U) -> Self::Restructured {
         Slot { ptr, _phantom: PhantomData }

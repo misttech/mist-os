@@ -8,7 +8,7 @@ use core::{concat, stringify};
 
 use fidl_next_codec::{
     munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
-    EncodeRef, Slot, TakeFrom, ZeroPadding,
+    EncodeRef, FromWire, FromWireOption, Slot, Wire,
 };
 
 macro_rules! endpoint {
@@ -24,10 +24,17 @@ macro_rules! endpoint {
             _protocol: PhantomData<P>,
         }
 
-        // SAFETY: `$name` is `#[repr(transparent)]` over the transport `T`, and `zero_padding`
-        // calls `T::zero_padding` on `transport`. `_protocol` is a ZST which does not have any
-        // padding bytes to zero-initialize.
-        unsafe impl<T: ZeroPadding, P> ZeroPadding for $name<T, P> {
+        // SAFETY:
+        // - `$name::Decoded<'de>` wraps a `T::Decoded<'de>`. Because `T: Wire`, `T::Decoded<'de>`
+        //   does not yield any references to decoded data that outlive `'de`. Therefore,
+        //   `$name::Decoded<'de>` also does not yield any references to decoded data that outlive
+        //   `'de`.
+        // - `$name` is `#[repr(transparent)]` over the transport `T`, and `zero_padding` calls
+        //   `T::zero_padding` on `transport`. `_protocol` is a ZST which does not have any padding
+        //   bytes to zero-initialize.
+        unsafe impl<T: Wire, P: 'static> Wire for $name<T, P> {
+            type Decoded<'de> = $name<T::Decoded<'de>, P>;
+
             #[inline]
             fn zero_padding(out: &mut MaybeUninit<Self>) {
                 munge!(let Self { transport, _protocol: _ } = out);
@@ -64,6 +71,7 @@ macro_rules! endpoint {
         where
             D: ?Sized,
             T: Decode<D>,
+            P: 'static,
         {
             fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
                 munge!(let Self { transport, _protocol: _ } = slot);
@@ -74,6 +82,7 @@ macro_rules! endpoint {
         impl<T, P> Encodable for $name<T, P>
         where
             T: Encodable,
+            P: 'static,
         {
             type Encoded = $name<T::Encoded, P>;
         }
@@ -81,6 +90,7 @@ macro_rules! endpoint {
         impl<T, P> EncodableOption for $name<T, P>
         where
             T: EncodableOption,
+            P: 'static,
         {
             type EncodedOption = $name<T::EncodedOption, P>;
         }
@@ -91,6 +101,7 @@ macro_rules! endpoint {
         where
             E: ?Sized,
             T: Encode<E>,
+            P: 'static,
         {
             fn encode(
                 self,
@@ -109,6 +120,7 @@ macro_rules! endpoint {
         where
             E: ?Sized,
             T: EncodeRef<E>,
+            P: 'static,
         {
             fn encode_ref(
                 &self,
@@ -126,6 +138,7 @@ macro_rules! endpoint {
         where
             E: ?Sized,
             T: EncodeOption<E>,
+            P: 'static,
         {
             fn encode_option(
                 this: Option<Self>,
@@ -137,45 +150,40 @@ macro_rules! endpoint {
             }
         }
 
-        impl<T, P, U> TakeFrom<$name<U, P>> for $name<T, P>
+        impl<T, P, U> FromWire<$name<U, P>> for $name<T, P>
         where
-            T: TakeFrom<U>,
+            T: FromWire<U>,
         {
-            fn take_from(from: &$name<U, P>) -> Self {
-                Self { transport: T::take_from(&from.transport), _protocol: PhantomData }
+            fn from_wire(wire: $name<U, P>) -> Self {
+                $name {
+                    transport: T::from_wire(wire.transport),
+                    _protocol: PhantomData,
+                }
             }
         }
 
-        impl<T, P, U> TakeFrom<$name<U, P>> for Option<$name<T, P>>
+        impl<T, P, U> FromWireOption<$name<U, P>> for $name<T, P>
         where
-            Option<T>: TakeFrom<U>,
+            T: FromWireOption<U>,
+            U: Wire,
+            P: 'static,
         {
-            fn take_from(from: &$name<U, P>) -> Self {
-                Option::<T>::take_from(&from.transport)
-                    .map(|transport| $name { transport, _protocol: PhantomData })
-            }
-        }
-
-        #[cfg(feature = "compat")]
-        impl<T, P1, P2> TakeFrom<$name<T, P1>> for ::fidl::endpoints::$name<P2>
-        where
-            ::fidl::Channel: TakeFrom<T>,
-            P2: TakeFrom<P1>,
-        {
-            fn take_from(from: &$name<T, P1>) -> Self {
-                Self::new(::fidl::Channel::take_from(&from.transport))
+            fn from_wire_option(wire: $name<U, P>) -> Option<Self> {
+                T::from_wire_option(wire.transport).map(|transport| $name {
+                    transport,
+                    _protocol: PhantomData,
+                })
             }
         }
 
         #[cfg(feature = "compat")]
-        impl<T, P1, P2> TakeFrom<$name<T, P1>> for Option<::fidl::endpoints::$name<P2>>
+        impl<T, P1, P2> From<$name<T, P1>> for ::fidl::endpoints::$name<P2>
         where
-            Option<::fidl::Channel>: TakeFrom<T>,
-            P2: TakeFrom<P1>,
+            ::fidl::Channel: From<T>,
+            P2: From<P1>,
         {
-            fn take_from(from: &$name<T, P1>) -> Self {
-                Option::<::fidl::Channel>::take_from(&from.transport)
-                    .map(::fidl::endpoints::$name::new)
+            fn from(from: $name<T, P1>) -> Self {
+                Self::new(from.transport.into())
             }
         }
     };

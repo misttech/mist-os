@@ -7,7 +7,7 @@ use core::mem::MaybeUninit;
 use crate::fuchsia::{HandleDecoder, HandleEncoder, WireHandle, WireOptionalHandle};
 use crate::{
     munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
-    Slot, TakeFrom, ZeroPadding,
+    FromWire, FromWireOption, Slot, Wire,
 };
 
 use zx::sys::zx_handle_t;
@@ -20,7 +20,9 @@ pub struct WireChannel {
     handle: WireHandle,
 }
 
-unsafe impl ZeroPadding for WireChannel {
+unsafe impl Wire for WireChannel {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(out: &mut MaybeUninit<Self>) {
         munge!(let Self { handle } = out);
@@ -40,11 +42,6 @@ impl WireChannel {
         self.handle.is_invalid()
     }
 
-    /// Takes the channel, if any, leaving an invalid handle in its place.
-    pub fn take(&self) -> Channel {
-        self.handle.take().into()
-    }
-
     /// Returns the underlying [`zx_handle_t`].
     #[inline]
     pub fn as_raw_handle(&self) -> zx_handle_t {
@@ -59,12 +56,6 @@ unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireChannel {
     }
 }
 
-impl TakeFrom<WireChannel> for Channel {
-    fn take_from(from: &WireChannel) -> Self {
-        from.take()
-    }
-}
-
 /// An optional Zircon channel.
 #[derive(Debug)]
 #[repr(transparent)]
@@ -72,7 +63,9 @@ pub struct WireOptionalChannel {
     handle: WireOptionalHandle,
 }
 
-unsafe impl ZeroPadding for WireOptionalChannel {
+unsafe impl Wire for WireOptionalChannel {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(out: &mut MaybeUninit<Self>) {
         munge!(let Self { handle } = out);
@@ -103,15 +96,17 @@ impl WireOptionalChannel {
         self.handle.is_none()
     }
 
-    /// Takes the channel, if any, leaving an invalid channel in its place.
-    pub fn take(&self) -> Option<Channel> {
-        self.handle.take().map(Channel::from)
-    }
-
     /// Returns the underlying [`zx_handle_t`], if any.
     #[inline]
     pub fn as_raw_handle(&self) -> Option<zx_handle_t> {
         self.handle.as_raw_handle()
+    }
+}
+
+unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireOptionalChannel {
+    fn decode(mut slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
+        munge!(let Self { handle } = slot.as_mut());
+        WireOptionalHandle::decode(handle, decoder)
     }
 }
 
@@ -130,6 +125,12 @@ unsafe impl<E: HandleEncoder + ?Sized> Encode<E> for Channel {
     }
 }
 
+impl FromWire<WireChannel> for Channel {
+    fn from_wire(wire: WireChannel) -> Self {
+        Handle::from_wire(wire.handle).into()
+    }
+}
+
 impl EncodableOption for Channel {
     type EncodedOption = WireOptionalChannel;
 }
@@ -145,15 +146,8 @@ unsafe impl<E: HandleEncoder + ?Sized> EncodeOption<E> for Channel {
     }
 }
 
-unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireOptionalChannel {
-    fn decode(mut slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
-        munge!(let Self { handle } = slot.as_mut());
-        WireOptionalHandle::decode(handle, decoder)
-    }
-}
-
-impl TakeFrom<WireOptionalChannel> for Option<Channel> {
-    fn take_from(from: &WireOptionalChannel) -> Self {
-        from.take()
+impl FromWireOption<WireOptionalChannel> for Channel {
+    fn from_wire_option(wire: WireOptionalChannel) -> Option<Self> {
+        Handle::from_wire_option(wire.handle).map(Channel::from)
     }
 }

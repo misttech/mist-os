@@ -7,8 +7,8 @@ use core::hint::unreachable_unchecked;
 use core::mem::MaybeUninit;
 
 use fidl_next_codec::{
-    munge, Decode, DecodeError, Encodable, Encode, EncodeError, EncodeRef, Slot, TakeFrom, WireI32,
-    ZeroPadding,
+    munge, Decode, DecodeError, Encodable, Encode, EncodeError, EncodeRef, FromWire, Slot, Wire,
+    WireI32,
 };
 
 /// An internal framework error.
@@ -26,7 +26,9 @@ pub struct WireFrameworkError {
     inner: WireI32,
 }
 
-unsafe impl ZeroPadding for WireFrameworkError {
+unsafe impl Wire for WireFrameworkError {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut MaybeUninit<Self>) {}
 }
@@ -85,8 +87,8 @@ unsafe impl<E: ?Sized> EncodeRef<E> for FrameworkError {
     }
 }
 
-impl TakeFrom<WireFrameworkError> for FrameworkError {
-    fn take_from(from: &WireFrameworkError) -> Self {
-        Self::from(*from)
+impl FromWire<WireFrameworkError> for FrameworkError {
+    fn from_wire(wire: WireFrameworkError) -> Self {
+        Self::from(wire)
     }
 }

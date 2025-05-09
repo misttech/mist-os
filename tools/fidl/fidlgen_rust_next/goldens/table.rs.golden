@@ -12,7 +12,7 @@ impl EmptyTable {
 }
 
 impl ::fidl_next::Encodable for EmptyTable {
-    type Encoded = WireEmptyTable;
+    type Encoded = WireEmptyTable<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for EmptyTable
@@ -30,7 +30,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -65,7 +65,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -85,20 +85,24 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireEmptyTable> for EmptyTable {
+impl<'de> ::fidl_next::FromWire<WireEmptyTable<'de>> for EmptyTable {
     #[inline]
-    fn take_from(from: &WireEmptyTable) -> Self {
+    fn from_wire(wire: WireEmptyTable<'de>) -> Self {
+        let table = ::core::mem::ManuallyDrop::new(wire.table);
+
         Self {}
     }
 }
 
 /// The wire type corresponding to [`EmptyTable`].
 #[repr(C)]
-pub struct WireEmptyTable {
-    table: ::fidl_next::WireTable,
+pub struct WireEmptyTable<'de> {
+    table: ::fidl_next::WireTable<'de>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireEmptyTable {
+unsafe impl ::fidl_next::Wire for WireEmptyTable<'static> {
+    type Decoded<'de> = WireEmptyTable<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         ::fidl_next::munge!(let Self { table } = out);
@@ -106,7 +110,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireEmptyTable {
     }
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyTable<'static>
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -126,9 +130,9 @@ where
     }
 }
 
-impl WireEmptyTable {}
+impl<'de> WireEmptyTable<'de> {}
 
-impl ::core::fmt::Debug for WireEmptyTable {
+impl<'de> ::core::fmt::Debug for WireEmptyTable<'de> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("EmptyTable").finish()
     }
@@ -144,7 +148,7 @@ impl ExtensionTable {
 }
 
 impl ::fidl_next::Encodable for ExtensionTable {
-    type Encoded = WireExtensionTable;
+    type Encoded = WireExtensionTable<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for ExtensionTable
@@ -162,7 +166,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -197,7 +201,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -217,20 +221,24 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireExtensionTable> for ExtensionTable {
+impl<'de> ::fidl_next::FromWire<WireExtensionTable<'de>> for ExtensionTable {
     #[inline]
-    fn take_from(from: &WireExtensionTable) -> Self {
+    fn from_wire(wire: WireExtensionTable<'de>) -> Self {
+        let table = ::core::mem::ManuallyDrop::new(wire.table);
+
         Self {}
     }
 }
 
 /// The wire type corresponding to [`ExtensionTable`].
 #[repr(C)]
-pub struct WireExtensionTable {
-    table: ::fidl_next::WireTable,
+pub struct WireExtensionTable<'de> {
+    table: ::fidl_next::WireTable<'de>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireExtensionTable {
+unsafe impl ::fidl_next::Wire for WireExtensionTable<'static> {
+    type Decoded<'de> = WireExtensionTable<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         ::fidl_next::munge!(let Self { table } = out);
@@ -238,7 +246,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireExtensionTable {
     }
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireExtensionTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExtensionTable<'static>
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -258,9 +266,9 @@ where
     }
 }
 
-impl WireExtensionTable {}
+impl<'de> WireExtensionTable<'de> {}
 
-impl ::core::fmt::Debug for WireExtensionTable {
+impl<'de> ::core::fmt::Debug for WireExtensionTable<'de> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("ExtensionTable").finish()
     }
@@ -294,7 +302,7 @@ impl NewerSimpleTable {
 }
 
 impl ::fidl_next::Encodable for NewerSimpleTable {
-    type Encoded = WireNewerSimpleTable;
+    type Encoded = WireNewerSimpleTable<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for NewerSimpleTable
@@ -312,7 +320,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -371,7 +379,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -415,26 +423,48 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireNewerSimpleTable> for NewerSimpleTable {
+impl<'de> ::fidl_next::FromWire<WireNewerSimpleTable<'de>> for NewerSimpleTable {
     #[inline]
-    fn take_from(from: &WireNewerSimpleTable) -> Self {
+    fn from_wire(wire: WireNewerSimpleTable<'de>) -> Self {
+        let table = ::core::mem::ManuallyDrop::new(wire.table);
+
+        let x = table.get(1);
+
+        let y = table.get(5);
+
+        let z = table.get(6);
+
         Self {
-            x: from.x().map(::fidl_next::TakeFrom::take_from),
+            x: x.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            y: from.y().map(::fidl_next::TakeFrom::take_from),
+            y: y.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            z: from.z().map(::fidl_next::TakeFrom::take_from),
+            z: z.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
         }
     }
 }
 
 /// The wire type corresponding to [`NewerSimpleTable`].
 #[repr(C)]
-pub struct WireNewerSimpleTable {
-    table: ::fidl_next::WireTable,
+pub struct WireNewerSimpleTable<'de> {
+    table: ::fidl_next::WireTable<'de>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireNewerSimpleTable {
+unsafe impl ::fidl_next::Wire for WireNewerSimpleTable<'static> {
+    type Decoded<'de> = WireNewerSimpleTable<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         ::fidl_next::munge!(let Self { table } = out);
@@ -442,7 +472,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireNewerSimpleTable {
     }
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireNewerSimpleTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireNewerSimpleTable<'static>
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -489,7 +519,7 @@ where
     }
 }
 
-impl WireNewerSimpleTable {
+impl<'de> WireNewerSimpleTable<'de> {
     pub fn x(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
@@ -503,7 +533,7 @@ impl WireNewerSimpleTable {
     }
 }
 
-impl ::core::fmt::Debug for WireNewerSimpleTable {
+impl<'de> ::core::fmt::Debug for WireNewerSimpleTable<'de> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("NewerSimpleTable")
             .field("x", &self.x())
@@ -529,7 +559,7 @@ impl OlderSimpleTable {
 }
 
 impl ::fidl_next::Encodable for OlderSimpleTable {
-    type Encoded = WireOlderSimpleTable;
+    type Encoded = WireOlderSimpleTable<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for OlderSimpleTable
@@ -547,7 +577,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -590,7 +620,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -618,20 +648,32 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireOlderSimpleTable> for OlderSimpleTable {
+impl<'de> ::fidl_next::FromWire<WireOlderSimpleTable<'de>> for OlderSimpleTable {
     #[inline]
-    fn take_from(from: &WireOlderSimpleTable) -> Self {
-        Self { x: from.x().map(::fidl_next::TakeFrom::take_from) }
+    fn from_wire(wire: WireOlderSimpleTable<'de>) -> Self {
+        let table = ::core::mem::ManuallyDrop::new(wire.table);
+
+        let x = table.get(1);
+
+        Self {
+            x: x.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+        }
     }
 }
 
 /// The wire type corresponding to [`OlderSimpleTable`].
 #[repr(C)]
-pub struct WireOlderSimpleTable {
-    table: ::fidl_next::WireTable,
+pub struct WireOlderSimpleTable<'de> {
+    table: ::fidl_next::WireTable<'de>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireOlderSimpleTable {
+unsafe impl ::fidl_next::Wire for WireOlderSimpleTable<'static> {
+    type Decoded<'de> = WireOlderSimpleTable<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         ::fidl_next::munge!(let Self { table } = out);
@@ -639,7 +681,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireOlderSimpleTable {
     }
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireOlderSimpleTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOlderSimpleTable<'static>
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -668,13 +710,13 @@ where
     }
 }
 
-impl WireOlderSimpleTable {
+impl<'de> WireOlderSimpleTable<'de> {
     pub fn x(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 }
 
-impl ::core::fmt::Debug for WireOlderSimpleTable {
+impl<'de> ::core::fmt::Debug for WireOlderSimpleTable<'de> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("OlderSimpleTable").field("x", &self.x()).finish()
     }
@@ -708,7 +750,7 @@ impl ReverseOrdinalTable {
 }
 
 impl ::fidl_next::Encodable for ReverseOrdinalTable {
-    type Encoded = WireReverseOrdinalTable;
+    type Encoded = WireReverseOrdinalTable<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for ReverseOrdinalTable
@@ -726,7 +768,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -785,7 +827,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -829,26 +871,48 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireReverseOrdinalTable> for ReverseOrdinalTable {
+impl<'de> ::fidl_next::FromWire<WireReverseOrdinalTable<'de>> for ReverseOrdinalTable {
     #[inline]
-    fn take_from(from: &WireReverseOrdinalTable) -> Self {
+    fn from_wire(wire: WireReverseOrdinalTable<'de>) -> Self {
+        let table = ::core::mem::ManuallyDrop::new(wire.table);
+
+        let z = table.get(1);
+
+        let y = table.get(2);
+
+        let x = table.get(3);
+
         Self {
-            z: from.z().map(::fidl_next::TakeFrom::take_from),
+            z: z.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            y: from.y().map(::fidl_next::TakeFrom::take_from),
+            y: y.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            x: from.x().map(::fidl_next::TakeFrom::take_from),
+            x: x.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
         }
     }
 }
 
 /// The wire type corresponding to [`ReverseOrdinalTable`].
 #[repr(C)]
-pub struct WireReverseOrdinalTable {
-    table: ::fidl_next::WireTable,
+pub struct WireReverseOrdinalTable<'de> {
+    table: ::fidl_next::WireTable<'de>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireReverseOrdinalTable {
+unsafe impl ::fidl_next::Wire for WireReverseOrdinalTable<'static> {
+    type Decoded<'de> = WireReverseOrdinalTable<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         ::fidl_next::munge!(let Self { table } = out);
@@ -856,7 +920,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireReverseOrdinalTable {
     }
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireReverseOrdinalTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireReverseOrdinalTable<'static>
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -903,7 +967,7 @@ where
     }
 }
 
-impl WireReverseOrdinalTable {
+impl<'de> WireReverseOrdinalTable<'de> {
     pub fn z(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
@@ -917,7 +981,7 @@ impl WireReverseOrdinalTable {
     }
 }
 
-impl ::core::fmt::Debug for WireReverseOrdinalTable {
+impl<'de> ::core::fmt::Debug for WireReverseOrdinalTable<'de> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("ReverseOrdinalTable")
             .field("z", &self.z())
@@ -949,7 +1013,7 @@ impl SimpleTable {
 }
 
 impl ::fidl_next::Encodable for SimpleTable {
-    type Encoded = WireSimpleTable;
+    type Encoded = WireSimpleTable<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for SimpleTable
@@ -967,7 +1031,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -1018,7 +1082,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -1054,24 +1118,40 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireSimpleTable> for SimpleTable {
+impl<'de> ::fidl_next::FromWire<WireSimpleTable<'de>> for SimpleTable {
     #[inline]
-    fn take_from(from: &WireSimpleTable) -> Self {
-        Self {
-            x: from.x().map(::fidl_next::TakeFrom::take_from),
+    fn from_wire(wire: WireSimpleTable<'de>) -> Self {
+        let table = ::core::mem::ManuallyDrop::new(wire.table);
 
-            y: from.y().map(::fidl_next::TakeFrom::take_from),
+        let x = table.get(1);
+
+        let y = table.get(5);
+
+        Self {
+            x: x.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            y: y.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
         }
     }
 }
 
 /// The wire type corresponding to [`SimpleTable`].
 #[repr(C)]
-pub struct WireSimpleTable {
-    table: ::fidl_next::WireTable,
+pub struct WireSimpleTable<'de> {
+    table: ::fidl_next::WireTable<'de>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireSimpleTable {
+unsafe impl ::fidl_next::Wire for WireSimpleTable<'static> {
+    type Decoded<'de> = WireSimpleTable<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         ::fidl_next::munge!(let Self { table } = out);
@@ -1079,7 +1159,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireSimpleTable {
     }
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleTable<'static>
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -1117,7 +1197,7 @@ where
     }
 }
 
-impl WireSimpleTable {
+impl<'de> WireSimpleTable<'de> {
     pub fn x(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
@@ -1127,7 +1207,7 @@ impl WireSimpleTable {
     }
 }
 
-impl ::core::fmt::Debug for WireSimpleTable {
+impl<'de> ::core::fmt::Debug for WireSimpleTable<'de> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("SimpleTable").field("x", &self.x()).field("y", &self.y()).finish()
     }
@@ -1527,7 +1607,7 @@ impl SixtyFourOrdinalTable {
 }
 
 impl ::fidl_next::Encodable for SixtyFourOrdinalTable {
-    type Encoded = WireSixtyFourOrdinalTable;
+    type Encoded = WireSixtyFourOrdinalTable<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for SixtyFourOrdinalTable
@@ -1545,7 +1625,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -2348,7 +2428,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -3136,148 +3216,536 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireSixtyFourOrdinalTable> for SixtyFourOrdinalTable {
+impl<'de> ::fidl_next::FromWire<WireSixtyFourOrdinalTable<'de>> for SixtyFourOrdinalTable {
     #[inline]
-    fn take_from(from: &WireSixtyFourOrdinalTable) -> Self {
+    fn from_wire(wire: WireSixtyFourOrdinalTable<'de>) -> Self {
+        let table = ::core::mem::ManuallyDrop::new(wire.table);
+
+        let v1 = table.get(1);
+
+        let v2 = table.get(2);
+
+        let v3 = table.get(3);
+
+        let v4 = table.get(4);
+
+        let v5 = table.get(5);
+
+        let v6 = table.get(6);
+
+        let v7 = table.get(7);
+
+        let v8 = table.get(8);
+
+        let v9 = table.get(9);
+
+        let v10 = table.get(10);
+
+        let v11 = table.get(11);
+
+        let v12 = table.get(12);
+
+        let v13 = table.get(13);
+
+        let v14 = table.get(14);
+
+        let v15 = table.get(15);
+
+        let v16 = table.get(16);
+
+        let v17 = table.get(17);
+
+        let v18 = table.get(18);
+
+        let v19 = table.get(19);
+
+        let v20 = table.get(20);
+
+        let v21 = table.get(21);
+
+        let v22 = table.get(22);
+
+        let v23 = table.get(23);
+
+        let v24 = table.get(24);
+
+        let v25 = table.get(25);
+
+        let v26 = table.get(26);
+
+        let v27 = table.get(27);
+
+        let v28 = table.get(28);
+
+        let v29 = table.get(29);
+
+        let v30 = table.get(30);
+
+        let v31 = table.get(31);
+
+        let v32 = table.get(32);
+
+        let v33 = table.get(33);
+
+        let v34 = table.get(34);
+
+        let v35 = table.get(35);
+
+        let v36 = table.get(36);
+
+        let v37 = table.get(37);
+
+        let v38 = table.get(38);
+
+        let v39 = table.get(39);
+
+        let v40 = table.get(40);
+
+        let v41 = table.get(41);
+
+        let v42 = table.get(42);
+
+        let v43 = table.get(43);
+
+        let v44 = table.get(44);
+
+        let v45 = table.get(45);
+
+        let v46 = table.get(46);
+
+        let v47 = table.get(47);
+
+        let v48 = table.get(48);
+
+        let v49 = table.get(49);
+
+        let v50 = table.get(50);
+
+        let v51 = table.get(51);
+
+        let v52 = table.get(52);
+
+        let v53 = table.get(53);
+
+        let v54 = table.get(54);
+
+        let v55 = table.get(55);
+
+        let v56 = table.get(56);
+
+        let v57 = table.get(57);
+
+        let v58 = table.get(58);
+
+        let v59 = table.get(59);
+
+        let v60 = table.get(60);
+
+        let v61 = table.get(61);
+
+        let v62 = table.get(62);
+
+        let v63 = table.get(63);
+
+        let v64 = table.get(64);
+
         Self {
-            v1: from.v1().map(::fidl_next::TakeFrom::take_from),
+            v1: v1.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v2: from.v2().map(::fidl_next::TakeFrom::take_from),
+            v2: v2.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v3: from.v3().map(::fidl_next::TakeFrom::take_from),
+            v3: v3.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v4: from.v4().map(::fidl_next::TakeFrom::take_from),
+            v4: v4.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v5: from.v5().map(::fidl_next::TakeFrom::take_from),
+            v5: v5.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v6: from.v6().map(::fidl_next::TakeFrom::take_from),
+            v6: v6.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v7: from.v7().map(::fidl_next::TakeFrom::take_from),
+            v7: v7.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v8: from.v8().map(::fidl_next::TakeFrom::take_from),
+            v8: v8.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v9: from.v9().map(::fidl_next::TakeFrom::take_from),
+            v9: v9.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v10: from.v10().map(::fidl_next::TakeFrom::take_from),
+            v10: v10.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v11: from.v11().map(::fidl_next::TakeFrom::take_from),
+            v11: v11.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v12: from.v12().map(::fidl_next::TakeFrom::take_from),
+            v12: v12.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v13: from.v13().map(::fidl_next::TakeFrom::take_from),
+            v13: v13.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v14: from.v14().map(::fidl_next::TakeFrom::take_from),
+            v14: v14.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v15: from.v15().map(::fidl_next::TakeFrom::take_from),
+            v15: v15.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v16: from.v16().map(::fidl_next::TakeFrom::take_from),
+            v16: v16.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v17: from.v17().map(::fidl_next::TakeFrom::take_from),
+            v17: v17.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v18: from.v18().map(::fidl_next::TakeFrom::take_from),
+            v18: v18.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v19: from.v19().map(::fidl_next::TakeFrom::take_from),
+            v19: v19.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v20: from.v20().map(::fidl_next::TakeFrom::take_from),
+            v20: v20.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v21: from.v21().map(::fidl_next::TakeFrom::take_from),
+            v21: v21.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v22: from.v22().map(::fidl_next::TakeFrom::take_from),
+            v22: v22.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v23: from.v23().map(::fidl_next::TakeFrom::take_from),
+            v23: v23.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v24: from.v24().map(::fidl_next::TakeFrom::take_from),
+            v24: v24.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v25: from.v25().map(::fidl_next::TakeFrom::take_from),
+            v25: v25.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v26: from.v26().map(::fidl_next::TakeFrom::take_from),
+            v26: v26.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v27: from.v27().map(::fidl_next::TakeFrom::take_from),
+            v27: v27.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v28: from.v28().map(::fidl_next::TakeFrom::take_from),
+            v28: v28.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v29: from.v29().map(::fidl_next::TakeFrom::take_from),
+            v29: v29.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v30: from.v30().map(::fidl_next::TakeFrom::take_from),
+            v30: v30.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v31: from.v31().map(::fidl_next::TakeFrom::take_from),
+            v31: v31.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v32: from.v32().map(::fidl_next::TakeFrom::take_from),
+            v32: v32.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v33: from.v33().map(::fidl_next::TakeFrom::take_from),
+            v33: v33.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v34: from.v34().map(::fidl_next::TakeFrom::take_from),
+            v34: v34.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v35: from.v35().map(::fidl_next::TakeFrom::take_from),
+            v35: v35.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v36: from.v36().map(::fidl_next::TakeFrom::take_from),
+            v36: v36.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v37: from.v37().map(::fidl_next::TakeFrom::take_from),
+            v37: v37.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v38: from.v38().map(::fidl_next::TakeFrom::take_from),
+            v38: v38.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v39: from.v39().map(::fidl_next::TakeFrom::take_from),
+            v39: v39.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v40: from.v40().map(::fidl_next::TakeFrom::take_from),
+            v40: v40.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v41: from.v41().map(::fidl_next::TakeFrom::take_from),
+            v41: v41.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v42: from.v42().map(::fidl_next::TakeFrom::take_from),
+            v42: v42.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v43: from.v43().map(::fidl_next::TakeFrom::take_from),
+            v43: v43.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v44: from.v44().map(::fidl_next::TakeFrom::take_from),
+            v44: v44.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v45: from.v45().map(::fidl_next::TakeFrom::take_from),
+            v45: v45.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v46: from.v46().map(::fidl_next::TakeFrom::take_from),
+            v46: v46.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v47: from.v47().map(::fidl_next::TakeFrom::take_from),
+            v47: v47.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v48: from.v48().map(::fidl_next::TakeFrom::take_from),
+            v48: v48.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v49: from.v49().map(::fidl_next::TakeFrom::take_from),
+            v49: v49.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v50: from.v50().map(::fidl_next::TakeFrom::take_from),
+            v50: v50.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v51: from.v51().map(::fidl_next::TakeFrom::take_from),
+            v51: v51.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v52: from.v52().map(::fidl_next::TakeFrom::take_from),
+            v52: v52.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v53: from.v53().map(::fidl_next::TakeFrom::take_from),
+            v53: v53.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v54: from.v54().map(::fidl_next::TakeFrom::take_from),
+            v54: v54.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v55: from.v55().map(::fidl_next::TakeFrom::take_from),
+            v55: v55.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v56: from.v56().map(::fidl_next::TakeFrom::take_from),
+            v56: v56.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v57: from.v57().map(::fidl_next::TakeFrom::take_from),
+            v57: v57.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v58: from.v58().map(::fidl_next::TakeFrom::take_from),
+            v58: v58.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v59: from.v59().map(::fidl_next::TakeFrom::take_from),
+            v59: v59.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v60: from.v60().map(::fidl_next::TakeFrom::take_from),
+            v60: v60.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v61: from.v61().map(::fidl_next::TakeFrom::take_from),
+            v61: v61.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v62: from.v62().map(::fidl_next::TakeFrom::take_from),
+            v62: v62.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v63: from.v63().map(::fidl_next::TakeFrom::take_from),
+            v63: v63.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
 
-            v64: from.v64().map(::fidl_next::TakeFrom::take_from),
+            v64: v64.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<crate::WireExtensionTable<'de>>()
+                })
+            }),
         }
     }
 }
 
 /// The wire type corresponding to [`SixtyFourOrdinalTable`].
 #[repr(C)]
-pub struct WireSixtyFourOrdinalTable {
-    table: ::fidl_next::WireTable,
+pub struct WireSixtyFourOrdinalTable<'de> {
+    table: ::fidl_next::WireTable<'de>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireSixtyFourOrdinalTable {
+unsafe impl ::fidl_next::Wire for WireSixtyFourOrdinalTable<'static> {
+    type Decoded<'de> = WireSixtyFourOrdinalTable<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         ::fidl_next::munge!(let Self { table } = out);
@@ -3285,7 +3753,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireSixtyFourOrdinalTable {
     }
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireSixtyFourOrdinalTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSixtyFourOrdinalTable<'static>
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -3867,7 +4335,7 @@ where
                 }
 
                 64 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, crate::WireExtensionTable>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, crate::WireExtensionTable<'static>>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -3881,7 +4349,7 @@ where
     }
 }
 
-impl WireSixtyFourOrdinalTable {
+impl<'de> WireSixtyFourOrdinalTable<'de> {
     pub fn v1(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
@@ -4134,12 +4602,12 @@ impl WireSixtyFourOrdinalTable {
         unsafe { Some(self.table.get(63)?.deref_unchecked()) }
     }
 
-    pub fn v64(&self) -> Option<&crate::WireExtensionTable> {
+    pub fn v64(&self) -> Option<&crate::WireExtensionTable<'de>> {
         unsafe { Some(self.table.get(64)?.deref_unchecked()) }
     }
 }
 
-impl ::core::fmt::Debug for WireSixtyFourOrdinalTable {
+impl<'de> ::core::fmt::Debug for WireSixtyFourOrdinalTable<'de> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("SixtyFourOrdinalTable")
             .field("v1", &self.v1())
@@ -4226,7 +4694,7 @@ impl TableWithAttributes {
 }
 
 impl ::fidl_next::Encodable for TableWithAttributes {
-    type Encoded = WireTableWithAttributes;
+    type Encoded = WireTableWithAttributes<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for TableWithAttributes
@@ -4244,7 +4712,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -4287,7 +4755,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -4315,20 +4783,32 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireTableWithAttributes> for TableWithAttributes {
+impl<'de> ::fidl_next::FromWire<WireTableWithAttributes<'de>> for TableWithAttributes {
     #[inline]
-    fn take_from(from: &WireTableWithAttributes) -> Self {
-        Self { x: from.x().map(::fidl_next::TakeFrom::take_from) }
+    fn from_wire(wire: WireTableWithAttributes<'de>) -> Self {
+        let table = ::core::mem::ManuallyDrop::new(wire.table);
+
+        let x = table.get(1);
+
+        Self {
+            x: x.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+        }
     }
 }
 
 /// The wire type corresponding to [`TableWithAttributes`].
 #[repr(C)]
-pub struct WireTableWithAttributes {
-    table: ::fidl_next::WireTable,
+pub struct WireTableWithAttributes<'de> {
+    table: ::fidl_next::WireTable<'de>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireTableWithAttributes {
+unsafe impl ::fidl_next::Wire for WireTableWithAttributes<'static> {
+    type Decoded<'de> = WireTableWithAttributes<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         ::fidl_next::munge!(let Self { table } = out);
@@ -4336,7 +4816,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireTableWithAttributes {
     }
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireTableWithAttributes
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireTableWithAttributes<'static>
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -4365,240 +4845,17 @@ where
     }
 }
 
-impl WireTableWithAttributes {
+impl<'de> WireTableWithAttributes<'de> {
     pub fn x(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 }
 
-impl ::core::fmt::Debug for WireTableWithAttributes {
+impl<'de> ::core::fmt::Debug for WireTableWithAttributes<'de> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("TableWithAttributes").field("x", &self.x()).finish()
     }
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {
-
-    impl ::fidl_next::TakeFrom<crate::WireEmptyTable> for ::fidl_test_table::EmptyTable {
-        #[inline]
-        fn take_from(from: &crate::WireEmptyTable) -> Self {
-            Self { __source_breaking: ::fidl::marker::SourceBreaking }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireExtensionTable> for ::fidl_test_table::ExtensionTable {
-        #[inline]
-        fn take_from(from: &crate::WireExtensionTable) -> Self {
-            Self { __source_breaking: ::fidl::marker::SourceBreaking }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireNewerSimpleTable> for ::fidl_test_table::NewerSimpleTable {
-        #[inline]
-        fn take_from(from: &crate::WireNewerSimpleTable) -> Self {
-            Self {
-                x: from.x().map(::fidl_next::TakeFrom::take_from),
-
-                y: from.y().map(::fidl_next::TakeFrom::take_from),
-
-                z: from.z().map(::fidl_next::TakeFrom::take_from),
-
-                __source_breaking: ::fidl::marker::SourceBreaking,
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireOlderSimpleTable> for ::fidl_test_table::OlderSimpleTable {
-        #[inline]
-        fn take_from(from: &crate::WireOlderSimpleTable) -> Self {
-            Self {
-                x: from.x().map(::fidl_next::TakeFrom::take_from),
-
-                __source_breaking: ::fidl::marker::SourceBreaking,
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireReverseOrdinalTable>
-        for ::fidl_test_table::ReverseOrdinalTable
-    {
-        #[inline]
-        fn take_from(from: &crate::WireReverseOrdinalTable) -> Self {
-            Self {
-                z: from.z().map(::fidl_next::TakeFrom::take_from),
-
-                y: from.y().map(::fidl_next::TakeFrom::take_from),
-
-                x: from.x().map(::fidl_next::TakeFrom::take_from),
-
-                __source_breaking: ::fidl::marker::SourceBreaking,
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireSimpleTable> for ::fidl_test_table::SimpleTable {
-        #[inline]
-        fn take_from(from: &crate::WireSimpleTable) -> Self {
-            Self {
-                x: from.x().map(::fidl_next::TakeFrom::take_from),
-
-                y: from.y().map(::fidl_next::TakeFrom::take_from),
-
-                __source_breaking: ::fidl::marker::SourceBreaking,
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireSixtyFourOrdinalTable>
-        for ::fidl_test_table::SixtyFourOrdinalTable
-    {
-        #[inline]
-        fn take_from(from: &crate::WireSixtyFourOrdinalTable) -> Self {
-            Self {
-                v1: from.v1().map(::fidl_next::TakeFrom::take_from),
-
-                v2: from.v2().map(::fidl_next::TakeFrom::take_from),
-
-                v3: from.v3().map(::fidl_next::TakeFrom::take_from),
-
-                v4: from.v4().map(::fidl_next::TakeFrom::take_from),
-
-                v5: from.v5().map(::fidl_next::TakeFrom::take_from),
-
-                v6: from.v6().map(::fidl_next::TakeFrom::take_from),
-
-                v7: from.v7().map(::fidl_next::TakeFrom::take_from),
-
-                v8: from.v8().map(::fidl_next::TakeFrom::take_from),
-
-                v9: from.v9().map(::fidl_next::TakeFrom::take_from),
-
-                v10: from.v10().map(::fidl_next::TakeFrom::take_from),
-
-                v11: from.v11().map(::fidl_next::TakeFrom::take_from),
-
-                v12: from.v12().map(::fidl_next::TakeFrom::take_from),
-
-                v13: from.v13().map(::fidl_next::TakeFrom::take_from),
-
-                v14: from.v14().map(::fidl_next::TakeFrom::take_from),
-
-                v15: from.v15().map(::fidl_next::TakeFrom::take_from),
-
-                v16: from.v16().map(::fidl_next::TakeFrom::take_from),
-
-                v17: from.v17().map(::fidl_next::TakeFrom::take_from),
-
-                v18: from.v18().map(::fidl_next::TakeFrom::take_from),
-
-                v19: from.v19().map(::fidl_next::TakeFrom::take_from),
-
-                v20: from.v20().map(::fidl_next::TakeFrom::take_from),
-
-                v21: from.v21().map(::fidl_next::TakeFrom::take_from),
-
-                v22: from.v22().map(::fidl_next::TakeFrom::take_from),
-
-                v23: from.v23().map(::fidl_next::TakeFrom::take_from),
-
-                v24: from.v24().map(::fidl_next::TakeFrom::take_from),
-
-                v25: from.v25().map(::fidl_next::TakeFrom::take_from),
-
-                v26: from.v26().map(::fidl_next::TakeFrom::take_from),
-
-                v27: from.v27().map(::fidl_next::TakeFrom::take_from),
-
-                v28: from.v28().map(::fidl_next::TakeFrom::take_from),
-
-                v29: from.v29().map(::fidl_next::TakeFrom::take_from),
-
-                v30: from.v30().map(::fidl_next::TakeFrom::take_from),
-
-                v31: from.v31().map(::fidl_next::TakeFrom::take_from),
-
-                v32: from.v32().map(::fidl_next::TakeFrom::take_from),
-
-                v33: from.v33().map(::fidl_next::TakeFrom::take_from),
-
-                v34: from.v34().map(::fidl_next::TakeFrom::take_from),
-
-                v35: from.v35().map(::fidl_next::TakeFrom::take_from),
-
-                v36: from.v36().map(::fidl_next::TakeFrom::take_from),
-
-                v37: from.v37().map(::fidl_next::TakeFrom::take_from),
-
-                v38: from.v38().map(::fidl_next::TakeFrom::take_from),
-
-                v39: from.v39().map(::fidl_next::TakeFrom::take_from),
-
-                v40: from.v40().map(::fidl_next::TakeFrom::take_from),
-
-                v41: from.v41().map(::fidl_next::TakeFrom::take_from),
-
-                v42: from.v42().map(::fidl_next::TakeFrom::take_from),
-
-                v43: from.v43().map(::fidl_next::TakeFrom::take_from),
-
-                v44: from.v44().map(::fidl_next::TakeFrom::take_from),
-
-                v45: from.v45().map(::fidl_next::TakeFrom::take_from),
-
-                v46: from.v46().map(::fidl_next::TakeFrom::take_from),
-
-                v47: from.v47().map(::fidl_next::TakeFrom::take_from),
-
-                v48: from.v48().map(::fidl_next::TakeFrom::take_from),
-
-                v49: from.v49().map(::fidl_next::TakeFrom::take_from),
-
-                v50: from.v50().map(::fidl_next::TakeFrom::take_from),
-
-                v51: from.v51().map(::fidl_next::TakeFrom::take_from),
-
-                v52: from.v52().map(::fidl_next::TakeFrom::take_from),
-
-                v53: from.v53().map(::fidl_next::TakeFrom::take_from),
-
-                v54: from.v54().map(::fidl_next::TakeFrom::take_from),
-
-                v55: from.v55().map(::fidl_next::TakeFrom::take_from),
-
-                v56: from.v56().map(::fidl_next::TakeFrom::take_from),
-
-                v57: from.v57().map(::fidl_next::TakeFrom::take_from),
-
-                v58: from.v58().map(::fidl_next::TakeFrom::take_from),
-
-                v59: from.v59().map(::fidl_next::TakeFrom::take_from),
-
-                v60: from.v60().map(::fidl_next::TakeFrom::take_from),
-
-                v61: from.v61().map(::fidl_next::TakeFrom::take_from),
-
-                v62: from.v62().map(::fidl_next::TakeFrom::take_from),
-
-                v63: from.v63().map(::fidl_next::TakeFrom::take_from),
-
-                v64: from.v64().map(::fidl_next::TakeFrom::take_from),
-
-                __source_breaking: ::fidl::marker::SourceBreaking,
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireTableWithAttributes>
-        for ::fidl_test_table::TableWithAttributes
-    {
-        #[inline]
-        fn take_from(from: &crate::WireTableWithAttributes) -> Self {
-            Self {
-                x: from.x().map(::fidl_next::TakeFrom::take_from),
-
-                __source_breaking: ::fidl::marker::SourceBreaking,
-            }
-        }
-    }
-}
+pub mod compat {}

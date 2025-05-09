@@ -10,7 +10,7 @@ pub struct ExampleUseOfVectors {
 }
 
 impl ::fidl_next::Encodable for ExampleUseOfVectors {
-    type Encoded = WireExampleUseOfVectors;
+    type Encoded = WireExampleUseOfVectors<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for ExampleUseOfVectors
@@ -77,11 +77,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<ExampleUseOfVectors> {
-    type EncodedOption = ::fidl_next::WireBox<WireExampleUseOfVectors>;
+impl ::fidl_next::EncodableOption for ExampleUseOfVectors {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireExampleUseOfVectors<'static>>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleUseOfVectors>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for ExampleUseOfVectors
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ExampleUseOfVectors: ::fidl_next::Encode<___E>,
@@ -93,7 +93,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -103,7 +103,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<ExampleUseOfVectors>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for ExampleUseOfVectors
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ExampleUseOfVectors: ::fidl_next::EncodeRef<___E>,
@@ -125,14 +125,14 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireExampleUseOfVectors> for ExampleUseOfVectors {
+impl<'de> ::fidl_next::FromWire<WireExampleUseOfVectors<'de>> for ExampleUseOfVectors {
     #[inline]
-    fn take_from(from: &WireExampleUseOfVectors) -> Self {
+    fn from_wire(wire: WireExampleUseOfVectors<'de>) -> Self {
         Self {
-            vector_of_uint8: ::fidl_next::TakeFrom::take_from(&from.vector_of_uint8),
+            vector_of_uint8: ::fidl_next::FromWire::from_wire(wire.vector_of_uint8),
 
-            vector_of_vector_of_bool: ::fidl_next::TakeFrom::take_from(
-                &from.vector_of_vector_of_bool,
+            vector_of_vector_of_bool: ::fidl_next::FromWire::from_wire(
+                wire.vector_of_vector_of_bool,
             ),
         }
     }
@@ -141,18 +141,20 @@ impl ::fidl_next::TakeFrom<WireExampleUseOfVectors> for ExampleUseOfVectors {
 /// The wire type corresponding to [`ExampleUseOfVectors`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireExampleUseOfVectors {
-    pub vector_of_uint8: ::fidl_next::WireVector<u8>,
+pub struct WireExampleUseOfVectors<'de> {
+    pub vector_of_uint8: ::fidl_next::WireVector<'de, u8>,
 
-    pub vector_of_vector_of_bool: ::fidl_next::WireVector<::fidl_next::WireVector<bool>>,
+    pub vector_of_vector_of_bool: ::fidl_next::WireVector<'de, ::fidl_next::WireVector<'de, bool>>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireExampleUseOfVectors {
+unsafe impl ::fidl_next::Wire for WireExampleUseOfVectors<'static> {
+    type Decoded<'de> = WireExampleUseOfVectors<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUseOfVectors
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUseOfVectors<'static>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -179,20 +181,4 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {
-
-    impl ::fidl_next::TakeFrom<crate::WireExampleUseOfVectors>
-        for ::fidl_test_vectors::ExampleUseOfVectors
-    {
-        #[inline]
-        fn take_from(from: &crate::WireExampleUseOfVectors) -> Self {
-            Self {
-                vector_of_uint8: ::fidl_next::TakeFrom::take_from(&from.vector_of_uint8),
-
-                vector_of_vector_of_bool: ::fidl_next::TakeFrom::take_from(
-                    &from.vector_of_vector_of_bool,
-                ),
-            }
-        }
-    }
-}
+pub mod compat {}

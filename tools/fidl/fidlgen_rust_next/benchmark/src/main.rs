@@ -11,7 +11,7 @@ mod minecraft;
 use core::mem::MaybeUninit;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use fidl_next::{DecoderExt as _, EncoderExt as _};
+use fidl_next::{DecoderExt as _, EncoderExt as _, Wire};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng as _};
 
@@ -128,10 +128,12 @@ where
     );
 }
 
-fn bench_rust_next<T, W>(c: &mut Criterion, name: &str, input: T, input_size: usize)
+fn bench_rust_next<T>(c: &mut Criterion, name: &str, input: T, input_size: usize)
 where
-    T: 'static + fidl_next::EncodeRef<Vec<fidl_next::Chunk>> + fidl_next::TakeFrom<W>,
-    W: for<'a> fidl_next::Decode<&'a mut [fidl_next::Chunk]>,
+    T: 'static
+        + fidl_next::EncodeRef<Vec<fidl_next::Chunk>>
+        + for<'de> fidl_next::FromWire<<T::Encoded as Wire>::Decoded<'de>>,
+    T::Encoded: for<'a> fidl_next::Decode<&'a mut [fidl_next::Chunk]>,
 {
     let mut decode_chunks = Vec::new();
     decode_chunks.encode_next(&input).unwrap();
@@ -150,7 +152,7 @@ where
             || decode_wire_chunks.clone(),
             |decode_chunks| {
                 let chunks = black_box(decode_chunks).as_mut_slice();
-                black_box(chunks.decode::<W>()).unwrap();
+                black_box(chunks.decode::<T::Encoded>()).unwrap();
             },
             criterion::BatchSize::SmallInput,
         );
@@ -161,8 +163,8 @@ where
             || decode_chunks.clone(),
             |decode_chunks| {
                 let chunks = black_box(decode_chunks).as_mut_slice();
-                let value = chunks.decode::<W>().unwrap();
-                black_box(T::take_from(&value));
+                let value = chunks.decode::<T::Encoded>().unwrap();
+                black_box(value.take::<T>());
             },
             criterion::BatchSize::SmallInput,
         );

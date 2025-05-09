@@ -10,17 +10,19 @@ use core::str::{from_utf8, from_utf8_unchecked};
 use munge::munge;
 
 use crate::{
-    Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, EncodeRef, Encoder, Slot,
-    TakeFrom, WireVector, ZeroPadding,
+    Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, EncodeRef, Encoder, FromWire,
+    Slot, Wire, WireVector,
 };
 
 /// A FIDL string
 #[repr(transparent)]
-pub struct WireString {
-    vec: WireVector<u8>,
+pub struct WireString<'de> {
+    vec: WireVector<'de, u8>,
 }
 
-unsafe impl ZeroPadding for WireString {
+unsafe impl Wire for WireString<'static> {
+    type Decoded<'de> = WireString<'de>;
+
     #[inline]
     fn zero_padding(out: &mut MaybeUninit<Self>) {
         munge!(let Self { vec } = out);
@@ -28,7 +30,7 @@ unsafe impl ZeroPadding for WireString {
     }
 }
 
-impl WireString {
+impl WireString<'_> {
     /// Encodes that a string is present in a slot.
     #[inline]
     pub fn encode_present(out: &mut MaybeUninit<Self>, len: u64) {
@@ -55,7 +57,7 @@ impl WireString {
     }
 }
 
-impl Deref for WireString {
+impl Deref for WireString<'_> {
     type Target = str;
 
     #[inline]
@@ -64,14 +66,14 @@ impl Deref for WireString {
     }
 }
 
-impl fmt::Debug for WireString {
+impl fmt::Debug for WireString<'_> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
     }
 }
 
-unsafe impl<D: Decoder + ?Sized> Decode<D> for WireString {
+unsafe impl<D: Decoder + ?Sized> Decode<D> for WireString<'static> {
     #[inline]
     fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { mut vec } = slot);
@@ -93,7 +95,7 @@ unsafe impl<D: Decoder + ?Sized> Decode<D> for WireString {
 }
 
 impl Encodable for String {
-    type Encoded = WireString;
+    type Encoded = WireString<'static>;
 }
 
 unsafe impl<E: Encoder + ?Sized> Encode<E> for String {
@@ -119,7 +121,7 @@ unsafe impl<E: Encoder + ?Sized> EncodeRef<E> for String {
 }
 
 impl Encodable for &str {
-    type Encoded = WireString;
+    type Encoded = WireString<'static>;
 }
 
 unsafe impl<E: Encoder + ?Sized> Encode<E> for &str {
@@ -135,9 +137,9 @@ unsafe impl<E: Encoder + ?Sized> Encode<E> for &str {
     }
 }
 
-impl TakeFrom<WireString> for String {
+impl FromWire<WireString<'_>> for String {
     #[inline]
-    fn take_from(from: &WireString) -> Self {
-        from.to_string()
+    fn from_wire(wire: WireString<'_>) -> Self {
+        unsafe { String::from_utf8_unchecked(Vec::from_wire(wire.vec)) }
     }
 }

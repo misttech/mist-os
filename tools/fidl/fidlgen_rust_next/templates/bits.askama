@@ -68,10 +68,10 @@ impl ::core::convert::From<{{ wire_name }}> for {{ name }} {
     }
 }
 
-impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
+impl ::fidl_next::FromWire<{{ wire_name }}> for {{ name }} {
     #[inline]
-    fn take_from(from: &{{ wire_name }}) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: {{ wire_name }}) -> Self {
+        Self::from(wire)
     }
 }
 
@@ -88,7 +88,9 @@ pub struct {{ wire_name }} {
     value: {{ wire_subtype }},
 }
 
-unsafe impl ::fidl_next::ZeroPadding for {{ wire_name }} {
+unsafe impl ::fidl_next::Wire for {{ wire_name }} {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding

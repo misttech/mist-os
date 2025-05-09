@@ -361,7 +361,7 @@ mod tests {
     use fidl_next_codec::fuchsia::{HandleDecoder, HandleEncoder, WireHandle};
     use fidl_next_codec::{
         munge, Decode, DecodeError, DecoderExt as _, Encodable, Encode, EncodeError,
-        EncoderExt as _, Slot, WireString, ZeroPadding,
+        EncoderExt as _, FromWire, Slot, Wire, WireString,
     };
     use fuchsia_async as fasync;
     use zx::{AsHandleRef, Channel, Handle, HandleBased as _, Instant, Signals, WaitResult};
@@ -414,7 +414,9 @@ mod tests {
         boolean: bool,
     }
 
-    unsafe impl ZeroPadding for WireHandleAndBoolean {
+    unsafe impl Wire for WireHandleAndBoolean {
+        type Decoded<'de> = Self;
+
         fn zero_padding(out: &mut MaybeUninit<Self>) {
             unsafe {
                 out.as_mut_ptr().write_bytes(0, 1);
@@ -448,6 +450,12 @@ mod tests {
         }
     }
 
+    impl FromWire<WireHandleAndBoolean> for HandleAndBoolean {
+        fn from_wire(wire: WireHandleAndBoolean) -> Self {
+            Self { handle: Handle::from_wire(wire.handle), boolean: wire.boolean }
+        }
+    }
+
     #[test]
     fn partial_decode_drops_handles() {
         let (encode_end, check_end) = Channel::create();
@@ -461,7 +469,7 @@ mod tests {
 
         let mut recv_buffer = RecvBuffer { buffer, chunks_taken: 0, handles_taken: 0 };
         (&mut recv_buffer)
-            .decode_prefix::<WireHandleAndBoolean>()
+            .decode_owned::<WireHandleAndBoolean>()
             .expect_err("decoding an invalid boolean should fail");
 
         // Decoding failed, so the handle should still be in the buffer.
@@ -498,15 +506,13 @@ mod tests {
             WaitResult::TimedOut(Signals::CHANNEL_WRITABLE),
         );
 
-        drop(decoded.handle.take());
+        drop(decoded);
 
         // Now the handle should be signaled.
         assert_eq!(
             check_end.wait_handle(Signals::CHANNEL_PEER_CLOSED, Instant::INFINITE_PAST),
             WaitResult::Ok(Signals::CHANNEL_PEER_CLOSED),
         );
-
-        drop(decoded);
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -517,7 +523,7 @@ mod tests {
         impl<T: Transport> ServerHandler<T> for TestServer {
             fn on_one_way(&mut self, _: &ServerSender<T>, ordinal: u64, buffer: T::RecvBuffer) {
                 assert_eq!(ordinal, 42);
-                let message = buffer.decode::<WireString>().expect("failed to decode request");
+                let message = buffer.decode::<WireString<'_>>().expect("failed to decode request");
                 assert_eq!(&**message, "Hello world");
             }
 

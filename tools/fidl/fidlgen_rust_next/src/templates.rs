@@ -39,7 +39,23 @@ impl Context {
     }
 
     fn wire_type<'a>(&'a self, ty: &'a Type) -> WireTypeTemplate<'a> {
-        WireTypeTemplate { ty, context: self }
+        WireTypeTemplate { ty, context: self, lifetime: "'de" }
+    }
+
+    fn static_wire_type<'a>(&'a self, ty: &'a Type) -> WireTypeTemplate<'a> {
+        WireTypeTemplate { ty, context: self, lifetime: "'static" }
+    }
+
+    fn wire_type_with_lifetime<'a>(
+        &'a self,
+        ty: &'a Type,
+        lifetime: &'static str,
+    ) -> WireTypeTemplate<'a> {
+        WireTypeTemplate { ty, context: self, lifetime }
+    }
+
+    fn anonymous_wire_type<'a>(&'a self, ty: &'a Type) -> WireTypeTemplate<'a> {
+        WireTypeTemplate { ty, context: self, lifetime: "'_" }
     }
 
     fn wire_optional_id<'a>(&'a self, id: &'a CompId) -> PrefixedIdTemplate<'a> {
@@ -208,6 +224,7 @@ struct PrefixedIdTemplate<'a> {
 struct WireTypeTemplate<'a> {
     ty: &'a Type,
     context: &'a Context,
+    lifetime: &'static str,
 }
 
 #[derive(Template)]
@@ -324,21 +341,34 @@ impl StructTemplate<'_> {
 }
 
 struct UnionTemplateStrings {
+    de: &'static str,
+    static_: &'static str,
+    phantom: &'static str,
     decode_unknown: &'static str,
     decode_as: &'static str,
     encode_as: &'static str,
 }
 
 impl UnionTemplate<'_> {
+    fn has_only_static_members(&self) -> bool {
+        self.union.members.iter().all(|m| m.ty.shape.max_out_of_line == 0)
+    }
+
     fn template_strings(&self) -> &'static UnionTemplateStrings {
         if self.union.shape.max_out_of_line == 0 {
             &UnionTemplateStrings {
+                de: "",
+                static_: "",
+                phantom: "()",
                 decode_unknown: "decode_unknown_static",
                 decode_as: "decode_as_static",
                 encode_as: "encode_as_static",
             }
         } else {
             &UnionTemplateStrings {
+                de: "<'de>",
+                static_: "<'static>",
+                phantom: "&'de mut [::fidl_next::Chunk]",
                 decode_unknown: "decode_unknown",
                 decode_as: "decode_as",
                 encode_as: "encode_as",

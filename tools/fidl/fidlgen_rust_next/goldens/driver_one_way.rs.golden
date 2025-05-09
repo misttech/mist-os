@@ -9,7 +9,7 @@ pub struct Payload {
 }
 
 impl ::fidl_next::Encodable for Payload {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WirePayload> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
         )
@@ -64,11 +64,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<Payload> {
-    type EncodedOption = ::fidl_next::WireBox<WirePayload>;
+impl ::fidl_next::EncodableOption for Payload {
+    type EncodedOption = ::fidl_next::WireBox<'static, WirePayload>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<Payload>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Payload
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     Payload: ::fidl_next::Encode<___E>,
@@ -80,7 +80,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -90,7 +90,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<Payload>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Payload
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     Payload: ::fidl_next::EncodeRef<___E>,
@@ -112,16 +112,17 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WirePayload> for Payload {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+impl ::fidl_next::FromWire<WirePayload> for Payload {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WirePayload, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WirePayload) -> Self {
-        Self { value: ::fidl_next::TakeFrom::take_from(&from.value) }
+    fn from_wire(wire: WirePayload) -> Self {
+        Self { value: ::fidl_next::FromWire::from_wire(wire.value) }
     }
 }
 
@@ -132,7 +133,9 @@ pub struct WirePayload {
     pub value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WirePayload {
+unsafe impl ::fidl_next::Wire for WirePayload {
+    type Decoded<'de> = WirePayload;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -165,7 +168,7 @@ pub struct OneWaySendRequest {
 }
 
 impl ::fidl_next::Encodable for OneWaySendRequest {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireOneWaySendRequest> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <crate::Payload as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
         )
@@ -220,11 +223,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<OneWaySendRequest> {
-    type EncodedOption = ::fidl_next::WireBox<WireOneWaySendRequest>;
+impl ::fidl_next::EncodableOption for OneWaySendRequest {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireOneWaySendRequest>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<OneWaySendRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for OneWaySendRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     OneWaySendRequest: ::fidl_next::Encode<___E>,
@@ -236,7 +239,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -246,7 +249,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<OneWaySendRequest>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for OneWaySendRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     OneWaySendRequest: ::fidl_next::EncodeRef<___E>,
@@ -268,16 +271,18 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireOneWaySendRequest> for OneWaySendRequest {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+impl ::fidl_next::FromWire<WireOneWaySendRequest> for OneWaySendRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireOneWaySendRequest, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <crate::Payload as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true
+                && <crate::Payload as ::fidl_next::FromWire<crate::WirePayload>>::COPY_OPTIMIZATION
+                    .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireOneWaySendRequest) -> Self {
-        Self { payload: ::fidl_next::TakeFrom::take_from(&from.payload) }
+    fn from_wire(wire: WireOneWaySendRequest) -> Self {
+        Self { payload: ::fidl_next::FromWire::from_wire(wire.payload) }
     }
 }
 
@@ -288,7 +293,9 @@ pub struct WireOneWaySendRequest {
     pub payload: crate::WirePayload,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireOneWaySendRequest {
+unsafe impl ::fidl_next::Wire for WireOneWaySendRequest {
+    type Decoded<'de> = WireOneWaySendRequest;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -429,7 +436,8 @@ where
     ___T: ::fidl_next::Transport,
     ___H: OneWayServerHandler<___T>,
 
-    crate::WireOneWaySendRequest: ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
+    <one_way::Send as ::fidl_next::Method>::Request:
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,
@@ -469,23 +477,6 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::fidl_next::TakeFrom<crate::WirePayload> for ::fidl_test_driveroneway::Payload {
-        #[inline]
-        fn take_from(from: &crate::WirePayload) -> Self {
-            Self { value: ::fidl_next::TakeFrom::take_from(&from.value) }
-        }
-    }
-
-    #[cfg(feature = "driver")]
-    impl ::fidl_next::TakeFrom<crate::WireOneWaySendRequest>
-        for ::fidl_test_driveroneway::OneWaySendRequest
-    {
-        #[inline]
-        fn take_from(from: &crate::WireOneWaySendRequest) -> Self {
-            Self { payload: ::fidl_next::TakeFrom::take_from(&from.payload) }
-        }
-    }
-
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `OneWay`
     /// protocol.
@@ -493,9 +484,9 @@ pub mod compat {
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::OneWay>;
 
     #[cfg(feature = "driver")]
-    impl ::fidl_next::TakeFrom<crate::OneWay> for ::fidl_test_driveroneway::OneWayMarker {
+    impl ::core::convert::From<crate::OneWay> for ::fidl_test_driveroneway::OneWayMarker {
         #[inline]
-        fn take_from(from: &crate::OneWay) -> Self {
+        fn from(_: crate::OneWay) -> Self {
             Self
         }
     }

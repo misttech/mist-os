@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::cell::Cell;
 use core::fmt;
-use core::mem::{ManuallyDrop, MaybeUninit};
+use core::mem::{forget, MaybeUninit};
 
 use zx::sys::{zx_handle_t, ZX_HANDLE_INVALID};
 use zx::Handle;
@@ -12,23 +11,27 @@ use zx::Handle;
 use crate::fuchsia::{HandleDecoder, HandleEncoder};
 use crate::{
     munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
-    Slot, TakeFrom, WireU32, ZeroPadding,
+    FromWire, FromWireOption, Slot, Wire, WireU32,
 };
 
 /// A Zircon handle.
 #[repr(C, align(4))]
 pub union WireHandle {
     encoded: WireU32,
-    decoded: ManuallyDrop<Cell<zx_handle_t>>,
+    decoded: zx_handle_t,
 }
 
 impl Drop for WireHandle {
     fn drop(&mut self) {
-        drop(self.take());
+        // SAFETY: `WireHandle` is always a valid `Handle`.
+        let handle = unsafe { Handle::from_raw(self.as_raw_handle()) };
+        drop(handle);
     }
 }
 
-unsafe impl ZeroPadding for WireHandle {
+unsafe impl Wire for WireHandle {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut MaybeUninit<Self>) {
         // Wire handles have no padding
@@ -47,16 +50,10 @@ impl WireHandle {
         self.as_raw_handle() == ZX_HANDLE_INVALID
     }
 
-    /// Takes the handle, if any, leaving an invalid handle in its place.
-    pub fn take(&self) -> Handle {
-        let raw = unsafe { self.decoded.replace(ZX_HANDLE_INVALID) };
-        unsafe { Handle::from_raw(raw) }
-    }
-
     /// Returns the underlying [`zx_handle_t`].
     #[inline]
     pub fn as_raw_handle(&self) -> zx_handle_t {
-        unsafe { self.decoded.get() }
+        unsafe { self.decoded }
     }
 }
 
@@ -77,18 +74,12 @@ unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireHandle {
                 munge!(let Self { mut decoded } = slot);
                 // SAFETY: `Cell` has no uninit bytes, even though it doesn't implement `IntoBytes`.
                 unsafe {
-                    decoded.as_mut_ptr().write(ManuallyDrop::new(Cell::new(handle)));
+                    decoded.as_mut_ptr().write(handle);
                 }
             }
             e => return Err(DecodeError::InvalidHandlePresence(e)),
         }
         Ok(())
-    }
-}
-
-impl TakeFrom<WireHandle> for Handle {
-    fn take_from(from: &WireHandle) -> Self {
-        from.take()
     }
 }
 
@@ -99,7 +90,9 @@ pub struct WireOptionalHandle {
     handle: WireHandle,
 }
 
-unsafe impl ZeroPadding for WireOptionalHandle {
+unsafe impl Wire for WireOptionalHandle {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(out: &mut MaybeUninit<Self>) {
         munge!(let Self { handle } = out);
@@ -130,15 +123,17 @@ impl WireOptionalHandle {
         self.handle.is_invalid()
     }
 
-    /// Takes the handle, if any, leaving an invalid handle in its place.
-    pub fn take(&self) -> Option<Handle> {
-        self.is_some().then(|| self.handle.take())
-    }
-
     /// Returns the underlying [`zx_handle_t`], if any.
     #[inline]
     pub fn as_raw_handle(&self) -> Option<zx_handle_t> {
         self.is_some().then(|| self.handle.as_raw_handle())
+    }
+}
+
+unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireOptionalHandle {
+    fn decode(mut slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
+        munge!(let Self { handle } = slot.as_mut());
+        WireHandle::decode(handle, decoder)
     }
 }
 
@@ -162,6 +157,15 @@ unsafe impl<E: HandleEncoder + ?Sized> Encode<E> for Handle {
     }
 }
 
+impl FromWire<WireHandle> for Handle {
+    fn from_wire(wire: WireHandle) -> Self {
+        // SAFETY: `WireHandle` is always a valid `Handle`.
+        let handle = unsafe { Handle::from_raw(wire.as_raw_handle()) };
+        forget(wire);
+        handle
+    }
+}
+
 impl EncodableOption for Handle {
     type EncodedOption = WireOptionalHandle;
 }
@@ -182,16 +186,11 @@ unsafe impl<E: HandleEncoder + ?Sized> EncodeOption<E> for Handle {
     }
 }
 
-unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireOptionalHandle {
-    fn decode(mut slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
-        munge!(let Self { handle } = slot.as_mut());
-        WireHandle::decode(handle, decoder)
-    }
-}
-
-impl TakeFrom<WireOptionalHandle> for Option<Handle> {
-    fn take_from(from: &WireOptionalHandle) -> Self {
-        from.take()
+impl FromWireOption<WireOptionalHandle> for Handle {
+    fn from_wire_option(wire: WireOptionalHandle) -> Option<Self> {
+        let raw_handle = wire.as_raw_handle();
+        forget(wire);
+        raw_handle.map(|raw| unsafe { Handle::from_raw(raw) })
     }
 }
 
@@ -199,15 +198,15 @@ impl TakeFrom<WireOptionalHandle> for Option<Handle> {
 macro_rules! impl_takefrom {
     ($($name:ident),* $(,)?) => {
         $(
-            impl TakeFrom<WireHandle> for zx::$name {
-                fn take_from(from: &WireHandle) -> zx::$name {
-                    from.take().into()
+            impl FromWire<WireHandle> for zx::$name {
+                fn from_wire(wire: WireHandle) -> Self {
+                    Handle::from_wire(wire).into()
                 }
             }
 
-            impl TakeFrom<WireOptionalHandle> for Option<zx::$name> {
-                fn take_from(from: &WireOptionalHandle) -> Self {
-                    from.take().map(<zx::$name>::from)
+            impl FromWireOption<WireOptionalHandle> for zx::$name {
+                fn from_wire_option(wire: WireOptionalHandle) -> Option<Self> {
+                    Handle::from_wire_option(wire).map(<zx::$name>::from)
                 }
             }
         )*

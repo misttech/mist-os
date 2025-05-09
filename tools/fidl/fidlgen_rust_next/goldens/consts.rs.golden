@@ -64,10 +64,10 @@ impl ::core::convert::From<WireBitsType> for BitsType {
     }
 }
 
-impl ::fidl_next::TakeFrom<WireBitsType> for BitsType {
+impl ::fidl_next::FromWire<WireBitsType> for BitsType {
     #[inline]
-    fn take_from(from: &WireBitsType) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: WireBitsType) -> Self {
+        Self::from(wire)
     }
 }
 
@@ -78,7 +78,9 @@ pub struct WireBitsType {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireBitsType {
+unsafe impl ::fidl_next::Wire for WireBitsType {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
@@ -187,10 +189,10 @@ impl ::core::convert::From<WireEnumType> for EnumType {
     }
 }
 
-impl ::fidl_next::TakeFrom<WireEnumType> for EnumType {
+impl ::fidl_next::FromWire<WireEnumType> for EnumType {
     #[inline]
-    fn take_from(from: &WireEnumType) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: WireEnumType) -> Self {
+        Self::from(wire)
     }
 }
 
@@ -201,7 +203,9 @@ pub struct WireEnumType {
     value: ::fidl_next::WireI32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireEnumType {
+unsafe impl ::fidl_next::Wire for WireEnumType {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
@@ -283,17 +287,17 @@ pub const ENUM_VAL: crate::EnumType = crate::EnumType::Value;
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::fidl_next::TakeFrom<crate::WireBitsType> for ::fidl_test_consts::BitsType {
+    impl ::core::convert::From<crate::BitsType> for ::fidl_test_consts::BitsType {
         #[inline]
-        fn take_from(from: &crate::WireBitsType) -> Self {
-            Self::from_bits_retain(from.value.into())
+        fn from(from: crate::BitsType) -> Self {
+            Self::from_bits_retain(from.bits())
         }
     }
 
-    impl ::fidl_next::TakeFrom<crate::WireEnumType> for ::fidl_test_consts::EnumType {
+    impl ::core::convert::From<crate::EnumType> for ::fidl_test_consts::EnumType {
         #[inline]
-        fn take_from(from: &crate::WireEnumType) -> Self {
-            match crate::EnumType::from(*from) {
+        fn from(from: crate::EnumType) -> Self {
+            match crate::EnumType::from(from) {
                 crate::EnumType::Value => Self::Value,
 
                 crate::EnumType::True => Self::True_,

@@ -5,8 +5,7 @@
 use core::mem::MaybeUninit;
 
 use fidl_next_codec::{
-    Decode, DecodeError, Encodable, Encode, EncodeError, EncodeRef, Slot, WireU32, WireU64,
-    ZeroPadding,
+    Decode, DecodeError, Encodable, Encode, EncodeError, EncodeRef, Slot, Wire, WireU32, WireU64,
 };
 
 use zerocopy::IntoBytes;
@@ -25,7 +24,9 @@ pub struct WireMessageHeader {
     pub ordinal: WireU64,
 }
 
-unsafe impl ZeroPadding for WireMessageHeader {
+unsafe impl Wire for WireMessageHeader {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut MaybeUninit<Self>) {
         // Wire message headers have no padding

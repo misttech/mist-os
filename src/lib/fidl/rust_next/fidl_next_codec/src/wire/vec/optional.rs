@@ -10,17 +10,19 @@ use munge::munge;
 use super::raw::RawWireVector;
 use crate::{
     Decode, DecodeError, Decoder, DecoderExt as _, Encodable, EncodableOption, Encode, EncodeError,
-    EncodeOption, EncodeOptionRef, EncodeRef, Encoder, EncoderExt as _, Slot, TakeFrom,
-    WirePointer, WireVector, ZeroPadding,
+    EncodeOption, EncodeOptionRef, EncodeRef, Encoder, EncoderExt as _, FromWire, FromWireOption,
+    Slot, Wire, WirePointer, WireVector,
 };
 
 /// An optional FIDL vector
 #[repr(transparent)]
-pub struct WireOptionalVector<T> {
-    raw: RawWireVector<T>,
+pub struct WireOptionalVector<'de, T> {
+    raw: RawWireVector<'de, T>,
 }
 
-unsafe impl<T> ZeroPadding for WireOptionalVector<T> {
+unsafe impl<T: Wire> Wire for WireOptionalVector<'static, T> {
+    type Decoded<'de> = WireOptionalVector<'de, T::Decoded<'de>>;
+
     #[inline]
     fn zero_padding(out: &mut MaybeUninit<Self>) {
         munge!(let Self { raw } = out);
@@ -28,7 +30,7 @@ unsafe impl<T> ZeroPadding for WireOptionalVector<T> {
     }
 }
 
-impl<T> Drop for WireOptionalVector<T> {
+impl<T> Drop for WireOptionalVector<'_, T> {
     fn drop(&mut self) {
         if needs_drop::<T>() && self.is_some() {
             unsafe {
@@ -38,7 +40,7 @@ impl<T> Drop for WireOptionalVector<T> {
     }
 }
 
-impl<T> WireOptionalVector<T> {
+impl<'de, T> WireOptionalVector<'de, T> {
     /// Encodes that a vector is present in a slot.
     pub fn encode_present(out: &mut MaybeUninit<Self>, len: u64) {
         munge!(let Self { raw } = out);
@@ -62,9 +64,18 @@ impl<T> WireOptionalVector<T> {
     }
 
     /// Gets a reference to the vector, if any.
-    pub fn as_ref(&self) -> Option<&WireVector<T>> {
+    pub fn as_ref(&self) -> Option<&WireVector<'_, T>> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
+        } else {
+            None
+        }
+    }
+
+    /// Converts the optional wire vector to an `Option<WireVector>`.
+    pub fn to_option(self) -> Option<WireVector<'de, T>> {
+        if self.is_some() {
+            Some(unsafe { core::mem::transmute::<Self, WireVector<'de, T>>(self) })
         } else {
             None
         }
@@ -74,7 +85,7 @@ impl<T> WireOptionalVector<T> {
     ///
     /// # Safety
     ///
-    /// The elements of the wire vecot rmust not need to be individually decoded, and must always be
+    /// The elements of the wire vector must not need to be individually decoded, and must always be
     /// valid.
     pub unsafe fn decode_raw<D>(
         mut slot: Slot<'_, Self>,
@@ -97,13 +108,13 @@ impl<T> WireOptionalVector<T> {
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for WireOptionalVector<T> {
+impl<T: fmt::Debug> fmt::Debug for WireOptionalVector<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_ref().fmt(f)
     }
 }
 
-unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for WireOptionalVector<T> {
+unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for WireOptionalVector<'static, T> {
     fn decode(mut slot: Slot<'_, Self>, mut decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { raw: RawWireVector { len, mut ptr } } = slot.as_mut());
 
@@ -125,7 +136,7 @@ unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for WireOptionalVector<
 fn encode_to_optional_vector<V, E, T>(
     value: Option<V>,
     encoder: &mut E,
-    out: &mut MaybeUninit<WireOptionalVector<T::Encoded>>,
+    out: &mut MaybeUninit<WireOptionalVector<'_, T::Encoded>>,
 ) -> Result<(), EncodeError>
 where
     V: AsRef<[T]> + IntoIterator,
@@ -154,10 +165,14 @@ where
 }
 
 impl<T: Encodable> EncodableOption for Vec<T> {
-    type EncodedOption = WireOptionalVector<T::Encoded>;
+    type EncodedOption = WireOptionalVector<'static, T::Encoded>;
 }
 
-unsafe impl<E: Encoder + ?Sized, T: Encode<E>> EncodeOption<E> for Vec<T> {
+unsafe impl<E, T> EncodeOption<E> for Vec<T>
+where
+    E: Encoder + ?Sized,
+    T: Encode<E>,
+{
     fn encode_option(
         this: Option<Self>,
         encoder: &mut E,
@@ -167,7 +182,11 @@ unsafe impl<E: Encoder + ?Sized, T: Encode<E>> EncodeOption<E> for Vec<T> {
     }
 }
 
-unsafe impl<E: Encoder + ?Sized, T: EncodeRef<E>> EncodeOptionRef<E> for Vec<T> {
+unsafe impl<E, T> EncodeOptionRef<E> for Vec<T>
+where
+    E: Encoder + ?Sized,
+    T: EncodeRef<E>,
+{
     fn encode_option_ref(
         this: Option<&Self>,
         encoder: &mut E,
@@ -178,10 +197,14 @@ unsafe impl<E: Encoder + ?Sized, T: EncodeRef<E>> EncodeOptionRef<E> for Vec<T> 
 }
 
 impl<T: Encodable> EncodableOption for &[T] {
-    type EncodedOption = WireOptionalVector<T::Encoded>;
+    type EncodedOption = WireOptionalVector<'static, T::Encoded>;
 }
 
-unsafe impl<E: Encoder + ?Sized, T: EncodeRef<E>> EncodeOption<E> for &[T] {
+unsafe impl<E, T> EncodeOption<E> for &[T]
+where
+    E: Encoder + ?Sized,
+    T: EncodeRef<E>,
+{
     fn encode_option(
         this: Option<Self>,
         encoder: &mut E,
@@ -191,8 +214,8 @@ unsafe impl<E: Encoder + ?Sized, T: EncodeRef<E>> EncodeOption<E> for &[T] {
     }
 }
 
-impl<T: TakeFrom<WT>, WT> TakeFrom<WireOptionalVector<WT>> for Option<Vec<T>> {
-    fn take_from(from: &WireOptionalVector<WT>) -> Self {
-        from.as_ref().map(Vec::take_from)
+impl<T: FromWire<W>, W> FromWireOption<WireOptionalVector<'_, W>> for Vec<T> {
+    fn from_wire_option(wire: WireOptionalVector<'_, W>) -> Option<Self> {
+        wire.to_option().map(Vec::from_wire)
     }
 }

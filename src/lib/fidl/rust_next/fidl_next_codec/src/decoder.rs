@@ -8,7 +8,7 @@ use core::mem::take;
 use core::ptr::NonNull;
 use core::slice;
 
-use crate::{Chunk, Decode, DecodeError, Decoded, Owned, Slot, CHUNK_SIZE};
+use crate::{Chunk, Decode, DecodeError, Decoded, Slot, CHUNK_SIZE};
 
 /// A decoder for FIDL handles (internal).
 pub trait InternalHandleDecoder {
@@ -99,34 +99,26 @@ unsafe impl Decoder for &mut [Chunk] {
 /// Extension methods for [`Decoder`].
 pub trait DecoderExt {
     /// Takes a slice of `Chunk`s from the decoder.
-    fn take_chunks<'buf>(
-        self: &mut &'buf mut Self,
+    fn take_chunks<'de>(
+        self: &mut &'de mut Self,
         count: usize,
-    ) -> Result<&'buf mut [Chunk], DecodeError>;
+    ) -> Result<&'de mut [Chunk], DecodeError>;
 
     /// Takes enough chunks for a `T`, returning a `Slot` of the taken value.
-    fn take_slot<'buf, T>(self: &mut &'buf mut Self) -> Result<Slot<'buf, T>, DecodeError>;
+    fn take_slot<'de, T>(self: &mut &'de mut Self) -> Result<Slot<'de, T>, DecodeError>;
 
     /// Takes enough chunks for a slice of `T`, returning a `Slot` of the taken slice.
-    fn take_slice_slot<'buf, T>(
-        self: &mut &'buf mut Self,
+    fn take_slice_slot<'de, T>(
+        self: &mut &'de mut Self,
         len: usize,
-    ) -> Result<Slot<'buf, [T]>, DecodeError>;
+    ) -> Result<Slot<'de, [T]>, DecodeError>;
 
     /// Decodes an `Owned` value from the decoder without finishing it.
     ///
     /// On success, returns `Ok` of an `Owned` value. Returns `Err` if decoding failed.
-    fn decode_prefix<'buf, T: Decode<Self>>(
-        self: &mut &'buf mut Self,
-    ) -> Result<Owned<'buf, T>, DecodeError>;
-
-    /// Decodes an `Owned` slice from the decoder without finishing it.
-    ///
-    /// On success, returns `Ok` of an `Owned` slice. Returns `Err` if decoding failed.
-    fn decode_slice_prefix<'buf, T: Decode<Self>>(
-        self: &mut &'buf mut Self,
-        len: usize,
-    ) -> Result<Owned<'buf, [T]>, DecodeError>;
+    fn decode_owned<'de, T: Decode<Self>>(
+        self: &mut &'de mut Self,
+    ) -> Result<T::Decoded<'de>, DecodeError>;
 
     /// Decodes a value from the decoder and finishes it.
     ///
@@ -136,26 +128,17 @@ pub trait DecoderExt {
     where
         T: Decode<Self>,
         Self: Sized;
-
-    /// Decodes a slice from the decoder and finishes it.
-    ///
-    /// On success, returns `Ok` of a `Decoded` slice with the decoder. Returns `Err` if decoding
-    /// failed or the decoder finished with an error.
-    fn decode_slice<T>(self, len: usize) -> Result<Decoded<[T], Self>, DecodeError>
-    where
-        T: Decode<Self>,
-        Self: Sized;
 }
 
 impl<D: Decoder + ?Sized> DecoderExt for D {
-    fn take_chunks<'buf>(
-        self: &mut &'buf mut Self,
+    fn take_chunks<'de>(
+        self: &mut &'de mut Self,
         count: usize,
-    ) -> Result<&'buf mut [Chunk], DecodeError> {
+    ) -> Result<&'de mut [Chunk], DecodeError> {
         self.take_chunks_raw(count).map(|p| unsafe { slice::from_raw_parts_mut(p.as_ptr(), count) })
     }
 
-    fn take_slot<'buf, T>(self: &mut &'buf mut Self) -> Result<Slot<'buf, T>, DecodeError> {
+    fn take_slot<'de, T>(self: &mut &'de mut Self) -> Result<Slot<'de, T>, DecodeError> {
         // TODO: might be able to move this into a const for guaranteed const
         // eval
         assert!(
@@ -171,10 +154,10 @@ impl<D: Decoder + ?Sized> DecoderExt for D {
         unsafe { Ok(Slot::new_unchecked(chunks.as_mut_ptr().cast())) }
     }
 
-    fn take_slice_slot<'buf, T>(
-        self: &mut &'buf mut Self,
+    fn take_slice_slot<'de, T>(
+        self: &mut &'de mut Self,
         len: usize,
-    ) -> Result<Slot<'buf, [T]>, DecodeError> {
+    ) -> Result<Slot<'de, [T]>, DecodeError> {
         assert!(
             align_of::<T>() <= CHUNK_SIZE,
             "attempted to take a slice slot for a type with an alignment \
@@ -188,29 +171,15 @@ impl<D: Decoder + ?Sized> DecoderExt for D {
         unsafe { Ok(Slot::new_slice_unchecked(chunks.as_mut_ptr().cast(), len)) }
     }
 
-    fn decode_prefix<'buf, T: Decode<Self>>(
-        self: &mut &'buf mut Self,
-    ) -> Result<Owned<'buf, T>, DecodeError> {
+    fn decode_owned<'de, T: Decode<Self>>(
+        self: &mut &'de mut Self,
+    ) -> Result<T::Decoded<'de>, DecodeError> {
         let mut slot = self.take_slot::<T>()?;
         T::decode(slot.as_mut(), self)?;
         self.commit();
         // SAFETY: `slot` decoded successfully and the decoder was committed. `slot` now points to a
         // valid `T` within the decoder.
-        unsafe { Ok(Owned::new_unchecked(slot.as_mut_ptr())) }
-    }
-
-    fn decode_slice_prefix<'buf, T: Decode<Self>>(
-        self: &mut &'buf mut Self,
-        len: usize,
-    ) -> Result<Owned<'buf, [T]>, DecodeError> {
-        let mut slot = self.take_slice_slot::<T>(len)?;
-        for i in 0..len {
-            T::decode(slot.index(i), self)?;
-        }
-        self.commit();
-        // SAFETY: `slot` decoded successfully and the decoder was committed. `slot` now points to a
-        // valid `[T]` within the decoder.
-        unsafe { Ok(Owned::new_unchecked(slot.as_mut_ptr())) }
+        unsafe { Ok(slot.as_mut_ptr().cast::<T::Decoded<'de>>().read()) }
     }
 
     fn decode<T>(mut self) -> Result<Decoded<T, Self>, DecodeError>
@@ -219,23 +188,11 @@ impl<D: Decoder + ?Sized> DecoderExt for D {
         Self: Sized,
     {
         let mut decoder = &mut self;
-        let result = decoder.decode_prefix::<T>()?;
-        decoder.finish()?;
-        // SAFETY: `result` points to an owned `T` contained within `decoder`.
-        unsafe { Ok(Decoded::new_unchecked(result.into_raw(), self)) }
-    }
-
-    fn decode_slice<T: Decode<Self>>(
-        mut self,
-        len: usize,
-    ) -> Result<Decoded<[T], Self>, DecodeError>
-    where
-        Self: Sized,
-    {
-        let mut decoder = &mut self;
-        let result = decoder.decode_slice_prefix::<T>(len)?;
-        decoder.finish()?;
-        // SAFETY: `result` points to an owned `[T]` contained within `decoder`.
-        unsafe { Ok(Decoded::new_unchecked(result.into_raw(), self)) }
+        let mut slot = decoder.take_slot::<T>()?;
+        T::decode(slot.as_mut(), decoder)?;
+        decoder.commit();
+        // SAFETY: `slot` decoded successfully and the decoder was committed. `slot` now points to a
+        // valid `T` within the decoder.
+        unsafe { Ok(Decoded::new_unchecked(slot.as_mut_ptr(), self)) }
     }
 }

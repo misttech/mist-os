@@ -28,30 +28,30 @@ mod testing;
 mod chunk;
 #[cfg(feature = "compat")]
 mod compat;
+mod copy_optimization;
 mod decode;
 mod decoded;
 pub mod decoder;
 mod encode;
 pub mod encoder;
+mod from_wire;
 #[cfg(feature = "fuchsia")]
 pub mod fuchsia;
-mod owned;
 mod primitives;
 mod slot;
-mod take;
 mod wire;
 
 pub use bitflags::bitflags;
 pub use munge::munge;
 
 pub use self::chunk::*;
+pub use self::copy_optimization::*;
 pub use self::decode::*;
 pub use self::decoded::*;
 pub use self::decoder::{Decoder, DecoderExt};
 pub use self::encode::*;
 pub use self::encoder::{Encoder, EncoderExt};
-pub use self::owned::*;
+pub use self::from_wire::*;
 pub use self::primitives::*;
 pub use self::slot::*;
-pub use self::take::*;
 pub use self::wire::*;

@@ -42,7 +42,7 @@ pub async fn test_close_on_drop<T: Transport + 'static>(client_end: T, server_en
             buffer: T::RecvBuffer,
             responder: Responder,
         ) {
-            let message = buffer.decode::<WireString>().expect("failed to decode request");
+            let message = buffer.decode::<WireString<'_>>().expect("failed to decode request");
             assert_eq!(ordinal, 42);
             assert_eq!(&**message, "Ping");
 
@@ -69,7 +69,7 @@ pub async fn test_close_on_drop<T: Transport + 'static>(client_end: T, server_en
         .expect("client failed to encode request")
         .await
         .expect("client failed to send request and receive response")
-        .decode::<WireString>()
+        .decode::<WireString<'_>>()
         .expect("failed to decode response");
     assert_eq!(&**message, "Pong");
 
@@ -85,7 +85,7 @@ pub async fn test_one_way<T: Transport + 'static>(client_end: T, server_end: T) 
     impl<T: Transport> ServerHandler<T> for TestServer {
         fn on_one_way(&mut self, _: &ServerSender<T>, ordinal: u64, buffer: T::RecvBuffer) {
             assert_eq!(ordinal, 42);
-            let message = buffer.decode::<WireString>().expect("failed to decode request");
+            let message = buffer.decode::<WireString<'_>>().expect("failed to decode request");
             assert_eq!(&**message, "Hello world");
         }
 
@@ -131,7 +131,7 @@ pub async fn test_two_way<T: Transport + 'static>(client_end: T, server_end: T) 
             responder: Responder,
         ) {
             assert_eq!(ordinal, 42);
-            let message = buffer.decode::<WireString>().expect("failed to decode request");
+            let message = buffer.decode::<WireString<'_>>().expect("failed to decode request");
             assert_eq!(&**message, "Ping");
 
             let server = server.clone();
@@ -157,7 +157,7 @@ pub async fn test_two_way<T: Transport + 'static>(client_end: T, server_end: T) 
         .expect("client failed to encode request")
         .await
         .expect("client failed to send request and receive response")
-        .decode::<WireString>()
+        .decode::<WireString<'_>>()
         .expect("failed to decode response");
     assert_eq!(&**message, "Pong");
 
@@ -186,7 +186,7 @@ pub async fn test_multiple_two_way<T: Transport + 'static>(client_end: T, server
             buffer: T::RecvBuffer,
             responder: Responder,
         ) {
-            let message = buffer.decode::<WireString>().expect("failed to decode request");
+            let message = buffer.decode::<WireString<'_>>().expect("failed to decode request");
 
             let response = match ordinal {
                 1 => "One",
@@ -224,19 +224,19 @@ pub async fn test_multiple_two_way<T: Transport + 'static>(client_end: T, server
 
     let message_one = response_one
         .expect("client failed to send request and receive response")
-        .decode::<WireString>()
+        .decode::<WireString<'_>>()
         .expect("failed to decode response");
     assert_eq!(&**message_one, "One");
 
     let message_two = response_two
         .expect("client failed to send request and receive response")
-        .decode::<WireString>()
+        .decode::<WireString<'_>>()
         .expect("failed to decode response");
     assert_eq!(&**message_two, "Two");
 
     let message_three = response_three
         .expect("client failed to send request and receive response")
-        .decode::<WireString>()
+        .decode::<WireString<'_>>()
         .expect("failed to decode response");
     assert_eq!(&**message_three, "Three");
 
@@ -254,7 +254,7 @@ pub async fn test_event<T: Transport + 'static>(client_end: T, server_end: T) {
     impl<T: Transport> ClientHandler<T> for TestClient {
         fn on_event(&mut self, client: &ClientSender<T>, ordinal: u64, buffer: T::RecvBuffer) {
             assert_eq!(ordinal, 10);
-            let message = buffer.decode::<WireString>().expect("failed to decode request");
+            let message = buffer.decode::<WireString<'_>>().expect("failed to decode request");
             assert_eq!(&**message, "Surprise!");
 
             client.close();

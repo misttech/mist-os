@@ -156,9 +156,9 @@ pub mod compat {
     /// protocol.
     pub type TopProxy = ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Top>;
 
-    impl ::fidl_next::TakeFrom<crate::Top> for ::fidl_test_transitivedependenciescompose::TopMarker {
+    impl ::core::convert::From<crate::Top> for ::fidl_test_transitivedependenciescompose::TopMarker {
         #[inline]
-        fn take_from(from: &crate::Top) -> Self {
+        fn from(_: crate::Top) -> Self {
             Self
         }
     }

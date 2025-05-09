@@ -10,16 +10,18 @@ use munge::munge;
 
 use crate::{
     Decode, DecodeError, Decoder, EncodableOption, EncodeError, EncodeOption, EncodeOptionRef,
-    Encoder, Slot, TakeFrom, WireOptionalVector, WireString, WireVector, ZeroPadding,
+    Encoder, FromWireOption, Slot, Wire, WireOptionalVector, WireString, WireVector,
 };
 
 /// An optional FIDL string
 #[repr(transparent)]
-pub struct WireOptionalString {
-    vec: WireOptionalVector<u8>,
+pub struct WireOptionalString<'de> {
+    vec: WireOptionalVector<'de, u8>,
 }
 
-unsafe impl ZeroPadding for WireOptionalString {
+unsafe impl Wire for WireOptionalString<'static> {
+    type Decoded<'de> = WireOptionalString<'de>;
+
     #[inline]
     fn zero_padding(out: &mut MaybeUninit<Self>) {
         munge!(let Self { vec } = out);
@@ -27,7 +29,7 @@ unsafe impl ZeroPadding for WireOptionalString {
     }
 }
 
-impl WireOptionalString {
+impl WireOptionalString<'_> {
     /// Encodes that a string is present in a slot.
     #[inline]
     pub fn encode_present(out: &mut MaybeUninit<Self>, len: u64) {
@@ -56,19 +58,19 @@ impl WireOptionalString {
 
     /// Returns a reference to the underlying string, if any.
     #[inline]
-    pub fn as_ref(&self) -> Option<&WireString> {
-        self.vec.as_ref().map(|vec| unsafe { &*(vec as *const WireVector<u8>).cast() })
+    pub fn as_ref(&self) -> Option<&WireString<'_>> {
+        self.vec.as_ref().map(|vec| unsafe { &*(vec as *const WireVector<'_, u8>).cast() })
     }
 }
 
-impl fmt::Debug for WireOptionalString {
+impl fmt::Debug for WireOptionalString<'_> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_ref().fmt(f)
     }
 }
 
-unsafe impl<D: Decoder + ?Sized> Decode<D> for WireOptionalString {
+unsafe impl<D: Decoder + ?Sized> Decode<D> for WireOptionalString<'static> {
     #[inline]
     fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { mut vec } = slot);
@@ -91,7 +93,7 @@ unsafe impl<D: Decoder + ?Sized> Decode<D> for WireOptionalString {
 }
 
 impl EncodableOption for String {
-    type EncodedOption = WireOptionalString;
+    type EncodedOption = WireOptionalString<'static>;
 }
 
 unsafe impl<E: Encoder + ?Sized> EncodeOption<E> for String {
@@ -117,7 +119,7 @@ unsafe impl<E: Encoder + ?Sized> EncodeOptionRef<E> for String {
 }
 
 impl EncodableOption for &str {
-    type EncodedOption = WireOptionalString;
+    type EncodedOption = WireOptionalString<'static>;
 }
 
 unsafe impl<E: Encoder + ?Sized> EncodeOption<E> for &str {
@@ -137,9 +139,9 @@ unsafe impl<E: Encoder + ?Sized> EncodeOption<E> for &str {
     }
 }
 
-impl TakeFrom<WireOptionalString> for Option<String> {
+impl FromWireOption<WireOptionalString<'_>> for String {
     #[inline]
-    fn take_from(from: &WireOptionalString) -> Self {
-        from.as_ref().map(String::take_from)
+    fn from_wire_option(from: WireOptionalString<'_>) -> Option<Self> {
+        Vec::from_wire_option(from.vec).map(|vec| unsafe { String::from_utf8_unchecked(vec) })
     }
 }

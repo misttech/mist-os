@@ -7,8 +7,8 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
 use fidl_next_codec::{
-    munge, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, EncodeRef, Encoder,
-    RawWireUnion, Slot, TakeFrom, ZeroPadding,
+    munge, Chunk, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, EncodeRef, Encoder,
+    FromWire, RawWireUnion, Slot, Wire,
 };
 
 use crate::{FrameworkError, WireFrameworkError};
@@ -34,12 +34,14 @@ impl<T> Flexible<T> {
 
 /// A flexible FIDL response.
 #[repr(transparent)]
-pub struct WireFlexible<T> {
+pub struct WireFlexible<'de, T> {
     raw: RawWireUnion,
-    _phantom: PhantomData<T>,
+    _phantom: PhantomData<(&'de mut [Chunk], T)>,
 }
 
-unsafe impl<T> ZeroPadding for WireFlexible<T> {
+unsafe impl<T: Wire> Wire for WireFlexible<'static, T> {
+    type Decoded<'de> = WireFlexible<'de, T::Decoded<'de>>;
+
     #[inline]
     fn zero_padding(out: &mut MaybeUninit<Self>) {
         munge!(let Self { raw, _phantom: _ } = out);
@@ -50,7 +52,7 @@ unsafe impl<T> ZeroPadding for WireFlexible<T> {
 const ORD_OK: u64 = 1;
 const ORD_FRAMEWORK_ERR: u64 = 3;
 
-impl<T> WireFlexible<T> {
+impl<T> WireFlexible<'_, T> {
     /// Returns whether the flexible response is `Ok`.
     pub fn is_ok(&self) -> bool {
         self.raw.ordinal() == ORD_OK
@@ -99,7 +101,7 @@ impl<T> WireFlexible<T> {
         }
     }
 
-    /// Returns a `Result` of the `Ok` value and a potential `FrameworkError`.`
+    /// Returns a `Result` of the `Ok` value and a potential `FrameworkError`.
     pub fn as_result(&self) -> Result<&T, FrameworkError> {
         match self.raw.ordinal() {
             ORD_OK => unsafe { Ok(self.raw.get().deref_unchecked()) },
@@ -109,9 +111,20 @@ impl<T> WireFlexible<T> {
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
+
+    /// Returns a `Flexible` of an `Owned` value or framework error.
+    pub fn to_flexible(self) -> Flexible<T> {
+        match self.raw.ordinal() {
+            ORD_OK => unsafe { Flexible::Ok(self.raw.get().read_unchecked()) },
+            ORD_FRAMEWORK_ERR => unsafe {
+                Flexible::FrameworkErr(self.raw.get().read_unchecked::<WireFrameworkError>().into())
+            },
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
-impl<T> fmt::Debug for WireFlexible<T>
+impl<T> fmt::Debug for WireFlexible<'_, T>
 where
     T: fmt::Debug,
 {
@@ -120,7 +133,7 @@ where
     }
 }
 
-unsafe impl<D, T> Decode<D> for WireFlexible<T>
+unsafe impl<D, T> Decode<D> for WireFlexible<'static, T>
 where
     D: Decoder + ?Sized,
     T: Decode<D>,
@@ -142,7 +155,7 @@ impl<T> Encodable for Flexible<T>
 where
     T: Encodable,
 {
-    type Encoded = WireFlexible<T::Encoded>;
+    type Encoded = WireFlexible<'static, T::Encoded>;
 }
 
 unsafe impl<E, T> Encode<E> for Flexible<T>
@@ -185,13 +198,13 @@ where
     }
 }
 
-impl<T, WT> TakeFrom<WireFlexible<WT>> for Flexible<T>
+impl<T, WT> FromWire<WireFlexible<'_, WT>> for Flexible<T>
 where
-    T: TakeFrom<WT>,
+    T: FromWire<WT>,
 {
-    fn take_from(from: &WireFlexible<WT>) -> Self {
-        match from.as_ref() {
-            Flexible::Ok(value) => Self::Ok(T::take_from(value)),
+    fn from_wire(wire: WireFlexible<'_, WT>) -> Self {
+        match wire.to_flexible() {
+            Flexible::Ok(value) => Self::Ok(T::from_wire(value)),
             Flexible::FrameworkErr(framework_error) => Self::FrameworkErr(framework_error),
         }
     }
@@ -225,14 +238,14 @@ mod tests {
 
     #[test]
     fn decode_flexible_result() {
-        assert_decoded::<WireFlexible<()>>(
+        assert_decoded::<WireFlexible<'_, ()>>(
             &mut chunks![
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x01, 0x00,
             ],
             |x| assert!(matches!(x.as_ref(), Flexible::Ok(()))),
         );
-        assert_decoded::<WireFlexible<()>>(
+        assert_decoded::<WireFlexible<'_, ()>>(
             &mut chunks![
                 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFE, 0xFF, 0xFF, 0xFF, 0x00, 0x00,
                 0x01, 0x00,

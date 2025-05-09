@@ -11,7 +11,7 @@ pub struct LocalStructPayload {
 }
 
 impl ::fidl_next::Encodable for LocalStructPayload {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireLocalStructPayload> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
                 && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
@@ -73,11 +73,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<LocalStructPayload> {
-    type EncodedOption = ::fidl_next::WireBox<WireLocalStructPayload>;
+impl ::fidl_next::EncodableOption for LocalStructPayload {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireLocalStructPayload>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<LocalStructPayload>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for LocalStructPayload
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     LocalStructPayload: ::fidl_next::Encode<___E>,
@@ -89,7 +89,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -99,7 +99,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<LocalStructPayload>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for LocalStructPayload
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     LocalStructPayload: ::fidl_next::EncodeRef<___E>,
@@ -121,20 +121,22 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireLocalStructPayload> for LocalStructPayload {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+impl ::fidl_next::FromWire<WireLocalStructPayload> for LocalStructPayload {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireLocalStructPayload, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                .is_enabled()
+                && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                    .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireLocalStructPayload) -> Self {
+    fn from_wire(wire: WireLocalStructPayload) -> Self {
         Self {
-            a: ::fidl_next::TakeFrom::take_from(&from.a),
+            a: ::fidl_next::FromWire::from_wire(wire.a),
 
-            b: ::fidl_next::TakeFrom::take_from(&from.b),
+            b: ::fidl_next::FromWire::from_wire(wire.b),
         }
     }
 }
@@ -148,7 +150,9 @@ pub struct WireLocalStructPayload {
     pub b: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireLocalStructPayload {
+unsafe impl ::fidl_next::Wire for WireLocalStructPayload {
+    type Decoded<'de> = WireLocalStructPayload;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -186,7 +190,10 @@ pub struct MainProtocolOneWayAnonRequest {
 }
 
 impl ::fidl_next::Encodable for MainProtocolOneWayAnonRequest {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<
+        Self,
+        WireMainProtocolOneWayAnonRequest,
+    > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
                 && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
@@ -248,11 +255,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<MainProtocolOneWayAnonRequest> {
-    type EncodedOption = ::fidl_next::WireBox<WireMainProtocolOneWayAnonRequest>;
+impl ::fidl_next::EncodableOption for MainProtocolOneWayAnonRequest {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireMainProtocolOneWayAnonRequest>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocolOneWayAnonRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for MainProtocolOneWayAnonRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MainProtocolOneWayAnonRequest: ::fidl_next::Encode<___E>,
@@ -264,7 +271,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -274,7 +281,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<MainProtocolOneWayAnonRequest>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for MainProtocolOneWayAnonRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MainProtocolOneWayAnonRequest: ::fidl_next::EncodeRef<___E>,
@@ -296,20 +303,25 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireMainProtocolOneWayAnonRequest> for MainProtocolOneWayAnonRequest {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+impl ::fidl_next::FromWire<WireMainProtocolOneWayAnonRequest> for MainProtocolOneWayAnonRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<
+        WireMainProtocolOneWayAnonRequest,
+        Self,
+    > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                .is_enabled()
+                && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                    .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireMainProtocolOneWayAnonRequest) -> Self {
+    fn from_wire(wire: WireMainProtocolOneWayAnonRequest) -> Self {
         Self {
-            a: ::fidl_next::TakeFrom::take_from(&from.a),
+            a: ::fidl_next::FromWire::from_wire(wire.a),
 
-            b: ::fidl_next::TakeFrom::take_from(&from.b),
+            b: ::fidl_next::FromWire::from_wire(wire.b),
         }
     }
 }
@@ -323,7 +335,9 @@ pub struct WireMainProtocolOneWayAnonRequest {
     pub b: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolOneWayAnonRequest {
+unsafe impl ::fidl_next::Wire for WireMainProtocolOneWayAnonRequest {
+    type Decoded<'de> = WireMainProtocolOneWayAnonRequest;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -361,7 +375,10 @@ pub struct MainProtocolTwoWayAnonRequest {
 }
 
 impl ::fidl_next::Encodable for MainProtocolTwoWayAnonRequest {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<
+        Self,
+        WireMainProtocolTwoWayAnonRequest,
+    > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
                 && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
@@ -423,11 +440,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<MainProtocolTwoWayAnonRequest> {
-    type EncodedOption = ::fidl_next::WireBox<WireMainProtocolTwoWayAnonRequest>;
+impl ::fidl_next::EncodableOption for MainProtocolTwoWayAnonRequest {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireMainProtocolTwoWayAnonRequest>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocolTwoWayAnonRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for MainProtocolTwoWayAnonRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MainProtocolTwoWayAnonRequest: ::fidl_next::Encode<___E>,
@@ -439,7 +456,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -449,7 +466,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<MainProtocolTwoWayAnonRequest>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for MainProtocolTwoWayAnonRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MainProtocolTwoWayAnonRequest: ::fidl_next::EncodeRef<___E>,
@@ -471,20 +488,25 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonRequest> for MainProtocolTwoWayAnonRequest {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+impl ::fidl_next::FromWire<WireMainProtocolTwoWayAnonRequest> for MainProtocolTwoWayAnonRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<
+        WireMainProtocolTwoWayAnonRequest,
+        Self,
+    > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                .is_enabled()
+                && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                    .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireMainProtocolTwoWayAnonRequest) -> Self {
+    fn from_wire(wire: WireMainProtocolTwoWayAnonRequest) -> Self {
         Self {
-            a: ::fidl_next::TakeFrom::take_from(&from.a),
+            a: ::fidl_next::FromWire::from_wire(wire.a),
 
-            b: ::fidl_next::TakeFrom::take_from(&from.b),
+            b: ::fidl_next::FromWire::from_wire(wire.b),
         }
     }
 }
@@ -498,7 +520,9 @@ pub struct WireMainProtocolTwoWayAnonRequest {
     pub b: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonRequest {
+unsafe impl ::fidl_next::Wire for WireMainProtocolTwoWayAnonRequest {
+    type Decoded<'de> = WireMainProtocolTwoWayAnonRequest;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -536,7 +560,10 @@ pub struct MainProtocolTwoWayAnonResponse {
 }
 
 impl ::fidl_next::Encodable for MainProtocolTwoWayAnonResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<
+        Self,
+        WireMainProtocolTwoWayAnonResponse,
+    > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
                 && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
@@ -598,11 +625,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<MainProtocolTwoWayAnonResponse> {
-    type EncodedOption = ::fidl_next::WireBox<WireMainProtocolTwoWayAnonResponse>;
+impl ::fidl_next::EncodableOption for MainProtocolTwoWayAnonResponse {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireMainProtocolTwoWayAnonResponse>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocolTwoWayAnonResponse>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for MainProtocolTwoWayAnonResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MainProtocolTwoWayAnonResponse: ::fidl_next::Encode<___E>,
@@ -614,7 +641,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -624,7 +651,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<MainProtocolTwoWayAnonResponse>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for MainProtocolTwoWayAnonResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MainProtocolTwoWayAnonResponse: ::fidl_next::EncodeRef<___E>,
@@ -646,20 +673,25 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonResponse> for MainProtocolTwoWayAnonResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+impl ::fidl_next::FromWire<WireMainProtocolTwoWayAnonResponse> for MainProtocolTwoWayAnonResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<
+        WireMainProtocolTwoWayAnonResponse,
+        Self,
+    > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                .is_enabled()
+                && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                    .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireMainProtocolTwoWayAnonResponse) -> Self {
+    fn from_wire(wire: WireMainProtocolTwoWayAnonResponse) -> Self {
         Self {
-            a: ::fidl_next::TakeFrom::take_from(&from.a),
+            a: ::fidl_next::FromWire::from_wire(wire.a),
 
-            b: ::fidl_next::TakeFrom::take_from(&from.b),
+            b: ::fidl_next::FromWire::from_wire(wire.b),
         }
     }
 }
@@ -673,7 +705,9 @@ pub struct WireMainProtocolTwoWayAnonResponse {
     pub b: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonResponse {
+unsafe impl ::fidl_next::Wire for WireMainProtocolTwoWayAnonResponse {
+    type Decoded<'de> = WireMainProtocolTwoWayAnonResponse;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -711,7 +745,10 @@ pub struct MainProtocolTwoWayAnonWithErrorRequest {
 }
 
 impl ::fidl_next::Encodable for MainProtocolTwoWayAnonWithErrorRequest {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<
+        Self,
+        WireMainProtocolTwoWayAnonWithErrorRequest,
+    > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
                 && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
@@ -773,11 +810,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<MainProtocolTwoWayAnonWithErrorRequest> {
-    type EncodedOption = ::fidl_next::WireBox<WireMainProtocolTwoWayAnonWithErrorRequest>;
+impl ::fidl_next::EncodableOption for MainProtocolTwoWayAnonWithErrorRequest {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireMainProtocolTwoWayAnonWithErrorRequest>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocolTwoWayAnonWithErrorRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for MainProtocolTwoWayAnonWithErrorRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MainProtocolTwoWayAnonWithErrorRequest: ::fidl_next::Encode<___E>,
@@ -789,7 +826,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -799,7 +836,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<MainProtocolTwoWayAnonWithErrorRequest>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for MainProtocolTwoWayAnonWithErrorRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MainProtocolTwoWayAnonWithErrorRequest: ::fidl_next::EncodeRef<___E>,
@@ -821,22 +858,27 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonWithErrorRequest>
+impl ::fidl_next::FromWire<WireMainProtocolTwoWayAnonWithErrorRequest>
     for MainProtocolTwoWayAnonWithErrorRequest
 {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<
+        WireMainProtocolTwoWayAnonWithErrorRequest,
+        Self,
+    > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                .is_enabled()
+                && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                    .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireMainProtocolTwoWayAnonWithErrorRequest) -> Self {
+    fn from_wire(wire: WireMainProtocolTwoWayAnonWithErrorRequest) -> Self {
         Self {
-            a: ::fidl_next::TakeFrom::take_from(&from.a),
+            a: ::fidl_next::FromWire::from_wire(wire.a),
 
-            b: ::fidl_next::TakeFrom::take_from(&from.b),
+            b: ::fidl_next::FromWire::from_wire(wire.b),
         }
     }
 }
@@ -850,7 +892,9 @@ pub struct WireMainProtocolTwoWayAnonWithErrorRequest {
     pub b: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonWithErrorRequest {
+unsafe impl ::fidl_next::Wire for WireMainProtocolTwoWayAnonWithErrorRequest {
+    type Decoded<'de> = WireMainProtocolTwoWayAnonWithErrorRequest;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -888,7 +932,10 @@ pub struct MainProtocolTwoWayAnonWithErrorResponse {
 }
 
 impl ::fidl_next::Encodable for MainProtocolTwoWayAnonWithErrorResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<
+        Self,
+        WireMainProtocolTwoWayAnonWithErrorResponse,
+    > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
                 && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
@@ -950,11 +997,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<MainProtocolTwoWayAnonWithErrorResponse> {
-    type EncodedOption = ::fidl_next::WireBox<WireMainProtocolTwoWayAnonWithErrorResponse>;
+impl ::fidl_next::EncodableOption for MainProtocolTwoWayAnonWithErrorResponse {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireMainProtocolTwoWayAnonWithErrorResponse>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocolTwoWayAnonWithErrorResponse>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for MainProtocolTwoWayAnonWithErrorResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MainProtocolTwoWayAnonWithErrorResponse: ::fidl_next::Encode<___E>,
@@ -966,7 +1013,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -976,8 +1023,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
-    for Box<MainProtocolTwoWayAnonWithErrorResponse>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for MainProtocolTwoWayAnonWithErrorResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MainProtocolTwoWayAnonWithErrorResponse: ::fidl_next::EncodeRef<___E>,
@@ -999,22 +1045,27 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonWithErrorResponse>
+impl ::fidl_next::FromWire<WireMainProtocolTwoWayAnonWithErrorResponse>
     for MainProtocolTwoWayAnonWithErrorResponse
 {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<
+        WireMainProtocolTwoWayAnonWithErrorResponse,
+        Self,
+    > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                .is_enabled()
+                && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                    .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireMainProtocolTwoWayAnonWithErrorResponse) -> Self {
+    fn from_wire(wire: WireMainProtocolTwoWayAnonWithErrorResponse) -> Self {
         Self {
-            a: ::fidl_next::TakeFrom::take_from(&from.a),
+            a: ::fidl_next::FromWire::from_wire(wire.a),
 
-            b: ::fidl_next::TakeFrom::take_from(&from.b),
+            b: ::fidl_next::FromWire::from_wire(wire.b),
         }
     }
 }
@@ -1028,7 +1079,9 @@ pub struct WireMainProtocolTwoWayAnonWithErrorResponse {
     pub b: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonWithErrorResponse {
+unsafe impl ::fidl_next::Wire for WireMainProtocolTwoWayAnonWithErrorResponse {
+    type Decoded<'de> = WireMainProtocolTwoWayAnonWithErrorResponse;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -1066,7 +1119,7 @@ pub struct MainProtocolOnAnonRequest {
 }
 
 impl ::fidl_next::Encodable for MainProtocolOnAnonRequest {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireMainProtocolOnAnonRequest> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
                 && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
@@ -1128,11 +1181,11 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<MainProtocolOnAnonRequest> {
-    type EncodedOption = ::fidl_next::WireBox<WireMainProtocolOnAnonRequest>;
+impl ::fidl_next::EncodableOption for MainProtocolOnAnonRequest {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireMainProtocolOnAnonRequest>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocolOnAnonRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for MainProtocolOnAnonRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MainProtocolOnAnonRequest: ::fidl_next::Encode<___E>,
@@ -1144,7 +1197,7 @@ where
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -1154,7 +1207,7 @@ where
     }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<MainProtocolOnAnonRequest>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for MainProtocolOnAnonRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     MainProtocolOnAnonRequest: ::fidl_next::EncodeRef<___E>,
@@ -1176,20 +1229,22 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireMainProtocolOnAnonRequest> for MainProtocolOnAnonRequest {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+impl ::fidl_next::FromWire<WireMainProtocolOnAnonRequest> for MainProtocolOnAnonRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireMainProtocolOnAnonRequest, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                .is_enabled()
+                && <u32 as ::fidl_next::FromWire<::fidl_next::WireU32>>::COPY_OPTIMIZATION
+                    .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireMainProtocolOnAnonRequest) -> Self {
+    fn from_wire(wire: WireMainProtocolOnAnonRequest) -> Self {
         Self {
-            a: ::fidl_next::TakeFrom::take_from(&from.a),
+            a: ::fidl_next::FromWire::from_wire(wire.a),
 
-            b: ::fidl_next::TakeFrom::take_from(&from.b),
+            b: ::fidl_next::FromWire::from_wire(wire.b),
         }
     }
 }
@@ -1203,7 +1258,9 @@ pub struct WireMainProtocolOnAnonRequest {
     pub b: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolOnAnonRequest {
+unsafe impl ::fidl_next::Wire for WireMainProtocolOnAnonRequest {
+    type Decoded<'de> = WireMainProtocolOnAnonRequest;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -1294,6 +1351,7 @@ pub mod main_protocol {
         type Request = ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload;
 
         type Response = ::fidl_next::WireResult<
+            'static,
             ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload,
             ::fidl_next::WireU32,
         >;
@@ -1345,7 +1403,7 @@ pub mod main_protocol {
         type Request = crate::WireLocalStructPayload;
 
         type Response =
-            ::fidl_next::WireResult<crate::WireLocalStructPayload, ::fidl_next::WireU32>;
+            ::fidl_next::WireResult<'static, crate::WireLocalStructPayload, ::fidl_next::WireU32>;
     }
 
     pub struct OnLocal;
@@ -1394,6 +1452,7 @@ pub mod main_protocol {
         type Request = ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload;
 
         type Response = ::fidl_next::WireResult<
+            'static,
             ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload,
             ::fidl_next::WireU32,
         >;
@@ -1445,6 +1504,7 @@ pub mod main_protocol {
         type Request = crate::WireMainProtocolTwoWayAnonWithErrorRequest;
 
         type Response = ::fidl_next::WireResult<
+            'static,
             crate::WireMainProtocolTwoWayAnonWithErrorResponse,
             ::fidl_next::WireU32,
         >;
@@ -2145,40 +2205,40 @@ where
     ___T: ::fidl_next::Transport,
     ___H: MainProtocolServerHandler<___T>,
 
-    ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
+    <main_protocol::OneWayComposed as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
+    <main_protocol::TwoWayComposed as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
+    <main_protocol::TwoWayComposedWithError as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    crate::WireLocalStructPayload:
+    <main_protocol::OneWayLocal as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    crate::WireLocalStructPayload:
+    <main_protocol::TwoWayLocal as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    crate::WireLocalStructPayload:
+    <main_protocol::TwoWayLocalWithError as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
+    <main_protocol::OneWayImport as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
+    <main_protocol::TwoWayImport as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
+    <main_protocol::TwoWayImportWithError as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    crate::WireMainProtocolOneWayAnonRequest:
+    <main_protocol::OneWayAnon as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    crate::WireMainProtocolTwoWayAnonRequest:
+    <main_protocol::TwoWayAnon as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    crate::WireMainProtocolTwoWayAnonWithErrorRequest:
+    <main_protocol::TwoWayAnonWithError as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_one_way(
@@ -2328,108 +2388,17 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::fidl_next::TakeFrom<crate::WireLocalStructPayload>
-        for ::fidl_test_protocolpayloads::LocalStructPayload
-    {
-        #[inline]
-        fn take_from(from: &crate::WireLocalStructPayload) -> Self {
-            Self {
-                a: ::fidl_next::TakeFrom::take_from(&from.a),
-
-                b: ::fidl_next::TakeFrom::take_from(&from.b),
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireMainProtocolOneWayAnonRequest>
-        for ::fidl_test_protocolpayloads::MainProtocolOneWayAnonRequest
-    {
-        #[inline]
-        fn take_from(from: &crate::WireMainProtocolOneWayAnonRequest) -> Self {
-            Self {
-                a: ::fidl_next::TakeFrom::take_from(&from.a),
-
-                b: ::fidl_next::TakeFrom::take_from(&from.b),
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireMainProtocolTwoWayAnonRequest>
-        for ::fidl_test_protocolpayloads::MainProtocolTwoWayAnonRequest
-    {
-        #[inline]
-        fn take_from(from: &crate::WireMainProtocolTwoWayAnonRequest) -> Self {
-            Self {
-                a: ::fidl_next::TakeFrom::take_from(&from.a),
-
-                b: ::fidl_next::TakeFrom::take_from(&from.b),
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireMainProtocolTwoWayAnonResponse>
-        for ::fidl_test_protocolpayloads::MainProtocolTwoWayAnonResponse
-    {
-        #[inline]
-        fn take_from(from: &crate::WireMainProtocolTwoWayAnonResponse) -> Self {
-            Self {
-                a: ::fidl_next::TakeFrom::take_from(&from.a),
-
-                b: ::fidl_next::TakeFrom::take_from(&from.b),
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireMainProtocolTwoWayAnonWithErrorRequest>
-        for ::fidl_test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest
-    {
-        #[inline]
-        fn take_from(from: &crate::WireMainProtocolTwoWayAnonWithErrorRequest) -> Self {
-            Self {
-                a: ::fidl_next::TakeFrom::take_from(&from.a),
-
-                b: ::fidl_next::TakeFrom::take_from(&from.b),
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireMainProtocolTwoWayAnonWithErrorResponse>
-        for ::fidl_test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse
-    {
-        #[inline]
-        fn take_from(from: &crate::WireMainProtocolTwoWayAnonWithErrorResponse) -> Self {
-            Self {
-                a: ::fidl_next::TakeFrom::take_from(&from.a),
-
-                b: ::fidl_next::TakeFrom::take_from(&from.b),
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireMainProtocolOnAnonRequest>
-        for ::fidl_test_protocolpayloads::MainProtocolOnAnonRequest
-    {
-        #[inline]
-        fn take_from(from: &crate::WireMainProtocolOnAnonRequest) -> Self {
-            Self {
-                a: ::fidl_next::TakeFrom::take_from(&from.a),
-
-                b: ::fidl_next::TakeFrom::take_from(&from.b),
-            }
-        }
-    }
-
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `MainProtocol`
     /// protocol.
     pub type MainProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::MainProtocol>;
 
-    impl ::fidl_next::TakeFrom<crate::MainProtocol>
+    impl ::core::convert::From<crate::MainProtocol>
         for ::fidl_test_protocolpayloads::MainProtocolMarker
     {
         #[inline]
-        fn take_from(from: &crate::MainProtocol) -> Self {
+        fn from(_: crate::MainProtocol) -> Self {
             Self
         }
     }

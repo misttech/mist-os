@@ -2,10 +2,14 @@
 {% let base_name = union.name.decl_name().camel() %}
 {% let name = filters::ident(base_name)? %}
 {% let wire_name = format!("Wire{base_name}") %}
+{% let wire_optional_name = format!("WireOptional{base_name}") %}
 {% let mod_name = filters::ident(union.name.decl_name().snake())? %}
 
 {%
     let UnionTemplateStrings {
+        de,
+        static_,
+        phantom,
         decode_unknown,
         decode_as,
         encode_as,
@@ -31,7 +35,7 @@ pub enum {{ name }} {
 }
 
 impl ::fidl_next::Encodable for {{ name }} {
-    type Encoded = {{ wire_name }};
+    type Encoded = {{ wire_name }}{{ static_ }};
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for {{ name }}
@@ -50,7 +54,7 @@ where
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let {{ wire_name }} { raw } = out);
+        ::fidl_next::munge!(let {{ wire_name }} { raw, _phantom: _ } = out);
 
         match self {
             {% for member in union.members %}
@@ -84,7 +88,7 @@ where
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let {{ wire_name }} { raw } = out);
+        ::fidl_next::munge!(let {{ wire_name }} { raw, _phantom: _ } = out);
 
         match self {
             {% for member in union.members %}
@@ -107,11 +111,11 @@ where
 }
 {% endif %}
 
-impl ::fidl_next::EncodableOption for Box<{{ name }}> {
-    type EncodedOption = WireOptional{{ name }};
+impl ::fidl_next::EncodableOption for {{ name }} {
+    type EncodedOption = {{ wire_optional_name }}{{ static_ }};
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<{{ name }}>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for {{ name }}
 where
     ___E: ?Sized,
     {{ name }}: ::fidl_next::Encode<___E>,
@@ -122,7 +126,7 @@ where
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptional{{ name }} { raw } = &mut *out);
+        ::fidl_next::munge!(let {{ wire_optional_name }} { raw, _phantom: _ } = &mut *out);
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
@@ -140,7 +144,7 @@ where
 }
 
 {% if !union.is_resource %}
-unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<{{ name }}>
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for {{ name }}
 where
     ___E: ?Sized,
     {{ name }}: ::fidl_next::EncodeRef<___E>,
@@ -151,7 +155,7 @@ where
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptional{{ name }} { raw } = &mut *out);
+        ::fidl_next::munge!(let {{ wire_optional_name }} { raw, _phantom: _ } = &mut *out);
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
@@ -169,25 +173,28 @@ where
 }
 {% endif %}
 
-impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
+impl{{ de }} ::fidl_next::FromWire<{{ wire_name }}{{ de }}> for {{ name }} {
     #[inline]
-    fn take_from(from: &{{ wire_name }}) -> Self {
-        match from.raw.ordinal() {
+    fn from_wire(wire: {{ wire_name }}{{ de }}) -> Self {
+        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
+        match raw.ordinal() {
             {% for member in union.members %}
-                {{ member.ordinal }} => Self::{{ member.name.camel()|ident }}(::fidl_next::TakeFrom::take_from(
-                    unsafe { from.raw.get().deref_unchecked::<{{ context.wire_type(member.ty) }}>() }
-                )),
+                {{ member.ordinal }} => Self::{{ member.name.camel()|ident }}(
+                    ::fidl_next::FromWire::from_wire(
+                        unsafe { raw.get().read_unchecked::<{{ context.wire_type(member.ty) }}>() }
+                    )
+                ),
             {% endfor %}
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 }
 
-impl ::fidl_next::TakeFrom<WireOptional{{ name }}> for Option<Box<{{ name }}>> {
+impl{{ de }} ::fidl_next::FromWireOption<{{ wire_optional_name }}{{ de }}> for Box<{{ name }}> {
     #[inline]
-    fn take_from(from: &WireOptional{{ name }}) -> Self {
-        if let Some(inner) = from.as_ref() {
-            Some(::fidl_next::TakeFrom::take_from(inner))
+    fn from_wire_option(wire: {{ wire_optional_name }}{{ de }}) -> Option<Self> {
+        if let Some(inner) = wire.into_option() {
+            Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
         } else {
             None
         }
@@ -196,14 +203,17 @@ impl ::fidl_next::TakeFrom<WireOptional{{ name }}> for Option<Box<{{ name }}>> {
 
 /// The wire type corresponding to [`{{ name }}`].
 #[repr(transparent)]
-pub struct {{ wire_name }} {
+pub struct {{ wire_name }}{{ de }} {
     raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<{{ phantom }}>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for {{ wire_name }} {
+unsafe impl ::fidl_next::Wire for {{ wire_name }}{{ static_ }} {
+    type Decoded<'de> = {{ wire_name }}{{ de }};
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
-        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::munge!(let Self { raw, _phantom: _ } = out);
         ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
@@ -214,14 +224,14 @@ unsafe impl ::fidl_next::ZeroPadding for {{ wire_name }} {
     {% let access_params = "" %}
     {% let access_args = "" %}
 {% else %}
-    {% let access_params = "<'union>" %}
+    {% let access_params = "<'de>" %}
     {% let access_args = "<'_>" %}
 {% endif %}
 
 pub mod {{ mod_name }} {
     pub enum Ref{{ access_params }} {
         {% for member in union.members %}
-            {{ member.name.camel()|ident }}(&'union {{ context.wire_type(member.ty) }}),
+            {{ member.name.camel()|ident }}(&'de {{ context.wire_type(member.ty) }}),
         {% endfor %}
         {% if !union.is_strict %}
             UnknownOrdinal_(u64),
@@ -229,12 +239,12 @@ pub mod {{ mod_name }} {
     }
 }
 
-impl {{ wire_name }} {
+impl{{ de }} {{ wire_name }}{{ de }} {
     pub fn as_ref(&self) -> crate::{{ mod_name }}::Ref{{ access_args }} {
         match self.raw.ordinal() {
             {% for member in union.members %}
                 {{ member.ordinal }} => crate::{{ mod_name }}::Ref::{{ member.name.camel()|ident }}(
-                    unsafe { self.raw.get().deref_unchecked::<{{ context.wire_type(member.ty) }}>() }
+                    unsafe { self.raw.get().deref_unchecked::<{{ context.anonymous_wire_type(member.ty) }}>() }
                 ),
             {% endfor %}
             {% if union.is_strict %}
@@ -247,19 +257,21 @@ impl {{ wire_name }} {
 }
 
 {% if is_static && !union.is_resource %}
-    impl Clone for {{ wire_name }} {
+    impl{{ de }} Clone for {{ wire_name }}{{ de }} {
         fn clone(&self) -> Self {
             match self.raw.ordinal() {
                 {% for member in union.members %}
                     {{ member.ordinal }} => Self {
-                        raw: unsafe { self.raw.clone_unchecked::<{{ context.wire_type(member.ty) }}>() },
+                        raw: unsafe { self.raw.clone_inline_unchecked::<{{ context.wire_type(member.ty) }}>() },
+                        _phantom: ::core::marker::PhantomData,
                     },
                 {% endfor %}
                 {% if union.is_strict %}
                     _ => unsafe { ::core::hint::unreachable_unchecked() },
                 {% else %}
                     _ => Self {
-                        raw: unsafe { self.raw.clone_unchecked::<()>() },
+                        raw: unsafe { self.raw.clone_inline_unchecked::<()>() },
+                        _phantom: ::core::marker::PhantomData,
                     },
                 {% endif %}
             }
@@ -267,7 +279,7 @@ impl {{ wire_name }} {
     }
 {% endif %}
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for {{ wire_name }}
+unsafe impl<___D> ::fidl_next::Decode<___D> for {{ wire_name }}{{ static_ }}
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
     {% if !is_static %}
@@ -281,10 +293,10 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             {% for member in union.members %}
-                {{ member.ordinal }} => ::fidl_next::RawWireUnion::{{ decode_as }}::<___D, {{ context.wire_type(member.ty) }}>(raw, decoder)?,
+                {{ member.ordinal }} => ::fidl_next::RawWireUnion::{{ decode_as }}::<___D, {{ context.static_wire_type(member.ty) }}>(raw, decoder)?,
             {% endfor %}
             {% if union.is_strict %}
                 ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
@@ -298,7 +310,7 @@ where
 }
 
 {% if context.config.emit_debug_impls %}
-    impl ::core::fmt::Debug for {{ wire_name }} {
+    impl{{ de }} ::core::fmt::Debug for {{ wire_name }}{{ de }} {
         fn fmt(
             &self,
             f: &mut ::core::fmt::Formatter<'_>,
@@ -307,7 +319,7 @@ where
                 {% for member in union.members -%}
                     {{ member.ordinal }} => unsafe {
                         self.raw.get().deref_unchecked::<
-                            {{ context.wire_type(member.ty) }}
+                            {{ context.anonymous_wire_type(member.ty) }}
                         >().fmt(f)
                     },
                 {%- endfor %}
@@ -318,19 +330,22 @@ where
 {% endif %}
 
 #[repr(transparent)]
-pub struct WireOptional{{ name }} {
+pub struct {{ wire_optional_name }}{{ de }} {
     raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<{{ phantom }}>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireOptional{{ name }} {
+unsafe impl ::fidl_next::Wire for {{ wire_optional_name }}{{ static_ }} {
+    type Decoded<'de> = {{ wire_optional_name }}{{ de }};
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
-        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::munge!(let Self { raw, _phantom: _ } = out);
         ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
-impl WireOptional{{ name }} {
+impl{{ de }} {{ wire_optional_name }}{{ de }} {
     pub fn is_some(&self) -> bool {
         self.raw.is_some()
     }
@@ -339,9 +354,20 @@ impl WireOptional{{ name }} {
         self.raw.is_none()
     }
 
-    pub fn as_ref(&self) -> Option<&{{ wire_name }}> {
+    pub fn as_ref(&self) -> Option<&{{ wire_name }}{{ de }}> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
+        } else {
+            None
+        }
+    }
+
+    pub fn into_option(self) -> Option<{{ wire_name }}{{ de }}> {
+        if self.is_some() {
+            Some({{ wire_name }} {
+                raw: self.raw,
+                _phantom: ::core::marker::PhantomData,
+            })
         } else {
             None
         }
@@ -349,25 +375,28 @@ impl WireOptional{{ name }} {
 }
 
 {% if is_static && !union.is_resource %}
-    impl Clone for WireOptional{{ name }} {
+    impl{{ de }} Clone for {{ wire_optional_name }}{{ de }} {
         fn clone(&self) -> Self {
             if self.is_none() {
-                return WireOptional{{ name }} {
+                return {{ wire_optional_name }} {
                     raw: ::fidl_next::RawWireUnion::absent(),
+                    _phantom: ::core::marker::PhantomData,
                 };
             }
 
             match self.raw.ordinal() {
                 {% for member in union.members %}
                     {{ member.ordinal }} => Self {
-                        raw: unsafe { self.raw.clone_unchecked::<{{ context.wire_type(member.ty) }}>() },
+                        raw: unsafe { self.raw.clone_inline_unchecked::<{{ context.wire_type(member.ty) }}>() },
+                        _phantom: ::core::marker::PhantomData,
                     },
                 {% endfor %}
                 {% if union.is_strict %}
                     _ => unsafe { ::core::hint::unreachable_unchecked() },
                 {% else %}
                     _ => Self {
-                        raw: unsafe { self.raw.clone_unchecked::<()>() },
+                        raw: unsafe { self.raw.clone_inline_unchecked::<()>() },
+                        _phantom: ::core::marker::PhantomData,
                     },
                 {% endif %}
             }
@@ -375,7 +404,7 @@ impl WireOptional{{ name }} {
     }
 {% endif %}
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptional{{ name }}
+unsafe impl<___D> ::fidl_next::Decode<___D> for {{ wire_optional_name }}{{ static_ }}
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
     {% if !is_static %}
@@ -389,10 +418,10 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             {% for member in union.members %}
-                {{ member.ordinal }} => ::fidl_next::RawWireUnion::{{ decode_as }}::<___D, {{ context.wire_type(member.ty) }}>(raw, decoder)?,
+                {{ member.ordinal }} => ::fidl_next::RawWireUnion::{{ decode_as }}::<___D, {{ context.static_wire_type(member.ty) }}>(raw, decoder)?,
             {% endfor %}
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::{{ decode_unknown}}(
@@ -406,7 +435,7 @@ where
 }
 
 {% if context.config.emit_debug_impls %}
-    impl ::core::fmt::Debug for WireOptional{{ name }} {
+    impl{{ de }} ::core::fmt::Debug for {{ wire_optional_name }}{{ de }} {
         fn fmt(
             &self,
             f: &mut ::core::fmt::Formatter<'_>,
