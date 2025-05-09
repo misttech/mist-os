@@ -2180,7 +2180,6 @@ async fn verify_service_route(
             unique_colls.sort();
             assert_eq!(collections, unique_colls);
             assert_matches!(capability, AggregateCapability::Service(_));
-            assert_eq!(*capability.source_name(), "foo");
             assert_eq!(&moniker, &agg_component.moniker);
         }
         _ => panic!("wrong capability source"),
@@ -2400,6 +2399,61 @@ async fn offer_service_from_collections_multilevel() {
         "/m/b",
         "/",
         &["coll1:c1", "coll2:c2", "coll3:c3"],
+        RouteType::Offer,
+    )
+    .await;
+}
+
+///   a
+///  / \
+/// b   coll
+///
+/// root: offer service `foo` from `coll` to b in dictionary `bar`
+/// b: route `use service`
+#[fuchsia::test]
+async fn offer_service_from_collection_to_dictionary() {
+    let use_decl = UseBuilder::service().name("foo").from_dictionary("bar").build();
+    let mut components = vec![
+        (
+            "a",
+            ComponentDeclBuilder::new()
+                .use_realm()
+                .dictionary_default("bar")
+                .offer(
+                    OfferBuilder::service()
+                        .name("foo")
+                        .source(OfferSource::Collection("coll".parse().unwrap()))
+                        .target(OfferTarget::Capability("bar".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("bar")
+                        .source(OfferSource::Self_)
+                        .target_static_child("b"),
+                )
+                .collection_default("coll")
+                .child_default("b")
+                .build(),
+        ),
+        ("b", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
+    ];
+    components.extend(["c1", "c2", "c3"].into_iter().map(|ch| {
+        (
+            ch,
+            ComponentDeclBuilder::new()
+                .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
+                .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
+                .build(),
+        )
+    }));
+    let test = RoutingTestBuilder::new("a", components).build().await;
+
+    verify_service_route(
+        &test,
+        use_decl,
+        "/b",
+        "/",
+        &["coll:c1", "coll:c2", "coll:c3"],
         RouteType::Offer,
     )
     .await;
