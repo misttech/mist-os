@@ -1361,4 +1361,37 @@ TEST(Snapshot, CloseSnapshot) { ASSERT_NO_FATAL_FAILURE(CloseTestHelper(PageDept
 
 TEST(Snapshot, CloseRoot) { ASSERT_NO_FATAL_FAILURE(CloseTestHelper(PageDepth::root)); }
 
+// This is a regression test for https://fxbug.dev/415665459
+TEST(Snapshot, ResizeSnapshotRace) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmoWithOptions(17, ZX_VMO_RESIZABLE, &vmo));
+  vmo->SetPageFaultSupplyLimit(17);
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 17));
+
+  // Create a clone for the resize to first walk into.
+  auto leading_clone = vmo->Clone();
+
+  for (vmo_test::TestLimiter limiter(1000, zx::sec(60)); !limiter.Finished(); limiter.next()) {
+    // Reset our size back to the original after the previous iteration.
+    vmo->vmo().set_size(zx_system_get_page_size() * 17);
+    // Create another clone of the VMO and copy-on-write the last page.
+    auto clone = vmo->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+    ASSERT_TRUE(clone);
+    const uint64_t data = 42;
+    EXPECT_OK(clone->vmo().write(&data, zx_system_get_page_size() * 16, sizeof(data)));
+    // In parallel resize the root and create a clone of our clone.
+    std::thread resize =
+        std::thread([&vmo] { vmo->vmo().set_size(zx_system_get_page_size() * 16); });
+    auto clone2 = clone->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+    ASSERT_TRUE(clone2);
+    resize.join();
+    // If things went badly, the clones will have had their parent_limit_ changed and when we drop
+    // them the hidden node will still have content and trigger a kernel panic. If things went well
+    // then nothing will happen.
+  };
+}
+
 }  // namespace pager_tests

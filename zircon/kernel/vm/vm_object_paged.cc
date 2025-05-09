@@ -787,6 +787,7 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type
   fbl::RefPtr<VmObjectPaged> vmo;
 
   {
+    VmCowPages::DeferredOps deferred(cow_pages_.get());
     Guard<VmoLockType> guard{lock()};
     // check that we're not uncached in some way
     if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
@@ -796,7 +797,8 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type
     // If we are a slice we require a unidirection clone, as performing a bi-directional clone
     // through a slice does not yet have defined semantics.
     const bool require_unidirection = is_slice();
-    auto result = cow_pages_locked()->CreateCloneLocked(type, require_unidirection, *cow_range);
+    auto result =
+        cow_pages_locked()->CreateCloneLocked(type, require_unidirection, *cow_range, deferred);
     if (result.is_error()) {
       return result.error_value();
     }

@@ -1722,8 +1722,14 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneUnidirectionalLocked(
 
 zx::result<VmCowPages::LockedRefPtr> VmCowPages::CreateCloneLocked(SnapshotType type,
                                                                    bool require_unidirectional,
-                                                                   VmCowRange range) {
+                                                                   VmCowRange range,
+                                                                   DeferredOps& ops) {
   canary_.Assert();
+
+  // When creating a clone the DeferredOps is not used beyond acting to serialize operations on
+  // pager backed hierarchies via the page_source_lock that it holds. For why this is important see
+  // the comments in ::Resize.
+  DEBUG_ASSERT(ops.self_ == this);
 
   LTRACEF("vmo %p offset %#" PRIx64 " size %#" PRIx64 "\n", this, range.offset, range.len);
 
@@ -4989,7 +4995,15 @@ zx_status_t VmCowPages::Resize(uint64_t s) {
     VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   }
   // Now that the lock is dropped, check if we need to update the child limits before the
-  // DeferredOps get finalized.
+  // DeferredOps get finalized. When iterating over our children it is important that we iterate
+  // precisely over *all* of our children and exactly our direct children (i.e. not our children's
+  // children). The TreeWalkCursor is able to provide these guarantees in this case since clone
+  // creation is serialized with the page_source_lock in the DeferredOps, just like here.
+  // Serializing the clone calls with resize ensures that any child we are iterating cannot move
+  // down in the tree and gain a new parent, which happens when a hidden node needs to be inserted.
+  // The deletion path is not an issue since if the node we are iterating at gets deleted then the
+  // cursor will just move to its sibling (or get deleted if no sibling), which is the behavior that
+  // we want anyway.
   if (update_child_limits) {
     // Use a TreeWalkCursor to walk all our children.
     // A child's parent limit will also limit that child's descendants' views into this node, so
@@ -4999,6 +5013,8 @@ zx_status_t VmCowPages::Resize(uint64_t s) {
     if (cursor.NextChild()) {
       // Update this child and all its siblings.
       do {
+        // Ensure that we are only modifying direct descendants.
+        DEBUG_ASSERT(cursor.GetCur().locked().parent_.get() == this);
         cursor.GetCur().locked().parent_limit_ = ClampedLimit(
             cursor.GetCur().locked().parent_offset_, cursor.GetCur().locked().parent_limit_, s);
       } while (cursor.NextSibling());

@@ -196,7 +196,7 @@ class VmCowPages final : public VmHierarchyBase,
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
   zx::result<LockedRefPtr> CreateCloneLocked(SnapshotType type, bool require_unidirection,
-                                             VmCowRange range) TA_REQ(lock());
+                                             VmCowRange range, DeferredOps& ops) TA_REQ(lock());
 
   // VmCowPages are initially created in the Init state and need to be transitioned to Alive prior
   // to being used. This is exposed for VmObjectPaged to call after ensuring that creation is
