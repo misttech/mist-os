@@ -6,7 +6,6 @@
 #define SRC_DEVICES_SERIAL_DRIVERS_AML_UART_AML_UART_H_
 
 #include <fidl/fuchsia.hardware.serialimpl/cpp/driver/fidl.h>
-#include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/async/cpp/wait.h>

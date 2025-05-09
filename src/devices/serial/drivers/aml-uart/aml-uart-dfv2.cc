@@ -10,8 +10,6 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
-#include <lib/driver/power/cpp/element-description-builder.h>
-#include <lib/driver/power/cpp/power-support.h>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/serial/cpp/bind.h>
