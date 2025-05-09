@@ -219,6 +219,9 @@ tables_generator_tests_*.txt
 /bazel-repos
 /bazel-workspace
 
+# The Bazel vendor directory
+!/third_party/bazel_vendor
+
 # Symlinks created by `fx setup-go`.
 /go.mod
 /go.sum
