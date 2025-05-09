@@ -5164,7 +5164,10 @@ void brcmf_get_noise_floor_samples(
     fuchsia_wlan_stats::wire::HistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxnoiseflr[i];
-    out_noise_floor_samples->push_back(bucket);
+    // Do not add empty buckets.
+    if (bucket.num_samples > 0) {
+      out_noise_floor_samples->push_back(bucket);
+    }
   }
   // rxnoiseflr has an extra bucket. If there is anything in it, it is invalid.
   *out_invalid_samples = histograms_report.rxsnr[255];
@@ -5177,7 +5180,10 @@ void brcmf_get_rssi_samples(const histograms_report_t& histograms_report,
     fuchsia_wlan_stats::wire::HistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxrssi[i];
-    out_rssi_samples->push_back(bucket);
+    // Do not add empty buckets.
+    if (bucket.num_samples > 0) {
+      out_rssi_samples->push_back(bucket);
+    }
   }
   // rxrssi has an extra bucket. If there is anything in it, it is invalid.
   *out_invalid_samples = histograms_report.rxrssi[255];
@@ -5190,7 +5196,10 @@ void brcmf_get_snr_samples(const histograms_report_t& histograms_report,
     fuchsia_wlan_stats::wire::HistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxsnr[i];
-    out_snr_samples->push_back(bucket);
+    // Do not add empty buckets.
+    if (bucket.num_samples > 0) {
+      out_snr_samples->push_back(bucket);
+    }
   }
   // rxsnr does not have any indices that should be considered invalid buckets.
   *out_invalid_samples = 0;
@@ -5209,7 +5218,10 @@ void brcmf_get_rx_rate_index_samples(
     fuchsia_wlan_stats::wire::HistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = rxrate[i];
-    out_rx_rate_index_samples->push_back(bucket);
+    // Do not add empty buckets.
+    if (bucket.num_samples > 0) {
+      out_rx_rate_index_samples->push_back(bucket);
+    }
   }
   // rxrate does not have any indices that should be considered invalid buckets.
   *out_invalid_samples = 0;
