@@ -789,6 +789,8 @@ config("default_warnings") {
     "-Wno-unused-parameter",
     "-Wnonportable-system-include-path",
   ]
+  cflags_c = []
+  cflags_cc = []
 
   # TODO(https://fxbug.dev/42142861): Disable "-Wmissing-field-initializers"
   # which warns when designated initializers are used on some (but not all)
@@ -818,24 +820,13 @@ config("default_warnings") {
     ]
   }
 
-  cflags_cc = []
-  if (fuchsia_cxx_version >= 20) {
-    cflags_cc += [
-      # TODO(https://fxbug.dev/42073532): The use of implicit capture of this via [=] has
-      # been deprecated in C++20, but we cannot address this because adding an
-      # explicit capture of 'this' to capture '*this' by reference is a C++20
-      # extension and not valid in C++17.
-      "-Wno-deprecated-this-capture",
-    ]
-  }
-
   if (is_gcc) {
     # GCC is pedantic about which flags apply to which language.
     cflags -= [
       "-Wstrict-prototypes",
       "-Wextra-semi",
     ]
-    cflags_c = [ "-Wstrict-prototypes" ]
+    cflags_c += [ "-Wstrict-prototypes" ]
     cflags_cc += [ "-Wextra-semi" ]
 
     # GCC doesn't support these flags
@@ -886,6 +877,10 @@ config("default_warnings") {
     # TODO(https://fxbug.dev/415133536): Disable "-Wunterminated-string-initialization"
     # until all instances are fixed.
     ":Wno-unterminated-string-initialization",
+
+    # TODO(https://fxbug.dev/42073532): //third_party/spirv* need this but they
+    # need it added to BUILD.gn files not in fuchsia.git
+    ":Wno-deprecated-this-capture",
   ]
 }
 
@@ -1665,6 +1660,14 @@ config("Wno-nontrivial-memaccess") {
 # until all instances are fixed.
 config("Wno-unterminated-string-initialization") {
   cflags_c = [ "-Wno-unterminated-string-initialization" ]
+}
+
+config("Wno-deprecated-this-capture") {
+  visibility = [
+    ":*",
+    "//third_party/*",
+  ]
+  cflags_cc = [ "-Wno-deprecated-this-capture" ]
 }
 
 config("Wsystem-headers") {

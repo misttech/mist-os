@@ -33,6 +33,7 @@ static_library("cppdap") {
 
   # Suppress warnings that Fuchsia build adds
   configs += [
+    "//build/config:Wno-deprecated-this-capture",
     "//build/config:Wno-extra-semi",
     "//build/config:Wno-newline-eof",
   ]
