@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Typed wrappers for the basic protocol types.
+//! Typed wrappers for FIDL bindings.
+//!
+//! This crate wraps a number of "untyped" items to add more type safety, and provides some basic
+//! [utility methods for use on Fuchsia](fuchsia).
 
 #![deny(
     future_incompatible,
