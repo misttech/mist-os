@@ -547,7 +547,7 @@ void CfiParser::AsyncStep(AsyncMemory* stack, RegisterID return_address_register
     }
   }
 
-  stack->FetchMemoryRanges(ranges, [=, cb = std::move(cb)]() mutable {
+  stack->FetchMemoryRanges(ranges, [=, this, cb = std::move(cb)]() mutable {
     // Now we should have all the needed memory fetched from the target so we can call the
     // synchronous Step to do the evaluations.
     Registers next(current.arch());
