@@ -230,7 +230,7 @@
              gitsubmoduleof="fuchsia"
              remote="https://fuchsia.googlesource.com/third_party/go"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="e9e3a9cbf1f5f43a54876380c448c8dc97f10867"
+             revision="f7d2e89741edde812c560a63aefd9091be1e7433"
              path="third_party/go"/>
     <project name="third_party/github.com/intel/intel-linux-processor-microcode-data-files"
              gitsubmoduleof="fuchsia"
