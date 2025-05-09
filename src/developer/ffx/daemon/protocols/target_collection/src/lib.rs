@@ -775,13 +775,13 @@ fn handle_discovered_target(
     if t.fastboot_interface.is_some() {
         tracing::debug!(
             "Found new fastboot target via mdns: {}. Address: {:?}",
-            t.nodename.as_deref().unwrap_or("<unknown>"),
+            t.nodename.as_deref().unwrap_or(ffx_target::UNKNOWN_TARGET_NAME),
             t.addresses
         );
     } else {
         tracing::debug!(
             "Found new target via mdns or file watcher: {}",
-            t.nodename.as_deref().unwrap_or("<unknown>")
+            t.nodename.as_deref().unwrap_or(ffx_target::UNKNOWN_TARGET_NAME),
         );
     }
 

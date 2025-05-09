@@ -150,7 +150,7 @@ impl DaemonEventHandler {
     async fn handle_zedboot(&self, t: Description) {
         tracing::trace!(
             "Found new target via zedboot: {}",
-            t.nodename.as_deref().unwrap_or("<unknown>")
+            t.nodename.as_deref().unwrap_or(ffx_target::UNKNOWN_TARGET_NAME)
         );
 
         let addrs = t
@@ -443,11 +443,13 @@ impl Daemon {
             .map_err(|e| anyhow!("{:#?}", e))
             .context("getting default target")?;
         if matches!(target.get_connection_state(), TargetConnectionState::Fastboot(_)) {
-            let nodename = target.nodename().unwrap_or_else(|| "<No Nodename>".to_string());
+            let nodename =
+                target.nodename().unwrap_or_else(|| ffx_target::UNKNOWN_TARGET_NAME.to_string());
             bail!("Attempting to open RCS on a fastboot target: {}", nodename);
         }
         if matches!(target.get_connection_state(), TargetConnectionState::Zedboot(_)) {
-            let nodename = target.nodename().unwrap_or_else(|| "<No Nodename>".to_string());
+            let nodename =
+                target.nodename().unwrap_or_else(|| ffx_target::UNKNOWN_TARGET_NAME.to_string());
             bail!("Attempting to connect to RCS on a zedboot target: {}", nodename);
         }
         let Some(overnet_node) = self.overnet_node.as_ref() else {

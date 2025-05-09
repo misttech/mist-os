@@ -7,6 +7,7 @@ use chrono::Utc;
 use ffx_daemon_events::TargetConnectionState;
 
 use ffx_ssh::parse::HostAddr;
+use ffx_target::UNKNOWN_TARGET_NAME;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use super::{
@@ -184,8 +185,8 @@ impl<'a> TargetUpdateBuilder<'a> {
         update = update.build_config(match (&identify.product_config, &identify.board_config) {
             (None, None) => None,
             (product, board) => Some(BuildConfig {
-                product_config: product.as_deref().unwrap_or("<unknown>").into(),
-                board_config: board.as_deref().unwrap_or("<unknown>").into(),
+                product_config: product.as_deref().unwrap_or(UNKNOWN_TARGET_NAME).into(),
+                board_config: board.as_deref().unwrap_or(UNKNOWN_TARGET_NAME).into(),
             }),
         });
 

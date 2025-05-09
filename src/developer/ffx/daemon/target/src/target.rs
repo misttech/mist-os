@@ -21,7 +21,7 @@ use ffx_fastboot::common::fastboot::{
     ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind,
 };
 use ffx_ssh::parse::HostAddr;
-use ffx_target::{Description, FastbootInterface};
+use ffx_target::{Description, FastbootInterface, UNKNOWN_TARGET_NAME};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx::TargetState;
 use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlProxy};
@@ -788,7 +788,7 @@ impl Target {
     }
 
     pub fn nodename_str(&self) -> String {
-        self.nodename().unwrap_or_else(|| "<unknown>".to_owned())
+        self.nodename().unwrap_or_else(|| UNKNOWN_TARGET_NAME.to_owned())
     }
 
     pub fn boot_timestamp_nanos(&self) -> Option<u64> {

@@ -52,9 +52,7 @@ pub use target_connector::{
 /// Re-export of [`fidl_fuchsia_developer_ffx::TargetProxy`] for ease of use
 pub use fidl_fuchsia_developer_ffx::TargetProxy;
 
-/// The default target name if no target spec is given (for debugging, reporting to the user, etc).
-/// TODO(b/371222096): Use this everywhere (will require a bit of digging).
-pub const UNSPECIFIED_TARGET_NAME: &str = "[unspecified]";
+pub use target_errors::{UNKNOWN_TARGET_NAME, UNSPECIFIED_TARGET_NAME};
 
 /// Attempt to connect to RemoteControl on a target device using a connection to a daemon.
 ///

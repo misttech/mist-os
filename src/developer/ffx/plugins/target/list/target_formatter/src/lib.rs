@@ -64,7 +64,7 @@ fn nodename_to_string(index: Option<usize>, nodename: Option<String>) -> String 
         Some(name) => name,
         None => match index {
             Some(index) => format!("<unknown-{}>", index),
-            None => UNKNOWN.to_string(),
+            None => target_errors::UNKNOWN_TARGET_NAME.to_owned(),
         },
     }
 }

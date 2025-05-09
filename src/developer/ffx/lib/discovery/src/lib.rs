@@ -404,7 +404,7 @@ pub mod test {
             TargetEvent::Removed(handle) => handle,
         };
 
-        let node_name = handle.node_name.unwrap_or("<unknown>".to_string());
+        let node_name = handle.node_name.unwrap_or(target_errors::UNKNOWN_TARGET_NAME.to_string());
         let state = handle.state;
 
         writeln!(writer, "{symbol}  {node_name}  {state}")?;

@@ -117,7 +117,8 @@ trait QueryResolverT {
             return Ok(Resolution::from_addr(a));
         }
         let res = self.resolve_single_target(&target_spec, ctx).await?;
-        let target_spec_info = target_spec.clone().unwrap_or_else(|| "<unspecified>".to_owned());
+        let target_spec_info =
+            target_spec.clone().unwrap_or_else(|| crate::UNSPECIFIED_TARGET_NAME.to_owned());
         tracing::debug!("resolved target spec {target_spec_info} to address {:?}", res.addr());
         Ok(res)
     }

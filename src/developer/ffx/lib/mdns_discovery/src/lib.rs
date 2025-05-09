@@ -57,7 +57,11 @@ impl CachedTarget {
 impl Hash for CachedTarget {
     fn hash<H: Hasher>(&self, state: &mut H) {
         #[allow(clippy::or_fun_call)] // TODO(https://fxbug.dev/379717780)
-        self.target.nodename.as_ref().unwrap_or(&"<unknown>".to_string()).hash(state);
+        self.target
+            .nodename
+            .as_ref()
+            .unwrap_or(&target_errors::UNKNOWN_TARGET_NAME.to_string())
+            .hash(state);
     }
 }
 
@@ -756,7 +760,7 @@ async fn recv_loop(
                 tracing::trace!(
                     "packet from {} ({}) on {}",
                     addr,
-                    t.nodename.as_ref().unwrap_or(&"<unknown>".to_string()),
+                    t.nodename.as_ref().unwrap_or(&target_errors::UNKNOWN_TARGET_NAME.to_string()),
                     sock.local_addr().unwrap()
                 );
                 mdns_protocol.handle_target(t, ttl).await;

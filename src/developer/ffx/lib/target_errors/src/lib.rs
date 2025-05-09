@@ -9,8 +9,9 @@ use fidl_fuchsia_developer_ffx::{
 };
 
 /// The default target name if no target spec is given (for debugging, reporting to the user, etc).
-/// TODO(b/371222096): Use this everywhere (will require a bit of digging).
 pub const UNSPECIFIED_TARGET_NAME: &str = "[unspecified]";
+/// The default target name if we fail to query the target's name.
+pub const UNKNOWN_TARGET_NAME: &str = "<unknown>";
 pub const BUG_REPORT_URL: &str =
     "https://issues.fuchsia.dev/issues/new?component=1378294&template=1838957";
 
