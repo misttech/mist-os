@@ -115,3 +115,13 @@ find $FUCHSIA_DIR/tools/devshell/ \
         complete -c fx --condition "__fish_seen_subcommand_from $command_name" -l $longoption2 -d $desc
     end
 end
+
+# Source any additional completers for the fx subcommands. If you would
+# like to add additionaly functionality for a completer create a file
+# named fx-<command>.fish which runs the completion command.
+# These completers should be sourced at the end of this file to allow the
+# subcommands to override any complete commands that have already been called.
+set sub_command_completers (dirname (status --current-filename))/fx-*.fish
+for completer in $sub_command_completers
+  source $completer
+end
