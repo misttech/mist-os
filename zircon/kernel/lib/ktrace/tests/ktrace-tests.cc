@@ -302,6 +302,11 @@ class KTraceTests {
     const uint32_t total_bufsize = PAGE_SIZE * num_cpus;
     ktrace.Init(total_bufsize, 0u);
 
+    // Test that passing nullptr to ReadUser returns the total_bufsize.
+    zx::result<size_t> result = ktrace.ReadUser(user_out_ptr<void>(nullptr), 0, total_bufsize);
+    ASSERT_OK(result.status_value());
+    ASSERT_EQ(total_bufsize, result.value());
+
     // Initialize "user" memory to test with.
     using testing::UserMemory;
     ktl::unique_ptr<UserMemory> user_mem = UserMemory::Create(total_bufsize);
@@ -321,7 +326,7 @@ class KTraceTests {
     memset(dst, 0, total_bufsize);
 
     // Verify that ReadUser succeeds and returns a size of zero when tracing has not been started.
-    zx::result<size_t> result = ktrace.ReadUser(user_mem->user_out<void>(), 0, total_bufsize);
+    result = ktrace.ReadUser(user_mem->user_out<void>(), 0, total_bufsize);
     ASSERT_OK(result.status_value());
     ASSERT_EQ(0ul, result.value());
 

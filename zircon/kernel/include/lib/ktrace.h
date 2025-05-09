@@ -914,8 +914,11 @@ class KTraceImpl {
   // ReadUser reads len bytes from the ktrace buffer starting at offset off into the given user
   // buffer.
   //
-  // On success, this function returns the number of bytes that were read into the buffer.
-  // On failure, a zx_status_t error code is returned.
+  // The return value is one of the following:
+  // * If ptr is nullptr, the number of bytes needed to read all of the available data is returned.
+  // * Otherwise:
+  //    * On success, this function returns the number of bytes that were read into the buffer.
+  //    * On failure, a zx_status_t error code is returned.
   zx::result<size_t> ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len);
 
   // Reserve reserves a slot in the ring buffer to write a record into.

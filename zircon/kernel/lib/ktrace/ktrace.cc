@@ -907,6 +907,12 @@ zx::result<size_t> KTraceImpl<BufferMode::kPerCpu>::ReadUser(user_out_ptr<void> 
   // Reads must be serialized with respect to all other non-write operations.
   KTraceGuard guard{&lock_};
 
+  // If the passed in ptr is nullptr, then return the buffer size needed to read all of the
+  // per-CPU buffers' contents.
+  if (!ptr) {
+    return zx::ok(buffer_size_ * num_buffers_);
+  }
+
   // If the per-CPU buffers have not been initialized, there's nothing to do, so return early.
   if (!percpu_buffers_) {
     return zx::ok(0);
