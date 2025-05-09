@@ -326,7 +326,7 @@ parking_lot = "0.12.0"
 petgraph = { version = "0.6.2" }
 proc-macro2 = { version = "1.0.94", features = ["span-locations"] }
 pulldown-cmark = { version = "0.9.3", features = ["serde"] }
-quote = "1.0.38"
+quote = "1.0.40"
 rustfix = "0.9.0"
 rustls-native-certs = "0.6.3"
 semver = "1.0.26"

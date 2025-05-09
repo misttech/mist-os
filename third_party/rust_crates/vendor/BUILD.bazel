@@ -2023,14 +2023,14 @@ alias(
 )
 
 alias(
-    name = "quote-1.0.38",
-    actual = "//third_party/rust_crates/vendor/quote-1.0.38:quote",
+    name = "quote-1.0.40",
+    actual = "//third_party/rust_crates/vendor/quote-1.0.40:quote",
     tags = ["manual"],
 )
 
 alias(
     name = "quote",
-    actual = "//third_party/rust_crates/vendor/quote-1.0.38:quote",
+    actual = "//third_party/rust_crates/vendor/quote-1.0.40:quote",
     tags = ["manual"],
 )
 

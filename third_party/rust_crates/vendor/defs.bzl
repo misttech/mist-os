@@ -510,7 +510,7 @@ _NORMAL_DEPENDENCIES = {
             "petgraph": Label("//third_party/rust_crates/vendor/petgraph-0.6.2:petgraph"),
             "proc-macro2": Label("//third_party/rust_crates/vendor/proc-macro2-1.0.94:proc_macro2"),
             "pulldown-cmark": Label("//third_party/rust_crates/vendor/pulldown-cmark-0.9.3:pulldown_cmark"),
-            "quote": Label("//third_party/rust_crates/vendor/quote-1.0.38:quote"),
+            "quote": Label("//third_party/rust_crates/vendor/quote-1.0.40:quote"),
             "rustfix": Label("//third_party/rust_crates/vendor/rustfix-0.9.0:rustfix"),
             "rustls-native-certs": Label("//third_party/rust_crates/vendor/rustls-native-certs-0.6.3:rustls_native_certs"),
             "semver": Label("//third_party/rust_crates/vendor/semver-1.0.26:semver"),

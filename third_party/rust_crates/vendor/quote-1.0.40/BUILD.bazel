@@ -22,7 +22,7 @@ package_info(
     name = "package_info",
     package_name = "quote",
     package_url = "https://github.com/dtolnay/quote",
-    package_version = "1.0.38",
+    package_version = "1.0.40",
 )
 
 license(
@@ -74,7 +74,7 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "1.0.38",
+    version = "1.0.40",
     deps = [
         "//third_party/rust_crates/vendor/proc-macro2-1.0.94:proc_macro2",
     ],
