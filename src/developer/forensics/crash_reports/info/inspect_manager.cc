@@ -32,7 +32,7 @@ void InspectManager::ExposeReportingPolicy(ReportingPolicyWatcher* watcher) {
                                 .CreateString("upload_policy", ToString(watcher->CurrentPolicy()));
 
   watcher->OnPolicyChange(
-      [=](const ReportingPolicy policy) { settings_.upload_policy.Set(ToString(policy)); });
+      [=, this](const ReportingPolicy policy) { settings_.upload_policy.Set(ToString(policy)); });
 }
 
 void InspectManager::ExposeStore(const StorageSize max_size) {
