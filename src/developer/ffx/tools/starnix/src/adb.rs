@@ -14,6 +14,7 @@ use fidl_fuchsia_developer_ffx::TargetIpAddrInfo;
 use futures::io::AsyncReadExt;
 use futures::stream::StreamExt;
 use futures::FutureExt;
+use log::info;
 use netext::{MultithreadedTokioAsyncWrapper, TcpListenerStream, TokioAsyncReadExt};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -30,7 +31,6 @@ use target_connector::Connector;
 use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
 use timeout::timeout;
 use tokio::net::{TcpListener, TcpStream};
-use tracing::info;
 use {fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_async as fasync};
 
 use crate::common::*;

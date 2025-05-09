@@ -23,7 +23,7 @@ if (is_host) {
       deps = [
         "//src/developer/ffx/tools/target-package:ffx_target_package_test_data",
         "//src/lib/fuchsia",
-        "//third_party/rust_crates:tracing",
+        "//third_party/rust_crates:log",
       ]
       inputs = [
         "testdata/package_file.txt",

@@ -12,6 +12,7 @@ use errors::{ffx_bail, ffx_error};
 use ffx_writer::{MachineWriter, ToolIO as _};
 use fho::{deferred, FfxMain, FfxTool};
 use fuchsia_async::unblock;
+use log::info;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::io::{stdin, BufRead};
@@ -20,7 +21,6 @@ use std::time::Duration;
 use target_holders::moniker;
 use tempfile::Builder;
 use termion::{color, style};
-use tracing::info;
 use {fidl_fuchsia_cpu_profiler as profiler, fidl_fuchsia_test_manager as test_manager};
 
 #[derive(Serialize, JsonSchema)]
@@ -72,7 +72,7 @@ impl FfxMain for ProfilerTool {
     type Writer = Writer;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        info!(?self.cmd, "Running profiler...");
+        info!(cmd:? = self.cmd; "Running profiler... ");
         Ok(profiler(self.controller, writer, self.cmd).await?)
     }
 }
@@ -190,7 +190,7 @@ async fn run_session(
     config: profiler::Config,
     opts: SessionOpts,
 ) -> Result<()> {
-    info!(?config, ?opts, "Running profiler session...");
+    info!(config:? = config, opts:? = opts; "Running profiler session...");
     let (client, server) = fidl::Socket::create_stream();
     let client = fidl::AsyncSocket::from_socket(client);
     let controller = controller.await?;
