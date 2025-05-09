@@ -1926,25 +1926,35 @@ void VmCowPages::MergeContentWithChildLocked() {
 
   __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(&child);
   page_list_.MergeRangeOntoAndClear(
-      [&](VmPageOrMarkerRef p, uint64_t off) __ALWAYS_INLINE {
-        if (p->IsReference()) {
+      [&](VmPageOrMarker* src, VmPageOrMarker* dst, uint64_t off) __ALWAYS_INLINE {
+        // Never overwrite any actual content in the destination.
+        if (dst->IsPageOrRef()) {
+          return;
+        }
+
+        // Either moving some content that the child was referring to in the parent from the parent
+        // into the child, or both parent and child ended up with a marker, in which case the move
+        // is a safe no-op.
+        DEBUG_ASSERT(dst->IsEmpty() || (dst->IsMarker() && src->IsMarker()));
+        if (src->IsReference()) {
           // A regular reference we can move, a temporary reference we need to turn back into its
           // page so we can move it. To determine if we have a temporary reference we can just
           // attempt to move it, and if it was a temporary reference we will get a page returned.
-          if (auto maybe_page = MaybeDecompressReference(compression, p->Reference())) {
+          if (auto maybe_page = MaybeDecompressReference(compression, src->Reference())) {
             // For simplicity, since this is a very uncommon edge case, just update the page in
             // place in this page list, then move it as a regular page.
             AssertHeld(lock_ref());
             SetNotPinnedLocked(*maybe_page, off);
-            VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*maybe_page);
+            VmPageOrMarker::ReferenceValue ref = src->SwapReferenceForPage(*maybe_page);
             ASSERT(compression->IsTempReference(ref));
           }
         }
         // Not an else-if to intentionally perform this if the previous block turned a reference
         // into a page.
-        if (p->IsPage()) {
-          page_backlink_updater.Push(p->Page(), off);
+        if (src->IsPage()) {
+          page_backlink_updater.Push(src->Page(), off);
         }
+        *dst = ktl::move(*src);
       },
       child.page_list_, merge_start_offset, merge_end_offset);
 

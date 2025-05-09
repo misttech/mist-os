@@ -631,16 +631,13 @@ class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmP
     return true;
   }
 
-  // For any empty slots in |this| moves over the corresponding slot in |other|. For any pages moved
-  // the |migrate_fn| is called.
+  // For any non-empty slots in |this| call the |migrate_fn| with |this| and the corresponding slot
+  // in |other|.
   template <typename F>
-  void MergeFrom(F migrate_fn, VmPageListNode& other, uint64_t skew) {
+  void MergeOnto(F migrate_fn, VmPageListNode& other, uint64_t skew) {
     for (size_t i = 0; i < kPageFanOut; i++) {
-      if (pages_[i].IsEmpty() && !other.pages_[i].IsEmpty()) {
-        if (other.pages_[i].IsPageOrRef()) {
-          migrate_fn(VmPageOrMarkerRef(&other.pages_[i]), obj_offset_ + i * PAGE_SIZE - skew);
-        }
-        pages_[i] = ktl::move(other.pages_[i]);
+      if (!pages_[i].IsEmpty()) {
+        migrate_fn(&pages_[i], &other.pages_[i], obj_offset_ + i * PAGE_SIZE - skew);
       }
     }
   }
@@ -1136,12 +1133,13 @@ class VmPageList final {
   // Merges the pages in the specified range in |this| onto the |other| with |offset| in this
   // mapping to the offset of 0 in |other|.
   //
-  // For any empty slot in |other| the content from |this|, if any exists, is moved there. If that
-  // content is a page or reference the given |migrate_fn| is called.
+  // For any offset in |this| that is not empty then the given |migrate_fn| is called with a
+  // reference to |this| and the corresponding slot in |other| and has the signature of:
+  // void migrate_fn(VmPageOrMarker* this_slot, VmPageOrMarker* other_slot, uint64_t other_offset);
   //
   // At the end of merging |this| is cleared and so it is an error for |this| to have any content
   // that is not a Marker that does not get moved to |other|, either because it is outside the
-  // specified range or because there was existing content in |other|.
+  // specified range or because the |migrate_fn| did not move or clear it.
   template <typename F>
   void MergeRangeOntoAndClear(F migrate_fn, VmPageList& other, uint64_t offset,
                               uint64_t end_offset) {
@@ -1200,23 +1198,33 @@ class VmPageList final {
       // If there is a target node we need to merge the nodes, otherwise we migrate this node over.
       if (cur_other && cur_other->offset() == target_node_offset) {
         DEBUG_ASSERT(cur_other->HasNoIntervalSentinel());
-        cur_other->MergeFrom(migrate_fn, *node, other.list_skew_);
+        node->MergeOnto(migrate_fn, *cur_other, list_skew_);
         // Done merging this node, move to the next node. This might not be the correct node if
         // |this| has a gap, but we will search for the right one in that case.
-        cur_other++;
+        auto prev = cur_other++;
+        // If prev was empty after migrating then remove it now that we have found the next node.
+        if (prev->IsEmpty()) {
+          other.list_.erase(prev);
+        }
       } else {
         // Merge target either doesn't exist, or is further ahead in the range.
         DEBUG_ASSERT(!cur_other || cur_other->offset() > target_node_offset);
         // Call the migrate on any pages and insert the node.
-        node->ForEveryPage<VmPageOrMarkerRef>(
-            [&](VmPageOrMarkerRef p, uint64_t offset) {
-              if (!p->IsMarker()) {
-                migrate_fn(p, offset);
-              }
+        node->ForEveryPage<VmPageOrMarker*>(
+            [&](VmPageOrMarker* p, uint64_t offset) {
+              // Use a temporary VmPageOrMarker to give to the |migrate_fn| that is initially empty
+              // so that it does not have to deal with the src and dest slots potentially being the
+              // same when 'moving'. In practice the migrate_fn will get inlined and this temporary
+              // gets elided.
+              VmPageOrMarker temp = VmPageOrMarker::Empty();
+              migrate_fn(p, &temp, offset);
+              *p = ktl::move(temp);
               return ZX_ERR_NEXT;
             },
             other.list_skew_);
-        other.list_.insert(ktl::move(node));
+        if (!node->IsEmpty()) {
+          other.list_.insert(ktl::move(node));
+        }
       }
     }
     list_.clear();
