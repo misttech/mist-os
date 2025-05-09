@@ -130,6 +130,13 @@ closed protocol Realm {
     strict GetResolvedInfo() -> (resource struct {
         resolved_info fuchsia.component.resolution.Component;
     }) error Error;
+
+    @available(added=HEAD)
+    strict GetChildOutputDictionary(resource struct {
+        child fuchsia.component.decl.ChildRef;
+    }) -> (resource struct {
+        dictionary fuchsia.component.sandbox.DictionaryRef;
+    }) error Error;
 };
 
 type CreateChildArgs = resource table {
