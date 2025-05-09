@@ -42,7 +42,6 @@
 ##                         More complicated arguments, e.g., lists, require
 ##                         their own special syntax. See GN documentation
 ##                         for the syntax of each kind of argument.
-##   --auto-dir            Act like `fx --dir out/PRODUCT.BOARD set ...`.
 ##   --ccache|--no-ccache  Whether to use ccache during the build. Ccache attempts
 ##                         to make builds faster by caching build artifacts.
 ##                         Defaults to detecting whether the CCACHE_DIR environment
@@ -130,7 +129,7 @@
 ## Example:
 ##
 ##   $ fx set core.x64 --with-test //bundles/tests
-##   -> build directory: out/default
+##   -> build directory: out/core.x64
 ##      board: //boards/x64.gni
 ##      product: //products/core.gni
 ##      developer_test_labels: //bundles/tests (all test packages)
@@ -188,7 +187,7 @@ function main {
     # Avoid "TMPDIR" since Go looks at that environment variable.
     BUILD_DIR=$(mktemp -d)
     trap 'rm -rf $BUILD_DIR' EXIT
-    pushd "$BUILD_DIR" > /dev/null
+    pushd "$BUILD_DIR" >/dev/null
     for target in go.{mod,sum} vendor; do
       ln -s "$FUCHSIA_DIR"/third_party/golibs/"${target}" .
     done
@@ -212,11 +211,11 @@ function main {
       fi
       return 1
     fi
-    popd > /dev/null
+    popd >/dev/null
 
     # Record the current HEAD *after* building fx-set so that we always try
     # to rebuild on subsequent attempts if compilation fails the first time.
-    echo "$current_revision" > "$revision_file"
+    echo "$current_revision" >"$revision_file"
   fi
 
   # If --dir is used, FUCHSIA_BUILD_DIR will not be empty, and _FX_BUILD_DIR

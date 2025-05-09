@@ -38,9 +38,11 @@ const (
 	// Populated when fx's top-level `--dir` flag is set.
 	buildDirEnvVar = "_FX_BUILD_DIR"
 
-	// We'll fall back to using this build dir if neither `fx --dir` nor `fx set
-	// --auto-dir` is specified.
-	defaultBuildDir = "out/default"
+	// out/default was the historical "default" build directory for Fuchsia.
+	// Many manual tests have hard-coded it. We preserve it as a symlink to the
+	// actual build directory, and now create directories by board to preserve
+	// local build artifacts between arch changes.
+	symlinkBuildDir = "out/default"
 
 	// When unspecified, this is used for --rbe-mode.
 	defaultRbeMode = "auto"
@@ -250,14 +252,11 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 
 	flagSet.BoolVar(&cmd.skipLocalArgs, "skip-local-args", false, "")
 
-	var autoDir = true
-	var deprecatedAutoDir bool //did the user use the flag
-	var providedBuildDir bool  //did the user set a --dir
+	var autoDir = true // default to automatically creating a named build directory
 
 	// Help strings don't matter because `fx set -h` uses the help text from
 	// //tools/devshell/set, which should be kept up to date with these flags.
 	flagSet.BoolVar(&cmd.verbose, "verbose", false, "")
-	flagSet.BoolVar(&deprecatedAutoDir, "auto-dir", false, "")
 	flagSet.StringVar(&cmd.fintParamsPath, "fint-params-path", "", "")
 	flagSet.BoolVar(&cmd.useCcache, "ccache", false, "")
 	flagSet.BoolVar(&cmd.noCcache, "no-ccache", false, "")
@@ -311,12 +310,11 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	}
 
 	if cmd.buildDir != "" {
-		providedBuildDir = true
 		autoDir = false
 	}
 
-	if cmd.buildDir == defaultBuildDir {
-		// If we had been using `defaultBuildDir` as a symlink, unlink it.
+	if cmd.buildDir == symlinkBuildDir {
+		// If the developer wants to use out/default as the out dir, and we had been using `symlinkBuildDir` as a symlink, unlink it.
 		userSpecifiedPath := filepath.Join(cmd.checkoutDir, cmd.buildDir)
 		symlink, err := isSymlink(userSpecifiedPath)
 		if err != nil {
@@ -377,15 +375,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 		}
 		cmd.buildDir = filepath.Join("out", strings.Join(nameComponents, "-"))
 	}
-	// TODO: b/401633163
-	message := "[INFO]\t2025-4-8\tb/401633163\n" +
-		"* --auto-dir is now default for fx set and the flag is deprecated for removal in\n  30 days\n" +
-		"* For backwards compatibility, out/default is a symbolic link pointing to \n  the active build directory (" + cmd.buildDir + ")\n" +
-		"* Pre-existing out/default build dir will be preserved at\n  out/default-migrated\n"
-	if !deprecatedAutoDir && !providedBuildDir { //someone who was relying on out/default
-		message += "* To continue to use a regular out/default as a build directory specify:\n  fx --dir out/default set [...]\n"
-	}
-	message += "The build directory for this build is " + cmd.buildDir + "\n"
+	message := "The build directory for this build is " + cmd.buildDir + "\n"
 	fmt.Printf(message)
 	return cmd, nil
 }
