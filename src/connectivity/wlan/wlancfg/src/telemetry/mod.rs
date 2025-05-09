@@ -37,7 +37,7 @@ use std::cmp::{max, min, Reverse};
 use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 use wlan_common::channel::Channel;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
@@ -812,9 +812,22 @@ macro_rules! fn_log_per_antenna_histograms {
                     let antenna_node = self.create_or_get_antenna_node(antenna_id);
 
                     let samples = &histogram.$field;
+                    // We expect the driver to send sparse histograms, but filter just in case.
+                    let samples: Vec<_> = samples.iter().filter(|s| s.num_samples > 0).collect();
+                    let array_size = samples.len() * 2;
                     let histogram_prop_name = concat!(stringify!($name), "_histogram");
                     let histogram_prop =
-                        antenna_node.create_int_array(histogram_prop_name, samples.len() * 2);
+                        antenna_node.create_int_array(histogram_prop_name, array_size);
+
+                    static ONCE: Once = Once::new();
+                    const INSPECT_ARRAY_SIZE_LIMIT: usize = 254;
+                    if array_size > INSPECT_ARRAY_SIZE_LIMIT {
+                        ONCE.call_once(|| {
+                            warn!("{} array size {} > {}. Array may not show up in Inspect",
+                                  histogram_prop_name, array_size, INSPECT_ARRAY_SIZE_LIMIT);
+                        })
+                    }
+
                     for (i, sample) in samples.iter().enumerate() {
                         let $sample = sample;
                         histogram_prop.set(i * 2, $sample_index_expr);
@@ -10559,10 +10572,12 @@ mod tests {
                 freq: fidl_fuchsia_wlan_stats::AntennaFreq::Antenna2G,
                 index: 0,
             })),
-            noise_floor_samples: vec![fidl_fuchsia_wlan_stats::HistBucket {
-                bucket_index: 200,
-                num_samples: 999,
-            }],
+            noise_floor_samples: vec![
+                // We normally don't expect the driver to send buckets with zero samples, but
+                // mock them here anyway so we can test that we filter them out if they exist.
+                fidl_fuchsia_wlan_stats::HistBucket { bucket_index: 199, num_samples: 0 },
+                fidl_fuchsia_wlan_stats::HistBucket { bucket_index: 200, num_samples: 999 },
+            ],
             invalid_samples: 44,
         }]
     }
