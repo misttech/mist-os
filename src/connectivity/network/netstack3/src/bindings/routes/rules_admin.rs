@@ -7,9 +7,8 @@ use std::collections::{BTreeMap, HashSet};
 use std::ops::ControlFlow;
 use std::pin::pin;
 
-use assert_matches::assert_matches;
 use async_utils::fold::{FoldResult, FoldWhile};
-use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
+use fidl::endpoints::ControlHandle as _;
 use fnet_routes_ext::rules::{
     FidlRuleAdminIpExt, InstalledRule, InterfaceMatcher, MarkMatcher, RuleAction, RuleIndex,
     RuleMatcher, RuleSetPriority, RuleSetRequest, RuleTableRequest,
@@ -264,6 +263,7 @@ struct UserRuleSet<I: Ip> {
 #[derive(Debug)]
 enum ApplyRuleWorkError<E> {
     RuleSetClosed,
+    ScopeCanceled,
     RuleWorkError(E),
 }
 
@@ -279,7 +279,7 @@ impl<E> ApplyRuleWorkError<E> {
         responder: R,
     ) -> Result<ControlFlow<R::ControlHandle>, fidl::Error> {
         match result {
-            Err(ApplyRuleWorkError::RuleSetClosed) => {
+            Err(ApplyRuleWorkError::RuleSetClosed | ApplyRuleWorkError::ScopeCanceled) => {
                 Ok(ControlFlow::Break(responder.control_handle().clone()))
             }
             Err(ApplyRuleWorkError::RuleWorkError(err)) => {
@@ -364,14 +364,21 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
         &self,
         op: RuleOp<I>,
     ) -> Result<(), ApplyRuleWorkError<fnet_routes_admin::RuleSetError>> {
+        // The rule worker gets unhappy with us if we drop the receiver. Ensure
+        // we're going to stay alive until a response comes in.
+        let scope_guard =
+            fasync::Scope::current().active_guard().ok_or(ApplyRuleWorkError::ScopeCanceled)?;
+
         let (responder, receiver) = oneshot::channel();
         self.rule_work_sink
             .unbounded_send(RuleWorkItem::RuleOp { op, responder })
             .map_err(|mpsc::TrySendError { .. }| ApplyRuleWorkError::RuleSetClosed)?;
-        receiver
+        let result = receiver
             .await
             .expect("responder should not be dropped")
-            .map_err(ApplyRuleWorkError::RuleWorkError)
+            .map_err(ApplyRuleWorkError::RuleWorkError);
+        drop(scope_guard);
+        result
     }
 }
 
@@ -393,13 +400,14 @@ async fn serve_rule_set<I: FidlRuleAdminIpExt>(
 
     match set.apply_rule_op(RuleOp::RemoveSet { priority: set.priority }).await {
         Ok(()) => {}
-        Err(err) => {
-            assert_matches!(err, ApplyRuleWorkError::RuleSetClosed);
-            log::warn!(
-                "rule set was already removed when finish serving {}",
-                I::RuleSetMarker::DEBUG_NAME
-            )
-        }
+        Err(err) => match err {
+            e @ ApplyRuleWorkError::RuleSetClosed | e @ ApplyRuleWorkError::ScopeCanceled => {
+                log::warn!("rule set removal skipped: {e:?}");
+            }
+            ApplyRuleWorkError::RuleWorkError(e) => {
+                panic!("unexpected rule set removal error {e:?}")
+            }
+        },
     }
 
     result.map(|control_handle| {
