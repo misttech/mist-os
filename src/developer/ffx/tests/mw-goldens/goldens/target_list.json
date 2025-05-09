@@ -11,6 +11,7 @@
       "required": [
         "addresses",
         "is_default",
+        "is_manual",
         "nodename",
         "rcs_state",
         "serial",
@@ -40,6 +41,9 @@
           }
         },
         "is_default": {
+          "type": "boolean"
+        },
+        "is_manual": {
           "type": "boolean"
         }
       }
