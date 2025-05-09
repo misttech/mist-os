@@ -15,7 +15,7 @@ use carnelian::scene::layout::{
 };
 use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{
-    input, App, AppAssistant, AppAssistantPtr, AppSender, Point, Size, ViewAssistant,
+    input, App, AppAssistant, AppAssistantPtr, AppSender, IntPoint, Point, Size, ViewAssistant,
     ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };
 use euclid::size2;
@@ -75,6 +75,8 @@ struct RecoveryViewAssistant {
     wheel_diff: i32,
     message: Option<&'static str>,
     waiting_for_confirmation: bool,
+    // tuple of touch contact id, start location, current location
+    active_contact: Option<(input::touch::ContactId, IntPoint, IntPoint)>,
 }
 
 impl RecoveryViewAssistant {
@@ -93,6 +95,7 @@ impl RecoveryViewAssistant {
             wheel_diff: 0,
             message: None,
             waiting_for_confirmation: false,
+            active_contact: None,
         })
     }
 
@@ -108,6 +111,41 @@ impl RecoveryViewAssistant {
         self.wheel_diff = 0;
         self.scene = None;
         self.view_sender.request_render();
+    }
+
+    fn on_menu_select(&mut self) {
+        match self.menu.current_item() {
+            menu::MenuItem::Reboot => {
+                self.log("Rebooting...");
+                self.view_sender.queue_message(RecoveryMessages::Reboot);
+            }
+            menu::MenuItem::RebootBootloader => {
+                self.log("Rebooting to bootloader...");
+                self.view_sender.queue_message(RecoveryMessages::RebootBootloader);
+            }
+            menu::MenuItem::PowerOff => {
+                self.log("Powering off...");
+                self.view_sender.queue_message(RecoveryMessages::PowerOff);
+            }
+            menu::MenuItem::WipeData => {
+                self.menu = Menu::new(menu::WIPE_DATA_MENU);
+                self.message = Some("Wipe all user data?\n  THIS CAN NOT BE UNDONE!");
+                self.request_render();
+            }
+            menu::MenuItem::WipeDataCancel => {
+                self.menu = Menu::new(menu::MAIN_MENU);
+                self.message = None;
+                self.request_render();
+            }
+            menu::MenuItem::WipeDataConfirm => {
+                self.log("Wiping data...");
+                self.view_sender.queue_message(RecoveryMessages::WipeData);
+            }
+            menu_item => {
+                self.log(format!("Not implemented: {menu_item:?}"));
+                self.view_sender.queue_message(RecoveryMessages::TaskDone);
+            }
+        }
     }
 }
 
@@ -295,6 +333,66 @@ impl ViewAssistant for RecoveryViewAssistant {
         Ok(())
     }
 
+    fn handle_touch_event(
+        &mut self,
+        context: &mut ViewAssistantContext,
+        _event: &input::Event,
+        touch_event: &input::touch::Event,
+    ) -> Result<(), Error> {
+        if self.logs.is_some() {
+            return Ok(());
+        }
+        match *touch_event.contacts {
+            [input::touch::Contact {
+                contact_id,
+                phase: input::touch::Phase::Down(location, _size),
+            }] => {
+                self.active_contact = Some((contact_id, location, location));
+            }
+            [input::touch::Contact {
+                contact_id,
+                phase: input::touch::Phase::Moved(location, _size),
+            }] => {
+                let start_location = if let Some((active_contact_id, start_location, _)) =
+                    self.active_contact
+                    && contact_id == active_contact_id
+                {
+                    start_location
+                } else {
+                    location
+                };
+
+                self.active_contact = Some((contact_id, start_location, location));
+            }
+            [input::touch::Contact { contact_id, phase: input::touch::Phase::Up }] => {
+                if let Some((active_contact_id, start_location, current_location)) =
+                    self.active_contact
+                    && contact_id == active_contact_id
+                {
+                    let delta = current_location - start_location;
+                    let x = delta.x.abs() as f32;
+                    let y = delta.y.abs() as f32;
+                    if y > context.size.height * 0.4 && y > x * 2.0 {
+                        if delta.y > 0 {
+                            self.menu.move_down();
+                        } else {
+                            self.menu.move_up();
+                        }
+                        self.request_render();
+                    } else if x > context.size.width * 0.4 && x > y * 2.0 {
+                        self.menu.set_active(true);
+                        self.on_menu_select();
+                    }
+                }
+                self.active_contact = None;
+            }
+            _ => {
+                self.active_contact = None;
+            }
+        }
+        Ok(())
+    }
+
     fn handle_consumer_control_event(
         &mut self,
         _context: &mut ViewAssistantContext,
@@ -331,38 +429,7 @@ impl ViewAssistant for RecoveryViewAssistant {
             input::consumer_control::Event {
                 button: ConsumerControlButton::Power,
                 phase: input::consumer_control::Phase::Up,
-            } => match self.menu.current_item() {
-                menu::MenuItem::Reboot => {
-                    self.log("Rebooting...");
-                    self.view_sender.queue_message(RecoveryMessages::Reboot);
-                }
-                menu::MenuItem::RebootBootloader => {
-                    self.log("Rebooting to bootloader...");
-                    self.view_sender.queue_message(RecoveryMessages::RebootBootloader);
-                }
-                menu::MenuItem::PowerOff => {
-                    self.log("Powering off...");
-                    self.view_sender.queue_message(RecoveryMessages::PowerOff);
-                }
-                menu::MenuItem::WipeData => {
-                    self.menu = Menu::new(menu::WIPE_DATA_MENU);
-                    self.message = Some("Wipe all user data?\n  THIS CAN NOT BE UNDONE!");
-                    self.request_render();
-                }
-                menu::MenuItem::WipeDataCancel => {
-                    self.menu = Menu::new(menu::MAIN_MENU);
-                    self.message = None;
-                    self.request_render();
-                }
-                menu::MenuItem::WipeDataConfirm => {
-                    self.log("Wiping data...");
-                    self.view_sender.queue_message(RecoveryMessages::WipeData);
-                }
-                menu_item => {
-                    self.log(format!("Not implemented: {menu_item:?}"));
-                    self.view_sender.queue_message(RecoveryMessages::TaskDone);
-                }
-            },
+            } => self.on_menu_select(),
             _ => {
                 return Ok(());
             }
