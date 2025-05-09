@@ -346,7 +346,11 @@ type DtmfCode = strict enum : uint8 {
     D = 68;
 };
 
-/// Controls the lifecycle of a call that has been routed through a headset.
+/// Controls the lifecycle of a call that has been routed through a headset. A
+/// client that wishes to know when a call is terminated should keep this
+/// protocol open until it has received a Terminated state update from the
+/// WatchState call.  However, closing the protocol will also hang up the call
+/// safely.
 closed protocol Call {
     /// A hanging get method for call state. See the `CallState` documentation
     /// for information on possible states.

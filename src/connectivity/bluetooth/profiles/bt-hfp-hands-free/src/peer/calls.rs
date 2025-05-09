@@ -26,22 +26,23 @@
 
 use anyhow::{format_err, Error};
 use async_helpers::maybe_stream::MaybeStream;
-use bt_hfp::call::list::{Idx as CallIdx, List as CallList};
+use bt_hfp::call::list::{Idx as CallIndex, List as CallList};
 use bt_hfp::call::{indicators as call_indicators, Direction, Number};
 use fidl_fuchsia_bluetooth_hfp::{
     CallDirection, CallMarker, CallRequest, CallRequestStream, CallState, CallWatchStateResponder,
     NextCall, PeerHandlerWatchNextCallResponder,
 };
 use fuchsia_bluetooth::types::PeerId;
+use futures::stream::FusedStream;
 use futures::{Stream, StreamExt};
 use log::{debug, error, info, warn};
 use std::fmt;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{Context, Poll, Waker};
 
 use crate::one_to_one::OneToOneMatcher;
 use crate::peer::ag_indicators::CallIndicator;
-use crate::peer::procedure::ProcedureInput;
+use crate::peer::procedure::{CommandFromHf, ProcedureInput};
 
 type ResponderResult = Result<(), fidl::Error>;
 type WatchStateMatcher = OneToOneMatcher<CallState, CallWatchStateResponder, ResponderResult>;
@@ -50,8 +51,8 @@ type WatchStateMatcher = OneToOneMatcher<CallState, CallWatchStateResponder, Res
 /// manipulate that state.  Additionally, it acts as a stream of `ProcedureInput`
 /// which translate incoming FIDL requests to change the call's state.
 struct Call {
-    peer_id: PeerId,             // Used for logging
-    call_index: Option<CallIdx>, // Set once the call is inserted in a CallList
+    peer_id: PeerId,               // Used for logging
+    call_index: Option<CallIndex>, // Set once the call is inserted in a CallList
 
     state: Option<CallState>, // Set to Some when we get any +CIEVs for this call.
     // For incoming calls, set to Some when we get a +CLIP.  For incoming calls,
@@ -65,6 +66,7 @@ struct Call {
     request_stream: MaybeStream<CallRequestStream>,
 
     watch_state_hanging_get_matcher: WatchStateMatcher,
+    waker: Option<Waker>,
 }
 
 fn respond_to_watch_call_state(
@@ -75,25 +77,38 @@ fn respond_to_watch_call_state(
 }
 
 impl Call {
-    #[allow(unused)]
-    pub fn new(peer_id: PeerId, number_option: Option<Number>, direction: Direction) -> Self {
+    pub fn new(
+        peer_id: PeerId,
+        state_option: Option<CallState>,
+        number_option: Option<Number>,
+        direction: Direction,
+    ) -> Self {
         let watch_state_hanging_get_matcher = OneToOneMatcher::new(respond_to_watch_call_state);
 
         Self {
             peer_id,
             call_index: None,
-            state: None,
+            state: state_option,
             number: number_option,
             direction,
             request_stream: MaybeStream::default(),
             watch_state_hanging_get_matcher,
+            waker: None,
         }
     }
 
-    pub fn set_call_index(&mut self, call_index: CallIdx) {
+    fn awaken(&mut self) {
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
+        }
+    }
+
+    pub fn set_call_index(&mut self, call_index: CallIndex) {
         self.call_index = Some(call_index);
     }
 
+    // TODO(https://fxbug.dev/135158) Handle setting phone numbers.
+    #[allow(unused)]
     pub fn set_number(&mut self, number: Number) {
         info!("Setting {:?} for peer {:} for call {:?}.", number, self.peer_id, self.call_index);
         self.number = Some(number);
@@ -106,22 +121,42 @@ impl Call {
         );
 
         self.state = Some(new_state);
+
         self.watch_state_hanging_get_matcher.enqueue_left(new_state);
+        // Make sure the stream is pumped to deliver this new state to a WatchState responder.
+        self.awaken();
     }
 
+    // The watch_state_hanging_get_matcher stream should be drained affer calling this method, as
+    // it does not set store the waker so no client will poll the stream and do so for us.
     fn handle_watch_state(&mut self, responder: CallWatchStateResponder) {
         info!(
             "Handling Call::WatchState for peer {:} for call {:?}.",
             self.peer_id, self.call_index
         );
 
-        // Enqueue the WatchState responder.  This will matach with any current or future enqueued
+        // Enqueue the WatchState responder.  This will match with any current or future enqueued
         // call states changes and respond to the hanging get.
         self.watch_state_hanging_get_matcher.enqueue_right(responder);
+
+        // We don't need to wake the waker here because this is called from the
+        // Stream impl poll_next which immediately pumps the matcher.
     }
 
-    fn call_request_to_procedure_input(_call_request: CallRequest) -> ProcedureInput {
-        unimplemented!()
+    // Must not be called with a WatchState or a SendDtmfCode request.
+    fn call_request_to_procedure_input(call_request: CallRequest) -> ProcedureInput {
+        match call_request {
+            // TODO(https://fxbug.dev/135119) Handle multiple calls
+            CallRequest::RequestHold { control_handle: _ } => unimplemented!(),
+            // TODO(https://fxbug.dev/135119) Handle multiple calls
+            CallRequest::RequestActive { control_handle: _ } => unimplemented!(),
+            CallRequest::RequestTerminate { control_handle: _ } => {
+                ProcedureInput::CommandFromHf(CommandFromHf::HangUpCall)
+            }
+            // TODO(https://fxbug.dev/134161) Implement transfers.
+            CallRequest::RequestTransferAudio { control_handle: _ } => unimplemented!(),
+            _ => panic!("Unexpected Call request {:?}", call_request),
+        }
     }
 
     /// Generate a NextCall if possible. This is possible if the number and
@@ -192,7 +227,7 @@ impl Stream for Call {
             );
         }
 
-        let item = match call_request {
+        let poll = match call_request {
             Poll::Pending => Poll::Pending, // Stream contained nothing, but has registered waker
             Poll::Ready(None) => Poll::Ready(None), // Stream was terminated
             Poll::Ready(Some(Err(error))) => Poll::Ready(Some(Err(error.into()))), // FIDL error, which is converted to anyhow
@@ -212,7 +247,13 @@ impl Stream for Call {
             }
         };
 
-        // Respond to any outstanding WatchState requests if we can.
+        if poll.is_pending() {
+            self.waker = Some(context.waker().clone());
+        }
+
+        // Respond to any outstanding WatchState requests if we can. This must
+        // happen after the call to `handle_watch_state`, which enqueues the
+        // responder.
         while let Poll::Ready(Some(result)) =
             self.watch_state_hanging_get_matcher.poll_next_unpin(context)
         {
@@ -221,7 +262,7 @@ impl Stream for Call {
             }
         }
 
-        item
+        poll
     }
 }
 
@@ -232,10 +273,10 @@ type NextCallMatcher =
 /// state.  Additionally, it acts as a stream of `ProcedureInput` by
 /// multiplexing the underlying Call`s' streams.
 pub struct Calls {
-    #[allow(unused)]
     peer_id: PeerId,
     call_list: CallList<Call>,
     watch_next_call_hanging_get_matcher: NextCallMatcher,
+    waker: Option<Waker>,
 }
 
 fn respond_to_watch_next_call(
@@ -246,18 +287,28 @@ fn respond_to_watch_next_call(
 }
 
 impl Calls {
-    #[allow(unused)]
     pub fn new(peer_id: PeerId) -> Self {
         let watch_next_call_hanging_get_matcher = OneToOneMatcher::new(respond_to_watch_next_call);
-        Self { peer_id, call_list: CallList::default(), watch_next_call_hanging_get_matcher }
+        Self {
+            peer_id,
+            call_list: CallList::default(),
+            watch_next_call_hanging_get_matcher,
+            waker: None,
+        }
     }
 
-    #[allow(unused)]
+    fn awaken(&mut self) {
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
+        }
+    }
+
     pub fn insert_new_call(
         &mut self,
+        state_option: Option<CallState>,
         number_option: Option<Number>,
         direction: Direction,
-    ) -> CallIdx {
+    ) -> CallIndex {
         // TODO(https://fxbug.dev/135119) Handle multiple calls
         if self.call_list.len() > 0 {
             unimplemented!(
@@ -267,7 +318,7 @@ impl Calls {
             );
         }
 
-        let call = Call::new(self.peer_id, number_option, direction);
+        let call = Call::new(self.peer_id, state_option, number_option, direction);
         let call_index = self.call_list.insert(call);
 
         let call = self.call_list.get_mut(call_index);
@@ -276,27 +327,11 @@ impl Calls {
 
         info!("Inserted call {:?} for peer {:}.", call, self.peer_id);
 
+        self.possibly_respond_to_watch_next_call(call_index);
+
         call_index
     }
 
-    #[allow(unused)]
-    pub fn remove_current_call(&mut self) {
-        // TODO(https://fxbug.dev/135119) Handle multiple calls
-        let idx = 1; // Calls are 1-indexed
-        let call_option = self.call_list.get_mut(idx);
-        match call_option {
-            Some(call) => info!("Removing call {:?} for peer {:?}", self.peer_id, call),
-            None => warn!(
-                "No call found for for peer {:} at index {:?} while removing call.",
-                self.peer_id, idx
-            ),
-        }
-        if self.call_list.remove(idx).is_none() {
-            warn!("Attempted to remove unknown call {:} from peer {:}.", idx, self.peer_id);
-        }
-    }
-
-    #[allow(unused)]
     pub fn set_call_state_by_indicator(&mut self, indicator: CallIndicator) {
         debug!(
             "Setting call state for peer {:} with indicator {:?} for call list {:?}",
@@ -308,9 +343,9 @@ impl Calls {
         // to and compute the state update it causes for that call.  The calls module in the AG
         // component has several methods to help with with that; these should be factored out into
         // the bt_hfp crate.
-        let idx = 1; // Calls are 1-indexed
+        let call_index = 1; // Calls are 1-indexed
 
-        let call_state = match indicator {
+        let call_state_option = match indicator {
             CallIndicator::Call(call_indicators::Call::None) => Some(CallState::Terminated),
             CallIndicator::Call(call_indicators::Call::Some) => Some(CallState::OngoingActive),
             // TODO(https://fxbug.dev/135119) Handle multiple calls.
@@ -337,58 +372,54 @@ impl Calls {
 
         debug!(
             "Setting call state for peer {:} for call {:} to {:?}",
-            self.peer_id, idx, call_state
+            self.peer_id, call_index, call_state_option
         );
-        call_state.into_iter().for_each(|s| self.set_state_for_call(idx, s));
+        call_state_option.into_iter().for_each(|s| self.set_state_for_call(call_index, s));
     }
 
-    fn set_state_for_call(&mut self, idx: CallIdx, new_state: CallState) {
-        let call_option = self.call_list.get_mut(idx);
+    fn set_state_for_call(&mut self, call_index: CallIndex, new_state: CallState) {
+        let call_option = self.call_list.get_mut(call_index);
         debug!(
             "Setting call {} -> {:?} for peer {:} state to {:?}",
-            idx, call_option, self.peer_id, new_state
+            call_index, call_option, self.peer_id, new_state
         );
         match call_option {
             Some(call) => {
                 call.set_state(new_state);
-                Self::possibly_respond_to_watch_next_call(
-                    self.peer_id,
-                    &mut self.watch_next_call_hanging_get_matcher,
-                    call,
-                )
+                self.possibly_respond_to_watch_next_call(call_index)
             }
             None => warn!(
                 "No call found for for peer {:} at index {:} while setting state to {:?}",
-                self.peer_id, idx, new_state
+                self.peer_id, call_index, new_state
             ),
         }
 
         if new_state == CallState::Terminated {
-            debug!("Removing call {:?} for peer {:}.", idx, self.peer_id);
-            let remove_option = self.call_list.remove(idx);
+            debug!("Removing call {:?} for peer {:}.", call_index, self.peer_id);
+            let remove_option = self.call_list.remove(call_index);
             if let None = remove_option {
-                warn!("Removed call {:?} for peer {:} but no call was present.", idx, self.peer_id);
+                warn!(
+                    "Removed call {:?} for peer {:} but no call was present.",
+                    call_index, self.peer_id
+                );
             }
         }
     }
 
+    // TODO(https://fxbug.dev/135158) Handle setting phone numbers.
     #[allow(unused)]
     pub fn set_number_for_current_call(&mut self, number: Number) {
         // TODO(https://fxbug.dev/135119) Handle multiple calls
-        let idx = 1; // Calls are 1-indexed
-        let call_option = self.call_list.get_mut(idx);
+        let call_index = 1; // Calls are 1-indexed
+        let call_option = self.call_list.get_mut(call_index);
         match call_option {
             Some(call) => {
                 call.set_number(number);
-                Self::possibly_respond_to_watch_next_call(
-                    self.peer_id,
-                    &mut self.watch_next_call_hanging_get_matcher,
-                    call,
-                )
+                self.possibly_respond_to_watch_next_call(call_index)
             }
             None => warn!(
                 "No call found for for peer {:} at index {:} while setting number to {:?}",
-                self.peer_id, idx, number
+                self.peer_id, call_index, number
             ),
         }
     }
@@ -396,25 +427,33 @@ impl Calls {
     #[allow(unused)]
     pub fn handle_watch_next_call(&mut self, responder: PeerHandlerWatchNextCallResponder) {
         self.watch_next_call_hanging_get_matcher.enqueue_right(responder);
+        // Make sure the stream is pumped to deliver any new calls to this WatchState responder.
+        self.awaken();
     }
 
-    fn possibly_respond_to_watch_next_call(
-        peer_id: PeerId,
-        matcher: &mut NextCallMatcher,
-        call: &mut Call,
-    ) {
+    fn possibly_respond_to_watch_next_call(&mut self, call_index: CallIndex) {
+        let call_option = self.call_list.get_mut(call_index);
+        let Some(call) = call_option else {
+            error!("Found no call at index {call_index} when responding to WatchNextCall.");
+            return;
+        };
         let next_call_result = call.possibly_generate_next_call();
         match next_call_result {
             Ok(next_call) => {
-                debug!("Enqueueing WatchNextCall response {:?} for peer {:}", next_call, peer_id);
-                matcher.enqueue_left(next_call);
+                debug!(
+                    "Enqueueing WatchNextCall response {:?} for peer {:}",
+                    next_call, self.peer_id
+                );
+                self.watch_next_call_hanging_get_matcher.enqueue_left(next_call);
+                // Make sure the stream is pumped to deliver this calls to any WatchState responder.
+                self.awaken();
             }
             Err(err) => {
                 // This isn't a real error but just indicates we don't have all the information we
                 // need for the NextCall yet, or we have already sent one.
                 debug!(
                     "Unable to generate WatchNextCall response for peer {:}: {:?}",
-                    peer_id, err
+                    self.peer_id, err
                 );
             }
         }
@@ -436,26 +475,35 @@ impl Stream for Calls {
         }
 
         // TODO(https://fxbug.dev/135119) Handle multiple calls.
-        let idx = 1; // Calls are 1-indexed
-        let call_option = self.call_list.get_mut(idx);
+        let call_index = 1; // Calls are 1-indexed
+        let call_option = self.call_list.get_mut(call_index);
         let call = match call_option {
             Some(call) => call,
             None => {
-                debug!(
-                    "No call found for for peer {:} at index {:} while polling calls.",
-                    self.peer_id, idx
-                );
+                self.waker = Some(context.waker().clone());
                 return Poll::Pending;
             }
         };
 
-        call.poll_next_unpin(context)
+        let poll = call.poll_next_unpin(context);
+
+        if poll.is_pending() {
+            self.waker = Some(context.waker().clone());
+        }
+
+        poll
+    }
+}
+
+impl FusedStream for Calls {
+    fn is_terminated(&self) -> bool {
+        false
     }
 }
 
 #[cfg(test)]
 mod test {
-    // TODO(https://fxbug.dev/410610394) Add more tests.
+    // TODO(https://https://fxbug.dev.dev/410610394) Add more tests.
 
     use super::*;
 
@@ -495,7 +543,8 @@ mod test {
             req => panic!("Unexpected PeerHandler request {req:?}."),
         };
 
-        let _call_index = calls.insert_new_call(Some(phone_number()), Direction::MobileOriginated);
+        let _call_index =
+            calls.insert_new_call(None, Some(phone_number()), Direction::MobileOriginated);
 
         calls.handle_watch_next_call(watch_next_call_responder);
 
@@ -553,7 +602,7 @@ mod test {
             req => panic!("Unexpected PeerHandler request {req:?}."),
         };
 
-        let _call_index = calls.insert_new_call(None, Direction::MobileOriginated);
+        let _call_index = calls.insert_new_call(None, None, Direction::MobileOriginated);
 
         calls.handle_watch_next_call(watch_next_call_responder);
 

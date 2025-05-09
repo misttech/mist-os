@@ -93,11 +93,10 @@ impl TryFrom<i64> for BatteryChargeIndicator {
 /// Typed AG Indicators, which represent the various +CIEV indicators the AG may send to the HF.
 /// This is split into three variants which represent the different uses the HF has for these
 /// indicators.
-/// - TODO(fxb/129577) Call indicators update the current calls in the Calls struct.
-/// - TODO(fxb/131814) NetworkInformation indicators are returned to the client of the HFP
+/// - Call indicators update the current calls in the Calls struct.
+/// - TODO(https://fxbug.dev/131814) NetworkInformation indicators are returned to the client of the HFP
 ///   PeerHandler protocol via the WatchNetworkInformation hanging get call.
-/// - TODO(fxb/131815) BatteryCharge is reported to the Power Reporting component and inspect.
-// TODO(fxb/129577) Hook this up to Call struct and other uses.
+/// - TODO(https://fxbug.dev/131815) BatteryCharge is reported to the Power Reporting component and inspect.
 #[derive(Debug, PartialEq)]
 pub enum AgIndicator {
     Call(CallIndicator),
@@ -127,8 +126,7 @@ impl AgIndicatorTranslator {
 
     /// Translate a +CIEV indicator received from the AG to a typed AgIndicator using the index
     /// values previously retrieved from the AG via a +CIND.
-    // TODO(fxb/129577) Use this in Peer task for calls and other uses.
-    #[allow(unused)]
+    // TODO(https://fxbug.dev/129577) Use this in Peer task for calls and other uses.
     pub fn translate_indicator(&self, index: i64, value: i64) -> Result<AgIndicator> {
         let Some(ag_indicator_index) = self.indices.get(&index) else {
             return Err(format_err!(

@@ -67,6 +67,7 @@ pub enum CommandFromHf {
     CallActionDialFromMemory { memory: String },
     CallActionRedialLast,
     StartAudioConnection,
+    HangUpCall,
 }
 
 #[derive(Clone, Debug, PartialEq)]
