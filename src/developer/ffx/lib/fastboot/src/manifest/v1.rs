@@ -84,7 +84,6 @@ pub struct FlashManifest(pub Vec<Product>);
 
 #[async_trait(?Send)]
 impl Flash for FlashManifest {
-    #[tracing::instrument(skip(file_resolver, cmd))]
     async fn flash<F, T>(
         &self,
         messenger: &Sender<Event>,

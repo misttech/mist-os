@@ -62,7 +62,6 @@ pub const UNSPECIFIED_TARGET_NAME: &str = "[unspecified]";
 ///
 /// The optional |target| is a string matcher as defined in fuchsia.developer.ffx.TargetQuery
 /// fidl table.
-#[tracing::instrument]
 pub async fn get_remote_proxy(
     target_spec: Option<String>,
     daemon_proxy: DaemonProxy,
@@ -178,7 +177,6 @@ async fn get_remote_proxy_impl(
 ///
 /// The optional |target| is a string matcher as defined in fuchsia.developer.ffx.TargetQuery
 /// fidl table.
-#[tracing::instrument]
 pub fn open_target_with_fut<'a, 'b: 'a>(
     target: Option<String>,
     daemon_proxy: DaemonProxy,

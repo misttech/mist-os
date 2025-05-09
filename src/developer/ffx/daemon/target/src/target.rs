@@ -901,7 +901,6 @@ impl Target {
     ///
     ///   RCS  ->   MDNS          =>  RCS (does not drop RCS state)
     ///   *    ->   Disconnected  =>  Manual if the device is manual
-    #[tracing::instrument(skip(func))]
     pub fn update_connection_state<F>(&self, func: F)
     where
         F: FnOnce(TargetConnectionState) -> TargetConnectionState + Sized,
@@ -1303,8 +1302,7 @@ impl Target {
     // will eventually send the resulting roid (even if it is None) back to the caller.
     //
     // This function can also take a HostPipeChildBuilder, for test purposes
-    #[tracing::instrument(skip(host_pipe_child_builder))]
-    pub fn run_host_pipe_with<T>(
+    fn run_host_pipe_with<T>(
         self: &Rc<Self>,
         overnet_node: &Arc<overnet_core::Router>,
         roid_sender: Option<channel::oneshot::Sender<Option<u64>>>,
@@ -1529,7 +1527,6 @@ impl Target {
         self.host_pipe.borrow().is_some()
     }
 
-    #[tracing::instrument]
     pub async fn init_remote_proxy(
         self: &Rc<Self>,
         overnet_node: &Arc<overnet_core::Router>,
@@ -1572,7 +1569,6 @@ impl Target {
     /// Check the current target state, and if it is a state that expires (such
     /// as mdns) perform the appropriate state transition. The daemon target
     /// collection expiry loop calls this function regularly.
-    #[tracing::instrument]
     pub fn expire_state(&self) {
         self.update_connection_state(|current_state| {
             let expire_duration = match current_state {
@@ -1687,7 +1683,6 @@ impl Target {
 }
 
 impl From<&Target> for ffx::TargetInfo {
-    #[tracing::instrument]
     fn from(target: &Target) -> Self {
         let (product_config, board_config) = target
             .build_config()

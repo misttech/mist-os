@@ -141,7 +141,6 @@ async fn try_get_target_info(
     Ok((rcs_state, pc, bc))
 }
 
-#[tracing::instrument]
 async fn get_target_info(
     context: &EnvironmentContext,
     addrs: &[addr::TargetAddr],

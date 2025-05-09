@@ -75,7 +75,6 @@ struct EmulatorWatcherHandler {
     throttle: HashMap<String, Instant>,
     cutoff: Duration,
 }
-#[tracing::instrument()]
 pub fn start_emulator_watching(instance_root: PathBuf) -> Result<EmulatorWatcher> {
     let (emu_instance_tx, emu_instance_rx) = mpsc::channel::<EmulatorInstanceEvent>(100);
     if !instance_root.exists() {
@@ -109,7 +108,6 @@ pub fn start_emulator_watching(instance_root: PathBuf) -> Result<EmulatorWatcher
 }
 impl EmulatorWatcherHandler {
     // Given a PathBuf, return the name of the emulator instance, if any.
-    #[tracing::instrument()]
     fn instance_name_from_path<T: AsRef<Path> + std::fmt::Debug>(
         &self,
         instance_path: T,
@@ -292,7 +290,6 @@ impl EmulatorWatcher {
             None
         }
     }
-    #[tracing::instrument()]
     fn make_target(instance: &EmulatorInstanceData) -> Option<ffx::TargetInfo> {
         let nodename: String = instance.get_name().into();
         let mut addresses = Vec::with_capacity(2);

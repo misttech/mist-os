@@ -622,7 +622,6 @@ impl TargetCollection {
     // TODO(b/304312166): Test-only now.
     // Will be removed once "targets" are associated with a single address.
     #[doc(hidden)]
-    #[tracing::instrument(skip(self))]
     pub fn merge_insert(&self, new_target: Rc<Target>) -> Rc<Target> {
         // Drop non-manual loopback address entries, as matching against
         // them could otherwise match every target in the collection.
@@ -1064,7 +1063,6 @@ impl TargetCollection {
     ///
     /// Returns an error if multiple targets match. In an environment where targets are discovered
     /// asynchronously this error will not consistently fire.
-    #[tracing::instrument(skip(self))]
     pub async fn discover_target(&self, query: &TargetInfoQuery) -> Result<DiscoveredTarget, ()> {
         tracing::debug!("Using query: {:?}", query);
 

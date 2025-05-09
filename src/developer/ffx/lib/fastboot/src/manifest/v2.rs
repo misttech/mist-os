@@ -30,7 +30,6 @@ pub struct FlashManifest {
 
 #[async_trait(?Send)]
 impl Flash for FlashManifest {
-    #[tracing::instrument(skip(self, file_resolver, cmd))]
     async fn flash<F, T>(
         &self,
         messenger: &Sender<Event>,

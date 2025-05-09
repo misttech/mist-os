@@ -93,7 +93,6 @@ impl FlashManifestVersion {
         }
     }
 
-    #[tracing::instrument]
     fn from_product_bundle_v2(product_bundle: &ProductBundleV2) -> Result<Self> {
         tracing::debug!("Begin loading flash manifest from ProductBundleV2: {:#?}", product_bundle);
         // Copy the unlock credentials from the partitions config to the flash manifest.
@@ -220,7 +219,6 @@ fn get_mapped_partitions(
 
 #[async_trait(?Send)]
 impl Flash for FlashManifestVersion {
-    #[tracing::instrument(skip(cmd, file_resolver, self))]
     async fn flash<F, T>(
         &self,
         messenger: &Sender<Event>,
@@ -307,7 +305,6 @@ pub async fn from_sdk<F: FastbootInterface>(
     }
 }
 
-#[tracing::instrument(skip(cmd))]
 pub async fn from_local_product_bundle<F: FastbootInterface>(
     messenger: &Sender<Event>,
     path: PathBuf,
@@ -395,7 +392,6 @@ pub struct FlashManifest<F: FileResolver + Sync> {
 }
 
 impl<F: FileResolver + Sync> FlashManifest<F> {
-    #[tracing::instrument(skip(self, cmd))]
     pub async fn flash<T: FastbootInterface>(
         &mut self,
         messenger: &Sender<Event>,

@@ -125,7 +125,6 @@ impl Injection {
         }
     }
 
-    #[tracing::instrument(skip(env_context))]
     pub async fn initialize_overnet(
         env_context: EnvironmentContext,
         router_interval: Option<Duration>,
@@ -140,7 +139,6 @@ impl Injection {
         Ok(Injection::new(env_context, daemon_check, node, target_spec))
     }
 
-    #[tracing::instrument]
     async fn init_remote_proxy(
         &self,
         target_info: &mut Option<TargetInfo>,
@@ -158,7 +156,6 @@ impl Injection {
         .await
     }
 
-    #[tracing::instrument]
     async fn target_factory_inner(&self) -> Result<TargetProxy> {
         // See if we need to do local resolution. (Do it here not in
         // open_target_with_fut because o_t_w_f is not async)
@@ -260,14 +257,12 @@ impl Injector for Injection {
 
     // This could get called multiple times by the plugin system via multiple threads - so make sure
     // the spawning only happens one thread at a time.
-    #[tracing::instrument]
     async fn daemon_factory(&self) -> Result<DaemonProxy, FfxInjectorError> {
         let should_autostart =
             self.env_context.query(CONFIG_DAEMON_AUTOSTART).get().unwrap_or(true);
         self.daemon_factory_impl(should_autostart).await
     }
 
-    #[tracing::instrument]
     async fn try_daemon(&self) -> Result<Option<DaemonProxy>> {
         let result = self
             .daemon_once
@@ -285,7 +280,6 @@ impl Injector for Injection {
         Ok(result)
     }
 
-    #[tracing::instrument]
     async fn target_factory(&self) -> Result<TargetProxy> {
         let timeout_error = self.daemon_timeout_error();
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
@@ -297,7 +291,6 @@ impl Injector for Injection {
         })?
     }
 
-    #[tracing::instrument]
     async fn remote_factory(&self) -> Result<RemoteControlProxy> {
         let timeout_error = self.daemon_timeout_error();
         // XXX Note: if we are doing local discovery, that will eat into this time.
@@ -326,7 +319,6 @@ impl Injector for Injection {
         proxy
     }
 
-    #[tracing::instrument]
     async fn remote_factory_fdomain(&self) -> Result<FRemoteControlProxy> {
         let rcs = self.remote_factory().await?;
         let toolbox = rcs::toolbox::open_toolbox(&rcs).await?;
@@ -361,7 +353,6 @@ enum DaemonStart {
     DoNotAutoStart,
 }
 
-#[tracing::instrument]
 async fn init_daemon_proxy(
     autostart: DaemonStart,
     node: Arc<overnet_core::Router>,

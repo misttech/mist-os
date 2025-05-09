@@ -32,7 +32,6 @@ pub use socket::SocketDetails;
 
 const CONFIG_DAEMON_CONNECT_TIMEOUT_MS: &str = "ffx.daemon_timeout";
 
-#[tracing::instrument]
 async fn create_daemon_proxy(
     node: &Arc<overnet_core::Router>,
     id: &mut NodeId,
@@ -110,7 +109,6 @@ pub async fn run_single_ascendd_link(
     run_ascendd_connection(node, &mut rx, &mut tx).await
 }
 
-#[tracing::instrument(skip_all)]
 async fn run_ascendd_connection<'a>(
     node: Arc<overnet_core::Router>,
     rx: &'a mut (dyn AsyncRead + Unpin + Send),
@@ -140,7 +138,6 @@ async fn run_ascendd_connection<'a>(
     .map_err(anyhow::Error::from)
 }
 
-#[tracing::instrument]
 pub async fn get_daemon_proxy_single_link(
     node: &Arc<overnet_core::Router>,
     socket_path: PathBuf,
@@ -175,7 +172,6 @@ pub async fn get_daemon_proxy_single_link(
     res.map(|(nodeid, proxy)| (nodeid, proxy, link))
 }
 
-#[tracing::instrument]
 async fn find_next_daemon<'a>(
     node: &Arc<overnet_core::Router>,
     exclusions: Option<Vec<NodeId>>,
@@ -228,7 +224,6 @@ async fn daemon_args(context: &EnvironmentContext) -> Result<Vec<String>> {
 }
 
 // This daemonizes the process, disconnecting it from the controlling terminal, etc.
-#[tracing::instrument]
 pub async fn spawn_daemon(context: &EnvironmentContext) -> Result<()> {
     // daemonize the given command, and do not keep the current directory for the new process
     // (start) the daemon in the  / directory.
@@ -244,7 +239,6 @@ pub async fn spawn_daemon(context: &EnvironmentContext) -> Result<()> {
 
 // This function is only used by isolate dir implementations. This allows cleaning up the daemon process
 // when the isolate is dropped.
-#[tracing::instrument]
 pub async fn run_daemon(context: &EnvironmentContext) -> Result<std::process::Child> {
     let mut cmd = context.rerun_prefix()?;
     let mut stdout = std::process::Stdio::null();
@@ -324,7 +318,6 @@ pub async fn try_to_kill_pid(pid: u32) -> Result<()> {
 ////////////////////////////////////////////////////////////////////////////////
 // start
 
-#[tracing::instrument]
 pub fn is_daemon_running_at_path(socket_path: &Path) -> bool {
     // Not strictly necessary check, but improves log output for diagnostics
     match std::fs::metadata(socket_path) {

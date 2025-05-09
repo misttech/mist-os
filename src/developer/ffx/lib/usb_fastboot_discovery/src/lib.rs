@@ -205,7 +205,6 @@ fn info_matches_serial(info: &InterfaceInfo, serial: &str) -> bool {
     }
 }
 
-#[tracing::instrument]
 pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
     tracing::debug!("Opening USB fastboot interface with serial number: {}", serial);
     let mut interface =

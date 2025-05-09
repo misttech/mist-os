@@ -201,7 +201,6 @@ impl From<&str> for TargetInfoQuery {
 impl From<String> for TargetInfoQuery {
     /// If the string can be parsed as some kind of IP address, will attempt to
     /// match based on that, else fall back to the nodename or serial matches.
-    #[tracing::instrument]
     fn from(s: String) -> Self {
         if s == "" {
             return Self::First;

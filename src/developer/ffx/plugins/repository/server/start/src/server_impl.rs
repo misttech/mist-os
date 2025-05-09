@@ -39,7 +39,6 @@ pub(crate) const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled
 const REPO_PATH_RELATIVE_TO_BUILD_DIR: &str = "amber-files";
 const CONFIG_KEY_DEFAULT_REPOSITORY: &str = "repository.default";
 
-#[tracing::instrument(skip(conn_quit_tx, server_quit_tx))]
 fn start_signal_monitoring(
     mut conn_quit_tx: futures::channel::mpsc::Sender<()>,
     mut server_quit_tx: futures::channel::mpsc::Sender<()>,

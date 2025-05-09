@@ -23,7 +23,6 @@ pub async fn handle_variables_for_fastboot<W: Write>(
     }
 }
 
-#[tracing::instrument(skip(messenger))]
 pub async fn info<F: FastbootInterface>(
     messenger: Sender<Variable>,
     fastboot_interface: &mut F,

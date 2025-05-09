@@ -50,7 +50,6 @@ pub enum ParseSshConnectionError {
     Timeout,
 }
 
-#[tracing::instrument(skip(lb, rdr))]
 pub async fn read_ssh_line<R: AsyncRead + Unpin>(
     lb: &mut LineBuffer,
     rdr: &mut R,
@@ -82,7 +81,6 @@ pub async fn read_ssh_line<R: AsyncRead + Unpin>(
     }
 }
 
-#[tracing::instrument(skip(rdr))]
 pub async fn read_ssh_line_with_timeouts<R: AsyncBufRead + Unpin>(
     rdr: &mut R,
 ) -> Result<String, ParseSshConnectionError> {
@@ -173,7 +171,6 @@ fn parse_ssh_connection_legacy(
     Ok((client_address.to_string(), None))
 }
 
-#[tracing::instrument(skip(stdout))]
 async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
     stdout: &mut R,
     verbose: bool,
@@ -268,7 +265,6 @@ pub async fn parse_ssh_output(
     }
 }
 
-#[tracing::instrument(skip(stderr))]
 async fn parse_ssh_error<R: AsyncBufRead + Unpin>(
     stderr: &mut R,
     verbose: bool,
@@ -310,9 +306,7 @@ async fn parse_ssh_error<R: AsyncBufRead + Unpin>(
         tracing::debug!("Reading stderr:  {l}");
         return if l.contains("Unrecognized argument: --abi-revision") {
             // It is an older image, so use the legacy command.
-            tracing::info!(
-                "Target does not support abi compatibility check"
-            );
+            tracing::info!("Target does not support abi compatibility check");
             PipeError::NoCompatibilityCheck
         } else {
             PipeError::ConnectionFailed(format!("{:?}", l))

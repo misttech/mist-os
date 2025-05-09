@@ -58,7 +58,6 @@ struct TargetHandleInner {
 }
 
 impl TargetHandleInner {
-    #[tracing::instrument(skip(self, cx))]
     async fn handle(&self, cx: &Context, req: ffx::TargetRequest) -> Result<()> {
         tracing::debug!("handling request {req:?}");
         match req {
@@ -173,7 +172,6 @@ impl TargetHandleInner {
     }
 }
 
-#[tracing::instrument]
 pub(crate) async fn wait_for_rcs(
     t: &Rc<Target>,
     cx: &Context,
@@ -219,7 +217,6 @@ pub(crate) async fn wait_for_rcs(
     })
 }
 
-#[tracing::instrument]
 fn host_pipe_err_to_fidl(ssh_err: SshError) -> ffx::TargetConnectionError {
     match ssh_err {
         SshError::Unknown(s) => {

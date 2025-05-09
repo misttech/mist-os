@@ -104,7 +104,6 @@ impl RebootController {
         return Ok(proxy);
     }
 
-    #[tracing::instrument(skip(self))]
     pub(crate) async fn reboot(
         &self,
         state: TargetRebootState,
@@ -315,7 +314,6 @@ impl RebootController {
     }
 }
 
-#[tracing::instrument]
 pub(crate) fn handle_fidl_connection_err(e: Error, responder: TargetRebootResponder) -> Result<()> {
     match e {
         Error::ClientChannelClosed { protocol_name, .. } => {
@@ -341,7 +339,6 @@ pub(crate) fn handle_fidl_connection_err(e: Error, responder: TargetRebootRespon
     Ok(())
 }
 
-#[tracing::instrument]
 async fn run_ssh_command(target: Weak<Target>, state: TargetRebootState) -> Result<()> {
     let t =
         target.upgrade().ok_or_else(|| anyhow!("Could not upgrade Target to build ssh command"))?;
@@ -370,7 +367,6 @@ async fn run_ssh_command(target: Weak<Target>, state: TargetRebootState) -> Resu
     }
 }
 
-#[tracing::instrument]
 async fn build_ssh_command_local(
     addr: TargetIpAddr,
     desired_state: TargetRebootState,

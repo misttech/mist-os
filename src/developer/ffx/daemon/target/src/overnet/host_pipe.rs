@@ -200,7 +200,6 @@ impl HostPipeChild {
         self.compatibility_status.clone()
     }
 
-    #[tracing::instrument(skip(stderr_buf, event_queue))]
     async fn new_inner(
         ssh_path: &str,
         addr: SocketAddr,
@@ -471,7 +470,6 @@ where
     }
 }
 
-#[tracing::instrument(skip(host_pipe_child_builder))]
 pub(crate) async fn spawn<T>(
     target: Weak<Target>,
     watchdogs: bool,

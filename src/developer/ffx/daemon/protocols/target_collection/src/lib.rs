@@ -79,7 +79,6 @@ impl Default for TargetCollectionProtocol {
     }
 }
 
-#[tracing::instrument]
 async fn target_is_fastboot_tcp(addr: SocketAddr) -> bool {
     tracing::info!("Checking if target at addr: {addr:?} in fastboot over tcp");
     let tclone = Target::new_with_fastboot_addrs(
@@ -107,7 +106,6 @@ async fn target_is_fastboot_tcp(addr: SocketAddr) -> bool {
     }
 }
 
-#[tracing::instrument(skip(manual_targets, tc))]
 async fn add_manual_target(
     manual_targets: Rc<dyn manual_targets::ManualTargets>,
     tc: &TargetCollection,
@@ -176,7 +174,6 @@ async fn add_manual_target(
     target
 }
 
-#[tracing::instrument(skip(manual_targets, tc))]
 async fn remove_manual_target(
     manual_targets: Rc<dyn manual_targets::ManualTargets>,
     tc: &TargetCollection,
@@ -204,7 +201,6 @@ async fn remove_manual_target(
 }
 
 impl TargetCollectionProtocol {
-    #[tracing::instrument(skip(cx, manual_targets))]
     async fn load_manual_targets(
         cx: &Context,
         manual_targets: Rc<dyn manual_targets::ManualTargets>,
@@ -339,7 +335,6 @@ impl FidlProtocol for TargetCollectionProtocol {
     type Protocol = ffx::TargetCollectionMarker;
     type StreamHandler = FidlStreamHandler<Self>;
 
-    #[tracing::instrument(skip(self, cx))]
     async fn handle(&self, cx: &Context, req: ffx::TargetCollectionRequest) -> Result<()> {
         tracing::debug!("handling request {req:?}");
         let target_collection = cx.get_target_collection().await?;
@@ -823,7 +818,6 @@ async fn handle_usb_target_impl(
 }
 
 // USB fastboot
-#[tracing::instrument(skip(tc))]
 fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget) {
     if let Some(serial) = target.serial {
         tracing::debug!("Found new target via fastboot: {}", serial);
@@ -851,7 +845,6 @@ fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget
 }
 
 // mDNS/Emulator Fastboot & RCS
-#[tracing::instrument(skip(tc))]
 fn handle_discovered_target(
     tc: &Rc<TargetCollection>,
     t: ffx::TargetInfo,

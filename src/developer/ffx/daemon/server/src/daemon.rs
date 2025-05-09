@@ -77,7 +77,6 @@ impl DaemonEventHandler {
         Self { node, target_collection }
     }
 
-    #[tracing::instrument(skip(self))]
     async fn handle_overnet_peer(&self, node_id: u64) {
         tracing::debug!("Got overnet peer {node_id}");
         let rcs = match RcsConnection::new(Arc::clone(&self.node), &mut NodeId { id: node_id }) {
@@ -141,7 +140,6 @@ impl DaemonEventHandler {
         }
     }
 
-    #[tracing::instrument(skip(self))]
     async fn handle_overnet_peer_lost(&self, node_id: u64) {
         self.target_collection.update_target(
             &[TargetUpdateFilter::OvernetNodeId(node_id)],
@@ -150,7 +148,6 @@ impl DaemonEventHandler {
         );
     }
 
-    #[tracing::instrument(skip(self))]
     async fn handle_zedboot(&self, t: Description) {
         tracing::trace!(
             "Found new target via zedboot: {}",
@@ -283,7 +280,6 @@ impl DaemonProtocolProvider for Daemon {
         Ok(target.as_ref().into())
     }
 
-    #[tracing::instrument(level = "info", skip(self))]
     async fn open_remote_control(
         &self,
         target_identifier: Option<String>,
@@ -310,7 +306,6 @@ impl DaemonProtocolProvider for Daemon {
 
 #[async_trait(?Send)]
 impl EventHandler<DaemonEvent> for DaemonEventHandler {
-    #[tracing::instrument(skip(self))]
     async fn on_event(&self, event: DaemonEvent) -> Result<events::Status> {
         tracing::debug!("! DaemonEvent::{:?}", event);
 
@@ -368,7 +363,6 @@ pub struct Daemon {
 }
 
 impl Daemon {
-    #[tracing::instrument]
     pub fn new(socket_path: PathBuf) -> Daemon {
         tracing::debug!("About to create Daemon, starting with Target Collection");
         let target_collection = TargetCollection::new();
@@ -391,7 +385,6 @@ impl Daemon {
         }
     }
 
-    #[tracing::instrument(skip(self, node))]
     pub async fn start(&mut self, node: Arc<overnet_core::Router>) -> Result<()> {
         tracing::debug!("starting daemon");
         self.overnet_node = Some(Arc::clone(&node));
@@ -416,7 +409,6 @@ impl Daemon {
         self.serve(&context, node, quit_tx, quit_rx).await.context("Serving clients")
     }
 
-    #[tracing::instrument(skip(self))]
     async fn log_startup_info(&self, context: &EnvironmentContext) -> Result<()> {
         let pid = std::process::id();
         let buildid = context.daemon_version_string()?;
@@ -487,7 +479,6 @@ impl Daemon {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self))]
     async fn prime_ascendd(
         &self,
         node: Arc<overnet_core::Router>,
@@ -508,7 +499,6 @@ impl Daemon {
         .map_err(|e| ffx_error!("Error trying to start daemon socket: {e}"))
     }
 
-    #[tracing::instrument(skip(self, primed_ascendd))]
     fn start_ascendd(&mut self, primed_ascendd: impl FnOnce() -> Ascendd) {
         // Start the ascendd socket only after we have registered our protocols.
         tracing::debug!("Starting ascendd");
@@ -518,7 +508,6 @@ impl Daemon {
         self.ascendd.replace(Some(ascendd));
     }
 
-    #[tracing::instrument(skip(self))]
     async fn start_socket_watch(&self, quit_tx: mpsc::Sender<()>) -> Result<RecommendedWatcher> {
         let socket_path = self.socket_path.clone();
         let socket_dir = self.socket_path.parent().context("Getting parent directory of socket")?;
@@ -574,7 +563,6 @@ impl Daemon {
         Ok(watcher)
     }
 
-    #[tracing::instrument(skip(self, quit_tx))]
     fn start_signal_monitoring(&self, mut quit_tx: mpsc::Sender<()>) {
         tracing::debug!("Starting monitoring for SIGHUP, SIGINT, SIGTERM");
         let mut signals = Signals::new(&[SIGHUP, SIGINT, SIGTERM]).unwrap();
@@ -658,7 +646,6 @@ impl Daemon {
         }
     }
 
-    #[tracing::instrument(skip(self, quit_tx, stream))]
     async fn handle_requests_from_stream(
         &self,
         quit_tx: &mpsc::Sender<()>,
@@ -704,7 +691,6 @@ impl Daemon {
         .detach();
     }
 
-    #[tracing::instrument(skip(queue))]
     fn handle_overnet_peers(
         queue: &events::Queue<DaemonEvent>,
         known_peers: HashSet<PeerSetElement>,
@@ -745,7 +731,6 @@ impl Daemon {
         new_peers
     }
 
-    #[tracing::instrument(skip(self))]
     async fn handle_request(
         &self,
         quit_tx: &mpsc::Sender<()>,
@@ -809,7 +794,6 @@ impl Daemon {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self))]
     async fn serve(
         &self,
         context: &EnvironmentContext,

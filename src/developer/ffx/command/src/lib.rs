@@ -52,7 +52,6 @@ fn write_exit_code<W: Write>(res: &Result<ExitStatus>, out: &mut W) {
 }
 
 /// Tries to report the given unexpected error to analytics if appropriate
-#[tracing::instrument(skip(err))]
 pub async fn report_bug(err: &impl std::fmt::Display) {
     // TODO(66918): make configurable, and evaluate chosen time value.
     if let Err(e) = analytics::add_crash_event(&format!("{}", err), None)
@@ -106,7 +105,6 @@ impl std::str::FromStr for MachineFormat {
     }
 }
 
-#[tracing::instrument]
 pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     let mut return_args_info = false;
     let mut return_help: Option<Error> = None;

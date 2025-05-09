@@ -61,7 +61,6 @@ impl VariableListener {
 
 #[async_trait]
 impl fastboot::InfoListener for VariableListener {
-    #[tracing::instrument]
     async fn on_info(&self, info: String) -> Result<()> {
         if let Some((name, val)) = info.split_once(':') {
             tracing::debug!("Got a variable string: {}", info);
@@ -84,22 +83,18 @@ impl ProgressListener {
 
 #[async_trait]
 impl fastboot::UploadProgressListener for ProgressListener {
-    #[tracing::instrument]
     async fn on_started(&self, size: usize) -> Result<()> {
         self.0.send(UploadProgress::OnStarted { size: size.try_into()? }).await?;
         Ok(())
     }
-    #[tracing::instrument]
     async fn on_progress(&self, bytes_written: u64) -> Result<()> {
         self.0.send(UploadProgress::OnProgress { bytes_written }).await?;
         Ok(())
     }
-    #[tracing::instrument]
     async fn on_error(&self, error: &UploadError) -> Result<()> {
         self.0.send(UploadProgress::OnError { error: anyhow!(error.to_string()) }).await?;
         Ok(())
     }
-    #[tracing::instrument]
     async fn on_finished(&self) -> Result<()> {
         self.0.send(UploadProgress::OnFinished).await?;
         Ok(())
@@ -143,7 +138,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> FastbootProxy<T> {
 
 #[async_trait(?Send)]
 impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
-    #[tracing::instrument]
     async fn get_var(&mut self, name: &str) -> core::result::Result<String, FastbootError> {
         let command = Command::GetVar(ClientVariable::Oem(name.to_string()));
         match send(command.clone(), self.interface().await?).await {
@@ -161,7 +155,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn get_all_vars(&mut self, listener: Sender<Variable>) -> Result<(), FastbootError> {
         let variable_listener = VariableListener::new(listener)?;
         let command = Command::GetVar(ClientVariable::All);
@@ -177,7 +170,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn flash(
         &mut self,
         partition_name: &str,
@@ -257,7 +249,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn erase(&mut self, partition_name: &str) -> Result<(), FastbootError> {
         let command = Command::Erase(partition_name.to_string());
         let reply =
@@ -280,7 +271,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn boot(&mut self) -> Result<(), FastbootError> {
         // Note: the target may not successfully send a response when asked to boot,
         // so let's use a short time-out, and treat a timeout error as a success.
@@ -302,7 +292,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn reboot(&mut self) -> Result<(), FastbootError> {
         // Note: the target may not successfully send a response when asked to reboot,
         // so let's use a short time-out, and treat a timeout error as a success.
@@ -323,7 +312,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn reboot_bootloader(
         &mut self,
         listener: Sender<RebootEvent>,
@@ -363,7 +351,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         Ok(())
     }
 
-    #[tracing::instrument]
     async fn continue_boot(&mut self) -> Result<(), FastbootError> {
         // Note: the target may not successfully send a response when asked to continue,
         // so let's use a short time-out, and treat a timeout error as a success.
@@ -385,7 +372,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn get_staged(&mut self, path: &str) -> Result<(), FastbootError> {
         match download(&path.to_string(), self.interface().await?)
             .await
@@ -405,7 +391,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn stage(
         &mut self,
         path: &str,
@@ -437,7 +422,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn set_active(&mut self, slot: &str) -> Result<(), FastbootError> {
         // Note: the target may not successfully send a response when asked to set active,
         // so let's use a short time-out, and treat a timeout error as a success.
@@ -462,7 +446,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn oem(&mut self, command: &str) -> Result<(), FastbootError> {
         let command = Command::Oem(command.to_string());
         match send(command.clone(), self.interface().await?).await.context("sending oem")? {
