@@ -19,6 +19,7 @@ source_set("test-utils") {
     "//src/storage/lib/ramdevice_client/cpp:ramdevice-client-test",
     "//src/storage/lib/vfs/cpp",
     "//zircon/kernel/lib/arch",
+    "//zircon/kernel/phys:zbi",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zxtest",
   ]
@@ -201,6 +202,7 @@ executable("misc_test") {
     "//src/storage/lib/block_server:fake_block_server_cc",
     "//src/storage/lib/vfs/cpp",
     "//zircon/kernel/lib/arch",
+    "//zircon/kernel/phys:zbi",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]

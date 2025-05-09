@@ -4,7 +4,6 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <lib/arch/zbi-boot.h>
 #include <lib/boot-shim/boot-shim.h>
 #include <lib/boot-shim/test-serial-number.h>
 #include <lib/fit/defer.h>
@@ -27,6 +26,7 @@
 #include <phys/symbolize.h>
 #include <phys/trampoline-boot.h>
 #include <phys/uart.h>
+#include <phys/zbi.h>
 
 #include "legacy-boot-shim.h"
 #include "stdout.h"
@@ -129,7 +129,7 @@ bool AppendDepthChargeItems(LegacyBootShim& shim, BootZbi::Zbi& zbi,
 // appending them as the protocol requires.
 bool LoadDepthchargeZbi(LegacyBootShim& shim, BootZbi& boot) {
   auto& input_zbi = shim.input_zbi();
-  auto kernel_item = input_zbi.find(arch::kZbiBootKernelType);
+  auto kernel_item = input_zbi.find(kArchZbiKernelType);
   if (shim.Check("ZBI Iteration error.", input_zbi.take_error()); kernel_item == input_zbi.end()) {
     printf("%s: No kernel item in the ZBI!.", ProgramName());
     return false;
@@ -176,7 +176,8 @@ bool LegacyBootShim::BootQuirksLoad(BootZbi& boot) {
   return !IsProperZbi() && LoadDepthchargeZbi(*this, boot);
 }
 
-uart::all::Config<> UartFromZbi(LegacyBootShim::InputZbi zbi, const uart::all::Config<>& uart_config) {
+uart::all::Config<> UartFromZbi(LegacyBootShim::InputZbi zbi,
+                                const uart::all::Config<>& uart_config) {
   auto check_and_print_error = [&zbi]() {
     if (auto maybe_error = zbi.take_error(); maybe_error.is_error()) {
       zbitl::PrintViewError(maybe_error.error_value());
@@ -188,7 +189,7 @@ uart::all::Config<> UartFromZbi(LegacyBootShim::InputZbi zbi, const uart::all::C
   auto first = zbi.begin();
   auto last = zbi.end();
 
-  auto kernel_it = zbi.find(arch::kZbiBootKernelType);
+  auto kernel_it = zbi.find(kArchZbiKernelType);
   if (check_and_print_error()) {
     return uart_config;
   }
@@ -198,7 +199,8 @@ uart::all::Config<> UartFromZbi(LegacyBootShim::InputZbi zbi, const uart::all::C
     return uart_config;
   }
 
-  std::optional new_uart_config = GetUartFromRange(ktl::next(kernel_it), last).value_or(uart_config);
+  std::optional new_uart_config =
+      GetUartFromRange(ktl::next(kernel_it), last).value_or(uart_config);
   if (check_and_print_error()) {
     return new_uart_config.value_or(uart_config);
   }

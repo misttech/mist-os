@@ -435,6 +435,7 @@ zbi_executable("trampoline-boot-test") {
     ":turducken",
     "..:new",
     "..:trampoline-boot",
+    "..:zbi",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/libc",
     "//zircon/system/ulib/pretty",

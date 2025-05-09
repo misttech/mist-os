@@ -70,7 +70,7 @@ def GenerateTestImageCArrayDeclaration(
 
         # Set reserved scratch memory size to 0. Otherwise it's a random (huge) number
         kernel_zbi_bytes = bytearray(kernel_zbi.read_bytes())
-        # See `arch::ZbiKernelImage` defined in <lib/arch/zbi.h>.
+        # See `ZbiKernelImage` defined in <phys/zbi.h>.
         # 2*zbi_header_t + uint64_t = 2 * 32 + 8
         kernel_zbi_bytes[72:80] = b"\x00" * 8
         kernel_zbi.write_bytes(kernel_zbi_bytes)

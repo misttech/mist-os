@@ -4,8 +4,6 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <lib/arch/zbi-boot.h>
-#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/view.h>
 #include <stdio.h>
 #include <zircon/assert.h>
@@ -14,6 +12,7 @@
 
 #include <ktl/algorithm.h>
 #include <ktl/string_view.h>
+#include <phys/zbi.h>
 
 #include "test-main.h"
 
@@ -28,7 +27,7 @@ int TestMain(void* bootloader_data, ktl::optional<EarlyBootZbi> zbi, arch::Early
   int buggy_item_index_2 = 0;
   for (const auto& [header, payload] : *zbi) {
     switch (header->type) {
-      case arch::kZbiBootKernelType:
+      case kArchZbiKernelType:
         ZX_ASSERT(i == 0);
         break;
       case ZBI_TYPE_BOOTLOADER_FILE:

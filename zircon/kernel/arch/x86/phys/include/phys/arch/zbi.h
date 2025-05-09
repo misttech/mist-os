@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_LIB_ARCH_X86_INCLUDE_LIB_ARCH_INTERNAL_ZBI_CONSTANTS_H_
-#define ZIRCON_KERNEL_LIB_ARCH_X86_INCLUDE_LIB_ARCH_INTERNAL_ZBI_CONSTANTS_H_
+#ifndef ZIRCON_KERNEL_ARCH_X86_PHYS_INCLUDE_PHYS_ARCH_ZBI_H_
+#define ZIRCON_KERNEL_ARCH_X86_PHYS_INCLUDE_PHYS_ARCH_ZBI_H_
 
 #ifdef __ASSEMBLER__
 #include <fidl/zbi/data/asm/zbi.h>
@@ -21,4 +21,4 @@
 // Alignment required for an x86 data ZBI.
 #define ARCH_ZBI_DATA_ALIGNMENT (1 << 12)
 
-#endif  // ZIRCON_KERNEL_LIB_ARCH_X86_INCLUDE_LIB_ARCH_INTERNAL_ZBI_CONSTANTS_H_
+#endif  // ZIRCON_KERNEL_ARCH_X86_PHYS_INCLUDE_PHYS_ARCH_ZBI_H_

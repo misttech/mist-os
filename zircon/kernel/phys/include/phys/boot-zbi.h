@@ -7,7 +7,6 @@
 #ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_BOOT_ZBI_H_
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_BOOT_ZBI_H_
 
-#include <lib/arch/zbi.h>
 #include <lib/fit/result.h>
 #include <lib/zbitl/image.h>
 #include <lib/zbitl/view.h>
@@ -17,6 +16,7 @@
 #include <ktl/optional.h>
 #include <ktl/span.h>
 #include <phys/allocation.h>
+#include <phys/zbi.h>
 
 // BootZbi represents a bootable ZBI and manages the memory allocation and ZBI
 // protocol details for getting its kernel image and data ZBI in place and
@@ -90,14 +90,14 @@ class BootZbi {
 
   // The Kernel* methods can be used at any time, even before Load().
 
-  const arch::ZbiKernelImage* KernelImage() const { return kernel_; }
+  const ZbiKernelImage* KernelImage() const { return kernel_; }
 
   const zbi_kernel_t* KernelHeader() const { return &KernelImage()->data_kernel; }
 
   uint64_t KernelLoadAddress() const { return reinterpret_cast<uintptr_t>(KernelImage()); }
 
   uint32_t KernelLoadSize() const {
-    return static_cast<uint32_t>(offsetof(arch::ZbiKernelImage, data_kernel)) +
+    return static_cast<uint32_t>(offsetof(ZbiKernelImage, data_kernel)) +
            KernelImage()->hdr_kernel.length;
   }
 
@@ -136,9 +136,7 @@ class BootZbi {
   void InitKernel(Allocation kernel);
   void InitData(Allocation data);
 
-  // Front-end for arch::ZbiBoot(Raw) with arch-specific extra arguments.
-  [[noreturn]] static void ZbiBoot(arch::ZbiKernelImage* kernel, void* arg);
-  [[noreturn]] static void ZbiBootRaw(uintptr_t entry, void* data);
+  [[noreturn]] void ZbiBoot(uintptr_t entry, void* data) const;
 
  private:
   void InitKernelFromItem();
@@ -157,10 +155,10 @@ class BootZbi {
   // only to the kernel item header (at kernel_->hdr_kernel) and payload.  At
   // construction by Init() this points to just before kernel_item_.  After
   // Load() it may instead point into kernel_buffer_.data(), but is guaranteed
-  // to be aligned to arch::kZbiBootKernelAlignment and to have enough memory
+  // to be aligned to kArchZbiKernelAlignment and to have enough memory
   // after the load image for the requested reserves (either allocated in
   // kernel_buffer_ or reusing zbi_.storage() when no longer in use for data).
-  const arch::ZbiKernelImage* kernel_ = nullptr;
+  const ZbiKernelImage* kernel_ = nullptr;
 };
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_BOOT_ZBI_H_

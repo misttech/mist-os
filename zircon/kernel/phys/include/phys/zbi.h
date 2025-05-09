@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_ZBI_H_
-#define ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_ZBI_H_
+#ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ZBI_H_
+#define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ZBI_H_
 
-#include <lib/arch/internal/zbi-constants.h>
+#include <phys/arch/zbi.h>
 
 #ifdef __ASSEMBLER__
 
@@ -91,7 +91,11 @@
 
 #else  // clang-format on
 
-namespace arch {
+constexpr uint32_t kArchZbiKernelType = ARCH_ZBI_KERNEL_TYPE;
+
+constexpr uintptr_t kArchZbiKernelAlignment = ARCH_ZBI_KERNEL_ALIGNMENT;
+
+constexpr uintptr_t kArchZbiDataAlignment = ARCH_ZBI_DATA_ALIGNMENT;
 
 // Represents (the headers of) a bootable ZBI, loaded into memory by the boot
 // loader.
@@ -101,8 +105,6 @@ struct ZbiKernelImage {
   zbi_kernel_t data_kernel;
 };
 
-}  // namespace arch
-
 #endif  // ifdef __ASSEMBLER__
 
-#endif  // ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_ZBI_H_
+#endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ZBI_H_

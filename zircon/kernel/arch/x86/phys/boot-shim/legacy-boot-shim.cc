@@ -7,7 +7,6 @@
 #include "legacy-boot-shim.h"
 
 #include <lib/acpi_lite.h>
-#include <lib/arch/zbi-boot.h>
 #include <lib/boot-shim/boot-shim.h>
 #include <lib/fit/defer.h>
 #include <lib/memalloc/pool.h>
@@ -24,6 +23,7 @@
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
 #include <phys/uart.h>
+#include <phys/zbi.h>
 
 #include "stdout.h"
 
@@ -78,7 +78,7 @@ bool LegacyBootShim::IsProperZbi() const {
   bool result = true;
   InputZbi zbi = input_zbi_;
   for (auto [header, payload] : zbi) {
-    result = header->type == arch::kZbiBootKernelType;
+    result = header->type == kArchZbiKernelType;
     break;
   }
   zbi.ignore_error();

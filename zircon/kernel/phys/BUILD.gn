@@ -211,9 +211,9 @@ if (toolchain_environment == "kernel.phys" ||
       ":main",
       ":stdio",
       ":uart",
+      ":zbi",
       ":zbi-memory",
       "//src/lib/zbitl",
-      "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/crypto:crypto-entropy-src",
       "//zircon/system/ulib/uart",
@@ -534,6 +534,7 @@ if (toolchain_environment == "kernel.phys" ||
       ":allocation",
       ":main",
       ":stdio",
+      ":zbi",
       "//src/lib/zbitl",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/ktl",
@@ -672,6 +673,22 @@ if (toolchain_environment == "kernel.phys" ||
       ]
     }
   }
+}
+
+source_set("zbi") {
+  public = [ "include/phys/zbi.h" ]
+  public_deps = [
+    # <phys/zbi.h> has #include <fidl/zbi/data/asm/zbi.h>
+    # <phys/arch/zbi.h> has #include <fidl/zbi/data/asm/zbi.h>
+    "//sdk/fidl/zbi:zbi_zither.asm",
+
+    # <phys/zbi.h>" has #include <lib/zbi-format/kernel.h>.
+    # <phys/zbi.h>" has #include <lib/zbi-format/zbi.h>.
+    # <phys/arch/zbi-boot.h> has #include <lib/zbi-format/zbi.h>.
+    "//sdk/lib/zbi-format",
+  ]
+  public_configs = [ ":includes" ]
+  sources = [ "$arch_phys/include/phys/arch/zbi.h" ]
 }
 
 config("includes") {

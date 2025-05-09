@@ -4,12 +4,12 @@
 
 #include "src/storage/lib/paver/validation.h"
 
-#include <lib/arch/zbi.h>
 #include <lib/zbi-format/zbi.h>
 #include <zircon/errors.h>
 
 #include <span>
 
+#include <phys/zbi.h>
 #include <zxtest/zxtest.h>
 
 #include "src/storage/lib/paver/device-partitioner.h"
@@ -25,14 +25,14 @@ TEST(IsValidKernelZbi, EmptyData) {
 
 TEST(IsValidKernelZbi, MinimalValid) {
   std::span<uint8_t> data;
-  arch::ZbiKernelImage* header;
+  ZbiKernelImage* header;
   auto array = CreateZbiHeader(Arch::kX64, 0, &header, &data);
   ASSERT_TRUE(IsValidKernelZbi(Arch::kX64, data));
 }
 
 TEST(IsValidKernelZbi, DataTooSmall) {
   std::span<uint8_t> data;
-  arch::ZbiKernelImage* header;
+  ZbiKernelImage* header;
   auto array = CreateZbiHeader(Arch::kX64, 1024, &header, &data);
   header->hdr_file.length += 1;
   ASSERT_FALSE(IsValidKernelZbi(Arch::kX64, data));
@@ -40,7 +40,7 @@ TEST(IsValidKernelZbi, DataTooSmall) {
 
 TEST(IsValidKernelZbi, DataTooBig) {
   std::span<uint8_t> data;
-  arch::ZbiKernelImage* header;
+  ZbiKernelImage* header;
   auto array = CreateZbiHeader(Arch::kX64, 1024, &header, &data);
   header->hdr_file.length = 0xffff'ffffu;
   ASSERT_FALSE(IsValidKernelZbi(Arch::kX64, data));
@@ -48,7 +48,7 @@ TEST(IsValidKernelZbi, DataTooBig) {
 
 TEST(IsValidKernelZbi, KernelDataTooSmall) {
   std::span<uint8_t> data;
-  arch::ZbiKernelImage* header;
+  ZbiKernelImage* header;
   auto array = CreateZbiHeader(Arch::kX64, 1024, &header, &data);
   header->hdr_kernel.length += 1;
   ASSERT_FALSE(IsValidKernelZbi(Arch::kX64, data));
@@ -56,21 +56,21 @@ TEST(IsValidKernelZbi, KernelDataTooSmall) {
 
 TEST(IsValidKernelZbi, ValidWithPayload) {
   std::span<uint8_t> data;
-  arch::ZbiKernelImage* header;
+  ZbiKernelImage* header;
   auto array = CreateZbiHeader(Arch::kX64, 1024, &header, &data);
   ASSERT_TRUE(IsValidKernelZbi(Arch::kX64, data));
 }
 
 TEST(IsValidKernelZbi, InvalidArch) {
   std::span<uint8_t> data;
-  arch::ZbiKernelImage* header;
+  ZbiKernelImage* header;
   auto array = CreateZbiHeader(Arch::kX64, 0, &header, &data);
   ASSERT_FALSE(IsValidKernelZbi(Arch::kArm64, data));
 }
 
 TEST(IsValidKernelZbi, InvalidMagic) {
   std::span<uint8_t> data;
-  arch::ZbiKernelImage* header;
+  ZbiKernelImage* header;
   auto array = CreateZbiHeader(Arch::kX64, 0, &header, &data);
   header->hdr_file.magic = 0;
   ASSERT_FALSE(IsValidKernelZbi(Arch::kX64, data));
@@ -78,7 +78,7 @@ TEST(IsValidKernelZbi, InvalidMagic) {
 
 TEST(IsValidKernelZbi, ValidCrc) {
   std::span<uint8_t> data;
-  arch::ZbiKernelImage* header;
+  ZbiKernelImage* header;
   auto array = CreateZbiHeader(Arch::kX64, 0, &header, &data);
   header->hdr_kernel.flags |= ZBI_FLAGS_CRC32;
   header->data_kernel.entry = 0x1122334455667788;
@@ -89,7 +89,7 @@ TEST(IsValidKernelZbi, ValidCrc) {
 
 TEST(IsValidKernelZbi, InvalidCrc) {
   std::span<uint8_t> data;
-  arch::ZbiKernelImage* header;
+  ZbiKernelImage* header;
   auto array = CreateZbiHeader(Arch::kX64, 0, &header, &data);
   header->hdr_kernel.flags |= ZBI_FLAGS_CRC32;
   header->data_kernel.entry = 0x1122334455667788;
