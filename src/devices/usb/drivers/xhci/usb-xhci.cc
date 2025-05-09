@@ -299,7 +299,7 @@ zx_status_t UsbXhci::DeviceOnline(uint32_t slot, uint16_t port, usb_speed_t spee
     }
     if (state->GetHubLocked()) {
       transaction_lock.release();
-      PostCallback([=](const ddk::UsbBusInterfaceProtocolClient& bus) {
+      PostCallback([=, this](const ddk::UsbBusInterfaceProtocolClient& bus) {
         uint32_t hub_id;
         {
           auto state = device_state_[slot - 1];
@@ -325,7 +325,7 @@ zx_status_t UsbXhci::DeviceOnline(uint32_t slot, uint16_t port, usb_speed_t spee
     }
     is_usb_3 = GetPortState()[port].is_USB3;
   }
-  PostCallback([=](const ddk::UsbBusInterfaceProtocolClient& bus) {
+  PostCallback([=, this](const ddk::UsbBusInterfaceProtocolClient& bus) {
     bus.AddDevice(slot - 1,
                   static_cast<uint32_t>(is_usb_3 ? UsbHciGetMaxDeviceCount() - 1
                                                  : UsbHciGetMaxDeviceCount() - 2),
@@ -493,7 +493,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::ConfigureHubAsync(uint32_t device_
     context = command_ring_.AllocateContext();
   }
   return SubmitCommand(cmd, std::move(context))
-      .and_then([=](TRB*& trb) -> fpromise::promise<void, zx_status_t> {
+      .and_then([=, this](TRB*& trb) -> fpromise::promise<void, zx_status_t> {
         auto completion = reinterpret_cast<CommandCompletionEvent*>(trb);
         if (completion->CompletionCode() != CommandCompletionEvent::Success) {
           FDF_LOG(ERROR, "Failed to configure endpoint: CompletionCode() == %u",
@@ -850,31 +850,31 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciDisableEndpoint(uint32_t dev
   // TODO(https://fxbug.dev/42109415): Implement async support
   hw_mb();
   return SubmitCommand(trb, std::move(context))
-      .then(
-          [=](fpromise::result<TRB*, zx_status_t>& result) -> fpromise::result<void, zx_status_t> {
-            if (result.is_error()) {
-              return fpromise::error(ZX_ERR_BAD_STATE);
-            }
-            auto completion = reinterpret_cast<CommandCompletionEvent*>(result.value());
-            if (completion->CompletionCode() != CommandCompletionEvent::Success) {
-              FDF_LOG(ERROR, "Failed to configure endpoint: CompletionCode() == %u",
-                      completion->CompletionCode());
-              return fpromise::error(ZX_ERR_BAD_STATE);
-            }
-            auto endpoint_context = reinterpret_cast<EndpointContext*>(
-                reinterpret_cast<unsigned char*>(control) + (slot_size_bytes_ * (2 + index)));
-            endpoint_context->Deinit();
-            fbl::AutoLock _(&state->transaction_lock());
-            if (state->IsDisconnecting()) {
-              return fpromise::error(ZX_ERR_IO_NOT_PRESENT);
-            }
-            zx_status_t status = state->GetEndpoint(index - 1).transfer_ring().Deinit();
-            // If we can't deinit the ring something is seriously wrong.
-            if (status != ZX_OK) {
-              return fpromise::error(ZX_ERR_BAD_STATE);
-            }
-            return fpromise::ok();
-          })
+      .then([=, this](fpromise::result<TRB*, zx_status_t>& result)
+                -> fpromise::result<void, zx_status_t> {
+        if (result.is_error()) {
+          return fpromise::error(ZX_ERR_BAD_STATE);
+        }
+        auto completion = reinterpret_cast<CommandCompletionEvent*>(result.value());
+        if (completion->CompletionCode() != CommandCompletionEvent::Success) {
+          FDF_LOG(ERROR, "Failed to configure endpoint: CompletionCode() == %u",
+                  completion->CompletionCode());
+          return fpromise::error(ZX_ERR_BAD_STATE);
+        }
+        auto endpoint_context = reinterpret_cast<EndpointContext*>(
+            reinterpret_cast<unsigned char*>(control) + (slot_size_bytes_ * (2 + index)));
+        endpoint_context->Deinit();
+        fbl::AutoLock _(&state->transaction_lock());
+        if (state->IsDisconnecting()) {
+          return fpromise::error(ZX_ERR_IO_NOT_PRESENT);
+        }
+        zx_status_t status = state->GetEndpoint(index - 1).transfer_ring().Deinit();
+        // If we can't deinit the ring something is seriously wrong.
+        if (status != ZX_OK) {
+          return fpromise::error(ZX_ERR_BAD_STATE);
+        }
+        return fpromise::ok();
+      })
       .box();
 }
 
@@ -1049,7 +1049,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciResetEndpointAsync(uint32_t 
     }
   }
   return SubmitCommand(reset_command, std::move(context))
-      .and_then([=](TRB*& trb) -> TRBPromise {
+      .and_then([=, this](TRB*& trb) -> TRBPromise {
         CommandCompletionEvent* evt = static_cast<CommandCompletionEvent*>(trb);
         if (evt->CompletionCode() != CommandCompletionEvent::Success) {
           return fpromise::make_error_promise(ZX_ERR_IO);
@@ -1130,7 +1130,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciCancelAllAsync(uint32_t devi
   }
   auto context = command_ring_.AllocateContext();
   return SubmitCommand(stop, std::move(context))
-      .and_then([=](TRB*& trb) -> fpromise::promise<void, zx_status_t> {
+      .and_then([=, this](TRB*& trb) -> fpromise::promise<void, zx_status_t> {
         auto completion_event = static_cast<CommandCompletionEvent*>(trb);
         auto completion_code = completion_event->CompletionCode();
         zx_status_t status =

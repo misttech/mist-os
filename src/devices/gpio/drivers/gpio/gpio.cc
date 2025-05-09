@@ -440,7 +440,7 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
   }
 
   async::PostTask(fidl_dispatcher()->async_dispatcher(),
-                  [=, pins = std::move(pins), completer = std::move(completer)]() mutable {
+                  [=, this, pins = std::move(pins), completer = std::move(completer)]() mutable {
                     CreatePinDevices(controller_id, pins, std::move(completer));
                   });
 }
@@ -464,7 +464,7 @@ void GpioRootDevice::CreatePinDevices(const uint32_t controller_id,
     }
   }
 
-  async::PostTask(dispatcher(), [=, completer = std::move(completer)]() mutable {
+  async::PostTask(dispatcher(), [=, this, completer = std::move(completer)]() mutable {
     ServePinDevices(std::move(completer));
   });
 }
@@ -478,9 +478,10 @@ void GpioRootDevice::ServePinDevices(fdf::StartCompleter completer) {
     }
   }
 
-  async::PostTask(
-      fidl_dispatcher()->async_dispatcher(),
-      [=, completer = std::move(completer)]() mutable { AddPinDevices(std::move(completer)); });
+  async::PostTask(fidl_dispatcher()->async_dispatcher(),
+                  [=, this, completer = std::move(completer)]() mutable {
+                    AddPinDevices(std::move(completer));
+                  });
 }
 
 void GpioRootDevice::AddPinDevices(fdf::StartCompleter completer) {
