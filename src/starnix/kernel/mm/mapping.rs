@@ -83,7 +83,11 @@ impl Mapping {
         file_write_guard: FileWriteGuardRef,
     ) -> Mapping {
         Mapping {
-            backing: MappingBacking::Memory(MappingBackingMemory { base, memory, memory_offset }),
+            backing: MappingBacking::Memory(Box::new(MappingBackingMemory {
+                base,
+                memory,
+                memory_offset,
+            })),
             flags,
             max_access,
             name,
@@ -313,7 +317,7 @@ impl Mapping {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum MappingBacking {
-    Memory(MappingBackingMemory),
+    Memory(Box<MappingBackingMemory>),
 
     #[cfg(feature = "alternate_anon_allocs")]
     PrivateAnonymous,
