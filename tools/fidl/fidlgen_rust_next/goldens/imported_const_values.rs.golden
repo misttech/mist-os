@@ -121,6 +121,13 @@ impl ::fidl_next::FromWire<WireMyStruct> for MyStruct {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireMyStruct> for MyStruct {
+    #[inline]
+    fn from_wire_ref(wire: &WireMyStruct) -> Self {
+        Self {}
+    }
+}
+
 /// The wire type corresponding to [`MyStruct`].
 #[derive(Clone, Debug)]
 #[repr(C)]

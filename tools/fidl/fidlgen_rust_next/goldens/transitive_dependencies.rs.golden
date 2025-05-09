@@ -129,6 +129,13 @@ impl ::fidl_next::FromWire<WireBaz> for Baz {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireBaz> for Baz {
+    #[inline]
+    fn from_wire_ref(wire: &WireBaz) -> Self {
+        Self { g: ::fidl_next::FromWireRef::from_wire_ref(&wire.g) }
+    }
+}
+
 /// The wire type corresponding to [`Baz`].
 #[derive(Clone, Debug)]
 #[repr(C)]

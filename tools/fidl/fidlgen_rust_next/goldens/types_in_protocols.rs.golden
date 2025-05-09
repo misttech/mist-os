@@ -228,6 +228,37 @@ impl<'de> ::fidl_next::FromWire<WireArrayBasic<'de>> for ArrayBasic {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireArrayBasic<'de>> for ArrayBasic {
+    #[inline]
+    fn from_wire_ref(wire: &WireArrayBasic<'de>) -> Self {
+        Self {
+            array_uint8: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_uint8),
+
+            array_uint16: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_uint16),
+
+            array_uint32: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_uint32),
+
+            array_uint64: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_uint64),
+
+            array_int8: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_int8),
+
+            array_int16: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_int16),
+
+            array_int32: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_int32),
+
+            array_int64: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_int64),
+
+            array_float32: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_float32),
+
+            array_float64: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_float64),
+
+            array_string: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_string),
+
+            array_opt_string: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_opt_string),
+        }
+    }
+}
+
 /// The wire type corresponding to [`ArrayBasic`].
 #[derive(Debug)]
 #[repr(C)]
@@ -402,6 +433,13 @@ impl ::fidl_next::FromWire<WireBits> for Bits {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireBits> for Bits {
+    #[inline]
+    fn from_wire_ref(wire: &WireBits) -> Self {
+        Self::from(*wire)
+    }
+}
+
 /// The wire type corresponding to [`Bits`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
@@ -505,6 +543,13 @@ impl ::fidl_next::FromWire<WireEnum> for Enum {
     #[inline]
     fn from_wire(wire: WireEnum) -> Self {
         Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireEnum> for Enum {
+    #[inline]
+    fn from_wire_ref(wire: &WireEnum) -> Self {
+        Self::from(*wire)
     }
 }
 
@@ -659,6 +704,13 @@ impl ::fidl_next::FromWire<WireStruct> for Struct {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireStruct> for Struct {
+    #[inline]
+    fn from_wire_ref(wire: &WireStruct) -> Self {
+        Self {}
+    }
+}
+
 /// The wire type corresponding to [`Struct`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -777,6 +829,13 @@ impl<'de> ::fidl_next::FromWire<WireTable<'de>> for Table {
     fn from_wire(wire: WireTable<'de>) -> Self {
         let table = ::core::mem::ManuallyDrop::new(wire.table);
 
+        Self {}
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireTable<'de>> for Table {
+    #[inline]
+    fn from_wire_ref(wire: &WireTable<'de>) -> Self {
         Self {}
     }
 }
@@ -954,11 +1013,35 @@ impl ::fidl_next::FromWire<WireUnion> for Union {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnion> for Union {
+    #[inline]
+    fn from_wire_ref(wire: &WireUnion) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::B(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<bool>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalUnion> for Box<Union> {
     #[inline]
     fn from_wire_option(wire: WireOptionalUnion) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalUnion> for Box<Union> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalUnion) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -1311,6 +1394,27 @@ impl<'de> ::fidl_next::FromWire<WireArrayCompound<'de>> for ArrayCompound {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireArrayCompound<'de>> for ArrayCompound {
+    #[inline]
+    fn from_wire_ref(wire: &WireArrayCompound<'de>) -> Self {
+        Self {
+            array_bits: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_bits),
+
+            array_enum: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_enum),
+
+            array_struct: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_struct),
+
+            array_table: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_table),
+
+            array_union: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_union),
+
+            array_opt_struct: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_opt_struct),
+
+            array_opt_union: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_opt_union),
+        }
+    }
+}
+
 /// The wire type corresponding to [`ArrayCompound`].
 #[derive(Debug)]
 #[repr(C)]
@@ -1528,6 +1632,21 @@ impl<'de> ::fidl_next::FromWire<WireArrayVectorNested<'de>> for ArrayVectorNeste
             vector_array_uint8: ::fidl_next::FromWire::from_wire(wire.vector_array_uint8),
 
             vector_vector_uint8: ::fidl_next::FromWire::from_wire(wire.vector_vector_uint8),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireArrayVectorNested<'de>> for ArrayVectorNested {
+    #[inline]
+    fn from_wire_ref(wire: &WireArrayVectorNested<'de>) -> Self {
+        Self {
+            array_array_uint8: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_array_uint8),
+
+            array_vector_uint8: ::fidl_next::FromWireRef::from_wire_ref(&wire.array_vector_uint8),
+
+            vector_array_uint8: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_array_uint8),
+
+            vector_vector_uint8: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_vector_uint8),
         }
     }
 }
@@ -1814,6 +1933,37 @@ impl<'de> ::fidl_next::FromWire<WireBasic<'de>> for Basic {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireBasic<'de>> for Basic {
+    #[inline]
+    fn from_wire_ref(wire: &WireBasic<'de>) -> Self {
+        Self {
+            uint8: ::fidl_next::FromWireRef::from_wire_ref(&wire.uint8),
+
+            uint16: ::fidl_next::FromWireRef::from_wire_ref(&wire.uint16),
+
+            uint32: ::fidl_next::FromWireRef::from_wire_ref(&wire.uint32),
+
+            uint64: ::fidl_next::FromWireRef::from_wire_ref(&wire.uint64),
+
+            int8: ::fidl_next::FromWireRef::from_wire_ref(&wire.int8),
+
+            int16: ::fidl_next::FromWireRef::from_wire_ref(&wire.int16),
+
+            int32: ::fidl_next::FromWireRef::from_wire_ref(&wire.int32),
+
+            int64: ::fidl_next::FromWireRef::from_wire_ref(&wire.int64),
+
+            float32: ::fidl_next::FromWireRef::from_wire_ref(&wire.float32),
+
+            float64: ::fidl_next::FromWireRef::from_wire_ref(&wire.float64),
+
+            string: ::fidl_next::FromWireRef::from_wire_ref(&wire.string),
+
+            opt_string: ::fidl_next::FromWireRef::from_wire_ref(&wire.opt_string),
+        }
+    }
+}
+
 /// The wire type corresponding to [`Basic`].
 #[derive(Debug)]
 #[repr(C)]
@@ -2090,6 +2240,27 @@ impl<'de> ::fidl_next::FromWire<WireCompound<'de>> for Compound {
             opt_struct: ::fidl_next::FromWire::from_wire(wire.opt_struct),
 
             opt_union: ::fidl_next::FromWire::from_wire(wire.opt_union),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireCompound<'de>> for Compound {
+    #[inline]
+    fn from_wire_ref(wire: &WireCompound<'de>) -> Self {
+        Self {
+            bits: ::fidl_next::FromWireRef::from_wire_ref(&wire.bits),
+
+            enum_: ::fidl_next::FromWireRef::from_wire_ref(&wire.enum_),
+
+            struct_: ::fidl_next::FromWireRef::from_wire_ref(&wire.struct_),
+
+            table: ::fidl_next::FromWireRef::from_wire_ref(&wire.table),
+
+            union: ::fidl_next::FromWireRef::from_wire_ref(&wire.union),
+
+            opt_struct: ::fidl_next::FromWireRef::from_wire_ref(&wire.opt_struct),
+
+            opt_union: ::fidl_next::FromWireRef::from_wire_ref(&wire.opt_union),
         }
     }
 }
@@ -2391,6 +2562,37 @@ impl<'de> ::fidl_next::FromWire<WireVectorBasic<'de>> for VectorBasic {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireVectorBasic<'de>> for VectorBasic {
+    #[inline]
+    fn from_wire_ref(wire: &WireVectorBasic<'de>) -> Self {
+        Self {
+            vector_uint8: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_uint8),
+
+            vector_uint16: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_uint16),
+
+            vector_uint32: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_uint32),
+
+            vector_uint64: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_uint64),
+
+            vector_int8: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_int8),
+
+            vector_int16: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_int16),
+
+            vector_int32: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_int32),
+
+            vector_int64: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_int64),
+
+            vector_float32: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_float32),
+
+            vector_float64: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_float64),
+
+            vector_string: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_string),
+
+            vector_opt_string: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_opt_string),
+        }
+    }
+}
+
 /// The wire type corresponding to [`VectorBasic`].
 #[derive(Debug)]
 #[repr(C)]
@@ -2659,6 +2861,27 @@ impl<'de> ::fidl_next::FromWire<WireVectorCompound<'de>> for VectorCompound {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireVectorCompound<'de>> for VectorCompound {
+    #[inline]
+    fn from_wire_ref(wire: &WireVectorCompound<'de>) -> Self {
+        Self {
+            vector_bits: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_bits),
+
+            vector_enum: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_enum),
+
+            vector_struct: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_struct),
+
+            vector_table: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_table),
+
+            vector_union: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_union),
+
+            vector_opt_struct: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_opt_struct),
+
+            vector_opt_union: ::fidl_next::FromWireRef::from_wire_ref(&wire.vector_opt_union),
+        }
+    }
+}
+
 /// The wire type corresponding to [`VectorCompound`].
 #[derive(Debug)]
 #[repr(C)]
@@ -2873,6 +3096,23 @@ impl<'de> ::fidl_next::FromWire<WireVectorOptional<'de>> for VectorOptional {
             opt_vector_struct: ::fidl_next::FromWire::from_wire(wire.opt_vector_struct),
 
             opt_vector_opt_struct: ::fidl_next::FromWire::from_wire(wire.opt_vector_opt_struct),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireVectorOptional<'de>> for VectorOptional {
+    #[inline]
+    fn from_wire_ref(wire: &WireVectorOptional<'de>) -> Self {
+        Self {
+            opt_vector_uint8: ::fidl_next::FromWireRef::from_wire_ref(&wire.opt_vector_uint8),
+
+            opt_vector_string: ::fidl_next::FromWireRef::from_wire_ref(&wire.opt_vector_string),
+
+            opt_vector_struct: ::fidl_next::FromWireRef::from_wire_ref(&wire.opt_vector_struct),
+
+            opt_vector_opt_struct: ::fidl_next::FromWireRef::from_wire_ref(
+                &wire.opt_vector_opt_struct,
+            ),
         }
     }
 }

@@ -71,6 +71,13 @@ impl ::fidl_next::FromWire<WireExampleBits> for ExampleBits {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireExampleBits> for ExampleBits {
+    #[inline]
+    fn from_wire_ref(wire: &WireExampleBits) -> Self {
+        Self::from(*wire)
+    }
+}
+
 /// The wire type corresponding to [`ExampleBits`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
@@ -181,6 +188,13 @@ impl ::fidl_next::FromWire<WireExampleEnum> for ExampleEnum {
     #[inline]
     fn from_wire(wire: WireExampleEnum) -> Self {
         Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireExampleEnum> for ExampleEnum {
+    #[inline]
+    fn from_wire_ref(wire: &WireExampleEnum) -> Self {
+        Self::from(*wire)
     }
 }
 
@@ -359,6 +373,13 @@ impl ::fidl_next::FromWire<WireExampleProtocolMethodRequest> for ExampleProtocol
     #[inline]
     fn from_wire(wire: WireExampleProtocolMethodRequest) -> Self {
         Self { arg: ::fidl_next::FromWire::from_wire(wire.arg) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireExampleProtocolMethodRequest> for ExampleProtocolMethodRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireExampleProtocolMethodRequest) -> Self {
+        Self { arg: ::fidl_next::FromWireRef::from_wire_ref(&wire.arg) }
     }
 }
 
@@ -674,6 +695,13 @@ impl ::fidl_next::FromWire<WireExampleStruct> for ExampleStruct {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireExampleStruct> for ExampleStruct {
+    #[inline]
+    fn from_wire_ref(wire: &WireExampleStruct) -> Self {
+        Self { member: ::fidl_next::FromWireRef::from_wire_ref(&wire.member) }
+    }
+}
+
 /// The wire type corresponding to [`ExampleStruct`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -833,6 +861,19 @@ impl<'de> ::fidl_next::FromWire<WireExampleTable<'de>> for ExampleTable {
             member: member.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<::fidl_next::WireU32>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireExampleTable<'de>> for ExampleTable {
+    #[inline]
+    fn from_wire_ref(wire: &WireExampleTable<'de>) -> Self {
+        Self {
+            member: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireU32>()
                 })
             }),
         }
@@ -1015,11 +1056,35 @@ impl ::fidl_next::FromWire<WireExampleUnion> for ExampleUnion {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireExampleUnion> for ExampleUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireExampleUnion) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::Variant(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireU32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalExampleUnion> for Box<ExampleUnion> {
     #[inline]
     fn from_wire_option(wire: WireOptionalExampleUnion) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalExampleUnion> for Box<ExampleUnion> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalExampleUnion) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }

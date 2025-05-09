@@ -111,6 +111,13 @@ impl ::fidl_next::FromWire<WireSerializableStruct> for SerializableStruct {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireSerializableStruct> for SerializableStruct {
+    #[inline]
+    fn from_wire_ref(wire: &WireSerializableStruct) -> Self {
+        Self {}
+    }
+}
+
 /// The wire type corresponding to [`SerializableStruct`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -229,6 +236,13 @@ impl<'de> ::fidl_next::FromWire<WireSerializableTable<'de>> for SerializableTabl
     fn from_wire(wire: WireSerializableTable<'de>) -> Self {
         let table = ::core::mem::ManuallyDrop::new(wire.table);
 
+        Self {}
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireSerializableTable<'de>> for SerializableTable {
+    #[inline]
+    fn from_wire_ref(wire: &WireSerializableTable<'de>) -> Self {
         Self {}
     }
 }
@@ -396,11 +410,35 @@ impl ::fidl_next::FromWire<WireSerializableUnion> for SerializableUnion {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireSerializableUnion> for SerializableUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireSerializableUnion) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::Unused(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<bool>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalSerializableUnion> for Box<SerializableUnion> {
     #[inline]
     fn from_wire_option(wire: WireOptionalSerializableUnion) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalSerializableUnion> for Box<SerializableUnion> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalSerializableUnion) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }

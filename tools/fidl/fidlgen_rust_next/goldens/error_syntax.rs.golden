@@ -120,6 +120,15 @@ impl<'de> ::fidl_next::FromWire<WireExampleUseOfErrorSyntaxCallWhichMayFailReque
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireExampleUseOfErrorSyntaxCallWhichMayFailRequest<'de>>
+    for ExampleUseOfErrorSyntaxCallWhichMayFailRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireExampleUseOfErrorSyntaxCallWhichMayFailRequest<'de>) -> Self {
+        Self { s: ::fidl_next::FromWireRef::from_wire_ref(&wire.s) }
+    }
+}
+
 /// The wire type corresponding to [`ExampleUseOfErrorSyntaxCallWhichMayFailRequest`].
 #[derive(Debug)]
 #[repr(C)]
@@ -290,6 +299,15 @@ impl ::fidl_next::FromWire<WireExampleUseOfErrorSyntaxCallWhichMayFailResponse>
     #[inline]
     fn from_wire(wire: WireExampleUseOfErrorSyntaxCallWhichMayFailResponse) -> Self {
         Self { value: ::fidl_next::FromWire::from_wire(wire.value) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireExampleUseOfErrorSyntaxCallWhichMayFailResponse>
+    for ExampleUseOfErrorSyntaxCallWhichMayFailResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireExampleUseOfErrorSyntaxCallWhichMayFailResponse) -> Self {
+        Self { value: ::fidl_next::FromWireRef::from_wire_ref(&wire.value) }
     }
 }
 

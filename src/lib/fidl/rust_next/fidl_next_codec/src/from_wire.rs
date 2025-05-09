@@ -20,10 +20,22 @@ pub trait FromWire<W>: Sized {
     fn from_wire(wire: W) -> Self;
 }
 
+/// A type which is convertible from a reference to a wire type.
+pub trait FromWireRef<W>: FromWire<W> {
+    /// Converts the given `wire` reference to this type.
+    fn from_wire_ref(wire: &W) -> Self;
+}
+
 /// An optional type which is convertible from a wire type.
 pub trait FromWireOption<W>: Sized {
     /// Converts the given `wire` to an option of this type.
     fn from_wire_option(wire: W) -> Option<Self>;
+}
+
+/// An optional type which is convertible from a reference to a wire type.
+pub trait FromWireOptionRef<W>: FromWireOption<W> {
+    /// Converts the given `wire` reference to an option of this type.
+    fn from_wire_option_ref(wire: &W) -> Option<Self>;
 }
 
 macro_rules! impl_primitive {
@@ -35,8 +47,16 @@ macro_rules! impl_primitive {
             const COPY_OPTIMIZATION: CopyOptimization<$enc, $ty> =
                 CopyOptimization::<$enc, $ty>::PRIMITIVE;
 
+            #[inline]
             fn from_wire(wire: $enc) -> Self {
                 wire.into()
+            }
+        }
+
+        impl FromWireRef<$enc> for $ty {
+            #[inline]
+            fn from_wire_ref(wire: &$enc) -> Self {
+                (*wire).into()
             }
         }
     };
@@ -87,14 +107,45 @@ impl<T: FromWire<W>, W, const N: usize> FromWire<[W; N]> for [T; N] {
     }
 }
 
+impl<T: FromWireRef<W>, W, const N: usize> FromWireRef<[W; N]> for [T; N] {
+    fn from_wire_ref(wire: &[W; N]) -> Self {
+        let mut result = MaybeUninit::<[T; N]>::uninit();
+        if T::COPY_OPTIMIZATION.is_enabled() {
+            // SAFETY: `T` has copy optimization enabled and so is safe to copy bytewise.
+            unsafe {
+                copy_nonoverlapping(wire.as_ptr().cast(), result.as_mut_ptr(), 1);
+            }
+        } else {
+            for (i, item) in wire.iter().enumerate() {
+                unsafe {
+                    result.as_mut_ptr().cast::<T>().add(i).write(T::from_wire_ref(item));
+                }
+            }
+        }
+        unsafe { result.assume_init() }
+    }
+}
+
 impl<T: FromWire<W>, W> FromWire<W> for Box<T> {
     fn from_wire(wire: W) -> Self {
         Box::new(T::from_wire(wire))
     }
 }
 
+impl<T: FromWireRef<W>, W> FromWireRef<W> for Box<T> {
+    fn from_wire_ref(wire: &W) -> Self {
+        Box::new(T::from_wire_ref(wire))
+    }
+}
+
 impl<T: FromWireOption<W>, W> FromWire<W> for Option<T> {
     fn from_wire(wire: W) -> Self {
         T::from_wire_option(wire)
+    }
+}
+
+impl<T: FromWireOptionRef<W>, W> FromWireRef<W> for Option<T> {
+    fn from_wire_ref(wire: &W) -> Self {
+        T::from_wire_option_ref(wire)
     }
 }

@@ -111,6 +111,13 @@ impl ::fidl_next::FromWire<WireEmpty> for Empty {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireEmpty> for Empty {
+    #[inline]
+    fn from_wire_ref(wire: &WireEmpty) -> Self {
+        Self {}
+    }
+}
+
 /// The wire type corresponding to [`Empty`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -256,11 +263,31 @@ impl ::fidl_next::FromWire<WireEmptyFlexibleUnion> for EmptyFlexibleUnion {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireEmptyFlexibleUnion> for EmptyFlexibleUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireEmptyFlexibleUnion) -> Self {
+        match wire.raw.ordinal() {
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalEmptyFlexibleUnion> for Box<EmptyFlexibleUnion> {
     #[inline]
     fn from_wire_option(wire: WireOptionalEmptyFlexibleUnion) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalEmptyFlexibleUnion> for Box<EmptyFlexibleUnion> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalEmptyFlexibleUnion) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -565,6 +592,23 @@ impl<'de> ::fidl_next::FromWire<WireExplicitFlexibleUnion<'de>> for ExplicitFlex
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireExplicitFlexibleUnion<'de>> for ExplicitFlexibleUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireExplicitFlexibleUnion<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::I(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI64>()
+            })),
+
+            4 => Self::F(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireF32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalExplicitFlexibleUnion<'de>>
     for Box<ExplicitFlexibleUnion>
 {
@@ -572,6 +616,19 @@ impl<'de> ::fidl_next::FromWireOption<WireOptionalExplicitFlexibleUnion<'de>>
     fn from_wire_option(wire: WireOptionalExplicitFlexibleUnion<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalExplicitFlexibleUnion<'de>>
+    for Box<ExplicitFlexibleUnion>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalExplicitFlexibleUnion<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -873,11 +930,39 @@ impl<'de> ::fidl_next::FromWire<WireExplicitFoo<'de>> for ExplicitFoo {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireExplicitFoo<'de>> for ExplicitFoo {
+    #[inline]
+    fn from_wire_ref(wire: &WireExplicitFoo<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::I(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            2 => Self::S(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireString<'de>>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalExplicitFoo<'de>> for Box<ExplicitFoo> {
     #[inline]
     fn from_wire_option(wire: WireOptionalExplicitFoo<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalExplicitFoo<'de>> for Box<ExplicitFoo> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalExplicitFoo<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -1150,6 +1235,13 @@ impl<'de> ::fidl_next::FromWire<WirePizza<'de>> for Pizza {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WirePizza<'de>> for Pizza {
+    #[inline]
+    fn from_wire_ref(wire: &WirePizza<'de>) -> Self {
+        Self { toppings: ::fidl_next::FromWireRef::from_wire_ref(&wire.toppings) }
+    }
+}
+
 /// The wire type corresponding to [`Pizza`].
 #[derive(Debug)]
 #[repr(C)]
@@ -1298,6 +1390,13 @@ impl<'de> ::fidl_next::FromWire<WirePasta<'de>> for Pasta {
     #[inline]
     fn from_wire(wire: WirePasta<'de>) -> Self {
         Self { sauce: ::fidl_next::FromWire::from_wire(wire.sauce) }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WirePasta<'de>> for Pasta {
+    #[inline]
+    fn from_wire_ref(wire: &WirePasta<'de>) -> Self {
+        Self { sauce: ::fidl_next::FromWireRef::from_wire_ref(&wire.sauce) }
     }
 }
 
@@ -1484,6 +1583,23 @@ impl<'de> ::fidl_next::FromWire<WireExplicitPizzaOrPasta<'de>> for ExplicitPizza
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireExplicitPizzaOrPasta<'de>> for ExplicitPizzaOrPasta {
+    #[inline]
+    fn from_wire_ref(wire: &WireExplicitPizzaOrPasta<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::Pizza(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<crate::WirePizza<'de>>()
+            })),
+
+            4 => Self::Pasta(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<crate::WirePasta<'de>>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalExplicitPizzaOrPasta<'de>>
     for Box<ExplicitPizzaOrPasta>
 {
@@ -1491,6 +1607,19 @@ impl<'de> ::fidl_next::FromWireOption<WireOptionalExplicitPizzaOrPasta<'de>>
     fn from_wire_option(wire: WireOptionalExplicitPizzaOrPasta<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalExplicitPizzaOrPasta<'de>>
+    for Box<ExplicitPizzaOrPasta>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalExplicitPizzaOrPasta<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -1788,6 +1917,23 @@ impl<'de> ::fidl_next::FromWire<WireExplicitStrictFoo<'de>> for ExplicitStrictFo
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireExplicitStrictFoo<'de>> for ExplicitStrictFoo {
+    #[inline]
+    fn from_wire_ref(wire: &WireExplicitStrictFoo<'de>) -> Self {
+        match wire.raw.ordinal() {
+            2 => Self::I(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            3 => Self::S(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireString<'de>>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalExplicitStrictFoo<'de>>
     for Box<ExplicitStrictFoo>
 {
@@ -1795,6 +1941,19 @@ impl<'de> ::fidl_next::FromWireOption<WireOptionalExplicitStrictFoo<'de>>
     fn from_wire_option(wire: WireOptionalExplicitStrictFoo<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalExplicitStrictFoo<'de>>
+    for Box<ExplicitStrictFoo>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalExplicitStrictFoo<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -2088,11 +2247,39 @@ impl<'de> ::fidl_next::FromWire<WireExplicitUnion<'de>> for ExplicitUnion {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireExplicitUnion<'de>> for ExplicitUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireExplicitUnion<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::Primitive(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            3 => Self::StringNeedsConstructor(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireString<'de>>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalExplicitUnion<'de>> for Box<ExplicitUnion> {
     #[inline]
     fn from_wire_option(wire: WireOptionalExplicitUnion<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalExplicitUnion<'de>> for Box<ExplicitUnion> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalExplicitUnion<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -2368,11 +2555,35 @@ impl ::fidl_next::FromWire<WireFieldCollision> for FieldCollision {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireFieldCollision> for FieldCollision {
+    #[inline]
+    fn from_wire_ref(wire: &WireFieldCollision) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::FieldCollisionTag(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalFieldCollision> for Box<FieldCollision> {
     #[inline]
     fn from_wire_option(wire: WireOptionalFieldCollision) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalFieldCollision> for Box<FieldCollision> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalFieldCollision) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -2694,11 +2905,39 @@ impl<'de> ::fidl_next::FromWire<WireFlexibleFoo<'de>> for FlexibleFoo {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireFlexibleFoo<'de>> for FlexibleFoo {
+    #[inline]
+    fn from_wire_ref(wire: &WireFlexibleFoo<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::S(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireString<'de>>()
+            })),
+
+            2 => Self::I(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalFlexibleFoo<'de>> for Box<FlexibleFoo> {
     #[inline]
     fn from_wire_option(wire: WireOptionalFlexibleFoo<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalFlexibleFoo<'de>> for Box<FlexibleFoo> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalFlexibleFoo<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -3004,6 +3243,23 @@ impl<'de> ::fidl_next::FromWire<WireFlexiblePizzaOrPasta<'de>> for FlexiblePizza
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireFlexiblePizzaOrPasta<'de>> for FlexiblePizzaOrPasta {
+    #[inline]
+    fn from_wire_ref(wire: &WireFlexiblePizzaOrPasta<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::Pizza(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<crate::WirePizza<'de>>()
+            })),
+
+            2 => Self::Pasta(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<crate::WirePasta<'de>>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalFlexiblePizzaOrPasta<'de>>
     for Box<FlexiblePizzaOrPasta>
 {
@@ -3011,6 +3267,19 @@ impl<'de> ::fidl_next::FromWireOption<WireOptionalFlexiblePizzaOrPasta<'de>>
     fn from_wire_option(wire: WireOptionalFlexiblePizzaOrPasta<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalFlexiblePizzaOrPasta<'de>>
+    for Box<FlexiblePizzaOrPasta>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalFlexiblePizzaOrPasta<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -3335,11 +3604,45 @@ impl<'de> ::fidl_next::FromWire<WireFlexibleUnion<'de>> for FlexibleUnion {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireFlexibleUnion<'de>> for FlexibleUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireFlexibleUnion<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::Primitive(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            2 => Self::StringNeedsConstructor(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireString<'de>>()
+            })),
+
+            3 => Self::VectorStringAlsoNeedsConstructor(::fidl_next::FromWireRef::from_wire_ref(
+                unsafe {
+                    wire.raw.get().deref_unchecked::<::fidl_next::WireVector<'de, ::fidl_next::WireString<'de>>>()
+                },
+            )),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalFlexibleUnion<'de>> for Box<FlexibleUnion> {
     #[inline]
     fn from_wire_option(wire: WireOptionalFlexibleUnion<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalFlexibleUnion<'de>> for Box<FlexibleUnion> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalFlexibleUnion<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -3686,11 +3989,47 @@ impl<'de> ::fidl_next::FromWire<WireNewerSimpleUnion<'de>> for NewerSimpleUnion 
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireNewerSimpleUnion<'de>> for NewerSimpleUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireNewerSimpleUnion<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::I(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI64>()
+            })),
+
+            2 => Self::S(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireString<'de>>()
+            })),
+
+            3 => {
+                Self::V(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    wire.raw.get().deref_unchecked::<::fidl_next::WireVector<'de, ::fidl_next::WireString<'de>>>()
+                }))
+            }
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalNewerSimpleUnion<'de>> for Box<NewerSimpleUnion> {
     #[inline]
     fn from_wire_option(wire: WireOptionalNewerSimpleUnion<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalNewerSimpleUnion<'de>>
+    for Box<NewerSimpleUnion>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalNewerSimpleUnion<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -3987,6 +4326,13 @@ impl<'de> ::fidl_next::FromWire<WireNullableUnionStruct<'de>> for NullableUnionS
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireNullableUnionStruct<'de>> for NullableUnionStruct {
+    #[inline]
+    fn from_wire_ref(wire: &WireNullableUnionStruct<'de>) -> Self {
+        Self { the_union: ::fidl_next::FromWireRef::from_wire_ref(&wire.the_union) }
+    }
+}
+
 /// The wire type corresponding to [`NullableUnionStruct`].
 #[derive(Debug)]
 #[repr(C)]
@@ -4171,11 +4517,41 @@ impl<'de> ::fidl_next::FromWire<WireOlderSimpleUnion<'de>> for OlderSimpleUnion 
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireOlderSimpleUnion<'de>> for OlderSimpleUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireOlderSimpleUnion<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::I(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI64>()
+            })),
+
+            2 => Self::F(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireF32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalOlderSimpleUnion<'de>> for Box<OlderSimpleUnion> {
     #[inline]
     fn from_wire_option(wire: WireOptionalOlderSimpleUnion<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalOlderSimpleUnion<'de>>
+    for Box<OlderSimpleUnion>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalOlderSimpleUnion<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -4467,11 +4843,39 @@ impl<'de> ::fidl_next::FromWire<WirePizzaOrPasta<'de>> for PizzaOrPasta {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WirePizzaOrPasta<'de>> for PizzaOrPasta {
+    #[inline]
+    fn from_wire_ref(wire: &WirePizzaOrPasta<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::Pizza(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<crate::WirePizza<'de>>()
+            })),
+
+            2 => Self::Pasta(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<crate::WirePasta<'de>>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalPizzaOrPasta<'de>> for Box<PizzaOrPasta> {
     #[inline]
     fn from_wire_option(wire: WireOptionalPizzaOrPasta<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalPizzaOrPasta<'de>> for Box<PizzaOrPasta> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalPizzaOrPasta<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -4765,11 +5169,39 @@ impl ::fidl_next::FromWire<WireReverseOrdinalUnion> for ReverseOrdinalUnion {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireReverseOrdinalUnion> for ReverseOrdinalUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireReverseOrdinalUnion) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::First(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireU32>()
+            })),
+
+            2 => Self::Second(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireU32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalReverseOrdinalUnion> for Box<ReverseOrdinalUnion> {
     #[inline]
     fn from_wire_option(wire: WireOptionalReverseOrdinalUnion) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalReverseOrdinalUnion> for Box<ReverseOrdinalUnion> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalReverseOrdinalUnion) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -5092,6 +5524,19 @@ impl<'de> ::fidl_next::FromWire<WireStrictBoundedUnion<'de>> for StrictBoundedUn
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireStrictBoundedUnion<'de>> for StrictBoundedUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireStrictBoundedUnion<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::V(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireVector<'de, u8>>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalStrictBoundedUnion<'de>>
     for Box<StrictBoundedUnion>
 {
@@ -5099,6 +5544,19 @@ impl<'de> ::fidl_next::FromWireOption<WireOptionalStrictBoundedUnion<'de>>
     fn from_wire_option(wire: WireOptionalStrictBoundedUnion<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalStrictBoundedUnion<'de>>
+    for Box<StrictBoundedUnion>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalStrictBoundedUnion<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -5387,11 +5845,39 @@ impl<'de> ::fidl_next::FromWire<WireStrictFoo<'de>> for StrictFoo {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireStrictFoo<'de>> for StrictFoo {
+    #[inline]
+    fn from_wire_ref(wire: &WireStrictFoo<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::S(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireString<'de>>()
+            })),
+
+            2 => Self::I(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalStrictFoo<'de>> for Box<StrictFoo> {
     #[inline]
     fn from_wire_option(wire: WireOptionalStrictFoo<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalStrictFoo<'de>> for Box<StrictFoo> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalStrictFoo<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -5685,6 +6171,23 @@ impl<'de> ::fidl_next::FromWire<WireStrictPizzaOrPasta<'de>> for StrictPizzaOrPa
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireStrictPizzaOrPasta<'de>> for StrictPizzaOrPasta {
+    #[inline]
+    fn from_wire_ref(wire: &WireStrictPizzaOrPasta<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::Pizza(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<crate::WirePizza<'de>>()
+            })),
+
+            2 => Self::Pasta(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<crate::WirePasta<'de>>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalStrictPizzaOrPasta<'de>>
     for Box<StrictPizzaOrPasta>
 {
@@ -5692,6 +6195,19 @@ impl<'de> ::fidl_next::FromWireOption<WireOptionalStrictPizzaOrPasta<'de>>
     fn from_wire_option(wire: WireOptionalStrictPizzaOrPasta<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalStrictPizzaOrPasta<'de>>
+    for Box<StrictPizzaOrPasta>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalStrictPizzaOrPasta<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -6003,6 +6519,27 @@ impl<'de> ::fidl_next::FromWire<WireStrictSimpleUnion<'de>> for StrictSimpleUnio
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireStrictSimpleUnion<'de>> for StrictSimpleUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireStrictSimpleUnion<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::I(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            2 => Self::F(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireF32>()
+            })),
+
+            3 => Self::S(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireString<'de>>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalStrictSimpleUnion<'de>>
     for Box<StrictSimpleUnion>
 {
@@ -6010,6 +6547,19 @@ impl<'de> ::fidl_next::FromWireOption<WireOptionalStrictSimpleUnion<'de>>
     fn from_wire_option(wire: WireOptionalStrictSimpleUnion<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalStrictSimpleUnion<'de>>
+    for Box<StrictSimpleUnion>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalStrictSimpleUnion<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -6329,11 +6879,45 @@ impl<'de> ::fidl_next::FromWire<WireStrictUnion<'de>> for StrictUnion {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireStrictUnion<'de>> for StrictUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireStrictUnion<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::Primitive(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            2 => Self::StringNeedsConstructor(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireString<'de>>()
+            })),
+
+            3 => Self::VectorStringAlsoNeedsConstructor(::fidl_next::FromWireRef::from_wire_ref(
+                unsafe {
+                    wire.raw.get().deref_unchecked::<::fidl_next::WireVector<'de, ::fidl_next::WireString<'de>>>()
+                },
+            )),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalStrictUnion<'de>> for Box<StrictUnion> {
     #[inline]
     fn from_wire_option(wire: WireOptionalStrictUnion<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalStrictUnion<'de>> for Box<StrictUnion> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalStrictUnion<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -6630,6 +7214,13 @@ impl<'de> ::fidl_next::FromWire<WireStructWithNullableUnion<'de>> for StructWith
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireStructWithNullableUnion<'de>> for StructWithNullableUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireStructWithNullableUnion<'de>) -> Self {
+        Self { x1: ::fidl_next::FromWireRef::from_wire_ref(&wire.x1) }
+    }
+}
+
 /// The wire type corresponding to [`StructWithNullableUnion`].
 #[derive(Debug)]
 #[repr(C)]
@@ -6792,6 +7383,19 @@ impl<'de>
         wire: WireTestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse<'de>,
     ) -> Self {
         Self { xu: ::fidl_next::FromWire::from_wire(wire.xu) }
+    }
+}
+
+impl<'de>
+    ::fidl_next::FromWireRef<
+        WireTestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse<'de>,
+    > for TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireTestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse<'de>,
+    ) -> Self {
+        Self { xu: ::fidl_next::FromWireRef::from_wire_ref(&wire.xu) }
     }
 }
 
@@ -6961,6 +7565,19 @@ impl<'de>
         wire: WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse<'de>,
     ) -> Self {
         Self { xu: ::fidl_next::FromWire::from_wire(wire.xu) }
+    }
+}
+
+impl<'de>
+    ::fidl_next::FromWireRef<
+        WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse<'de>,
+    > for TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse<'de>,
+    ) -> Self {
+        Self { xu: ::fidl_next::FromWireRef::from_wire_ref(&wire.xu) }
     }
 }
 
@@ -7373,11 +7990,45 @@ impl<'de> ::fidl_next::FromWire<WireUnion<'de>> for Union {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireUnion<'de>> for Union {
+    #[inline]
+    fn from_wire_ref(wire: &WireUnion<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::Primitive(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            2 => Self::StringNeedsConstructor(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireString<'de>>()
+            })),
+
+            3 => Self::VectorStringAlsoNeedsConstructor(::fidl_next::FromWireRef::from_wire_ref(
+                unsafe {
+                    wire.raw.get().deref_unchecked::<::fidl_next::WireVector<'de, ::fidl_next::WireString<'de>>>()
+                },
+            )),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalUnion<'de>> for Box<Union> {
     #[inline]
     fn from_wire_option(wire: WireOptionalUnion<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalUnion<'de>> for Box<Union> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalUnion<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -7693,6 +8344,19 @@ impl ::fidl_next::FromWire<WireUnionContainingEmptyStruct> for UnionContainingEm
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnionContainingEmptyStruct> for UnionContainingEmptyStruct {
+    #[inline]
+    fn from_wire_ref(wire: &WireUnionContainingEmptyStruct) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::Empty(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<crate::WireEmpty>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalUnionContainingEmptyStruct>
     for Box<UnionContainingEmptyStruct>
 {
@@ -7700,6 +8364,19 @@ impl ::fidl_next::FromWireOption<WireOptionalUnionContainingEmptyStruct>
     fn from_wire_option(wire: WireOptionalUnionContainingEmptyStruct) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalUnionContainingEmptyStruct>
+    for Box<UnionContainingEmptyStruct>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalUnionContainingEmptyStruct) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -8021,6 +8698,19 @@ impl<'de> ::fidl_next::FromWire<WireUnionSandwich<'de>> for UnionSandwich {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireUnionSandwich<'de>> for UnionSandwich {
+    #[inline]
+    fn from_wire_ref(wire: &WireUnionSandwich<'de>) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            u: ::fidl_next::FromWireRef::from_wire_ref(&wire.u),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnionSandwich`].
 #[derive(Debug)]
 #[repr(C)]
@@ -8209,6 +8899,19 @@ impl<'de> ::fidl_next::FromWire<WireUnionWithAttributes<'de>> for UnionWithAttri
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireUnionWithAttributes<'de>> for UnionWithAttributes {
+    #[inline]
+    fn from_wire_ref(wire: &WireUnionWithAttributes<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::X(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI64>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalUnionWithAttributes<'de>>
     for Box<UnionWithAttributes>
 {
@@ -8216,6 +8919,19 @@ impl<'de> ::fidl_next::FromWireOption<WireOptionalUnionWithAttributes<'de>>
     fn from_wire_option(wire: WireOptionalUnionWithAttributes<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalUnionWithAttributes<'de>>
+    for Box<UnionWithAttributes>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalUnionWithAttributes<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }

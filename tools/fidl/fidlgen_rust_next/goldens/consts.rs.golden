@@ -71,6 +71,13 @@ impl ::fidl_next::FromWire<WireBitsType> for BitsType {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireBitsType> for BitsType {
+    #[inline]
+    fn from_wire_ref(wire: &WireBitsType) -> Self {
+        Self::from(*wire)
+    }
+}
+
 /// The wire type corresponding to [`BitsType`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
@@ -193,6 +200,13 @@ impl ::fidl_next::FromWire<WireEnumType> for EnumType {
     #[inline]
     fn from_wire(wire: WireEnumType) -> Self {
         Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireEnumType> for EnumType {
+    #[inline]
+    fn from_wire_ref(wire: &WireEnumType) -> Self {
+        Self::from(*wire)
     }
 }
 

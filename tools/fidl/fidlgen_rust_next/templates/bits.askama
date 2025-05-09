@@ -75,6 +75,13 @@ impl ::fidl_next::FromWire<{{ wire_name }}> for {{ name }} {
     }
 }
 
+impl ::fidl_next::FromWireRef<{{ wire_name}}> for {{ name }} {
+    #[inline]
+    fn from_wire_ref(wire: &{{ wire_name }}) -> Self {
+        Self::from(*wire)
+    }
+}
+
 /// The wire type corresponding to [`{{ name }}`].
 #[derive(
     Clone,

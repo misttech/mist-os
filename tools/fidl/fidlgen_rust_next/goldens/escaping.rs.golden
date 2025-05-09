@@ -118,6 +118,13 @@ impl ::fidl_next::FromWire<WireDocCommentWithQuotes> for DocCommentWithQuotes {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireDocCommentWithQuotes> for DocCommentWithQuotes {
+    #[inline]
+    fn from_wire_ref(wire: &WireDocCommentWithQuotes) -> Self {
+        Self {}
+    }
+}
+
 /// The wire type corresponding to [`DocCommentWithQuotes`].
 #[derive(Clone, Debug)]
 #[repr(C)]

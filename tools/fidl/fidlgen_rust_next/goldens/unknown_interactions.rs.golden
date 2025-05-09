@@ -145,6 +145,17 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse>
+    for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse,
+    ) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -320,6 +331,23 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse>
+    for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse,
+    ) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse,
@@ -331,6 +359,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse,
+    > for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -671,6 +716,25 @@ impl<'de>
     }
 }
 
+impl<'de>
+    ::fidl_next::FromWireRef<
+        WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse<'de>,
+    > for UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse`].
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse<'de> {
@@ -884,6 +948,18 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
     }
 }
 
+impl
+    ::fidl_next::FromWireRef<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse>
+    for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse,
+    ) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -1062,6 +1138,23 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse>
+    for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse,
+    ) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse,
@@ -1073,6 +1166,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse,
+    > for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -1409,6 +1519,25 @@ impl<'de>
             some_field: some_field.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de>
+    ::fidl_next::FromWireRef<
+        WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse<'de>,
+    > for UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
                 })
             }),
         }
@@ -2329,6 +2458,15 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolStrictTwoWayFields
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>
+    for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -2500,6 +2638,21 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionR
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>
+    for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
@@ -2511,6 +2664,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
+    > for Box<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -2841,6 +3011,24 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolStrictTwoWayT
     }
 }
 
+impl<'de>
+    ::fidl_next::FromWireRef<WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse<'de>>
+    for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsAjarProtocolStrictTwoWayTableResponse`].
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse<'de> {
@@ -3047,6 +3235,17 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolStrictTwoWayFields
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse>
+    for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse,
+    ) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -3218,6 +3417,23 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionE
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse>
+    for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse,
+    ) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse,
@@ -3229,6 +3445,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse,
+    > for Box<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -3566,6 +3799,24 @@ impl<'de>
     }
 }
 
+impl<'de>
+    ::fidl_next::FromWireRef<WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse<'de>>
+    for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse`].
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse<'de> {
@@ -3767,6 +4018,15 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolStrictEventFieldsR
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest>
+    for UnknownInteractionsAjarProtocolStrictEventFieldsRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsAjarProtocolStrictEventFieldsRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -3938,6 +4198,21 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolStrictEventUnionRe
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsAjarProtocolStrictEventUnionRequest>
+    for UnknownInteractionsAjarProtocolStrictEventUnionRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsAjarProtocolStrictEventUnionRequest) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest>
     for Box<UnknownInteractionsAjarProtocolStrictEventUnionRequest>
 {
@@ -3947,6 +4222,23 @@ impl ::fidl_next::FromWireOption<WireOptionalUnknownInteractionsAjarProtocolStri
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest,
+    > for Box<UnknownInteractionsAjarProtocolStrictEventUnionRequest>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -4275,6 +4567,23 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolStrictEventTa
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireUnknownInteractionsAjarProtocolStrictEventTableRequest<'de>>
+    for UnknownInteractionsAjarProtocolStrictEventTableRequest
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsAjarProtocolStrictEventTableRequest<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsAjarProtocolStrictEventTableRequest`].
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolStrictEventTableRequest<'de> {
@@ -4476,6 +4785,15 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolFlexibleEventField
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>
+    for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -4647,6 +4965,21 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolFlexibleEventUnion
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest>
+    for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
@@ -4658,6 +4991,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
+    > for Box<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -4982,6 +5332,24 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolFlexibleEvent
             some_field: some_field.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de>
+    ::fidl_next::FromWireRef<WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest<'de>>
+    for UnknownInteractionsAjarProtocolFlexibleEventTableRequest
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
                 })
             }),
         }
@@ -6260,6 +6628,17 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse>
+    for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse,
+    ) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -6438,6 +6817,23 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse>
+    for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse,
+    ) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse,
@@ -6449,6 +6845,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse,
+    > for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -6790,6 +7203,25 @@ impl<'de>
     }
 }
 
+impl<'de>
+    ::fidl_next::FromWireRef<
+        WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse<'de>,
+    > for UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse`].
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse<'de> {
@@ -7005,6 +7437,19 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
     }
 }
 
+impl
+    ::fidl_next::FromWireRef<
+        WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse,
+    > for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse,
+    ) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -7187,6 +7632,25 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
 }
 
 impl
+    ::fidl_next::FromWireRef<
+        WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse,
+    > for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse,
+    ) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
+impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse,
     > for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse>
@@ -7197,6 +7661,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse,
+    > for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -7537,6 +8018,25 @@ impl<'de>
             some_field: some_field.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de>
+    ::fidl_next::FromWireRef<
+        WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse<'de>,
+    > for UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
                 })
             }),
         }
@@ -8416,6 +8916,17 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedProtocolStrictTwoWayFiel
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>
+    for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse,
+    ) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -8587,6 +9098,23 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedProtocolStrictTwoWayUnio
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>
+    for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
+    ) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
@@ -8598,6 +9126,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
+    > for Box<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -8932,6 +9477,24 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsClosedProtocolStrictTwoWa
     }
 }
 
+impl<'de>
+    ::fidl_next::FromWireRef<WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse<'de>>
+    for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsClosedProtocolStrictTwoWayTableResponse`].
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse<'de> {
@@ -9142,6 +9705,17 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedProtocolStrictTwoWayFiel
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse>
+    for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse,
+    ) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -9317,6 +9891,23 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedProtocolStrictTwoWayUnio
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse>
+    for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse,
+    ) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse,
@@ -9328,6 +9919,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse,
+    > for Box<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -9668,6 +10276,24 @@ impl<'de>
     }
 }
 
+impl<'de>
+    ::fidl_next::FromWireRef<WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse<'de>>
+    for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse`].
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse<'de> {
@@ -9871,6 +10497,15 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedProtocolStrictEventField
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest>
+    for UnknownInteractionsClosedProtocolStrictEventFieldsRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsClosedProtocolStrictEventFieldsRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -10042,6 +10677,21 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedProtocolStrictEventUnion
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsClosedProtocolStrictEventUnionRequest>
+    for UnknownInteractionsClosedProtocolStrictEventUnionRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsClosedProtocolStrictEventUnionRequest) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest,
@@ -10053,6 +10703,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest,
+    > for Box<UnknownInteractionsClosedProtocolStrictEventUnionRequest>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -10377,6 +11044,24 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsClosedProtocolStrictEvent
             some_field: some_field.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de>
+    ::fidl_next::FromWireRef<WireUnknownInteractionsClosedProtocolStrictEventTableRequest<'de>>
+    for UnknownInteractionsClosedProtocolStrictEventTableRequest
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsClosedProtocolStrictEventTableRequest<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
                 })
             }),
         }
@@ -11400,6 +12085,17 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolStrictTwoWayFiel
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse>
+    for UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse,
+    ) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -11571,6 +12267,23 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolStrictTwoWayUnio
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>
+    for UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse,
+    ) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse,
@@ -11582,6 +12295,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse,
+    > for Box<UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -11916,6 +12646,24 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolStrictTwoWa
     }
 }
 
+impl<'de>
+    ::fidl_next::FromWireRef<WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse<'de>>
+    for UnknownInteractionsDriverProtocolStrictTwoWayTableResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsDriverProtocolStrictTwoWayTableResponse`].
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse<'de> {
@@ -12126,6 +12874,17 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolStrictTwoWayFiel
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse>
+    for UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse,
+    ) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -12301,6 +13060,23 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolStrictTwoWayUnio
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse>
+    for UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse,
+    ) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse,
@@ -12312,6 +13088,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse,
+    > for Box<UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -12652,6 +13445,24 @@ impl<'de>
     }
 }
 
+impl<'de>
+    ::fidl_next::FromWireRef<WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse<'de>>
+    for UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse`].
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse<'de> {
@@ -12862,6 +13673,17 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFi
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse>
+    for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse,
+    ) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -13035,6 +13857,23 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUn
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse>
+    for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse,
+    ) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse,
@@ -13046,6 +13885,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse,
+    > for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -13383,6 +14239,24 @@ impl<'de>
     }
 }
 
+impl<'de>
+    ::fidl_next::FromWireRef<WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'de>>
+    for UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse`].
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'de> {
@@ -13595,6 +14469,17 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFi
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse>
+    for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse,
+    ) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -13773,6 +14658,23 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUn
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse>
+    for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse,
+    ) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse,
@@ -13784,6 +14686,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse,
+    > for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -14118,6 +15037,25 @@ impl<'de>
             some_field: some_field.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de>
+    ::fidl_next::FromWireRef<
+        WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse<'de>,
+    > for UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
                 })
             }),
         }
@@ -15564,6 +16502,15 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictTwoWayFieldsResp
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse>
+    for UnknownInteractionsProtocolStrictTwoWayFieldsResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsProtocolStrictTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -15734,6 +16681,21 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictTwoWayUnionRespo
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolStrictTwoWayUnionResponse>
+    for UnknownInteractionsProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolStrictTwoWayUnionResponse) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse>
     for Box<UnknownInteractionsProtocolStrictTwoWayUnionResponse>
 {
@@ -15743,6 +16705,22 @@ impl ::fidl_next::FromWireOption<WireOptionalUnknownInteractionsProtocolStrictTw
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse>
+    for Box<UnknownInteractionsProtocolStrictTwoWayUnionResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -16068,6 +17046,21 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictTwoWayTable
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolStrictTwoWayTableResponse<'de>>
+    for UnknownInteractionsProtocolStrictTwoWayTableResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolStrictTwoWayTableResponse<'de>) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsProtocolStrictTwoWayTableResponse`].
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolStrictTwoWayTableResponse<'de> {
@@ -16272,6 +17265,15 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictTwoWayFieldsErrR
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse>
+    for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -16443,6 +17445,21 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictTwoWayUnionErrRe
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse>
+    for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse>
     for Box<UnknownInteractionsProtocolStrictTwoWayUnionErrResponse>
@@ -16453,6 +17470,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse,
+    > for Box<UnknownInteractionsProtocolStrictTwoWayUnionErrResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -16783,6 +17817,23 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictTwoWayTable
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse<'de>>
+    for UnknownInteractionsProtocolStrictTwoWayTableErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsProtocolStrictTwoWayTableErrResponse`].
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse<'de> {
@@ -16987,6 +18038,15 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsRe
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse>
+    for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -17158,6 +18218,21 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleTwoWayUnionRes
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
+    for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
     for Box<UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
 {
@@ -17167,6 +18242,23 @@ impl ::fidl_next::FromWireOption<WireOptionalUnknownInteractionsProtocolFlexible
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
+    > for Box<UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -17495,6 +18587,23 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleTwoWayTab
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'de>>
+    for UnknownInteractionsProtocolFlexibleTwoWayTableResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsProtocolFlexibleTwoWayTableResponse`].
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'de> {
@@ -17701,6 +18810,17 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsEr
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse>
+    for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse,
+    ) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -17872,6 +18992,21 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleTwoWayUnionErr
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse>
+    for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl
     ::fidl_next::FromWireOption<
         WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse,
@@ -17883,6 +19018,23 @@ impl
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<
+        WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse,
+    > for Box<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -18213,6 +19365,24 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleTwoWayTab
     }
 }
 
+impl<'de>
+    ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse<'de>>
+    for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse<'de>,
+    ) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse`].
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse<'de> {
@@ -18413,6 +19583,15 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictEventFieldsReque
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolStrictEventFieldsRequest>
+    for UnknownInteractionsProtocolStrictEventFieldsRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolStrictEventFieldsRequest) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsProtocolStrictEventFieldsRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -18583,6 +19762,21 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictEventUnionReques
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolStrictEventUnionRequest>
+    for UnknownInteractionsProtocolStrictEventUnionRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolStrictEventUnionRequest) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest>
     for Box<UnknownInteractionsProtocolStrictEventUnionRequest>
 {
@@ -18592,6 +19786,21 @@ impl ::fidl_next::FromWireOption<WireOptionalUnknownInteractionsProtocolStrictEv
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest>
+    for Box<UnknownInteractionsProtocolStrictEventUnionRequest>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -18917,6 +20126,21 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictEventTableR
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolStrictEventTableRequest<'de>>
+    for UnknownInteractionsProtocolStrictEventTableRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolStrictEventTableRequest<'de>) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsProtocolStrictEventTableRequest`].
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolStrictEventTableRequest<'de> {
@@ -19114,6 +20338,15 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleEventFieldsReq
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolFlexibleEventFieldsRequest>
+    for UnknownInteractionsProtocolFlexibleEventFieldsRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolFlexibleEventFieldsRequest) -> Self {
+        Self { some_field: ::fidl_next::FromWireRef::from_wire_ref(&wire.some_field) }
+    }
+}
+
 /// The wire type corresponding to [`UnknownInteractionsProtocolFlexibleEventFieldsRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -19284,6 +20517,21 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleEventUnionRequ
     }
 }
 
+impl ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolFlexibleEventUnionRequest>
+    for UnknownInteractionsProtocolFlexibleEventUnionRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolFlexibleEventUnionRequest) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::SomeField(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest>
     for Box<UnknownInteractionsProtocolFlexibleEventUnionRequest>
 {
@@ -19293,6 +20541,22 @@ impl ::fidl_next::FromWireOption<WireOptionalUnknownInteractionsProtocolFlexible
     ) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl
+    ::fidl_next::FromWireOptionRef<WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest>
+    for Box<UnknownInteractionsProtocolFlexibleEventUnionRequest>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -19612,6 +20876,21 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleEventTabl
             some_field: some_field.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<::fidl_next::WireI32>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolFlexibleEventTableRequest<'de>>
+    for UnknownInteractionsProtocolFlexibleEventTableRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireUnknownInteractionsProtocolFlexibleEventTableRequest<'de>) -> Self {
+        Self {
+            some_field: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI32>()
                 })
             }),
         }

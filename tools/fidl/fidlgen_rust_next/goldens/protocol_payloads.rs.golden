@@ -141,6 +141,17 @@ impl ::fidl_next::FromWire<WireLocalStructPayload> for LocalStructPayload {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireLocalStructPayload> for LocalStructPayload {
+    #[inline]
+    fn from_wire_ref(wire: &WireLocalStructPayload) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`LocalStructPayload`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -322,6 +333,17 @@ impl ::fidl_next::FromWire<WireMainProtocolOneWayAnonRequest> for MainProtocolOn
             a: ::fidl_next::FromWire::from_wire(wire.a),
 
             b: ::fidl_next::FromWire::from_wire(wire.b),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireMainProtocolOneWayAnonRequest> for MainProtocolOneWayAnonRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireMainProtocolOneWayAnonRequest) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
         }
     }
 }
@@ -511,6 +533,17 @@ impl ::fidl_next::FromWire<WireMainProtocolTwoWayAnonRequest> for MainProtocolTw
     }
 }
 
+impl ::fidl_next::FromWireRef<WireMainProtocolTwoWayAnonRequest> for MainProtocolTwoWayAnonRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireMainProtocolTwoWayAnonRequest) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`MainProtocolTwoWayAnonRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -692,6 +725,19 @@ impl ::fidl_next::FromWire<WireMainProtocolTwoWayAnonResponse> for MainProtocolT
             a: ::fidl_next::FromWire::from_wire(wire.a),
 
             b: ::fidl_next::FromWire::from_wire(wire.b),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireMainProtocolTwoWayAnonResponse>
+    for MainProtocolTwoWayAnonResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireMainProtocolTwoWayAnonResponse) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
         }
     }
 }
@@ -883,6 +929,19 @@ impl ::fidl_next::FromWire<WireMainProtocolTwoWayAnonWithErrorRequest>
     }
 }
 
+impl ::fidl_next::FromWireRef<WireMainProtocolTwoWayAnonWithErrorRequest>
+    for MainProtocolTwoWayAnonWithErrorRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireMainProtocolTwoWayAnonWithErrorRequest) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`MainProtocolTwoWayAnonWithErrorRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -1070,6 +1129,19 @@ impl ::fidl_next::FromWire<WireMainProtocolTwoWayAnonWithErrorResponse>
     }
 }
 
+impl ::fidl_next::FromWireRef<WireMainProtocolTwoWayAnonWithErrorResponse>
+    for MainProtocolTwoWayAnonWithErrorResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireMainProtocolTwoWayAnonWithErrorResponse) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`MainProtocolTwoWayAnonWithErrorResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -1245,6 +1317,17 @@ impl ::fidl_next::FromWire<WireMainProtocolOnAnonRequest> for MainProtocolOnAnon
             a: ::fidl_next::FromWire::from_wire(wire.a),
 
             b: ::fidl_next::FromWire::from_wire(wire.b),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireMainProtocolOnAnonRequest> for MainProtocolOnAnonRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireMainProtocolOnAnonRequest) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
         }
     }
 }

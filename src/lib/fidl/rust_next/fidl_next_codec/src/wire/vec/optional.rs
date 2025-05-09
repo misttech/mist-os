@@ -11,7 +11,7 @@ use super::raw::RawWireVector;
 use crate::{
     Decode, DecodeError, Decoder, DecoderExt as _, Encodable, EncodableOption, Encode, EncodeError,
     EncodeOption, EncodeOptionRef, EncodeRef, Encoder, EncoderExt as _, FromWire, FromWireOption,
-    Slot, Wire, WirePointer, WireVector,
+    FromWireOptionRef, FromWireRef, Slot, Wire, WirePointer, WireVector,
 };
 
 /// An optional FIDL vector
@@ -217,5 +217,11 @@ where
 impl<T: FromWire<W>, W> FromWireOption<WireOptionalVector<'_, W>> for Vec<T> {
     fn from_wire_option(wire: WireOptionalVector<'_, W>) -> Option<Self> {
         wire.to_option().map(Vec::from_wire)
+    }
+}
+
+impl<T: FromWireRef<W>, W> FromWireOptionRef<WireOptionalVector<'_, W>> for Vec<T> {
+    fn from_wire_option_ref(wire: &WireOptionalVector<'_, W>) -> Option<Self> {
+        wire.as_ref().map(Vec::from_wire_ref)
     }
 }

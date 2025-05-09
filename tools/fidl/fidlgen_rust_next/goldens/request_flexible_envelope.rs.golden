@@ -149,11 +149,39 @@ impl<'de> ::fidl_next::FromWire<WireFlexibleFoo<'de>> for FlexibleFoo {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireFlexibleFoo<'de>> for FlexibleFoo {
+    #[inline]
+    fn from_wire_ref(wire: &WireFlexibleFoo<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::S(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireString<'de>>()
+            })),
+
+            2 => Self::I(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalFlexibleFoo<'de>> for Box<FlexibleFoo> {
     #[inline]
     fn from_wire_option(wire: WireOptionalFlexibleFoo<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalFlexibleFoo<'de>> for Box<FlexibleFoo> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalFlexibleFoo<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -449,11 +477,39 @@ impl<'de> ::fidl_next::FromWire<WireStrictFoo<'de>> for StrictFoo {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireStrictFoo<'de>> for StrictFoo {
+    #[inline]
+    fn from_wire_ref(wire: &WireStrictFoo<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::S(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireString<'de>>()
+            })),
+
+            2 => Self::I(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalStrictFoo<'de>> for Box<StrictFoo> {
     #[inline]
     fn from_wire_option(wire: WireOptionalStrictFoo<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalStrictFoo<'de>> for Box<StrictFoo> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalStrictFoo<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -728,6 +784,15 @@ impl<'de> ::fidl_next::FromWire<WireProtocolRequestStrictResponseFlexibleRequest
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireProtocolRequestStrictResponseFlexibleRequest<'de>>
+    for ProtocolRequestStrictResponseFlexibleRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireProtocolRequestStrictResponseFlexibleRequest<'de>) -> Self {
+        Self { s: ::fidl_next::FromWireRef::from_wire_ref(&wire.s) }
+    }
+}
+
 /// The wire type corresponding to [`ProtocolRequestStrictResponseFlexibleRequest`].
 #[derive(Debug)]
 #[repr(C)]
@@ -881,6 +946,15 @@ impl<'de> ::fidl_next::FromWire<WireProtocolRequestStrictResponseFlexibleRespons
     #[inline]
     fn from_wire(wire: WireProtocolRequestStrictResponseFlexibleResponse<'de>) -> Self {
         Self { f: ::fidl_next::FromWire::from_wire(wire.f) }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireProtocolRequestStrictResponseFlexibleResponse<'de>>
+    for ProtocolRequestStrictResponseFlexibleResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireProtocolRequestStrictResponseFlexibleResponse<'de>) -> Self {
+        Self { f: ::fidl_next::FromWireRef::from_wire_ref(&wire.f) }
     }
 }
 
@@ -1040,6 +1114,15 @@ impl<'de> ::fidl_next::FromWire<WireProtocolRequestFlexibleResponseStrictRequest
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireProtocolRequestFlexibleResponseStrictRequest<'de>>
+    for ProtocolRequestFlexibleResponseStrictRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireProtocolRequestFlexibleResponseStrictRequest<'de>) -> Self {
+        Self { s: ::fidl_next::FromWireRef::from_wire_ref(&wire.s) }
+    }
+}
+
 /// The wire type corresponding to [`ProtocolRequestFlexibleResponseStrictRequest`].
 #[derive(Debug)]
 #[repr(C)]
@@ -1193,6 +1276,15 @@ impl<'de> ::fidl_next::FromWire<WireProtocolRequestFlexibleResponseStrictRespons
     #[inline]
     fn from_wire(wire: WireProtocolRequestFlexibleResponseStrictResponse<'de>) -> Self {
         Self { f: ::fidl_next::FromWire::from_wire(wire.f) }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireProtocolRequestFlexibleResponseStrictResponse<'de>>
+    for ProtocolRequestFlexibleResponseStrictResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireProtocolRequestFlexibleResponseStrictResponse<'de>) -> Self {
+        Self { f: ::fidl_next::FromWireRef::from_wire_ref(&wire.f) }
     }
 }
 

@@ -124,6 +124,17 @@ impl ::fidl_next::FromWire<WirePadding1ByteEnd> for Padding1ByteEnd {
     }
 }
 
+impl ::fidl_next::FromWireRef<WirePadding1ByteEnd> for Padding1ByteEnd {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding1ByteEnd) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`Padding1ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -286,6 +297,17 @@ impl ::fidl_next::FromWire<WirePadding1ByteMiddle> for Padding1ByteMiddle {
             a: ::fidl_next::FromWire::from_wire(wire.a),
 
             b: ::fidl_next::FromWire::from_wire(wire.b),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WirePadding1ByteMiddle> for Padding1ByteMiddle {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding1ByteMiddle) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
         }
     }
 }
@@ -466,6 +488,19 @@ impl ::fidl_next::FromWire<WirePadding2ByteAlignmentLength6> for Padding2ByteAli
     }
 }
 
+impl ::fidl_next::FromWireRef<WirePadding2ByteAlignmentLength6> for Padding2ByteAlignmentLength6 {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding2ByteAlignmentLength6) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+
+            c: ::fidl_next::FromWireRef::from_wire_ref(&wire.c),
+        }
+    }
+}
+
 /// The wire type corresponding to [`Padding2ByteAlignmentLength6`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -641,6 +676,17 @@ impl ::fidl_next::FromWire<WirePadding2ByteEnd> for Padding2ByteEnd {
     }
 }
 
+impl ::fidl_next::FromWireRef<WirePadding2ByteEnd> for Padding2ByteEnd {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding2ByteEnd) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`Padding2ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -803,6 +849,17 @@ impl ::fidl_next::FromWire<WirePadding2ByteMiddle> for Padding2ByteMiddle {
             a: ::fidl_next::FromWire::from_wire(wire.a),
 
             b: ::fidl_next::FromWire::from_wire(wire.b),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WirePadding2ByteMiddle> for Padding2ByteMiddle {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding2ByteMiddle) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
         }
     }
 }
@@ -973,6 +1030,17 @@ impl ::fidl_next::FromWire<WirePadding3ByteEnd> for Padding3ByteEnd {
     }
 }
 
+impl ::fidl_next::FromWireRef<WirePadding3ByteEnd> for Padding3ByteEnd {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding3ByteEnd) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`Padding3ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -1135,6 +1203,17 @@ impl ::fidl_next::FromWire<WirePadding3ByteMiddle> for Padding3ByteMiddle {
             a: ::fidl_next::FromWire::from_wire(wire.a),
 
             b: ::fidl_next::FromWire::from_wire(wire.b),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WirePadding3ByteMiddle> for Padding3ByteMiddle {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding3ByteMiddle) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
         }
     }
 }
@@ -1325,6 +1404,21 @@ impl ::fidl_next::FromWire<WirePadding4ByteAlignmentLength12> for Padding4ByteAl
     }
 }
 
+impl ::fidl_next::FromWireRef<WirePadding4ByteAlignmentLength12> for Padding4ByteAlignmentLength12 {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding4ByteAlignmentLength12) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+
+            c: ::fidl_next::FromWireRef::from_wire_ref(&wire.c),
+
+            d: ::fidl_next::FromWireRef::from_wire_ref(&wire.d),
+        }
+    }
+}
+
 /// The wire type corresponding to [`Padding4ByteAlignmentLength12`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -1505,6 +1599,17 @@ impl ::fidl_next::FromWire<WirePadding4ByteEnd> for Padding4ByteEnd {
     }
 }
 
+impl ::fidl_next::FromWireRef<WirePadding4ByteEnd> for Padding4ByteEnd {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding4ByteEnd) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`Padding4ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -1667,6 +1772,17 @@ impl ::fidl_next::FromWire<WirePadding4ByteMiddle> for Padding4ByteMiddle {
             a: ::fidl_next::FromWire::from_wire(wire.a),
 
             b: ::fidl_next::FromWire::from_wire(wire.b),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WirePadding4ByteMiddle> for Padding4ByteMiddle {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding4ByteMiddle) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
         }
     }
 }
@@ -1843,6 +1959,19 @@ impl ::fidl_next::FromWire<WirePadding5ByteEnd> for Padding5ByteEnd {
             b: ::fidl_next::FromWire::from_wire(wire.b),
 
             c: ::fidl_next::FromWire::from_wire(wire.c),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WirePadding5ByteEnd> for Padding5ByteEnd {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding5ByteEnd) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+
+            c: ::fidl_next::FromWireRef::from_wire_ref(&wire.c),
         }
     }
 }
@@ -2028,6 +2157,19 @@ impl ::fidl_next::FromWire<WirePadding5ByteMiddle> for Padding5ByteMiddle {
     }
 }
 
+impl ::fidl_next::FromWireRef<WirePadding5ByteMiddle> for Padding5ByteMiddle {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding5ByteMiddle) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+
+            c: ::fidl_next::FromWireRef::from_wire_ref(&wire.c),
+        }
+    }
+}
+
 /// The wire type corresponding to [`Padding5ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -2199,6 +2341,17 @@ impl ::fidl_next::FromWire<WirePadding6ByteEnd> for Padding6ByteEnd {
     }
 }
 
+impl ::fidl_next::FromWireRef<WirePadding6ByteEnd> for Padding6ByteEnd {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding6ByteEnd) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`Padding6ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -2361,6 +2514,17 @@ impl ::fidl_next::FromWire<WirePadding6ByteMiddle> for Padding6ByteMiddle {
             a: ::fidl_next::FromWire::from_wire(wire.a),
 
             b: ::fidl_next::FromWire::from_wire(wire.b),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WirePadding6ByteMiddle> for Padding6ByteMiddle {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding6ByteMiddle) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
         }
     }
 }
@@ -2531,6 +2695,17 @@ impl ::fidl_next::FromWire<WirePadding7ByteEnd> for Padding7ByteEnd {
     }
 }
 
+impl ::fidl_next::FromWireRef<WirePadding7ByteEnd> for Padding7ByteEnd {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding7ByteEnd) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`Padding7ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -2693,6 +2868,17 @@ impl ::fidl_next::FromWire<WirePadding7ByteMiddle> for Padding7ByteMiddle {
             a: ::fidl_next::FromWire::from_wire(wire.a),
 
             b: ::fidl_next::FromWire::from_wire(wire.b),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WirePadding7ByteMiddle> for Padding7ByteMiddle {
+    #[inline]
+    fn from_wire_ref(wire: &WirePadding7ByteMiddle) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
         }
     }
 }

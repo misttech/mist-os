@@ -124,6 +124,17 @@ impl ::fidl_next::FromWire<WireInt16Int8> for Int16Int8 {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireInt16Int8> for Int16Int8 {
+    #[inline]
+    fn from_wire_ref(wire: &WireInt16Int8) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`Int16Int8`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -275,6 +286,13 @@ impl ::fidl_next::FromWire<WireArrayInt16Int8> for ArrayInt16Int8 {
     #[inline]
     fn from_wire(wire: WireArrayInt16Int8) -> Self {
         Self { arr: ::fidl_next::FromWire::from_wire(wire.arr) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireArrayInt16Int8> for ArrayInt16Int8 {
+    #[inline]
+    fn from_wire_ref(wire: &WireArrayInt16Int8) -> Self {
+        Self { arr: ::fidl_next::FromWireRef::from_wire_ref(&wire.arr) }
     }
 }
 
@@ -431,6 +449,17 @@ impl ::fidl_next::FromWire<WireInt8Int32> for Int8Int32 {
             a: ::fidl_next::FromWire::from_wire(wire.a),
 
             b: ::fidl_next::FromWire::from_wire(wire.b),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireInt8Int32> for Int8Int32 {
+    #[inline]
+    fn from_wire_ref(wire: &WireInt8Int32) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
         }
     }
 }
@@ -733,6 +762,19 @@ impl ::fidl_next::FromWire<WireStructPaddingTestStruct> for StructPaddingTestStr
             inner: ::fidl_next::FromWire::from_wire(wire.inner),
 
             array: ::fidl_next::FromWire::from_wire(wire.array),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireStructPaddingTestStruct> for StructPaddingTestStruct {
+    #[inline]
+    fn from_wire_ref(wire: &WireStructPaddingTestStruct) -> Self {
+        Self {
+            trailing: ::fidl_next::FromWireRef::from_wire_ref(&wire.trailing),
+
+            inner: ::fidl_next::FromWireRef::from_wire_ref(&wire.inner),
+
+            array: ::fidl_next::FromWireRef::from_wire_ref(&wire.array),
         }
     }
 }

@@ -190,6 +190,24 @@ impl{{ de }} ::fidl_next::FromWire<{{ wire_name }}{{ de }}> for {{ name }} {
     }
 }
 
+{% if !union.is_resource %}
+impl{{ de }} ::fidl_next::FromWireRef<{{ wire_name }}{{ de }}> for {{ name }} {
+    #[inline]
+    fn from_wire_ref(wire: &{{ wire_name }}{{ de }}) -> Self {
+        match wire.raw.ordinal() {
+            {% for member in union.members %}
+                {{ member.ordinal }} => Self::{{ member.name.camel()|ident }}(
+                    ::fidl_next::FromWireRef::from_wire_ref(
+                        unsafe { wire.raw.get().deref_unchecked::<{{ context.wire_type(member.ty) }}>() }
+                    )
+                ),
+            {% endfor %}
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+{% endif %}
+
 impl{{ de }} ::fidl_next::FromWireOption<{{ wire_optional_name }}{{ de }}> for Box<{{ name }}> {
     #[inline]
     fn from_wire_option(wire: {{ wire_optional_name }}{{ de }}) -> Option<Self> {
@@ -200,6 +218,19 @@ impl{{ de }} ::fidl_next::FromWireOption<{{ wire_optional_name }}{{ de }}> for B
         }
     }
 }
+
+{% if !union.is_resource %}
+impl{{ de }} ::fidl_next::FromWireOptionRef<{{ wire_optional_name }}{{ de }}> for Box<{{ name }}> {
+    #[inline]
+    fn from_wire_option_ref(wire: &{{ wire_optional_name }}{{ de }}) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
+        } else {
+            None
+        }
+    }
+}
+{% endif %}
 
 /// The wire type corresponding to [`{{ name }}`].
 #[repr(transparent)]

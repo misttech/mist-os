@@ -66,6 +66,13 @@ impl ::fidl_next::FromWire<WireBits> for Bits {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireBits> for Bits {
+    #[inline]
+    fn from_wire_ref(wire: &WireBits) -> Self {
+        Self::from(*wire)
+    }
+}
+
 /// The wire type corresponding to [`Bits`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
@@ -172,6 +179,13 @@ impl ::fidl_next::FromWire<WireBitsType> for BitsType {
     #[inline]
     fn from_wire(wire: WireBitsType) -> Self {
         Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireBitsType> for BitsType {
+    #[inline]
+    fn from_wire_ref(wire: &WireBitsType) -> Self {
+        Self::from(*wire)
     }
 }
 
@@ -285,6 +299,13 @@ impl ::fidl_next::FromWire<WireEnum> for Enum {
     #[inline]
     fn from_wire(wire: WireEnum) -> Self {
         Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireEnum> for Enum {
+    #[inline]
+    fn from_wire_ref(wire: &WireEnum) -> Self {
+        Self::from(*wire)
     }
 }
 
@@ -408,6 +429,13 @@ impl ::fidl_next::FromWire<WireEnumType> for EnumType {
     #[inline]
     fn from_wire(wire: WireEnumType) -> Self {
         Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireEnumType> for EnumType {
+    #[inline]
+    fn from_wire_ref(wire: &WireEnumType) -> Self {
+        Self::from(*wire)
     }
 }
 
@@ -632,6 +660,23 @@ impl<'de> ::fidl_next::FromWire<WireStruct<'de>> for Struct {
             enum_with_default: ::fidl_next::FromWire::from_wire(wire.enum_with_default),
 
             bits_with_default: ::fidl_next::FromWire::from_wire(wire.bits_with_default),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireStruct<'de>> for Struct {
+    #[inline]
+    fn from_wire_ref(wire: &WireStruct<'de>) -> Self {
+        Self {
+            int64_with_default: ::fidl_next::FromWireRef::from_wire_ref(&wire.int64_with_default),
+
+            string_with_default: ::fidl_next::FromWireRef::from_wire_ref(&wire.string_with_default),
+
+            bool_with_default: ::fidl_next::FromWireRef::from_wire_ref(&wire.bool_with_default),
+
+            enum_with_default: ::fidl_next::FromWireRef::from_wire_ref(&wire.enum_with_default),
+
+            bits_with_default: ::fidl_next::FromWireRef::from_wire_ref(&wire.bits_with_default),
         }
     }
 }

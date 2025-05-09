@@ -8,7 +8,7 @@ use core::mem::MaybeUninit;
 
 use fidl_next_codec::{
     munge, Chunk, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, EncodeRef, Encoder,
-    FromWire, RawWireUnion, Slot, Wire,
+    FromWire, FromWireRef, RawWireUnion, Slot, Wire,
 };
 
 use crate::{FrameworkError, WireFrameworkError};
@@ -205,6 +205,18 @@ where
     fn from_wire(wire: WireFlexible<'_, WT>) -> Self {
         match wire.to_flexible() {
             Flexible::Ok(value) => Self::Ok(T::from_wire(value)),
+            Flexible::FrameworkErr(framework_error) => Self::FrameworkErr(framework_error),
+        }
+    }
+}
+
+impl<T, WT> FromWireRef<WireFlexible<'_, WT>> for Flexible<T>
+where
+    T: FromWireRef<WT>,
+{
+    fn from_wire_ref(wire: &WireFlexible<'_, WT>) -> Self {
+        match wire.as_ref() {
+            Flexible::Ok(value) => Self::Ok(T::from_wire_ref(value)),
             Flexible::FrameworkErr(framework_error) => Self::FrameworkErr(framework_error),
         }
     }

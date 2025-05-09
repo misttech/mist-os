@@ -141,6 +141,17 @@ impl ::fidl_next::FromWire<WireTwoWayAddRequest> for TwoWayAddRequest {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireTwoWayAddRequest> for TwoWayAddRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireTwoWayAddRequest) -> Self {
+        Self {
+            addend1: ::fidl_next::FromWireRef::from_wire_ref(&wire.addend1),
+
+            addend2: ::fidl_next::FromWireRef::from_wire_ref(&wire.addend2),
+        }
+    }
+}
+
 /// The wire type corresponding to [`TwoWayAddRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -302,6 +313,13 @@ impl ::fidl_next::FromWire<WireTwoWayAddResponse> for TwoWayAddResponse {
     #[inline]
     fn from_wire(wire: WireTwoWayAddResponse) -> Self {
         Self { sum: ::fidl_next::FromWire::from_wire(wire.sum) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireTwoWayAddResponse> for TwoWayAddResponse {
+    #[inline]
+    fn from_wire_ref(wire: &WireTwoWayAddResponse) -> Self {
+        Self { sum: ::fidl_next::FromWireRef::from_wire_ref(&wire.sum) }
     }
 }
 

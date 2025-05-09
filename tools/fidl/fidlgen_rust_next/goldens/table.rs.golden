@@ -94,6 +94,13 @@ impl<'de> ::fidl_next::FromWire<WireEmptyTable<'de>> for EmptyTable {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireEmptyTable<'de>> for EmptyTable {
+    #[inline]
+    fn from_wire_ref(wire: &WireEmptyTable<'de>) -> Self {
+        Self {}
+    }
+}
+
 /// The wire type corresponding to [`EmptyTable`].
 #[repr(C)]
 pub struct WireEmptyTable<'de> {
@@ -226,6 +233,13 @@ impl<'de> ::fidl_next::FromWire<WireExtensionTable<'de>> for ExtensionTable {
     fn from_wire(wire: WireExtensionTable<'de>) -> Self {
         let table = ::core::mem::ManuallyDrop::new(wire.table);
 
+        Self {}
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireExtensionTable<'de>> for ExtensionTable {
+    #[inline]
+    fn from_wire_ref(wire: &WireExtensionTable<'de>) -> Self {
         Self {}
     }
 }
@@ -456,6 +470,31 @@ impl<'de> ::fidl_next::FromWire<WireNewerSimpleTable<'de>> for NewerSimpleTable 
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireNewerSimpleTable<'de>> for NewerSimpleTable {
+    #[inline]
+    fn from_wire_ref(wire: &WireNewerSimpleTable<'de>) -> Self {
+        Self {
+            x: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            y: wire.table.get(5).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            z: wire.table.get(6).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`NewerSimpleTable`].
 #[repr(C)]
 pub struct WireNewerSimpleTable<'de> {
@@ -659,6 +698,19 @@ impl<'de> ::fidl_next::FromWire<WireOlderSimpleTable<'de>> for OlderSimpleTable 
             x: x.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireOlderSimpleTable<'de>> for OlderSimpleTable {
+    #[inline]
+    fn from_wire_ref(wire: &WireOlderSimpleTable<'de>) -> Self {
+        Self {
+            x: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
                 })
             }),
         }
@@ -904,6 +956,31 @@ impl<'de> ::fidl_next::FromWire<WireReverseOrdinalTable<'de>> for ReverseOrdinal
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireReverseOrdinalTable<'de>> for ReverseOrdinalTable {
+    #[inline]
+    fn from_wire_ref(wire: &WireReverseOrdinalTable<'de>) -> Self {
+        Self {
+            z: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            y: wire.table.get(2).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            x: wire.table.get(3).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`ReverseOrdinalTable`].
 #[repr(C)]
 pub struct WireReverseOrdinalTable<'de> {
@@ -1137,6 +1214,25 @@ impl<'de> ::fidl_next::FromWire<WireSimpleTable<'de>> for SimpleTable {
             y: y.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireSimpleTable<'de>> for SimpleTable {
+    #[inline]
+    fn from_wire_ref(wire: &WireSimpleTable<'de>) -> Self {
+        Self {
+            x: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            y: wire.table.get(5).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
                 })
             }),
         }
@@ -3737,6 +3833,397 @@ impl<'de> ::fidl_next::FromWire<WireSixtyFourOrdinalTable<'de>> for SixtyFourOrd
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireSixtyFourOrdinalTable<'de>> for SixtyFourOrdinalTable {
+    #[inline]
+    fn from_wire_ref(wire: &WireSixtyFourOrdinalTable<'de>) -> Self {
+        Self {
+            v1: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v2: wire.table.get(2).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v3: wire.table.get(3).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v4: wire.table.get(4).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v5: wire.table.get(5).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v6: wire.table.get(6).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v7: wire.table.get(7).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v8: wire.table.get(8).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v9: wire.table.get(9).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v10: wire.table.get(10).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v11: wire.table.get(11).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v12: wire.table.get(12).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v13: wire.table.get(13).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v14: wire.table.get(14).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v15: wire.table.get(15).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v16: wire.table.get(16).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v17: wire.table.get(17).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v18: wire.table.get(18).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v19: wire.table.get(19).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v20: wire.table.get(20).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v21: wire.table.get(21).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v22: wire.table.get(22).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v23: wire.table.get(23).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v24: wire.table.get(24).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v25: wire.table.get(25).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v26: wire.table.get(26).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v27: wire.table.get(27).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v28: wire.table.get(28).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v29: wire.table.get(29).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v30: wire.table.get(30).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v31: wire.table.get(31).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v32: wire.table.get(32).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v33: wire.table.get(33).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v34: wire.table.get(34).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v35: wire.table.get(35).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v36: wire.table.get(36).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v37: wire.table.get(37).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v38: wire.table.get(38).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v39: wire.table.get(39).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v40: wire.table.get(40).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v41: wire.table.get(41).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v42: wire.table.get(42).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v43: wire.table.get(43).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v44: wire.table.get(44).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v45: wire.table.get(45).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v46: wire.table.get(46).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v47: wire.table.get(47).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v48: wire.table.get(48).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v49: wire.table.get(49).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v50: wire.table.get(50).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v51: wire.table.get(51).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v52: wire.table.get(52).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v53: wire.table.get(53).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v54: wire.table.get(54).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v55: wire.table.get(55).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v56: wire.table.get(56).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v57: wire.table.get(57).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v58: wire.table.get(58).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v59: wire.table.get(59).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v60: wire.table.get(60).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v61: wire.table.get(61).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v62: wire.table.get(62).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v63: wire.table.get(63).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+
+            v64: wire.table.get(64).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<crate::WireExtensionTable<'de>>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`SixtyFourOrdinalTable`].
 #[repr(C)]
 pub struct WireSixtyFourOrdinalTable<'de> {
@@ -4794,6 +5281,19 @@ impl<'de> ::fidl_next::FromWire<WireTableWithAttributes<'de>> for TableWithAttri
             x: x.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<::fidl_next::WireI64>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireTableWithAttributes<'de>> for TableWithAttributes {
+    #[inline]
+    fn from_wire_ref(wire: &WireTableWithAttributes<'de>) -> Self {
+        Self {
+            x: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireI64>()
                 })
             }),
         }

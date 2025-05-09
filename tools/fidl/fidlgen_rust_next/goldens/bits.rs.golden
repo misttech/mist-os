@@ -63,6 +63,13 @@ impl ::fidl_next::FromWire<WireEmptyBits> for EmptyBits {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireEmptyBits> for EmptyBits {
+    #[inline]
+    fn from_wire_ref(wire: &WireEmptyBits) -> Self {
+        Self::from(*wire)
+    }
+}
+
 /// The wire type corresponding to [`EmptyBits`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
@@ -157,6 +164,13 @@ impl ::fidl_next::FromWire<WireFlexibleBits> for FlexibleBits {
     #[inline]
     fn from_wire(wire: WireFlexibleBits) -> Self {
         Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireFlexibleBits> for FlexibleBits {
+    #[inline]
+    fn from_wire_ref(wire: &WireFlexibleBits) -> Self {
+        Self::from(*wire)
     }
 }
 
@@ -255,6 +269,13 @@ impl ::fidl_next::FromWire<WireMyBits> for MyBits {
     #[inline]
     fn from_wire(wire: WireMyBits) -> Self {
         Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireMyBits> for MyBits {
+    #[inline]
+    fn from_wire_ref(wire: &WireMyBits) -> Self {
+        Self::from(*wire)
     }
 }
 
@@ -361,6 +382,13 @@ impl ::fidl_next::FromWire<WireStrictBits> for StrictBits {
     #[inline]
     fn from_wire(wire: WireStrictBits) -> Self {
         Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireStrictBits> for StrictBits {
+    #[inline]
+    fn from_wire_ref(wire: &WireStrictBits) -> Self {
+        Self::from(*wire)
     }
 }
 

@@ -10,7 +10,8 @@ use munge::munge;
 
 use crate::{
     Decode, DecodeError, Decoder, EncodableOption, EncodeError, EncodeOption, EncodeOptionRef,
-    Encoder, FromWireOption, Slot, Wire, WireOptionalVector, WireString, WireVector,
+    Encoder, FromWireOption, FromWireOptionRef, Slot, Wire, WireOptionalVector, WireString,
+    WireVector,
 };
 
 /// An optional FIDL string
@@ -141,7 +142,14 @@ unsafe impl<E: Encoder + ?Sized> EncodeOption<E> for &str {
 
 impl FromWireOption<WireOptionalString<'_>> for String {
     #[inline]
-    fn from_wire_option(from: WireOptionalString<'_>) -> Option<Self> {
-        Vec::from_wire_option(from.vec).map(|vec| unsafe { String::from_utf8_unchecked(vec) })
+    fn from_wire_option(wire: WireOptionalString<'_>) -> Option<Self> {
+        Vec::from_wire_option(wire.vec).map(|vec| unsafe { String::from_utf8_unchecked(vec) })
+    }
+}
+
+impl FromWireOptionRef<WireOptionalString<'_>> for String {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalString<'_>) -> Option<Self> {
+        Vec::from_wire_option_ref(&wire.vec).map(|vec| unsafe { String::from_utf8_unchecked(vec) })
     }
 }

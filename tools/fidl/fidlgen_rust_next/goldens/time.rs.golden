@@ -167,6 +167,21 @@ impl ::fidl_next::FromWire<WireAllInstants> for AllInstants {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireAllInstants> for AllInstants {
+    #[inline]
+    fn from_wire_ref(wire: &WireAllInstants) -> Self {
+        Self {
+            monotonic: ::fidl_next::FromWireRef::from_wire_ref(&wire.monotonic),
+
+            boot: ::fidl_next::FromWireRef::from_wire_ref(&wire.boot),
+
+            monotonic_ticks: ::fidl_next::FromWireRef::from_wire_ref(&wire.monotonic_ticks),
+
+            boot_ticks: ::fidl_next::FromWireRef::from_wire_ref(&wire.boot_ticks),
+        }
+    }
+}
+
 /// The wire type corresponding to [`AllInstants`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -455,6 +470,37 @@ impl<'de> ::fidl_next::FromWire<WireComplexInstants<'de>> for ComplexInstants {
             boot_ticks: boot_ticks.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<[::fidl_next::WireI64; 10]>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireComplexInstants<'de>> for ComplexInstants {
+    #[inline]
+    fn from_wire_ref(wire: &WireComplexInstants<'de>) -> Self {
+        Self {
+            monotonic: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<[::fidl_next::WireI64; 10]>()
+                })
+            }),
+
+            boot: wire.table.get(2).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireVector<'de, ::fidl_next::WireI64>>()
+                })
+            }),
+
+            monotonic_ticks: wire.table.get(3).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<[::fidl_next::WireI64; 10]>()
+                })
+            }),
+
+            boot_ticks: wire.table.get(4).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<[::fidl_next::WireI64; 10]>()
                 })
             }),
         }

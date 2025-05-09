@@ -11,7 +11,7 @@ use munge::munge;
 
 use crate::{
     Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, EncodeRef, Encoder, FromWire,
-    Slot, Wire, WireVector,
+    FromWireRef, Slot, Wire, WireVector,
 };
 
 /// A FIDL string
@@ -140,6 +140,13 @@ unsafe impl<E: Encoder + ?Sized> Encode<E> for &str {
 impl FromWire<WireString<'_>> for String {
     #[inline]
     fn from_wire(wire: WireString<'_>) -> Self {
-        unsafe { String::from_utf8_unchecked(Vec::from_wire(wire.vec)) }
+        String::from_wire_ref(&wire)
+    }
+}
+
+impl FromWireRef<WireString<'_>> for String {
+    #[inline]
+    fn from_wire_ref(wire: &WireString<'_>) -> Self {
+        unsafe { String::from_utf8_unchecked(Vec::from_wire_ref(&wire.vec)) }
     }
 }

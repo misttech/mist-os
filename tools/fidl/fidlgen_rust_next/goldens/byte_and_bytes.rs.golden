@@ -125,6 +125,13 @@ impl ::fidl_next::FromWire<WireByteAndBytes> for ByteAndBytes {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireByteAndBytes> for ByteAndBytes {
+    #[inline]
+    fn from_wire_ref(wire: &WireByteAndBytes) -> Self {
+        Self { single_byte: ::fidl_next::FromWireRef::from_wire_ref(&wire.single_byte) }
+    }
+}
+
 /// The wire type corresponding to [`ByteAndBytes`].
 #[derive(Clone, Debug)]
 #[repr(C)]

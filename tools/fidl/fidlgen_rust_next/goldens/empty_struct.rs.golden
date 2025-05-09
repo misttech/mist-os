@@ -111,6 +111,13 @@ impl ::fidl_next::FromWire<WireEmpty> for Empty {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireEmpty> for Empty {
+    #[inline]
+    fn from_wire_ref(wire: &WireEmpty) -> Self {
+        Self {}
+    }
+}
+
 /// The wire type corresponding to [`Empty`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -262,6 +269,13 @@ impl ::fidl_next::FromWire<WireEmptyProtocolSendRequest> for EmptyProtocolSendRe
     #[inline]
     fn from_wire(wire: WireEmptyProtocolSendRequest) -> Self {
         Self { e: ::fidl_next::FromWire::from_wire(wire.e) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireEmptyProtocolSendRequest> for EmptyProtocolSendRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireEmptyProtocolSendRequest) -> Self {
+        Self { e: ::fidl_next::FromWireRef::from_wire_ref(&wire.e) }
     }
 }
 
@@ -421,6 +435,13 @@ impl ::fidl_next::FromWire<WireEmptyProtocolReceiveRequest> for EmptyProtocolRec
     #[inline]
     fn from_wire(wire: WireEmptyProtocolReceiveRequest) -> Self {
         Self { e: ::fidl_next::FromWire::from_wire(wire.e) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireEmptyProtocolReceiveRequest> for EmptyProtocolReceiveRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireEmptyProtocolReceiveRequest) -> Self {
+        Self { e: ::fidl_next::FromWireRef::from_wire_ref(&wire.e) }
     }
 }
 
@@ -591,6 +612,15 @@ impl ::fidl_next::FromWire<WireEmptyProtocolSendAndReceiveRequest>
     }
 }
 
+impl ::fidl_next::FromWireRef<WireEmptyProtocolSendAndReceiveRequest>
+    for EmptyProtocolSendAndReceiveRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireEmptyProtocolSendAndReceiveRequest) -> Self {
+        Self { e: ::fidl_next::FromWireRef::from_wire_ref(&wire.e) }
+    }
+}
+
 /// The wire type corresponding to [`EmptyProtocolSendAndReceiveRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -755,6 +785,15 @@ impl ::fidl_next::FromWire<WireEmptyProtocolSendAndReceiveResponse>
     #[inline]
     fn from_wire(wire: WireEmptyProtocolSendAndReceiveResponse) -> Self {
         Self { e: ::fidl_next::FromWire::from_wire(wire.e) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireEmptyProtocolSendAndReceiveResponse>
+    for EmptyProtocolSendAndReceiveResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireEmptyProtocolSendAndReceiveResponse) -> Self {
+        Self { e: ::fidl_next::FromWireRef::from_wire_ref(&wire.e) }
     }
 }
 

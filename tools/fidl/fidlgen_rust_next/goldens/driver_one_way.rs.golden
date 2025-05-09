@@ -126,6 +126,13 @@ impl ::fidl_next::FromWire<WirePayload> for Payload {
     }
 }
 
+impl ::fidl_next::FromWireRef<WirePayload> for Payload {
+    #[inline]
+    fn from_wire_ref(wire: &WirePayload) -> Self {
+        Self { value: ::fidl_next::FromWireRef::from_wire_ref(&wire.value) }
+    }
+}
+
 /// The wire type corresponding to [`Payload`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -283,6 +290,13 @@ impl ::fidl_next::FromWire<WireOneWaySendRequest> for OneWaySendRequest {
     #[inline]
     fn from_wire(wire: WireOneWaySendRequest) -> Self {
         Self { payload: ::fidl_next::FromWire::from_wire(wire.payload) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireOneWaySendRequest> for OneWaySendRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireOneWaySendRequest) -> Self {
+        Self { payload: ::fidl_next::FromWireRef::from_wire_ref(&wire.payload) }
     }
 }
 

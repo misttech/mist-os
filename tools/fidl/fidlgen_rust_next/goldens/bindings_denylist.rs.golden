@@ -133,6 +133,15 @@ impl ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding4> for ShouldNeverAp
     }
 }
 
+impl ::fidl_next::FromWireRef<WireShouldNeverAppearInAnyBinding4>
+    for ShouldNeverAppearInAnyBinding4
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireShouldNeverAppearInAnyBinding4) -> Self {
+        Self { a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a) }
+    }
+}
+
 /// The wire type corresponding to [`ShouldNeverAppearInAnyBinding4`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -285,6 +294,21 @@ impl<'de> ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding5<'de>>
         Self {
             a: a.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe { envelope.read_unchecked::<bool>() })
+            }),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireShouldNeverAppearInAnyBinding5<'de>>
+    for ShouldNeverAppearInAnyBinding5
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireShouldNeverAppearInAnyBinding5<'de>) -> Self {
+        Self {
+            a: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<bool>()
+                })
             }),
         }
     }
@@ -473,6 +497,21 @@ impl ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding6> for ShouldNeverAp
     }
 }
 
+impl ::fidl_next::FromWireRef<WireShouldNeverAppearInAnyBinding6>
+    for ShouldNeverAppearInAnyBinding6
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireShouldNeverAppearInAnyBinding6) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::A(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<bool>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalShouldNeverAppearInAnyBinding6>
     for Box<ShouldNeverAppearInAnyBinding6>
 {
@@ -480,6 +519,19 @@ impl ::fidl_next::FromWireOption<WireOptionalShouldNeverAppearInAnyBinding6>
     fn from_wire_option(wire: WireOptionalShouldNeverAppearInAnyBinding6) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalShouldNeverAppearInAnyBinding6>
+    for Box<ShouldNeverAppearInAnyBinding6>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalShouldNeverAppearInAnyBinding6) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -822,6 +874,25 @@ impl<'de> ::fidl_next::FromWire<WireAllowedDeniedResponse<'de>> for AllowedDenie
 
             should_never_appear_in_any_binding_6: ::fidl_next::FromWire::from_wire(
                 wire.should_never_appear_in_any_binding_6,
+            ),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireAllowedDeniedResponse<'de>> for AllowedDeniedResponse {
+    #[inline]
+    fn from_wire_ref(wire: &WireAllowedDeniedResponse<'de>) -> Self {
+        Self {
+            should_never_appear_in_any_binding_4: ::fidl_next::FromWireRef::from_wire_ref(
+                &wire.should_never_appear_in_any_binding_4,
+            ),
+
+            should_never_appear_in_any_binding_5: ::fidl_next::FromWireRef::from_wire_ref(
+                &wire.should_never_appear_in_any_binding_5,
+            ),
+
+            should_never_appear_in_any_binding_6: ::fidl_next::FromWireRef::from_wire_ref(
+                &wire.should_never_appear_in_any_binding_6,
             ),
         }
     }
@@ -1257,6 +1328,15 @@ impl ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding1> for ShouldNeverAp
     }
 }
 
+impl ::fidl_next::FromWireRef<WireShouldNeverAppearInAnyBinding1>
+    for ShouldNeverAppearInAnyBinding1
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireShouldNeverAppearInAnyBinding1) -> Self {
+        Self { a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a) }
+    }
+}
+
 /// The wire type corresponding to [`ShouldNeverAppearInAnyBinding1`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -1409,6 +1489,21 @@ impl<'de> ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding2<'de>>
         Self {
             a: a.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe { envelope.read_unchecked::<bool>() })
+            }),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireShouldNeverAppearInAnyBinding2<'de>>
+    for ShouldNeverAppearInAnyBinding2
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireShouldNeverAppearInAnyBinding2<'de>) -> Self {
+        Self {
+            a: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<bool>()
+                })
             }),
         }
     }
@@ -1597,6 +1692,21 @@ impl ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding3> for ShouldNeverAp
     }
 }
 
+impl ::fidl_next::FromWireRef<WireShouldNeverAppearInAnyBinding3>
+    for ShouldNeverAppearInAnyBinding3
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireShouldNeverAppearInAnyBinding3) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::A(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<bool>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalShouldNeverAppearInAnyBinding3>
     for Box<ShouldNeverAppearInAnyBinding3>
 {
@@ -1604,6 +1714,19 @@ impl ::fidl_next::FromWireOption<WireOptionalShouldNeverAppearInAnyBinding3>
     fn from_wire_option(wire: WireOptionalShouldNeverAppearInAnyBinding3) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalShouldNeverAppearInAnyBinding3>
+    for Box<ShouldNeverAppearInAnyBinding3>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalShouldNeverAppearInAnyBinding3) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -1954,6 +2077,27 @@ impl<'de> ::fidl_next::FromWire<WireDeniedShouldNeverAppearInAnyBindingRequest<'
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireDeniedShouldNeverAppearInAnyBindingRequest<'de>>
+    for DeniedShouldNeverAppearInAnyBindingRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireDeniedShouldNeverAppearInAnyBindingRequest<'de>) -> Self {
+        Self {
+            should_never_appear_in_any_binding_1: ::fidl_next::FromWireRef::from_wire_ref(
+                &wire.should_never_appear_in_any_binding_1,
+            ),
+
+            should_never_appear_in_any_binding_2: ::fidl_next::FromWireRef::from_wire_ref(
+                &wire.should_never_appear_in_any_binding_2,
+            ),
+
+            should_never_appear_in_any_binding_3: ::fidl_next::FromWireRef::from_wire_ref(
+                &wire.should_never_appear_in_any_binding_3,
+            ),
+        }
+    }
+}
+
 /// The wire type corresponding to [`DeniedShouldNeverAppearInAnyBindingRequest`].
 #[derive(Debug)]
 #[repr(C)]
@@ -2288,6 +2432,15 @@ impl ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding7> for ShouldNeverAp
     }
 }
 
+impl ::fidl_next::FromWireRef<WireShouldNeverAppearInAnyBinding7>
+    for ShouldNeverAppearInAnyBinding7
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireShouldNeverAppearInAnyBinding7) -> Self {
+        Self { a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a) }
+    }
+}
+
 /// The wire type corresponding to [`ShouldNeverAppearInAnyBinding7`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -2440,6 +2593,21 @@ impl<'de> ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding8<'de>>
         Self {
             a: a.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe { envelope.read_unchecked::<bool>() })
+            }),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireShouldNeverAppearInAnyBinding8<'de>>
+    for ShouldNeverAppearInAnyBinding8
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireShouldNeverAppearInAnyBinding8<'de>) -> Self {
+        Self {
+            a: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<bool>()
+                })
             }),
         }
     }
@@ -2628,6 +2796,21 @@ impl ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding9> for ShouldNeverAp
     }
 }
 
+impl ::fidl_next::FromWireRef<WireShouldNeverAppearInAnyBinding9>
+    for ShouldNeverAppearInAnyBinding9
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireShouldNeverAppearInAnyBinding9) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::A(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<bool>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalShouldNeverAppearInAnyBinding9>
     for Box<ShouldNeverAppearInAnyBinding9>
 {
@@ -2635,6 +2818,19 @@ impl ::fidl_next::FromWireOption<WireOptionalShouldNeverAppearInAnyBinding9>
     fn from_wire_option(wire: WireOptionalShouldNeverAppearInAnyBinding9) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalShouldNeverAppearInAnyBinding9>
+    for Box<ShouldNeverAppearInAnyBinding9>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalShouldNeverAppearInAnyBinding9) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -2982,6 +3178,25 @@ impl<'de> ::fidl_next::FromWire<WireDeniedAnonymous<'de>> for DeniedAnonymous {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireDeniedAnonymous<'de>> for DeniedAnonymous {
+    #[inline]
+    fn from_wire_ref(wire: &WireDeniedAnonymous<'de>) -> Self {
+        Self {
+            should_never_appear_in_any_binding_7: ::fidl_next::FromWireRef::from_wire_ref(
+                &wire.should_never_appear_in_any_binding_7,
+            ),
+
+            should_never_appear_in_any_binding_8: ::fidl_next::FromWireRef::from_wire_ref(
+                &wire.should_never_appear_in_any_binding_8,
+            ),
+
+            should_never_appear_in_any_binding_9: ::fidl_next::FromWireRef::from_wire_ref(
+                &wire.should_never_appear_in_any_binding_9,
+            ),
+        }
+    }
+}
+
 /// The wire type corresponding to [`DeniedAnonymous`].
 #[derive(Debug)]
 #[repr(C)]
@@ -3164,6 +3379,15 @@ impl ::fidl_next::FromWire<WireDenyEachBindingOnlyDenyCppRequest>
     }
 }
 
+impl ::fidl_next::FromWireRef<WireDenyEachBindingOnlyDenyCppRequest>
+    for DenyEachBindingOnlyDenyCppRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireDenyEachBindingOnlyDenyCppRequest) -> Self {
+        Self { a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a) }
+    }
+}
+
 /// The wire type corresponding to [`DenyEachBindingOnlyDenyCppRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -3331,6 +3555,15 @@ impl ::fidl_next::FromWire<WireDenyEachBindingOnlyDenyCppResponse>
     }
 }
 
+impl ::fidl_next::FromWireRef<WireDenyEachBindingOnlyDenyCppResponse>
+    for DenyEachBindingOnlyDenyCppResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireDenyEachBindingOnlyDenyCppResponse) -> Self {
+        Self { b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b) }
+    }
+}
+
 /// The wire type corresponding to [`DenyEachBindingOnlyDenyCppResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -3494,6 +3727,15 @@ impl ::fidl_next::FromWire<WireDenyEachBindingOnlyDenyDartRequest>
     #[inline]
     fn from_wire(wire: WireDenyEachBindingOnlyDenyDartRequest) -> Self {
         Self { a: ::fidl_next::FromWire::from_wire(wire.a) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireDenyEachBindingOnlyDenyDartRequest>
+    for DenyEachBindingOnlyDenyDartRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireDenyEachBindingOnlyDenyDartRequest) -> Self {
+        Self { a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a) }
     }
 }
 
@@ -3664,6 +3906,15 @@ impl ::fidl_next::FromWire<WireDenyEachBindingOnlyDenyDartResponse>
     }
 }
 
+impl ::fidl_next::FromWireRef<WireDenyEachBindingOnlyDenyDartResponse>
+    for DenyEachBindingOnlyDenyDartResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireDenyEachBindingOnlyDenyDartResponse) -> Self {
+        Self { b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b) }
+    }
+}
+
 /// The wire type corresponding to [`DenyEachBindingOnlyDenyDartResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -3827,6 +4078,15 @@ impl ::fidl_next::FromWire<WireDenyEachBindingOnlyDenyGoRequest>
     #[inline]
     fn from_wire(wire: WireDenyEachBindingOnlyDenyGoRequest) -> Self {
         Self { a: ::fidl_next::FromWire::from_wire(wire.a) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireDenyEachBindingOnlyDenyGoRequest>
+    for DenyEachBindingOnlyDenyGoRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireDenyEachBindingOnlyDenyGoRequest) -> Self {
+        Self { a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a) }
     }
 }
 
@@ -3997,6 +4257,15 @@ impl ::fidl_next::FromWire<WireDenyEachBindingOnlyDenyGoResponse>
     }
 }
 
+impl ::fidl_next::FromWireRef<WireDenyEachBindingOnlyDenyGoResponse>
+    for DenyEachBindingOnlyDenyGoResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireDenyEachBindingOnlyDenyGoResponse) -> Self {
+        Self { b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b) }
+    }
+}
+
 /// The wire type corresponding to [`DenyEachBindingOnlyDenyGoResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -4160,6 +4429,15 @@ impl ::fidl_next::FromWire<WireDenyEachBindingOnlyDenyPythonRequest>
     #[inline]
     fn from_wire(wire: WireDenyEachBindingOnlyDenyPythonRequest) -> Self {
         Self { a: ::fidl_next::FromWire::from_wire(wire.a) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireDenyEachBindingOnlyDenyPythonRequest>
+    for DenyEachBindingOnlyDenyPythonRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireDenyEachBindingOnlyDenyPythonRequest) -> Self {
+        Self { a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a) }
     }
 }
 
@@ -4330,6 +4608,15 @@ impl ::fidl_next::FromWire<WireDenyEachBindingOnlyDenyPythonResponse>
     }
 }
 
+impl ::fidl_next::FromWireRef<WireDenyEachBindingOnlyDenyPythonResponse>
+    for DenyEachBindingOnlyDenyPythonResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireDenyEachBindingOnlyDenyPythonResponse) -> Self {
+        Self { b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b) }
+    }
+}
+
 /// The wire type corresponding to [`DenyEachBindingOnlyDenyPythonResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -4493,6 +4780,15 @@ impl ::fidl_next::FromWire<WireDenyEachBindingOnlyDenyRustRequest>
     #[inline]
     fn from_wire(wire: WireDenyEachBindingOnlyDenyRustRequest) -> Self {
         Self { a: ::fidl_next::FromWire::from_wire(wire.a) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireDenyEachBindingOnlyDenyRustRequest>
+    for DenyEachBindingOnlyDenyRustRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireDenyEachBindingOnlyDenyRustRequest) -> Self {
+        Self { a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a) }
     }
 }
 
@@ -4663,6 +4959,15 @@ impl ::fidl_next::FromWire<WireDenyEachBindingOnlyDenyRustResponse>
     }
 }
 
+impl ::fidl_next::FromWireRef<WireDenyEachBindingOnlyDenyRustResponse>
+    for DenyEachBindingOnlyDenyRustResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireDenyEachBindingOnlyDenyRustResponse) -> Self {
+        Self { b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b) }
+    }
+}
+
 /// The wire type corresponding to [`DenyEachBindingOnlyDenyRustResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -4826,6 +5131,15 @@ impl ::fidl_next::FromWire<WireDenyEachBindingOnlyDenySyzkallerRequest>
     #[inline]
     fn from_wire(wire: WireDenyEachBindingOnlyDenySyzkallerRequest) -> Self {
         Self { a: ::fidl_next::FromWire::from_wire(wire.a) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireDenyEachBindingOnlyDenySyzkallerRequest>
+    for DenyEachBindingOnlyDenySyzkallerRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireDenyEachBindingOnlyDenySyzkallerRequest) -> Self {
+        Self { a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a) }
     }
 }
 
@@ -4994,6 +5308,15 @@ impl ::fidl_next::FromWire<WireDenyEachBindingOnlyDenySyzkallerResponse>
     #[inline]
     fn from_wire(wire: WireDenyEachBindingOnlyDenySyzkallerResponse) -> Self {
         Self { b: ::fidl_next::FromWire::from_wire(wire.b) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireDenyEachBindingOnlyDenySyzkallerResponse>
+    for DenyEachBindingOnlyDenySyzkallerResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireDenyEachBindingOnlyDenySyzkallerResponse) -> Self {
+        Self { b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b) }
     }
 }
 
@@ -5939,6 +6262,15 @@ impl ::fidl_next::FromWire<WireMemberOnlyAppearsInImportingLibrary>
     }
 }
 
+impl ::fidl_next::FromWireRef<WireMemberOnlyAppearsInImportingLibrary>
+    for MemberOnlyAppearsInImportingLibrary
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireMemberOnlyAppearsInImportingLibrary) -> Self {
+        Self { a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a) }
+    }
+}
+
 /// The wire type corresponding to [`MemberOnlyAppearsInImportingLibrary`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -6118,6 +6450,17 @@ impl ::fidl_next::FromWire<WireOnlyAppearsInImportingLibrary> for OnlyAppearsInI
         Self {
             member_only_appears_in_importing_library: ::fidl_next::FromWire::from_wire(
                 wire.member_only_appears_in_importing_library,
+            ),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireOnlyAppearsInImportingLibrary> for OnlyAppearsInImportingLibrary {
+    #[inline]
+    fn from_wire_ref(wire: &WireOnlyAppearsInImportingLibrary) -> Self {
+        Self {
+            member_only_appears_in_importing_library: ::fidl_next::FromWireRef::from_wire_ref(
+                &wire.member_only_appears_in_importing_library,
             ),
         }
     }
@@ -6327,6 +6670,13 @@ impl ::fidl_next::FromWire<WireOnlyDart> for OnlyDart {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireOnlyDart> for OnlyDart {
+    #[inline]
+    fn from_wire_ref(wire: &WireOnlyDart) -> Self {
+        Self::from(*wire)
+    }
+}
+
 /// The wire type corresponding to [`OnlyDart`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(transparent)]
@@ -6479,6 +6829,13 @@ impl ::fidl_next::FromWire<WireOnlyGo> for OnlyGo {
 
     #[inline]
     fn from_wire(wire: WireOnlyGo) -> Self {
+        Self {}
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireOnlyGo> for OnlyGo {
+    #[inline]
+    fn from_wire_ref(wire: &WireOnlyGo) -> Self {
         Self {}
     }
 }
@@ -6653,11 +7010,35 @@ impl ::fidl_next::FromWire<WireOnlyLlcpp> for OnlyLlcpp {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireOnlyLlcpp> for OnlyLlcpp {
+    #[inline]
+    fn from_wire_ref(wire: &WireOnlyLlcpp) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::X(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireU32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalOnlyLlcpp> for Box<OnlyLlcpp> {
     #[inline]
     fn from_wire_option(wire: WireOptionalOnlyLlcpp) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalOnlyLlcpp> for Box<OnlyLlcpp> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalOnlyLlcpp) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -6924,6 +7305,13 @@ impl<'de> ::fidl_next::FromWire<WireOnlyPython<'de>> for OnlyPython {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireOnlyPython<'de>> for OnlyPython {
+    #[inline]
+    fn from_wire_ref(wire: &WireOnlyPython<'de>) -> Self {
+        Self {}
+    }
+}
+
 /// The wire type corresponding to [`OnlyPython`].
 #[repr(C)]
 pub struct WireOnlyPython<'de> {
@@ -7060,6 +7448,13 @@ impl<'de> ::fidl_next::FromWire<WireOnlyRust<'de>> for OnlyRust {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireOnlyRust<'de>> for OnlyRust {
+    #[inline]
+    fn from_wire_ref(wire: &WireOnlyRust<'de>) -> Self {
+        Self {}
+    }
+}
+
 /// The wire type corresponding to [`OnlyRust`].
 #[repr(C)]
 pub struct WireOnlyRust<'de> {
@@ -7163,6 +7558,13 @@ impl ::fidl_next::FromWire<WireOnlySyzkaller> for OnlySyzkaller {
     #[inline]
     fn from_wire(wire: WireOnlySyzkaller) -> Self {
         Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireOnlySyzkaller> for OnlySyzkaller {
+    #[inline]
+    fn from_wire_ref(wire: &WireOnlySyzkaller) -> Self {
+        Self::from(*wire)
     }
 }
 

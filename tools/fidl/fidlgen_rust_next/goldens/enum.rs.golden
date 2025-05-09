@@ -67,6 +67,13 @@ impl ::fidl_next::FromWire<WireMyEmptyFlexibleEnum> for MyEmptyFlexibleEnum {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireMyEmptyFlexibleEnum> for MyEmptyFlexibleEnum {
+    #[inline]
+    fn from_wire_ref(wire: &WireMyEmptyFlexibleEnum) -> Self {
+        Self::from(*wire)
+    }
+}
+
 /// The wire type corresponding to [`MyEmptyFlexibleEnum`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(transparent)]
@@ -182,6 +189,13 @@ impl ::fidl_next::FromWire<WireMyFlexibleEnum> for MyFlexibleEnum {
     #[inline]
     fn from_wire(wire: WireMyFlexibleEnum) -> Self {
         Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireMyFlexibleEnum> for MyFlexibleEnum {
+    #[inline]
+    fn from_wire_ref(wire: &WireMyFlexibleEnum) -> Self {
+        Self::from(*wire)
     }
 }
 
@@ -321,6 +335,15 @@ impl ::fidl_next::FromWire<WireMyFlexibleEnumWithCustomUnknown>
     }
 }
 
+impl ::fidl_next::FromWireRef<WireMyFlexibleEnumWithCustomUnknown>
+    for MyFlexibleEnumWithCustomUnknown
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireMyFlexibleEnumWithCustomUnknown) -> Self {
+        Self::from(*wire)
+    }
+}
+
 /// The wire type corresponding to [`MyFlexibleEnumWithCustomUnknown`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(transparent)]
@@ -453,6 +476,13 @@ impl ::fidl_next::FromWire<WireMyStrictEnum> for MyStrictEnum {
     #[inline]
     fn from_wire(wire: WireMyStrictEnum) -> Self {
         Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireMyStrictEnum> for MyStrictEnum {
+    #[inline]
+    fn from_wire_ref(wire: &WireMyStrictEnum) -> Self {
+        Self::from(*wire)
     }
 }
 

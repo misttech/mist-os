@@ -133,6 +133,13 @@ impl ::fidl_next::FromWire<WireFoo> for Foo {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireFoo> for Foo {
+    #[inline]
+    fn from_wire_ref(wire: &WireFoo) -> Self {
+        Self { field: ::fidl_next::FromWireRef::from_wire_ref(&wire.field) }
+    }
+}
+
 /// The wire type corresponding to [`Foo`].
 #[derive(Clone, Debug)]
 #[repr(C)]

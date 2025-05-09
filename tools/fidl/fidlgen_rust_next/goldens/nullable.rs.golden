@@ -126,6 +126,13 @@ impl ::fidl_next::FromWire<WireInt32Wrapper> for Int32Wrapper {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireInt32Wrapper> for Int32Wrapper {
+    #[inline]
+    fn from_wire_ref(wire: &WireInt32Wrapper) -> Self {
+        Self { val: ::fidl_next::FromWireRef::from_wire_ref(&wire.val) }
+    }
+}
+
 /// The wire type corresponding to [`Int32Wrapper`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -300,6 +307,17 @@ impl ::fidl_next::FromWire<WireSimpleProtocolAddRequest> for SimpleProtocolAddRe
     }
 }
 
+impl ::fidl_next::FromWireRef<WireSimpleProtocolAddRequest> for SimpleProtocolAddRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireSimpleProtocolAddRequest) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`SimpleProtocolAddRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -461,6 +479,13 @@ impl ::fidl_next::FromWire<WireSimpleProtocolAddResponse> for SimpleProtocolAddR
     #[inline]
     fn from_wire(wire: WireSimpleProtocolAddResponse) -> Self {
         Self { sum: ::fidl_next::FromWire::from_wire(wire.sum) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireSimpleProtocolAddResponse> for SimpleProtocolAddResponse {
+    #[inline]
+    fn from_wire_ref(wire: &WireSimpleProtocolAddResponse) -> Self {
+        Self { sum: ::fidl_next::FromWireRef::from_wire_ref(&wire.sum) }
     }
 }
 
@@ -804,11 +829,39 @@ impl ::fidl_next::FromWire<WireSimpleUnion> for SimpleUnion {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireSimpleUnion> for SimpleUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireSimpleUnion) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::A(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            })),
+
+            2 => Self::B(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireF32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalSimpleUnion> for Box<SimpleUnion> {
     #[inline]
     fn from_wire_option(wire: WireOptionalSimpleUnion) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalSimpleUnion> for Box<SimpleUnion> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalSimpleUnion) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -1511,6 +1564,13 @@ impl<'de> ::fidl_next::FromWire<WireStructWithNullableString<'de>> for StructWit
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireStructWithNullableString<'de>> for StructWithNullableString {
+    #[inline]
+    fn from_wire_ref(wire: &WireStructWithNullableString<'de>) -> Self {
+        Self { val: ::fidl_next::FromWireRef::from_wire_ref(&wire.val) }
+    }
+}
+
 /// The wire type corresponding to [`StructWithNullableString`].
 #[derive(Debug)]
 #[repr(C)]
@@ -1659,6 +1719,13 @@ impl<'de> ::fidl_next::FromWire<WireStructWithNullableStruct<'de>> for StructWit
     #[inline]
     fn from_wire(wire: WireStructWithNullableStruct<'de>) -> Self {
         Self { val: ::fidl_next::FromWire::from_wire(wire.val) }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireStructWithNullableStruct<'de>> for StructWithNullableStruct {
+    #[inline]
+    fn from_wire_ref(wire: &WireStructWithNullableStruct<'de>) -> Self {
+        Self { val: ::fidl_next::FromWireRef::from_wire_ref(&wire.val) }
     }
 }
 
@@ -1826,6 +1893,13 @@ impl ::fidl_next::FromWire<WireStructWithNullableUnion> for StructWithNullableUn
     }
 }
 
+impl ::fidl_next::FromWireRef<WireStructWithNullableUnion> for StructWithNullableUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireStructWithNullableUnion) -> Self {
+        Self { val: ::fidl_next::FromWireRef::from_wire_ref(&wire.val) }
+    }
+}
+
 /// The wire type corresponding to [`StructWithNullableUnion`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -1972,6 +2046,13 @@ impl<'de> ::fidl_next::FromWire<WireStructWithNullableVector<'de>> for StructWit
     #[inline]
     fn from_wire(wire: WireStructWithNullableVector<'de>) -> Self {
         Self { val: ::fidl_next::FromWire::from_wire(wire.val) }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireStructWithNullableVector<'de>> for StructWithNullableVector {
+    #[inline]
+    fn from_wire_ref(wire: &WireStructWithNullableVector<'de>) -> Self {
+        Self { val: ::fidl_next::FromWireRef::from_wire_ref(&wire.val) }
     }
 }
 

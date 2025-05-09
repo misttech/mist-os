@@ -13,7 +13,7 @@ use munge::munge;
 use super::raw::RawWireVector;
 use crate::{
     Chunk, Decode, DecodeError, Decoder, DecoderExt as _, Encodable, Encode, EncodeError,
-    EncodeRef, Encoder, EncoderExt as _, FromWire, Slot, Wire, WirePointer,
+    EncodeRef, Encoder, EncoderExt as _, FromWire, FromWireRef, Slot, Wire, WirePointer,
 };
 
 /// A FIDL vector
@@ -265,6 +265,25 @@ impl<T: FromWire<W>, W> FromWire<WireVector<'_, W>> for Vec<T> {
         } else {
             for item in wire.into_iter() {
                 result.push(T::from_wire(item));
+            }
+        }
+        result
+    }
+}
+
+impl<T: FromWireRef<W>, W> FromWireRef<WireVector<'_, W>> for Vec<T> {
+    fn from_wire_ref(wire: &WireVector<'_, W>) -> Self {
+        let mut result = Vec::<T>::with_capacity(wire.len());
+        if T::COPY_OPTIMIZATION.is_enabled() {
+            unsafe {
+                copy_nonoverlapping(wire.as_ptr().cast(), result.as_mut_ptr(), wire.len());
+            }
+            unsafe {
+                result.set_len(wire.len());
+            }
+        } else {
+            for item in wire.iter() {
+                result.push(T::from_wire_ref(item));
             }
         }
         result

@@ -253,6 +253,17 @@ impl ::fidl_next::FromWire<WireChannelProtocolMethodARequest> for ChannelProtoco
     }
 }
 
+impl ::fidl_next::FromWireRef<WireChannelProtocolMethodARequest> for ChannelProtocolMethodARequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireChannelProtocolMethodARequest) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`ChannelProtocolMethodARequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -428,6 +439,17 @@ impl ::fidl_next::FromWire<WireChannelProtocolEventARequest> for ChannelProtocol
             a: ::fidl_next::FromWire::from_wire(wire.a),
 
             b: ::fidl_next::FromWire::from_wire(wire.b),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireChannelProtocolEventARequest> for ChannelProtocolEventARequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireChannelProtocolEventARequest) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
         }
     }
 }
@@ -617,6 +639,17 @@ impl ::fidl_next::FromWire<WireChannelProtocolMethodBRequest> for ChannelProtoco
     }
 }
 
+impl ::fidl_next::FromWireRef<WireChannelProtocolMethodBRequest> for ChannelProtocolMethodBRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireChannelProtocolMethodBRequest) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+        }
+    }
+}
+
 /// The wire type corresponding to [`ChannelProtocolMethodBRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -784,6 +817,15 @@ impl ::fidl_next::FromWire<WireChannelProtocolMethodBResponse> for ChannelProtoc
     #[inline]
     fn from_wire(wire: WireChannelProtocolMethodBResponse) -> Self {
         Self { result: ::fidl_next::FromWire::from_wire(wire.result) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireChannelProtocolMethodBResponse>
+    for ChannelProtocolMethodBResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireChannelProtocolMethodBResponse) -> Self {
+        Self { result: ::fidl_next::FromWireRef::from_wire_ref(&wire.result) }
     }
 }
 
@@ -1837,6 +1879,13 @@ impl ::fidl_next::FromWire<WireErrorEnum> for ErrorEnum {
     #[inline]
     fn from_wire(wire: WireErrorEnum) -> Self {
         Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireErrorEnum> for ErrorEnum {
+    #[inline]
+    fn from_wire_ref(wire: &WireErrorEnum) -> Self {
+        Self::from(*wire)
     }
 }
 
@@ -2986,6 +3035,43 @@ impl ::fidl_next::FromWire<WireManyParametersFifteenRequest> for ManyParametersF
     }
 }
 
+impl ::fidl_next::FromWireRef<WireManyParametersFifteenRequest> for ManyParametersFifteenRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireManyParametersFifteenRequest) -> Self {
+        Self {
+            p1: ::fidl_next::FromWireRef::from_wire_ref(&wire.p1),
+
+            p2: ::fidl_next::FromWireRef::from_wire_ref(&wire.p2),
+
+            p3: ::fidl_next::FromWireRef::from_wire_ref(&wire.p3),
+
+            p4: ::fidl_next::FromWireRef::from_wire_ref(&wire.p4),
+
+            p5: ::fidl_next::FromWireRef::from_wire_ref(&wire.p5),
+
+            p6: ::fidl_next::FromWireRef::from_wire_ref(&wire.p6),
+
+            p7: ::fidl_next::FromWireRef::from_wire_ref(&wire.p7),
+
+            p8: ::fidl_next::FromWireRef::from_wire_ref(&wire.p8),
+
+            p9: ::fidl_next::FromWireRef::from_wire_ref(&wire.p9),
+
+            p10: ::fidl_next::FromWireRef::from_wire_ref(&wire.p10),
+
+            p11: ::fidl_next::FromWireRef::from_wire_ref(&wire.p11),
+
+            p12: ::fidl_next::FromWireRef::from_wire_ref(&wire.p12),
+
+            p13: ::fidl_next::FromWireRef::from_wire_ref(&wire.p13),
+
+            p14: ::fidl_next::FromWireRef::from_wire_ref(&wire.p14),
+
+            p15: ::fidl_next::FromWireRef::from_wire_ref(&wire.p15),
+        }
+    }
+}
+
 /// The wire type corresponding to [`ManyParametersFifteenRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -3373,11 +3459,35 @@ impl ::fidl_next::FromWire<WireTheUnion> for TheUnion {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireTheUnion> for TheUnion {
+    #[inline]
+    fn from_wire_ref(wire: &WireTheUnion) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::V(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<::fidl_next::WireU32>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalTheUnion> for Box<TheUnion> {
     #[inline]
     fn from_wire_option(wire: WireOptionalTheUnion) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalTheUnion> for Box<TheUnion> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalTheUnion) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -3696,6 +3806,15 @@ impl ::fidl_next::FromWire<WireMethodWithUnionUnionMethodRequest>
     }
 }
 
+impl ::fidl_next::FromWireRef<WireMethodWithUnionUnionMethodRequest>
+    for MethodWithUnionUnionMethodRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireMethodWithUnionUnionMethodRequest) -> Self {
+        Self { u: ::fidl_next::FromWireRef::from_wire_ref(&wire.u) }
+    }
+}
+
 /// The wire type corresponding to [`MethodWithUnionUnionMethodRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -3863,6 +3982,15 @@ impl ::fidl_next::FromWire<WireMethodWithUnionUnionMethodResponse>
     #[inline]
     fn from_wire(wire: WireMethodWithUnionUnionMethodResponse) -> Self {
         Self { u: ::fidl_next::FromWire::from_wire(wire.u) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireMethodWithUnionUnionMethodResponse>
+    for MethodWithUnionUnionMethodResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireMethodWithUnionUnionMethodResponse) -> Self {
+        Self { u: ::fidl_next::FromWireRef::from_wire_ref(&wire.u) }
     }
 }
 
@@ -4530,6 +4658,18 @@ impl<'de> ::fidl_next::FromWire<WireWithAndWithoutRequestResponseNoRequestWithRe
     }
 }
 
+impl<'de>
+    ::fidl_next::FromWireRef<WireWithAndWithoutRequestResponseNoRequestWithResponseResponse<'de>>
+    for WithAndWithoutRequestResponseNoRequestWithResponseResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireWithAndWithoutRequestResponseNoRequestWithResponseResponse<'de>,
+    ) -> Self {
+        Self { ret: ::fidl_next::FromWireRef::from_wire_ref(&wire.ret) }
+    }
+}
+
 /// The wire type corresponding to [`WithAndWithoutRequestResponseNoRequestWithResponseResponse`].
 #[derive(Debug)]
 #[repr(C)]
@@ -4690,6 +4830,18 @@ impl<'de> ::fidl_next::FromWire<WireWithAndWithoutRequestResponseWithRequestNoRe
     #[inline]
     fn from_wire(wire: WireWithAndWithoutRequestResponseWithRequestNoResponseRequest<'de>) -> Self {
         Self { arg: ::fidl_next::FromWire::from_wire(wire.arg) }
+    }
+}
+
+impl<'de>
+    ::fidl_next::FromWireRef<WireWithAndWithoutRequestResponseWithRequestNoResponseRequest<'de>>
+    for WithAndWithoutRequestResponseWithRequestNoResponseRequest
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireWithAndWithoutRequestResponseWithRequestNoResponseRequest<'de>,
+    ) -> Self {
+        Self { arg: ::fidl_next::FromWireRef::from_wire_ref(&wire.arg) }
     }
 }
 
@@ -4859,6 +5011,18 @@ impl<'de>
     }
 }
 
+impl<'de>
+    ::fidl_next::FromWireRef<WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest<'de>>
+    for WithAndWithoutRequestResponseWithRequestEmptyResponseRequest
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest<'de>,
+    ) -> Self {
+        Self { arg: ::fidl_next::FromWireRef::from_wire_ref(&wire.arg) }
+    }
+}
+
 /// The wire type corresponding to [`WithAndWithoutRequestResponseWithRequestEmptyResponseRequest`].
 #[derive(Debug)]
 #[repr(C)]
@@ -5022,6 +5186,18 @@ impl<'de>
         wire: WireWithAndWithoutRequestResponseWithRequestWithResponseRequest<'de>,
     ) -> Self {
         Self { arg: ::fidl_next::FromWire::from_wire(wire.arg) }
+    }
+}
+
+impl<'de>
+    ::fidl_next::FromWireRef<WireWithAndWithoutRequestResponseWithRequestWithResponseRequest<'de>>
+    for WithAndWithoutRequestResponseWithRequestWithResponseRequest
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireWithAndWithoutRequestResponseWithRequestWithResponseRequest<'de>,
+    ) -> Self {
+        Self { arg: ::fidl_next::FromWireRef::from_wire_ref(&wire.arg) }
     }
 }
 
@@ -5191,6 +5367,18 @@ impl<'de>
     }
 }
 
+impl<'de>
+    ::fidl_next::FromWireRef<WireWithAndWithoutRequestResponseWithRequestWithResponseResponse<'de>>
+    for WithAndWithoutRequestResponseWithRequestWithResponseResponse
+{
+    #[inline]
+    fn from_wire_ref(
+        wire: &WireWithAndWithoutRequestResponseWithRequestWithResponseResponse<'de>,
+    ) -> Self {
+        Self { ret: ::fidl_next::FromWireRef::from_wire_ref(&wire.ret) }
+    }
+}
+
 /// The wire type corresponding to [`WithAndWithoutRequestResponseWithRequestWithResponseResponse`].
 #[derive(Debug)]
 #[repr(C)]
@@ -5350,6 +5538,15 @@ impl<'de> ::fidl_next::FromWire<WireWithAndWithoutRequestResponseOnWithResponseR
     #[inline]
     fn from_wire(wire: WireWithAndWithoutRequestResponseOnWithResponseRequest<'de>) -> Self {
         Self { ret: ::fidl_next::FromWire::from_wire(wire.ret) }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireWithAndWithoutRequestResponseOnWithResponseRequest<'de>>
+    for WithAndWithoutRequestResponseOnWithResponseRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireWithAndWithoutRequestResponseOnWithResponseRequest<'de>) -> Self {
+        Self { ret: ::fidl_next::FromWireRef::from_wire_ref(&wire.ret) }
     }
 }
 
@@ -6118,6 +6315,21 @@ impl ::fidl_next::FromWire<WireWithErrorSyntaxResponseAsStructResponse>
             b: ::fidl_next::FromWire::from_wire(wire.b),
 
             c: ::fidl_next::FromWire::from_wire(wire.c),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireWithErrorSyntaxResponseAsStructResponse>
+    for WithErrorSyntaxResponseAsStructResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireWithErrorSyntaxResponseAsStructResponse) -> Self {
+        Self {
+            a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a),
+
+            b: ::fidl_next::FromWireRef::from_wire_ref(&wire.b),
+
+            c: ::fidl_next::FromWireRef::from_wire_ref(&wire.c),
         }
     }
 }

@@ -7,8 +7,8 @@ use core::hint::unreachable_unchecked;
 use core::mem::MaybeUninit;
 
 use fidl_next_codec::{
-    munge, Decode, DecodeError, Encodable, Encode, EncodeError, EncodeRef, FromWire, Slot, Wire,
-    WireI32,
+    munge, Decode, DecodeError, Encodable, Encode, EncodeError, EncodeRef, FromWire, FromWireRef,
+    Slot, Wire, WireI32,
 };
 
 /// An internal framework error.
@@ -88,7 +88,15 @@ unsafe impl<E: ?Sized> EncodeRef<E> for FrameworkError {
 }
 
 impl FromWire<WireFrameworkError> for FrameworkError {
+    #[inline]
     fn from_wire(wire: WireFrameworkError) -> Self {
-        Self::from(wire)
+        Self::from_wire_ref(&wire)
+    }
+}
+
+impl FromWireRef<WireFrameworkError> for FrameworkError {
+    #[inline]
+    fn from_wire_ref(wire: &WireFrameworkError) -> Self {
+        Self::from(*wire)
     }
 }

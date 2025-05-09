@@ -124,6 +124,19 @@ impl<'de> ::fidl_next::FromWire<WireLocalTablePayload<'de>> for LocalTablePayloa
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireLocalTablePayload<'de>> for LocalTablePayload {
+    #[inline]
+    fn from_wire_ref(wire: &WireLocalTablePayload<'de>) -> Self {
+        Self {
+            a: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireU16>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`LocalTablePayload`].
 #[repr(C)]
 pub struct WireLocalTablePayload<'de> {
@@ -310,11 +323,35 @@ impl ::fidl_next::FromWire<WireLocalUnionPayload> for LocalUnionPayload {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireLocalUnionPayload> for LocalUnionPayload {
+    #[inline]
+    fn from_wire_ref(wire: &WireLocalUnionPayload) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::B(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<bool>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalLocalUnionPayload> for Box<LocalUnionPayload> {
     #[inline]
     fn from_wire_option(wire: WireOptionalLocalUnionPayload) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalLocalUnionPayload> for Box<LocalUnionPayload> {
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalLocalUnionPayload) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -617,6 +654,21 @@ impl<'de> ::fidl_next::FromWire<WireMainProtocolOneWayAnonRequest<'de>>
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireMainProtocolOneWayAnonRequest<'de>>
+    for MainProtocolOneWayAnonRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireMainProtocolOneWayAnonRequest<'de>) -> Self {
+        Self {
+            a: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireU16>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`MainProtocolOneWayAnonRequest`].
 #[repr(C)]
 pub struct WireMainProtocolOneWayAnonRequest<'de> {
@@ -803,6 +855,19 @@ impl ::fidl_next::FromWire<WireMainProtocolTwoWayAnonRequest> for MainProtocolTw
     }
 }
 
+impl ::fidl_next::FromWireRef<WireMainProtocolTwoWayAnonRequest> for MainProtocolTwoWayAnonRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireMainProtocolTwoWayAnonRequest) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::B(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<bool>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalMainProtocolTwoWayAnonRequest>
     for Box<MainProtocolTwoWayAnonRequest>
 {
@@ -810,6 +875,19 @@ impl ::fidl_next::FromWireOption<WireOptionalMainProtocolTwoWayAnonRequest>
     fn from_wire_option(wire: WireOptionalMainProtocolTwoWayAnonRequest) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalMainProtocolTwoWayAnonRequest>
+    for Box<MainProtocolTwoWayAnonRequest>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalMainProtocolTwoWayAnonRequest) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -1115,6 +1193,21 @@ impl<'de> ::fidl_next::FromWire<WireMainProtocolTwoWayAnonResponse<'de>>
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireMainProtocolTwoWayAnonResponse<'de>>
+    for MainProtocolTwoWayAnonResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireMainProtocolTwoWayAnonResponse<'de>) -> Self {
+        Self {
+            a: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireU16>()
+                })
+            }),
+        }
+    }
+}
+
 /// The wire type corresponding to [`MainProtocolTwoWayAnonResponse`].
 #[repr(C)]
 pub struct WireMainProtocolTwoWayAnonResponse<'de> {
@@ -1290,6 +1383,21 @@ impl<'de> ::fidl_next::FromWire<WireMainProtocolTwoWayAnonWithErrorRequest<'de>>
             a: a.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<::fidl_next::WireU16>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireMainProtocolTwoWayAnonWithErrorRequest<'de>>
+    for MainProtocolTwoWayAnonWithErrorRequest
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireMainProtocolTwoWayAnonWithErrorRequest<'de>) -> Self {
+        Self {
+            a: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireU16>()
                 })
             }),
         }
@@ -1484,6 +1592,21 @@ impl ::fidl_next::FromWire<WireMainProtocolTwoWayAnonWithErrorResponse>
     }
 }
 
+impl ::fidl_next::FromWireRef<WireMainProtocolTwoWayAnonWithErrorResponse>
+    for MainProtocolTwoWayAnonWithErrorResponse
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireMainProtocolTwoWayAnonWithErrorResponse) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::B(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<bool>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalMainProtocolTwoWayAnonWithErrorResponse>
     for Box<MainProtocolTwoWayAnonWithErrorResponse>
 {
@@ -1491,6 +1614,21 @@ impl ::fidl_next::FromWireOption<WireOptionalMainProtocolTwoWayAnonWithErrorResp
     fn from_wire_option(wire: WireOptionalMainProtocolTwoWayAnonWithErrorResponse) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalMainProtocolTwoWayAnonWithErrorResponse>
+    for Box<MainProtocolTwoWayAnonWithErrorResponse>
+{
+    #[inline]
+    fn from_wire_option_ref(
+        wire: &WireOptionalMainProtocolTwoWayAnonWithErrorResponse,
+    ) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -1803,6 +1941,19 @@ impl ::fidl_next::FromWire<WireMainProtocolOnAnonRequest> for MainProtocolOnAnon
     }
 }
 
+impl ::fidl_next::FromWireRef<WireMainProtocolOnAnonRequest> for MainProtocolOnAnonRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireMainProtocolOnAnonRequest) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::B(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<bool>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl ::fidl_next::FromWireOption<WireOptionalMainProtocolOnAnonRequest>
     for Box<MainProtocolOnAnonRequest>
 {
@@ -1810,6 +1961,19 @@ impl ::fidl_next::FromWireOption<WireOptionalMainProtocolOnAnonRequest>
     fn from_wire_option(wire: WireOptionalMainProtocolOnAnonRequest) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl ::fidl_next::FromWireOptionRef<WireOptionalMainProtocolOnAnonRequest>
+    for Box<MainProtocolOnAnonRequest>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalMainProtocolOnAnonRequest) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }

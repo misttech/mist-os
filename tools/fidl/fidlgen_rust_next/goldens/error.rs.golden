@@ -116,6 +116,13 @@ impl<'de> ::fidl_next::FromWire<WireExampleFooRequest<'de>> for ExampleFooReques
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireExampleFooRequest<'de>> for ExampleFooRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireExampleFooRequest<'de>) -> Self {
+        Self { s: ::fidl_next::FromWireRef::from_wire_ref(&wire.s) }
+    }
+}
+
 /// The wire type corresponding to [`ExampleFooRequest`].
 #[derive(Debug)]
 #[repr(C)]
@@ -274,6 +281,13 @@ impl ::fidl_next::FromWire<WireExampleFooResponse> for ExampleFooResponse {
     #[inline]
     fn from_wire(wire: WireExampleFooResponse) -> Self {
         Self { y: ::fidl_next::FromWire::from_wire(wire.y) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireExampleFooResponse> for ExampleFooResponse {
+    #[inline]
+    fn from_wire_ref(wire: &WireExampleFooResponse) -> Self {
+        Self { y: ::fidl_next::FromWireRef::from_wire_ref(&wire.y) }
     }
 }
 

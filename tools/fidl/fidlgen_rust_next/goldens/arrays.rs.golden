@@ -130,6 +130,13 @@ impl ::fidl_next::FromWire<WireStructLargeArray> for StructLargeArray {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireStructLargeArray> for StructLargeArray {
+    #[inline]
+    fn from_wire_ref(wire: &WireStructLargeArray) -> Self {
+        Self { a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a) }
+    }
+}
+
 /// The wire type corresponding to [`StructLargeArray`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -293,6 +300,13 @@ impl ::fidl_next::FromWire<WireStructSmallArray> for StructSmallArray {
     }
 }
 
+impl ::fidl_next::FromWireRef<WireStructSmallArray> for StructSmallArray {
+    #[inline]
+    fn from_wire_ref(wire: &WireStructSmallArray) -> Self {
+        Self { a: ::fidl_next::FromWireRef::from_wire_ref(&wire.a) }
+    }
+}
+
 /// The wire type corresponding to [`StructSmallArray`].
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -444,6 +458,19 @@ impl<'de> ::fidl_next::FromWire<WireTableLargeArray<'de>> for TableLargeArray {
             a: a.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<[::fidl_next::WireU32; 100]>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireTableLargeArray<'de>> for TableLargeArray {
+    #[inline]
+    fn from_wire_ref(wire: &WireTableLargeArray<'de>) -> Self {
+        Self {
+            a: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<[::fidl_next::WireU32; 100]>()
                 })
             }),
         }
@@ -623,6 +650,19 @@ impl<'de> ::fidl_next::FromWire<WireTableSmallArray<'de>> for TableSmallArray {
             a: a.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<[::fidl_next::WireU32; 2]>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireTableSmallArray<'de>> for TableSmallArray {
+    #[inline]
+    fn from_wire_ref(wire: &WireTableSmallArray<'de>) -> Self {
+        Self {
+            a: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<[::fidl_next::WireU32; 2]>()
                 })
             }),
         }
@@ -809,11 +849,37 @@ impl<'de> ::fidl_next::FromWire<WireUnionLargeArray<'de>> for UnionLargeArray {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireUnionLargeArray<'de>> for UnionLargeArray {
+    #[inline]
+    fn from_wire_ref(wire: &WireUnionLargeArray<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::A(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<[::fidl_next::WireU32; 100]>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalUnionLargeArray<'de>> for Box<UnionLargeArray> {
     #[inline]
     fn from_wire_option(wire: WireOptionalUnionLargeArray<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalUnionLargeArray<'de>>
+    for Box<UnionLargeArray>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalUnionLargeArray<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
@@ -1082,11 +1148,37 @@ impl<'de> ::fidl_next::FromWire<WireUnionSmallArray<'de>> for UnionSmallArray {
     }
 }
 
+impl<'de> ::fidl_next::FromWireRef<WireUnionSmallArray<'de>> for UnionSmallArray {
+    #[inline]
+    fn from_wire_ref(wire: &WireUnionSmallArray<'de>) -> Self {
+        match wire.raw.ordinal() {
+            1 => Self::A(::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                wire.raw.get().deref_unchecked::<[::fidl_next::WireU32; 2]>()
+            })),
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 impl<'de> ::fidl_next::FromWireOption<WireOptionalUnionSmallArray<'de>> for Box<UnionSmallArray> {
     #[inline]
     fn from_wire_option(wire: WireOptionalUnionSmallArray<'de>) -> Option<Self> {
         if let Some(inner) = wire.into_option() {
             Some(Box::new(::fidl_next::FromWire::from_wire(inner)))
+        } else {
+            None
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalUnionSmallArray<'de>>
+    for Box<UnionSmallArray>
+{
+    #[inline]
+    fn from_wire_option_ref(wire: &WireOptionalUnionSmallArray<'de>) -> Option<Self> {
+        if let Some(inner) = wire.as_ref() {
+            Some(Box::new(::fidl_next::FromWireRef::from_wire_ref(inner)))
         } else {
             None
         }
