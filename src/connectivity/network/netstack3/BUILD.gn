@@ -131,6 +131,7 @@ common_sources = [
   "src/bindings/netdevice_worker.rs",
   "src/bindings/persistence.rs",
   "src/bindings/power.rs",
+  "src/bindings/reference_notifier.rs",
   "src/bindings/resource_removal.rs",
   "src/bindings/root_fidl_worker.rs",
   "src/bindings/routes.rs",

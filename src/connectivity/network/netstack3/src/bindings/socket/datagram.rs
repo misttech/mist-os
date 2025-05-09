@@ -417,7 +417,7 @@ where
             .api()
             .udp()
             .close(id)
-            .map_deferred(|d| d.into_future("udp socket", &weak))
+            .map_deferred(|d| d.into_future("udp socket", &weak, ctx))
             .into_future()
             .await;
     }
@@ -770,7 +770,7 @@ where
             .api()
             .icmp_echo()
             .close(id)
-            .map_deferred(|d| d.into_future("icmp socket", &weak))
+            .map_deferred(|d| d.into_future("icmp socket", &weak, ctx))
             .into_future()
             .await;
     }

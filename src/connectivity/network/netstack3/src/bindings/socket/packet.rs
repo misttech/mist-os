@@ -244,7 +244,7 @@ impl worker::SocketWorkerHandler for BindingData {
             .api()
             .device_socket()
             .remove(id)
-            .map_deferred(|d| d.into_future("packet socket", &weak))
+            .map_deferred(|d| d.into_future("packet socket", &weak, ctx))
             .into_future()
             .await;
     }

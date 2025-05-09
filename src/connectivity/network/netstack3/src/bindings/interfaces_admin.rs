@@ -877,7 +877,7 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 ctx.bindings_ctx()
                     .multicast_admin
                     .remove_multicast_routes_on_device(&weak_id).await;
-                result.map_deferred(|d| d.into_future("device", &id)).into_future().await.into()
+                result.map_deferred(|d| d.into_future("device", &id, ctx)).into_future().await.into()
             }
         );
 
@@ -946,10 +946,10 @@ async fn remove_address(ctx: &mut Ctx, id: BindingId, address: fnet::Subnet) -> 
                 let _: AddrSubnetEither = result
                     .map_deferred(|d| {
                         d.map_left(|l| {
-                            l.into_future("device addr", &specified_addr).map(Into::into)
+                            l.into_future("device addr", &specified_addr, ctx).map(Into::into)
                         })
                         .map_right(|r| {
-                            r.into_future("device addr", &specified_addr).map(Into::into)
+                            r.into_future("device addr", &specified_addr, ctx).map(Into::into)
                         })
                     })
                     .into_future()
@@ -1759,8 +1759,8 @@ async fn run_address_state_provider(
             ctx.api().device_ip_any().del_ip_addr(&core_id, address).expect("address must exist");
         let _: AddrSubnetEither = result
             .map_deferred(|d| {
-                d.map_left(|l| l.into_future("device addr", &address).map(Into::into))
-                    .map_right(|r| r.into_future("device addr", &address).map(Into::into))
+                d.map_left(|l| l.into_future("device addr", &address, &ctx).map(Into::into))
+                    .map_right(|r| r.into_future("device addr", &address, &ctx).map(Into::into))
             })
             .into_future()
             .await;

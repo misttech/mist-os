@@ -540,7 +540,7 @@ where
                         let weak = core_id.downgrade();
                         ctx.api().routes()
                             .remove_table(core_id)
-                            .map_deferred(|d| d.into_future("table id", &weak))
+                            .map_deferred(|d| d.into_future("table id", &weak, &ctx))
                             .into_future()
                             .await;
                         // Make sure all the strong references to the route set is gone before

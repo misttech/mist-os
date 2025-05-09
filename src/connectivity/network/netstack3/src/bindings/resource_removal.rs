@@ -14,6 +14,8 @@ use futures::{Future, FutureExt as _, Stream, StreamExt};
 use log::{debug, error, info, warn};
 use netstack3_core::sync::DynDebugReferences;
 
+use crate::bindings::reference_notifier::ReferenceReceiver;
+
 /// The interval at which [`ResourceRemovalWorker`] generates reports for each
 /// pending resource.
 ///
@@ -187,6 +189,18 @@ impl ResourceRemovalSink {
                 },
             })
             .expect("worker not running");
+    }
+
+    #[cfg_attr(feature = "instrumented", track_caller)]
+    pub(crate) fn defer_removal_with_receiver<T: Send + 'static>(
+        &self,
+        receiver: ReferenceReceiver<T>,
+    ) {
+        let ReferenceReceiver { receiver, debug_references } = receiver;
+        self.defer_removal(
+            debug_references,
+            receiver.map(|r| r.expect("sender dropped without notifying receiver")),
+        );
     }
 
     pub(crate) fn close(&self) {

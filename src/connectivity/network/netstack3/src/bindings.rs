@@ -16,6 +16,7 @@ mod counters;
 mod debug_fidl_worker;
 mod devices;
 mod filter;
+mod health_check_worker;
 mod inspect;
 mod interfaces_admin;
 mod interfaces_watcher;
@@ -26,19 +27,17 @@ mod neighbor_worker;
 mod netdevice_worker;
 mod persistence;
 mod power;
+mod reference_notifier;
 mod resource_removal;
 mod root_fidl_worker;
 mod routes;
 mod socket;
 mod stack_fidl_worker;
-
-mod health_check_worker;
 mod time;
 mod timers;
 mod util;
 
 use std::fmt::Debug;
-use std::future::Future;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -96,14 +95,14 @@ use netstack3_core::ip::{
     Ipv6DeviceConfigurationUpdate, Lifetime, RouterAdvertisementEvent, SlaacConfigurationUpdate,
 };
 use netstack3_core::routes::RawMetric;
-use netstack3_core::sync::{DynDebugReferences, RwLock as CoreRwLock};
+use netstack3_core::sync::RwLock as CoreRwLock;
 use netstack3_core::udp::{
     UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId,
 };
 use netstack3_core::{
     neighbor, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-    IpExt, ReferenceNotifiers, RngContext, StackState, StackStateBuilder, TimerBindingsTypes,
-    TimerContext, TimerId, TxMetadata, TxMetadataBindingsTypes,
+    IpExt, RngContext, StackState, StackStateBuilder, TimerBindingsTypes, TimerContext, TimerId,
+    TxMetadata, TxMetadataBindingsTypes,
 };
 
 pub(crate) use inspect::InspectPublisher;
@@ -809,80 +808,10 @@ impl EventContext<RouterAdvertisementEvent<DeviceId<BindingsCtx>>> for BindingsC
     }
 }
 
-/// Implements `RcNotifier` for futures oneshot channels.
-///
-/// We need a newtype here because of orphan rules.
-pub(crate) struct ReferenceNotifier<T>(Option<oneshot::Sender<T>>);
-
-impl<T: Send> netstack3_core::sync::RcNotifier<T> for ReferenceNotifier<T> {
-    fn notify(&mut self, data: T) {
-        let Self(inner) = self;
-        inner.take().expect("notified twice").send(data).unwrap_or_else(|_: T| {
-            panic!(
-                "receiver was dropped before notifying for {}",
-                // Print the type name so we don't need Debug bounds.
-                core::any::type_name::<T>()
-            )
-        })
-    }
-}
-
-pub(crate) struct ReferenceReceiver<T> {
-    pub(crate) receiver: oneshot::Receiver<T>,
-    pub(crate) debug_references: DynDebugReferences,
-}
-
-impl<T> ReferenceReceiver<T> {
-    pub(crate) fn into_future<'a>(
-        self,
-        resource_name: &'static str,
-        resource_id: &'a impl Debug,
-    ) -> impl Future<Output = T> + 'a
-    where
-        T: 'a,
-    {
-        let Self { receiver, debug_references: refs } = self;
-        debug!("{resource_name} {resource_id:?} removal is pending references: {refs:?}");
-        // If we get stuck trying to remove the resource, log the remaining refs
-        // at a low frequency to aid debugging.
-        let interval_logging = fasync::Interval::new(zx::MonotonicDuration::from_seconds(30))
-            .map(move |()| {
-                warn!("{resource_name} {resource_id:?} removal is pending references: {refs:?}")
-            })
-            .collect::<()>();
-
-        futures::future::select(receiver, interval_logging).map(|r| match r {
-            futures::future::Either::Left((rcv, _)) => {
-                rcv.expect("sender dropped without notifying")
-            }
-            futures::future::Either::Right(((), _)) => {
-                unreachable!("interval channel never completes")
-            }
-        })
-    }
-}
-
-impl ReferenceNotifiers for BindingsCtx {
-    type ReferenceReceiver<T: 'static> = ReferenceReceiver<T>;
-
-    type ReferenceNotifier<T: Send + 'static> = ReferenceNotifier<T>;
-
-    fn new_reference_notifier<T: Send + 'static>(
-        debug_references: DynDebugReferences,
-    ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
-        let (sender, receiver) = oneshot::channel();
-        (ReferenceNotifier(Some(sender)), ReferenceReceiver { receiver, debug_references })
-    }
-}
-
 impl DeferredResourceRemovalContext for BindingsCtx {
     #[cfg_attr(feature = "instrumented", track_caller)]
     fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>) {
-        let ReferenceReceiver { receiver, debug_references } = receiver;
-        self.resource_removal.defer_removal(
-            debug_references,
-            receiver.map(|r| r.expect("sender dropped without notifying receiver")),
-        );
+        self.resource_removal.defer_removal_with_receiver(receiver);
     }
 }
 

@@ -179,7 +179,7 @@ impl<I: IpExt + IpSockAddrExt> SocketWorkerHandler for SocketWorkerState<I> {
             .api()
             .raw_ip_socket()
             .close(id)
-            .map_deferred(|d| d.into_future("raw IP socket", &weak))
+            .map_deferred(|d| d.into_future("raw IP socket", &weak, ctx))
             .into_future()
             .await;
     }
