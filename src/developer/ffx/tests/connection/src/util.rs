@@ -220,7 +220,7 @@ where
         (Err(test_err), Ok(())) => std::panic::resume_unwind(test_err),
         (Ok(()), Err(destroy_err)) => panic!("{}", destroy_err),
         (Err(test_err), Err(destroy_err)) => {
-            tracing::error!("Destroy failed: {}", destroy_err);
+            log::error!("Destroy failed: {}", destroy_err);
             std::panic::resume_unwind(test_err);
         }
     }

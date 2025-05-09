@@ -251,7 +251,6 @@ tracing_visibility = [
   "//src/developer/ffx/config/*",
   "//src/developer/ffx/daemon/*",
   "//src/developer/ffx/lib/*",
-  "//src/developer/ffx/tests/*",
   "//src/connectivity/overnet/lib/ascendd:*",
   "//src/developer/lib/credentials:*",
   "//src/lib/fuchsia-lockfile:*",
