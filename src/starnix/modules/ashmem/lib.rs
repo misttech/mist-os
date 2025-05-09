@@ -206,7 +206,7 @@ impl FileOps for Ashmem {
             prot_flags,
             file.max_access_for_memory_mapping(),
             mapping_options,
-            MappingName::Ashmem(state.name.clone()),
+            MappingName::Ashmem(state.name.clone().into()),
             FileWriteGuardRef(None),
         )?;
 

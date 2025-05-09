@@ -374,6 +374,7 @@ rustc_library("starnix_core") {
     "//src/lib/diagnostics/log/message/rust",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/flyweights",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",

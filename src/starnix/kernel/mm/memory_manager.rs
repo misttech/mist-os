@@ -17,6 +17,7 @@ use crate::vfs::{
 };
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
+use flyweights::FlyByteStr;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
 use rand::{thread_rng, Rng};
 use range_map::RangeMap;
@@ -3984,7 +3985,7 @@ impl MemoryManager {
                 range.end = end;
             }
             mapping.set_name(match &name {
-                Some(name) => MappingName::Vma(name.clone()),
+                Some(name) => MappingName::Vma(FlyByteStr::new(name.as_bytes())),
                 None => MappingName::None,
             });
             state.mappings.insert(range, mapping);
@@ -4124,7 +4125,7 @@ impl MemoryManager {
         let state = self.state.read();
         let (_, mapping) = state.mappings.get(addr).ok_or_else(|| errno!(EFAULT))?;
         if let MappingName::Vma(name) = mapping.name() {
-            Ok(Some(name.clone()))
+            Ok(Some(name.as_bstr().to_owned()))
         } else {
             Ok(None)
         }

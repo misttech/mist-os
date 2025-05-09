@@ -8,8 +8,9 @@ use crate::mm::{
     GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS, PAGE_SIZE,
 };
 use crate::vfs::aio::AioContext;
-use crate::vfs::{ActiveNamespaceNode, FileWriteGuardRef, FsString};
+use crate::vfs::{ActiveNamespaceNode, FileWriteGuardRef};
 use bitflags::bitflags;
+use flyweights::FlyByteStr;
 use fuchsia_inspect::HistogramProperty;
 use fuchsia_inspect_contrib::profile_duration;
 use starnix_uapi::errors::Errno;
@@ -342,11 +343,11 @@ pub enum MappingName {
     /// An empty name is distinct from an unnamed mapping. Mappings are initially created with no
     /// name and can be reset to the unnamed state by passing NULL to
     /// prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
-    Vma(FsString),
+    Vma(FlyByteStr),
 
     /// The name associated with the mapping of an ashmem region.  Set by ioctl(fd, ASHMEM_SET_NAME, ...).
     /// By default "dev/ashmem".
-    Ashmem(FsString),
+    Ashmem(FlyByteStr),
 
     /// This mapping is a context for asynchronous I/O.
     AioContext(Arc<AioContext>),

@@ -485,6 +485,13 @@ impl From<String> for FlyByteStr {
     }
 }
 
+impl From<BString> for FlyByteStr {
+    #[inline]
+    fn from(s: BString) -> Self {
+        Self::new(s)
+    }
+}
+
 impl From<Box<[u8]>> for FlyByteStr {
     #[inline]
     fn from(s: Box<[u8]>) -> Self {
