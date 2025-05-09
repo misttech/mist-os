@@ -21,6 +21,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:glob",
     "//third_party/rust_crates:home",
+    "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
   ]
@@ -40,9 +41,6 @@ group("tests") {
   deps = [ ":lib_test" ]
 }
 
-# Use $root_build_dir instead of $root_out_dir because
-# 1. It eliminates multiple copies of the data for different host toolchains.
-# 2. Tests are launched with $root_build_dir as cwd, test data are relatively fixed.
 if (is_host) {
   host_test_data("test_data") {
     sources = [

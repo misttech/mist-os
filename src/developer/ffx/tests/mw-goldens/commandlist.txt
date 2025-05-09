@@ -1,5 +1,9 @@
 ffx component show
 ffx daemon stop
+ffx debug symbol-index list
+ffx debug symbol-index add
+ffx debug symbol-index remove
+ffx debug symbol-index clean
 ffx emu list
 ffx emu show
 ffx emu start

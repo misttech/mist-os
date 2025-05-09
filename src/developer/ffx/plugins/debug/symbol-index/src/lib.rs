@@ -6,42 +6,93 @@ use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_debug_symbol_index_args::*;
-use ffx_writer::SimpleWriter;
-use fho::{FfxMain, FfxTool};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{FfxContext, FfxMain, FfxTool};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 use symbol_index::*;
+
+#[derive(Debug)]
+struct SymbolIndexPath {
+    inner: String,
+}
+
+#[async_trait(?Send)]
+impl fho::TryFromEnv for SymbolIndexPath {
+    async fn try_from_env(_env: &fho::FhoEnvironment) -> fho::Result<Self> {
+        Ok(SymbolIndexPath { inner: global_symbol_index_path().bug()? })
+    }
+}
 
 #[derive(FfxTool)]
 pub struct SymbolIndexTool {
     #[command]
     cmd: SymbolIndexCommand,
+    path: SymbolIndexPath,
 }
 
 fho::embedded_plugin!(SymbolIndexTool);
 
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandStatus {
+    Ok,
+    /// Successful execution with information strings.
+    Index(SymbolIndex),
+}
+
+impl CommandStatus {
+    fn index(&self) -> Option<&SymbolIndex> {
+        match self {
+            Self::Ok => None,
+            Self::Index(ref s) => Some(s),
+        }
+    }
+}
+
 #[async_trait(?Send)]
 impl FfxMain for SymbolIndexTool {
-    type Writer = SimpleWriter;
+    type Writer = VerifiedMachineWriter<CommandStatus>;
 
-    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         match self.cmd.sub_command {
-            SymbolIndexSubCommand::List(cmd) => list(cmd, &global_symbol_index_path()?)?,
-            SymbolIndexSubCommand::Add(cmd) => add(cmd, &global_symbol_index_path()?)?,
-            SymbolIndexSubCommand::Remove(cmd) => remove(cmd, &global_symbol_index_path()?)?,
-            SymbolIndexSubCommand::Clean(cmd) => clean(cmd, &global_symbol_index_path()?)?,
+            SymbolIndexSubCommand::List(cmd) => {
+                let result = CommandStatus::Index(list(cmd, &self.path.inner)?);
+                // This is a little awkward: the command is intended to be printed in the normal
+                // non-machine way as JSON output, so this prints it as JSON in both ways, with
+                // just one being wrapped in the `CommandStatus` schema.
+                writer
+                    .machine_or_else(&result, || {
+                        serde_json::to_string_pretty(result.index().unwrap())
+                            .expect("serializing json")
+                    })
+                    .bug()?;
+            }
+            SymbolIndexSubCommand::Add(cmd) => {
+                add(cmd, &self.path.inner)?;
+                writer.machine(&CommandStatus::Ok).bug()?;
+            }
+            SymbolIndexSubCommand::Remove(cmd) => {
+                remove(cmd, &self.path.inner)?;
+                writer.machine(&CommandStatus::Ok).bug()?;
+            }
+            SymbolIndexSubCommand::Clean(cmd) => {
+                clean(cmd, &self.path.inner)?;
+                writer.machine(&CommandStatus::Ok).bug()?;
+            }
         }
         Ok(())
     }
 }
 
-fn list(cmd: ListCommand, global_symbol_index_path: &str) -> Result<()> {
+fn list(cmd: ListCommand, global_symbol_index_path: &str) -> Result<SymbolIndex> {
     let index = if cmd.aggregated {
         SymbolIndex::load_aggregate(global_symbol_index_path)?
     } else {
         SymbolIndex::load(global_symbol_index_path)?
     };
-    serde_json::to_writer_pretty(std::io::stdout(), &index)?;
-    Ok(println!())
+    Ok(index)
 }
 
 fn add(cmd: AddCommand, global_symbol_index_path: &str) -> Result<()> {
@@ -119,21 +170,51 @@ fn resolve_path_from_cwd(relative: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffx_writer::{Format, TestBuffers};
     use std::fs::*;
     use tempfile::TempDir;
 
-    #[test]
-    fn test_list() {
-        list(
-            ListCommand { aggregated: false },
-            "../../src/developer/ffx/lib/symbol-index/test_data/main.json",
-        )
-        .unwrap();
-        list(
-            ListCommand { aggregated: true },
-            "../../src/developer/ffx/lib/symbol-index/test_data/main.json",
-        )
-        .unwrap();
+    const LIST_RESULT_MAIN_PATH: &'static str =
+        "../../src/developer/ffx/lib/symbol-index/test_data/main.json";
+
+    #[fuchsia::test]
+    async fn test_list_no_aggregate() {
+        let cmd = SymbolIndexCommand {
+            sub_command: SymbolIndexSubCommand::List(ListCommand { aggregated: false }),
+        };
+        let path = SymbolIndexPath { inner: LIST_RESULT_MAIN_PATH.to_owned() };
+        let tool = SymbolIndexTool { cmd, path };
+        let machine_buffers = TestBuffers::default();
+        let machine_writer =
+            VerifiedMachineWriter::<CommandStatus>::new_test(Some(Format::Json), &machine_buffers);
+        tool.main(machine_writer).await.expect("command success");
+        let (stdout, _stderr) = machine_buffers.into_strings();
+        let data: CommandStatus = serde_json::from_str(&stdout).unwrap();
+        let list_result = data.index().expect("data index");
+        let output = serde_json::to_string_pretty(&list_result).unwrap();
+        let expected_idx = SymbolIndex::load(LIST_RESULT_MAIN_PATH).unwrap();
+        let expected_out = serde_json::to_string_pretty(&expected_idx).unwrap();
+        assert_eq!(expected_out, output);
+    }
+
+    #[fuchsia::test]
+    async fn test_list_aggregate() {
+        let cmd = SymbolIndexCommand {
+            sub_command: SymbolIndexSubCommand::List(ListCommand { aggregated: true }),
+        };
+        let path = SymbolIndexPath { inner: LIST_RESULT_MAIN_PATH.to_owned() };
+        let tool = SymbolIndexTool { cmd, path };
+        let machine_buffers = TestBuffers::default();
+        let machine_writer =
+            VerifiedMachineWriter::<CommandStatus>::new_test(Some(Format::Json), &machine_buffers);
+        tool.main(machine_writer).await.expect("command success");
+        let (stdout, _stderr) = machine_buffers.into_strings();
+        let data: CommandStatus = serde_json::from_str(&stdout).unwrap();
+        let list_result = data.index().expect("data index");
+        let output = serde_json::to_string_pretty(&list_result).unwrap();
+        let expected_idx = SymbolIndex::load_aggregate(LIST_RESULT_MAIN_PATH).unwrap();
+        let expected_out = serde_json::to_string_pretty(&expected_idx).unwrap();
+        assert_eq!(expected_out, output);
     }
 
     #[test]
