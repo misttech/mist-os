@@ -58,6 +58,12 @@ impl Default for ProgramInput {
     }
 }
 
+impl From<ProgramInput> for Dict {
+    fn from(program_input: ProgramInput) -> Self {
+        program_input.inner
+    }
+}
+
 impl ProgramInput {
     pub fn new(namespace: Dict, runner: Option<Router<Connector>>, config: Dict) -> Self {
         let inner = Dict::new();

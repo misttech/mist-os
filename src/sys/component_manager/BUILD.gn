@@ -177,6 +177,7 @@ _component_manager_bin = {
     "src/constants.rs",
     "src/framework/binder.rs",
     "src/framework/capability_store.rs",
+    "src/framework/component_sandbox_retriever.rs",
     "src/framework/config_override.rs",
     "src/framework/controller.rs",
     "src/framework/introspector.rs",
