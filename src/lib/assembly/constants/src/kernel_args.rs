@@ -132,6 +132,10 @@ pub enum KernelArg {
 
     /// Enable userboot.next
     UserbootNext(String),
+
+    /// This option configures the amount of memory, in MiB, that should be used
+    /// to store kernel trace data.
+    KtraceBufsize(u32),
 }
 
 /// Options for zero page scanner configuration.
@@ -247,6 +251,7 @@ impl KernelArg {
             }
             Self::NetsvcNetboot(b) => ("netsvc.netboot", b.to_string()),
             Self::UserbootNext(s) => ("userboot.next", s.to_string()),
+            Self::KtraceBufsize(s) => ("ktrace.bufsize", s.to_string()),
         };
         (key.to_string(), value)
     }
@@ -289,6 +294,7 @@ impl KernelArg {
             // These kernel args are eng-only, and therefore should never be in an allowlist.
             Self::NetsvcNetboot(_) => vec![],
             Self::UserbootNext(_) => vec![],
+            Self::KtraceBufsize(_) => vec![],
         }
     }
 }

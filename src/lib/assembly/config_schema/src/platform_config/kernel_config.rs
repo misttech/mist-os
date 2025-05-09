@@ -90,6 +90,19 @@ pub struct PlatformKernelConfig {
     // Configurations related to out-of-memory and memory reclamation behavior.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub oom: OomConfig,
+
+    // Configurations related to kernel tracing.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub ktrace: KtraceConfig,
+}
+
+/// Options for ktrace behaviors.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct KtraceConfig {
+    /// Total amount of memory in MiB used to store the ktrace buffers.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bufsize: Option<u32>,
 }
 
 /// Options for cprng behaviors

@@ -183,6 +183,10 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             builder.kernel_arg(KernelArg::MemoryLimitMib(memory_limit_mb));
         }
 
+        if let Some(ktrace_bufsize) = kernel_config.ktrace.bufsize {
+            builder.kernel_arg(KernelArg::KtraceBufsize(ktrace_bufsize));
+        }
+
         for thread_roles_file in &context.board_info.configuration.thread_roles {
             let filename = thread_roles_file
                 .file_name()
