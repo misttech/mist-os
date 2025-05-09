@@ -8,6 +8,8 @@ Generate tests.json.
 
 import json
 import os
+import pprint
+import sys
 import typing as T
 from pathlib import Path
 
@@ -40,6 +42,7 @@ def build_tests_json(build_dir: Path) -> T.Set[Path]:
         build_dir, "obj", "tests", "product_bundle_test_groups.json"
     )
     tests_json_path = os.path.join(build_dir, "tests.json")
+    product_bundles_json_path = os.path.join(build_dir, "product_bundles.json")
 
     # Open the list of tests that were collected from a GN metadata walk.
     with open(tests_from_metadata_path, "r") as f:
@@ -48,13 +51,31 @@ def build_tests_json(build_dir: Path) -> T.Set[Path]:
     # Open the mapping between test sets and product bundle name.
     with open(test_groups_path, "r") as f:
         test_groups = json.load(f)
+
+    # Open the list of product bundles that were collected from a GN metadata
+    # walk.
+    with open(product_bundles_json_path, "r") as f:
+        product_bundles = json.load(f)
+        product_bundle_names = [pb["name"] for pb in product_bundles]
+
     # For every group of tests that are supposed to target a specific product
     # bundle, we parse the tests, add `product_bundle: <name>` and add the test
     # to `tests`. When infra reads the final tests.json file, it will read that
     # field and know to flash the product bundle with <name> before running the
     # test.
+    #
+    # We also assert that the product bundle name is found in
+    # product_bundles.json.
     for test_group in test_groups:
         product_bundle_name = test_group["product_bundle_name"]
+        if product_bundle_name not in product_bundle_names:
+            print(
+                f"ERROR: {product_bundle_name} is not a valid product_bundle_name."
+            )
+            print("Available names are:")
+            pprint.pp(product_bundle_names)
+            sys.exit(1)
+
         environments = test_group.get("environments", [])
         product_bundle_tests_file = build_dir / test_group["tests_json"]
         # Read the tests.json that is assigned to this specific product bundle.
