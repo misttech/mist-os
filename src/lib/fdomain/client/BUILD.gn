@@ -14,9 +14,7 @@ rustc_library("client") {
 
   deps = [
     "//sdk/fidl/fuchsia.fdomain:fuchsia.fdomain_rust",
-    "//sdk/fidl/fuchsia.fdomain($fidl_toolchain)",
     "//sdk/rust/zx-types",
-    "//src/lib/fdomain/container:fdomain_macros",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fidl/rust/fidl_message",
     "//src/lib/fuchsia-async",
@@ -24,10 +22,6 @@ rustc_library("client") {
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
   ]
-
-  inputs = [ "${root_build_dir}/fidling/gen/sdk/fidl/fuchsia.fdomain/fuchsia.fdomain.fidl.json" ]
-  rustenv = [ "FDOMAIN_FIDL_PATH=" +
-              "fidling/gen/sdk/fidl/fuchsia.fdomain/fuchsia.fdomain.fidl.json" ]
 
   test_deps = [
     "//src/lib/fdomain/container",

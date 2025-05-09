@@ -56,7 +56,7 @@ pub use Handle as Vmar;
 #[rustfmt::skip]
 pub use Handle as Vmo;
 
-fdomain_macros::extract_ordinals_env!("FDOMAIN_FIDL_PATH");
+use proto::f_domain_ordinals as ordinals;
 
 fn write_fdomain_error(error: &FDomainError, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match error {

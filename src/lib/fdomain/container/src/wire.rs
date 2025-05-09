@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 use std::num::NonZeroU32;
 use std::task::{Context, Poll, Waker};
 
-fdomain_macros::extract_ordinals_env!("FDOMAIN_FIDL_PATH");
+use proto::f_domain_ordinals as ordinals;
 
 /// Wraps an [`FDomain`] and provides an interface that operates on
 /// binary-encoded FIDL messages, as opposed to the FIDL request/response
