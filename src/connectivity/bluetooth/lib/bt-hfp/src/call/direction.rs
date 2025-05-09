@@ -22,6 +22,15 @@ impl From<FidlCallDirection> for Direction {
     }
 }
 
+impl From<Direction> for FidlCallDirection {
+    fn from(x: Direction) -> Self {
+        match x {
+            Direction::MobileOriginated => Self::MobileOriginated,
+            Direction::MobileTerminated => Self::MobileTerminated,
+        }
+    }
+}
+
 impl From<Direction> for i64 {
     fn from(x: Direction) -> Self {
         match x {

@@ -274,11 +274,11 @@ type CallState = flexible enum {
     INCOMING_RINGING = 3;
     /// There is a callsetup procedure in progress for an incoming call.
     INCOMING_WAITING = 4;
-    /// A call is in progress but another call is active.
+    /// A call is held.  Another call may be active or not.
     ONGOING_HELD = 5;
     /// A call is active.
     ONGOING_ACTIVE = 6;
-    /// The call has been termianted.
+    /// The call has been terminated.
     TERMINATED = 7;
     /// The call has been transferred to the AG, after which the HF is no longer
     /// tracking its state.

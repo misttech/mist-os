@@ -51,6 +51,7 @@ rustc_binary("bin") {
     "src/peer.rs",
     "src/peer/ag_indicators.rs",
     "src/peer/at_connection.rs",
+    "src/peer/calls.rs",
     "src/peer/hf_indicators.rs",
     "src/peer/peer_task.rs",
     "src/peer/procedure.rs",

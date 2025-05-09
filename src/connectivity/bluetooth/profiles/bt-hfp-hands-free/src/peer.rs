@@ -19,6 +19,7 @@ use crate::config::HandsFreeFeatureSupport;
 
 mod ag_indicators;
 mod at_connection;
+mod calls;
 mod hf_indicators;
 mod peer_task;
 mod procedure;
