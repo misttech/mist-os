@@ -15,7 +15,6 @@ python_perf_test("snapshot_test") {
     "//src/tests/end_to_end/lib/perf_utils",
     "//src/performance/lib/perf_publish",
     "//src/performance/lib/memory",
-    "//src/performance/lib/py_test_utils:perf_test_utils",
     "//src/performance/lib/trace_processing",
   ]
 
