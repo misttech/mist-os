@@ -341,7 +341,7 @@ pub enum MappingName {
     Vvar,
 
     /// The file backing this mapping.
-    File(ActiveNamespaceNode),
+    File(Box<ActiveNamespaceNode>),
 
     /// The name associated with the mapping. Set by prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
     /// An empty name is distinct from an unnamed mapping. Mappings are initially created with no

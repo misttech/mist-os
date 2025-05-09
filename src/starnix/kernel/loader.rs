@@ -260,7 +260,7 @@ impl elf_load::Mapper for Mapper<'_> {
                 ProtectionFlags::from_vmar_flags(vmar_flags),
                 access_from_vmar_flags(vmar_flags),
                 MappingOptions::ELF_BINARY,
-                MappingName::File(self.file.name.clone()),
+                MappingName::File(Box::new(self.file.name.clone())),
                 self.file_write_guard.clone(),
             )
             .map_err(|e| {

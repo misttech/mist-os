@@ -337,7 +337,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             prot_flags,
             file.max_access_for_memory_mapping(),
             options,
-            MappingName::File(filename.into_active()),
+            MappingName::File(Box::new(filename.into_active())),
             file_write_guard,
         )
     }

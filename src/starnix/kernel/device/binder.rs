@@ -4662,7 +4662,7 @@ impl BinderDriver {
             prot_flags,
             prot_flags.to_access(),
             mapping_options,
-            MappingName::File(filename.into_active()),
+            MappingName::File(Box::new(filename.into_active())),
             FileWriteGuardRef(None),
         )?;
 

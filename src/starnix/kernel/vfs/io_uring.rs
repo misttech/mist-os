@@ -839,7 +839,7 @@ impl FileOps for IoUringFileObject {
             prot_flags,
             Access::rwx(),
             options,
-            MappingName::File(filename.into_active()),
+            MappingName::File(Box::new(filename.into_active())),
             FileWriteGuardRef(None),
         )
     }
