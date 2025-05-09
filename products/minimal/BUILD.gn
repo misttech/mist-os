@@ -83,6 +83,7 @@ if (current_cpu == "riscv64") {
     testonly = true
     product_bundle_name = "minimal.riscv64"
     allow_eng_platform_bundle_use = true
+    image_use_vbmeta = false
     bazel_product_bundle_target = ":product_bundle.riscv64"
     bazel_product_image_target = ":image.riscv64"
     bazel_recovery_image_target = "//products/zedboot:riscv64"

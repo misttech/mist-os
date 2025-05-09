@@ -139,6 +139,7 @@ if (target_cpu == "arm64") {
     image_use_vbmeta = false
     product_bundle_name = "terminal.qemu-arm64"
     allow_eng_platform_bundle_use = true
+    image_use_vbmeta = false
     bazel_product_bundle_target = ":product_bundle.qemu-arm64"
     bazel_product_image_target = ":image.qemu-arm64"
     bazel_recovery_image_target = "//products/zedboot:qemu-arm64"
@@ -189,6 +190,7 @@ if (target_cpu == "arm64") {
     image_use_vbmeta = false
     product_bundle_name = "terminal_with_netstack2.qemu-arm64"
     allow_eng_platform_bundle_use = true
+    image_use_vbmeta = false
     bazel_product_bundle_target = ":product_bundle_with_netstack2.qemu-arm64"
     bazel_product_image_target = ":image_with_netstack2.qemu-arm64"
     bazel_recovery_image_target = "//products/zedboot:qemu-arm64"
