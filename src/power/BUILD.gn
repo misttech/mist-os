@@ -11,10 +11,6 @@ group("power") {
     "power-manager",
     "shutdown-shim",
   ]
-
-  if (target_cpu == "x64") {
-    deps += [ "thermd" ]
-  }
 }
 
 group("battery") {
@@ -58,6 +54,5 @@ group("tests") {
     "system-activity-governor:tests",
     "system-activity-governor-controller:tests",
     "testing:tests",
-    "thermd:tests",
   ]
 }
