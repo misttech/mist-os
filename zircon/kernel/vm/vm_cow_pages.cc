@@ -516,42 +516,49 @@ class VmCowPages::TreeWalkCursor
   // cursor.
   bool NextChild() {
     DEBUG_ASSERT(cur_locked_);
-    // If no child then find a sibling instead.
-    if (cur_locked_.locked().children_list_len_ == 0) {
-      return NextSibling();
-    }
+    do {
+      // If no child then find a sibling instead.
+      if (cur_locked_.locked().children_list_len_ == 0) {
+        return NextSibling();
+      }
 
-    // To acquire the sibling lock we need to release the current lock, so first take a refptr to
-    // the child.
-    fbl::RefPtr<VmCowPages> child_ref = fbl::MakeRefPtrUpgradeFromRaw(
-        &cur_locked_.locked().children_list_.front(), cur_locked_.locked().lock());
-    cur_locked_.release();
+      // To acquire the child lock we need to release the current lock, so first take a refptr to
+      // the child.
+      fbl::RefPtr<VmCowPages> child_ref = fbl::MakeRefPtrUpgradeFromRaw(
+          &cur_locked_.locked().children_list_.front(), cur_locked_.locked().lock());
+      cur_locked_.release();
 
-    {
-      LockedPtr child(child_ref.get(), VmLockAcquireMode::First);
-      // While the locks were dropped things could have changed, so check that the child still has
-      // a parent before attempting to acquire the parents lock.
-      if (child.locked().parent_) {
-        LockedPtr parent(child.locked().parent_.get(), VmLockAcquireMode::Reentrant);
-        Guard<CriticalMutex> guard{&lock_};
-        // If nothing raced then the parent of child should still be cur_.
-        if (parent.get() == cur_) {
-          // Both cur_ and child must be in the alive state, otherwise cur_ would have been updated
-          // on a dead transition. The fact that a dead transition has not occurred, and that child
-          // lock must be acquired to perform said transition, is why it is safe for us to drop
-          // child_ref and store a raw LockedPtr of child.
-          DEBUG_ASSERT(parent.locked().life_cycle_ == LifeCycle::Alive &&
-                       child.locked().life_cycle_ == LifeCycle::Alive);
-          MoveCurLocked(&parent.locked(), &child.locked(),
-                        cumulative_parent_offset_ + child.locked().parent_offset_);
-          cur_locked_ = ktl::move(child);
+      {
+        LockedPtr child(child_ref.get(), VmLockAcquireMode::First);
+        // While the locks were dropped things could have changed, so check that the child still has
+        // a parent before attempting to acquire the parents lock.
+        if (child.locked().parent_) {
+          LockedPtr parent(child.locked().parent_.get(), VmLockAcquireMode::Reentrant);
+          Guard<CriticalMutex> guard{&lock_};
+          // If nothing raced then the parent of child should still be cur_.
+          if (parent.get() == cur_) {
+            // Both cur_ and child must be in the alive state, otherwise cur_ would have been
+            // updated on a dead transition. The fact that a dead transition has not occurred, and
+            // that child lock must be acquired to perform said transition, is why it is safe for us
+            // to drop child_ref and store a raw LockedPtr of child.
+            DEBUG_ASSERT(parent.locked().life_cycle_ == LifeCycle::Alive &&
+                         child.locked().life_cycle_ == LifeCycle::Alive);
+            MoveCurLocked(&parent.locked(), &child.locked(),
+                          cumulative_parent_offset_ + child.locked().parent_offset_);
+            cur_locked_ = ktl::move(child);
+            // cur_ is updated and cur_locked_ holds a lock acquired with the correct order so we
+            // can directly return and do not need to use UpdateCurLocked to reacquire.
+            return true;
+          }
         }
       }
-    }
-    // We raced with a modification to the tree. This modification will have set the new value of
-    // cur_ (possibly to nullptr if the cursor has been deleted), and we all UpdateCurLocked to
-    // retrieve this.
-    return UpdateCurLocked();
+      // We raced with a modification to the tree. This modification will have set the new value of
+      // cur_ (possibly to nullptr if the cursor has been deleted), and we call UpdateCurLocked to
+      // retrieve this and then go around the loop and check again for a child.
+    } while (UpdateCurLocked());
+    // Only reach here if UpdateCurLocked returns false, which only happens if the cursor was
+    // deleted, in which case we definitely have no child.
+    return false;
   }
 
   // Move the cursor to the next un-visited sibling, skipping any children of the current node.
