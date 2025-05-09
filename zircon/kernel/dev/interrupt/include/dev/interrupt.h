@@ -43,6 +43,16 @@ void shutdown_interrupts();
 // Should be called before powering off the calling CPU.
 void shutdown_interrupts_curr_cpu();
 
+// Suspend interrupts for the calling CPU.
+//
+// Should be called before entering a hardware suspend state.
+zx_status_t suspend_interrupts_curr_cpu();
+
+// Resume interrupts for the calling CPU.
+//
+// Should be called after coming out of a hardware suspend state.
+zx_status_t resume_interrupts_curr_cpu();
+
 // Configure the specified interrupt vector.  If it is invoked, it muust be
 // invoked prior to interrupt registration
 zx_status_t configure_interrupt(unsigned int vector, enum interrupt_trigger_mode tm,
@@ -80,6 +90,8 @@ unsigned int remap_interrupt(unsigned int vector);
 
 // sends an inter-processor interrupt
 zx_status_t interrupt_send_ipi(cpu_mask_t target, mp_ipi_t ipi);
+
+void interrupt_init_percpu_early();
 
 // performs per-cpu initialization for the interrupt controller
 void interrupt_init_percpu();

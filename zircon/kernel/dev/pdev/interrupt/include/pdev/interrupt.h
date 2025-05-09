@@ -37,6 +37,8 @@ struct pdev_interrupt_ops {
   void (*handle_irq)(iframe_t* frame);
   void (*shutdown)();
   void (*shutdown_cpu)();
+  zx_status_t (*suspend_cpu)();
+  zx_status_t (*resume_cpu)();
 
   bool (*msi_is_supported)();
   bool (*msi_supports_masking)();
