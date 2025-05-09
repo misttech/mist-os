@@ -204,10 +204,10 @@ For a target to be visible in `@fuchsia_sdk`, the following must be true:
   - [`sdk_source_set()`][sdk_source_set]{:.external}: for C++ source libraries.
   - [`sdk_static_library()`][sdk_static_library]{:.external}: for prebuilt static C++ libraries.
   - [`sdk_shared_library()`][sdk_shared_library]{:.external}: for prebuilt shared C++ libraries.
-  - [`fidl()` with `sdk_category` set][fidl_template]{:.external}: for FIDL definition files.
-  - [`zx_library()` with `sdk_publishable = true`][zx_library]{:.external}:
-    for C++ source libraries that also need to be linked into the kernel,
-    the bootloader(s) or the `userboot` program.
+  - [`fidl()`][fidl_template]{:.external} with `sdk_category` set: for FIDL definition files.
+  - [`zx_library()`][zx_library]{:.external} with `sdk_publishable` set to an SDK category:
+    for C++ source, static, and shared libraries that also need to be linked
+    into the kernel, the bootloader(s) or the `userboot` program.
   - [`sdk_fuchsia_package()`][sdk_fuchsia_package]{:.external}: for prebuilt Fuchsia packages.
 
 [sdk_source_set]: https://cs.opensource.google/fuchsia/fuchsia/+/main:build/cpp/sdk_source_set.gni
