@@ -8,8 +8,12 @@
 #include <cstdint>
 #include <functional>
 
+namespace {
+
 #define SESSION_TRACE_ID(session_id, present_id) \
-  (((uint64_t)(session_id) << 32) | ((present_id) & 0xFFFFFFFF))
+  (((uint64_t)(session_id) << 32) | ((present_id)&0xFFFFFFFF))
+
+}  // anonymous namespace
 
 namespace scheduling {
 

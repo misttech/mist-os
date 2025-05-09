@@ -277,13 +277,7 @@ void DefaultFrameScheduler::ScheduleUpdateForSession(zx::time requested_presenta
   TRACE_DURATION("gfx", "DefaultFrameScheduler::ScheduleUpdateForSession",
                  "requested_presentation_time", requested_presentation_time.get() / 1'000'000);
 
-  // TODO(https://fxbug.dev/414450649): remove this, since it is a subset of the
-  // `scenic_session_present` flow.  This will require updating trace-processing scripts.
   TRACE_FLOW_END("gfx", "ScheduleUpdate", id_pair.present_id);
-
-  TRACE_INSTAFLOW_STEP("gfx", "scenic_session_present", "request_frame",
-                       SESSION_TRACE_ID(id_pair.session_id, id_pair.present_id), "session_id",
-                       TA_UINT64(id_pair.session_id), "present_id", TA_UINT64(id_pair.present_id));
 
   // Logging the first few frames to find common startup bugs.
   if (frame_number_ < kNumDebugFrames) {
@@ -408,8 +402,7 @@ void DefaultFrameScheduler::HandleFramePresented(uint64_t frame_number, zx::time
                     "elapsed time since presentation", elapsed_since_presentation.get());
     }
 
-    SignalPresentedUpTo(frame_number,
-                        /*actual_presentation_time*/ timestamps.actual_presentation_time,
+    SignalPresentedUpTo(frame_number, /*presentation_time*/ timestamps.actual_presentation_time,
                         /*presentation_interval*/ vsync_timing_->vsync_interval());
   }
   outstanding_latch_points_.pop_front();
@@ -487,13 +480,11 @@ std::unordered_map<SessionId, PresentId> DefaultFrameScheduler::CollectUpdatesFo
 std::vector<zx::event> DefaultFrameScheduler::PrepareUpdates(
     const std::unordered_map<SessionId, PresentId>& updates, zx::time latched_time,
     uint64_t frame_number) {
-  latched_updates_.push(
-      {.frame_number = frame_number, .updated_sessions = updates, .latched_time = latched_time});
+  latched_updates_.push({.frame_number = frame_number, .updated_sessions = updates});
   std::vector<zx::event> fences;
 
   for (const auto& [session_id, present_id] : updates) {
-    SetLatchedTimeForPresentsUpTo({.session_id = session_id, .present_id = present_id},
-                                  latched_time);
+    SetLatchedTimeForPresentsUpTo({session_id, present_id}, latched_time);
 
     // Grab all fences from presents previous to this one for this session.
     const auto begin_it = release_fences_.lower_bound({session_id, 0});
@@ -544,53 +535,33 @@ bool DefaultFrameScheduler::ApplyUpdates(zx::time target_presentation_time, zx::
 
   TRACE_FLOW_BEGIN("gfx", "scenic_frame", frame_number);
 
-  const std::unordered_map<SessionId, PresentId> update_map =
-      CollectUpdatesForThisFrame(target_presentation_time);
-  std::vector<zx::event> fences_from_previous_presents =
-      PrepareUpdates(update_map, latched_time, frame_number);
-
-  for (auto [session_id, present_id] : update_map) {
-    TRACE_INSTAFLOW_STEP("gfx", "scenic_session_present", "prepare_to_render",
-                         SESSION_TRACE_ID(session_id, present_id), "session_id",
-                         TA_UINT64(session_id), "present_id", TA_UINT64(present_id), "frame_number",
-                         TA_UINT64(frame_number), "latched_time", TA_INT64(latched_time.get()));
-  }
-
+  const auto update_map = CollectUpdatesForThisFrame(target_presentation_time);
+  const bool have_updates = !update_map.empty();
+  auto fences_from_previous_presents = PrepareUpdates(update_map, latched_time, frame_number);
   update_sessions_(update_map, frame_number, std::move(fences_from_previous_presents));
 
   // If anything was updated, we need to render.
-  return !update_map.empty();
+  return have_updates;
 }
 
-void DefaultFrameScheduler::SignalPresentedUpTo(uint64_t frame_number,
-                                                zx::time actual_presentation_time,
+void DefaultFrameScheduler::SignalPresentedUpTo(uint64_t frame_number, zx::time presentation_time,
                                                 zx::duration presentation_interval) {
   // Get last present_id up to |frame_number| for each session.
   std::unordered_map<SessionId, PresentId> last_updates;
   std::unordered_map<SessionId, std::map<PresentId, zx::time>> latched_times;
   while (!latched_updates_.empty() && latched_updates_.front().frame_number <= frame_number) {
-    const FrameUpdate& latched_update = latched_updates_.front();
-
-    for (const auto& [session_id, present_id] : latched_update.updated_sessions) {
-      TRACE_INSTAFLOW_STEP("gfx", "scenic_session_present", "frame_presented",
-                           SESSION_TRACE_ID(session_id, present_id), "session_id",
-                           TA_UINT64(session_id), "present_id", TA_UINT64(present_id),
-                           "frame_number", TA_UINT64(frame_number), "latched_time",
-                           TA_INT64(latched_update.latched_time.get()), "presentation_time",
-                           TA_INT64(actual_presentation_time.get()));
-
+    for (const auto& [session_id, present_id] : latched_updates_.front().updated_sessions) {
       last_updates[session_id] = present_id;
     }
     latched_updates_.pop();
   }
 
   for (const auto& [session_id, present_id] : last_updates) {
-    latched_times[session_id] =
-        ExtractLatchTimestampsUpTo({.session_id = session_id, .present_id = present_id});
+    latched_times[session_id] = ExtractLatchTimestampsUpTo({session_id, present_id});
   }
 
   on_frame_presented_(latched_times, PresentTimestamps{
-                                         .presented_time = zx::time(actual_presentation_time),
+                                         .presented_time = zx::time(presentation_time),
                                          .vsync_interval = zx::duration(presentation_interval),
                                      });
 }
