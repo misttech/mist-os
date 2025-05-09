@@ -396,6 +396,13 @@ impl TestFixture {
         self.ramdisks.push(ramdisk);
     }
 
+    pub fn connect_to_crypt(&self) -> CryptProxy {
+        self.realm
+            .root
+            .connect_to_protocol_at_exposed_dir::<CryptMarker>()
+            .expect("connect_to_protocol_at_exposed_dir failed for the Crypt protocol")
+    }
+
     pub async fn setup_starnix_crypt(&self) -> (CryptProxy, CryptManagementProxy) {
         let crypt_management =
             self.realm.root.connect_to_protocol_at_exposed_dir::<CryptManagementMarker>().expect(

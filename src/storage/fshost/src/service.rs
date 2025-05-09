@@ -141,6 +141,11 @@ async fn mount_main_starnix_volume(
     let mut env = environment.lock().await;
     if let Some(multi_vol_fs) = env.get_container() {
         let mounted_vol = if multi_vol_fs.has_volume(&starnix_volume_name).await? {
+            // Ensures that Starnix can remount its storage after an unclean container shutdown.
+            if let Some(_) = multi_vol_fs.volume(&starnix_volume_name) {
+                log::warn!("Unmounting the Starnix volume.");
+                multi_vol_fs.shutdown_volume(&starnix_volume_name).await?;
+            }
             multi_vol_fs
                 .open_volume(
                     &starnix_volume_name,
