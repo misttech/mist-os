@@ -37,6 +37,8 @@ using ::fuchsia_power_broker::ElementControl;
 using ::fuchsia_power_broker::ElementInfoProvider;
 using ::fuchsia_power_broker::ElementInfoProviderGetStatusEndpointsResponse;
 using ::fuchsia_power_broker::ElementInfoProviderService;
+using ::fuchsia_power_broker::ElementRunner;
+using ::fuchsia_power_broker::ElementRunnerSetLevelRequest;
 using ::fuchsia_power_broker::ElementSchema;
 using ::fuchsia_power_broker::ElementStatusEndpoint;
 using ::fuchsia_power_broker::LeaseControl;
@@ -119,7 +121,7 @@ std::unique_ptr<WakeLease> CreateWakeLease(async_dispatcher_t* dispatcher) {
 
 ElementSchema BuildAssertiveApplicationActivitySchema(
     zx::event requires_token, ServerEnd<ElementControl> element_control_server_end,
-    ServerEnd<Lessor> lessor_server_end, LevelControlChannels level_control_channels,
+    ServerEnd<Lessor> lessor_server_end, ClientEnd<ElementRunner> element_runner_client_end,
     const std::string& element_name) {
   LevelDependency dependency(
       /*dependency_type=*/DependencyType::kAssertive,
@@ -132,9 +134,9 @@ ElementSchema BuildAssertiveApplicationActivitySchema(
       .element_name = element_name,
       .initial_current_level = kPowerLevelActive,
       .valid_levels = std::vector<uint8_t>({kPowerLevelInactive, kPowerLevelActive}),
-      .level_control_channels = std::move(level_control_channels),
       .lessor_channel = std::move(lessor_server_end),
       .element_control = std::move(element_control_server_end),
+      .element_runner = std::move(element_runner_client_end),
   }};
 
   std::optional<std::vector<LevelDependency>>& dependencies = schema.dependencies();
@@ -146,27 +148,12 @@ ElementSchema BuildAssertiveApplicationActivitySchema(
 struct ElementWithLease {
   ClientEnd<ElementControl> element_control;
   ClientEnd<LeaseControl> lease_control;
+  ServerEnd<ElementRunner> element_runner;
 };
 
 // Adds an element with an assertive dependency on ApplicationActivity and takes a lease on that
 // element.
 ElementWithLease RaiseApplicationActivity() {
-  // |current_level| is used later in this function to respond to required level updates, as
-  // power broker won't proceed with level updates without getting acknowledgment of level changes.
-  Endpoints<CurrentLevel> current_level_endpoints = Endpoints<CurrentLevel>::Create();
-
-  // |required_level| is used later in this function to check if the lease's dependencies are
-  // satisfied. Activity Governor enforces that if a RequiredLevel endpoint is specified, a
-  // CurrentLevel endpoint must also specified in the schema.
-  Endpoints<RequiredLevel> required_level_endpoints = Endpoints<RequiredLevel>::Create();
-
-  LevelControlChannels level_control_endpoints{{
-      .current = std::move(current_level_endpoints.server),
-      .required = std::move(required_level_endpoints.server),
-  }};
-  SyncClient<CurrentLevel> current_level_client(std::move(current_level_endpoints.client));
-  SyncClient<RequiredLevel> required_level_client(std::move(required_level_endpoints.client));
-
   ASSIGN_OR_CHECK(PowerElements power_elements, Connect<ActivityGovernor>()->GetPowerElements());
   FX_CHECK(power_elements.application_activity().has_value());
   FX_CHECK(power_elements.application_activity()->assertive_dependency_token().has_value());
@@ -177,28 +164,21 @@ ElementWithLease RaiseApplicationActivity() {
   Endpoints<ElementControl> element_control_endpoints = Endpoints<ElementControl>::Create();
   Endpoints<Lessor> lessor_endpoints = Endpoints<Lessor>::Create();
   SyncClient<Lessor> lessor_client(std::move(lessor_endpoints.client));
+  Endpoints<ElementRunner> element_runner = Endpoints<ElementRunner>::Create();
 
   ElementSchema schema = BuildAssertiveApplicationActivitySchema(
       std::move(aa_token), std::move(element_control_endpoints.server),
-      std::move(lessor_endpoints.server), std::move(level_control_endpoints),
+      std::move(lessor_endpoints.server), std::move(element_runner.client),
       /*element_name=*/kBootCompleteIndicator);
 
   CHECK_RESULT(Connect<Topology>()->AddElement(std::move(schema)));
 
   ASSIGN_OR_CHECK(LessorLeaseResponse aa_lease, lessor_client->Lease(kPowerLevelActive));
 
-  ASSIGN_OR_CHECK(RequiredLevelWatchResponse required_level_result, required_level_client->Watch());
-
-  // SAG may transition through some power states while raising application activity,
-  // so respond to all current level updates until it reaches the desired state.
-  while (required_level_result.required_level() != kPowerLevelActive) {
-    CHECK_RESULT(current_level_client->Update(required_level_result.required_level()));
-    ASSIGN_OR_CHECK(required_level_result, required_level_client->Watch());
-  }
-
   return ElementWithLease{
       .element_control = std::move(element_control_endpoints.client),
       .lease_control = std::move(aa_lease.lease_control()),
+      .element_runner = std::move(element_runner.server),
   };
 }
 
@@ -240,6 +220,22 @@ uint8_t GetCurrentLevel(const SyncClient<Status>& status_client) {
 
 using WakeLeaseIntegrationTest = gtest::RealLoopFixture;
 
+class FakeElementRunner : public fidl::Server<ElementRunner> {
+ public:
+  FakeElementRunner() = default;
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<ElementRunner> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    FAIL() << "Unknown method called";
+  }
+
+  void SetLevel(ElementRunnerSetLevelRequest& request,
+                SetLevelCompleter::Sync& completer) override {
+    // Return to acknowledge the new level.
+    completer.Reply();
+  }
+};
+
 TEST_F(WakeLeaseIntegrationTest, AcquiresLease) {
   // Take an assertive dependency on ApplicationActivity to indicate boot complete, allowing SAG to
   // suspend if it deems appropriate. After we've acquired our wake lease using the WakeLease class,
@@ -277,6 +273,9 @@ TEST_F(WakeLeaseIntegrationTest, AcquiresLease) {
               [&lease](LeaseToken& acquired_lease) mutable { lease = std::move(acquired_lease); });
 
   async::Executor executor(dispatcher());
+  FakeElementRunner element_runner;
+  fidl::BindServer(executor.dispatcher(), std::move(aa_element.element_runner), &element_runner);
+
   executor.schedule_task(std::move(lease_promise));
   RunLoopWithTimeoutOrUntil([&lease]() { return lease.has_value(); },
                             kWakeLeaseAcquisitionTimeout + zx::sec(1));
