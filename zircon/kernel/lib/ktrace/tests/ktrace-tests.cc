@@ -40,6 +40,11 @@ class KTraceTests {
   static bool TestLegacyCategories() {
     BEGIN_TEST;
 
+#if EXPERIMENTAL_KTRACE_STREAMING_ENABLED
+    // This test is only useful when streaming mode is disabled.
+    END_TEST;
+#else
+
     KTrace ktrace(true);
     ktrace.internal_state_.disable_diags_printfs_ = true;
 
@@ -61,6 +66,7 @@ class KTraceTests {
     ASSERT_EQ(0u, ktrace.categories_bitmask());
 
     END_TEST;
+#endif
   }
 
   // Test the case where tracing is started by Init and stopped by Stop.
