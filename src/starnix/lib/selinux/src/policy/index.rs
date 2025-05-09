@@ -63,7 +63,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // Insert elements for each kernel object class. If the policy defines that unknown
         // kernel classes should cause rejection then return an error describing the missing
         // element.
-        for known_class in crate::KernelClass::all_variants().into_iter() {
+        for known_class in crate::KernelClass::all_variants() {
             match get_class_index_by_name(policy_classes, known_class.name()) {
                 Some(class_index) => {
                     classes.insert(known_class.into(), class_index);
@@ -88,9 +88,9 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // Accumulate permissions indexed by kernel permission enum. If the policy defines that
         // unknown permissions or classes should cause rejection then return an error describing the
         // missing element.
-        let kernel_permissions = crate::KernelPermission::all_variants();
-        let mut permissions = HashMap::with_capacity(kernel_permissions.len());
-        for known_permission in kernel_permissions.into_iter() {
+        let mut permissions =
+            HashMap::with_capacity(crate::KernelPermission::all_variants().count());
+        for known_permission in crate::KernelPermission::all_variants() {
             let object_class = known_permission.class();
             if let Some(class_index) = classes.get(&object_class.into()) {
                 let class = &policy_classes[*class_index];

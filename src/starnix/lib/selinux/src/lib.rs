@@ -68,10 +68,10 @@ macro_rules! enumerable_enum {
         }
 
         impl $name {
-            pub fn all_variants() -> Vec<Self> {
-                let all_variants = vec![$($name::$variant),*];
-                $(let mut all_variants = all_variants; all_variants.extend($common_name::all_variants().into_iter().map(Self::Common));)?
-                all_variants
+            pub fn all_variants() -> impl Iterator<Item=Self> {
+                let iter = [$($name::$variant),*].iter().map(Clone::clone);
+                $(let iter = iter.chain($common_name::all_variants().map($name::Common));)?
+                iter
             }
         }
     }
@@ -452,10 +452,10 @@ macro_rules! permission_enum {
                 }
             }
 
-            pub fn all_variants() -> Vec<Self> {
-                let mut all_variants = vec![];
-                $(all_variants.extend($inner::all_variants().into_iter().map($name::from));)*
-                all_variants
+            pub fn all_variants() -> impl Iterator<Item=Self> {
+                let iter = [].iter().map(Clone::clone);
+                $(let iter = iter.chain($inner::all_variants().map($name::from));)*
+                iter
             }
         }
     }
