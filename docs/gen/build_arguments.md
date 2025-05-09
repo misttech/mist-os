@@ -1051,7 +1051,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   tsan = {
@@ -1060,7 +1060,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
@@ -1134,7 +1134,7 @@ This should never be set as a build argument.
 }
   riscv64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = "../../../../out/not-default/libunwind.so"
+  libunwind_so = ""
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -1734,7 +1734,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
@@ -2657,16 +2657,6 @@ From //third_party/perfetto/gn/perfetto.gni:336
 
 From //src/power/power-manager/BUILD.gn:125
 
-### enable_suspend
-
-While suspend is being developed we define this flag which enables all
-suspend features. Developers working on suspend can then simply add this
-one flag to their build arguments.
-
-**Current value (from the default):** `false`
-
-From //build/suspend/config.gni:9
-
 ### enforce_abi_compat
 
 Enforce ABI compatibility checks for stable API levels.
@@ -3586,7 +3576,7 @@ status of the fuchsia git repository.
 
 **Current value (from the default):** `""`
 
-From //zircon/kernel/lib/version/BUILD.gn:18
+From //zircon/kernel/lib/version/BUILD.gn:22
 
 ### kernel_zbi_extra_deps
 
