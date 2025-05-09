@@ -82,11 +82,13 @@ constexpr auto ResumeSpEl3 = ResumeSpElx<arch::ArmSpEl1, arch::ArmSpEl2, SpSameE
 const zbi_dcfg_arm_psci_driver_t* FindPsciConfig(EarlyBootZbi zbi) {
   const zbi_dcfg_arm_psci_driver_t* cfg = nullptr;
 
-  for (auto [header, payload] : zbi) {
-    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_ARM_PSCI &&
-        payload.size() >= sizeof(*cfg)) {
-      // Keep looping.  The Last one wins.
-      cfg = reinterpret_cast<const zbi_dcfg_arm_psci_driver_t*>(payload.data());
+  for (auto [header, wrapped_payload] : zbi) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_ARM_PSCI) {
+      ktl::span payload = wrapped_payload.get();
+      if (payload.size() >= sizeof(*cfg)) {
+        // Keep looping.  The Last one wins.
+        cfg = reinterpret_cast<const zbi_dcfg_arm_psci_driver_t*>(payload.data());
+      }
     }
   }
   zbi.ignore_error();

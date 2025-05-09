@@ -22,15 +22,18 @@ void InitMemory(const void* zbi_ptr, ktl::optional<EarlyBootZbi> zbi, AddressSpa
 
   ZX_DEBUG_ASSERT(zbi);
 
-  for (auto [header, payload] : *zbi) {
+  for (auto [header, wrapped_payload] : *zbi) {
     switch (header->type) {
-      case ZBI_TYPE_MEM_CONFIG:
+      case ZBI_TYPE_MEM_CONFIG: {
+        ktl::span payload = wrapped_payload.get();
         zbi_ranges = {
             const_cast<zbi_mem_range_t*>(reinterpret_cast<const zbi_mem_range_t*>(payload.data())),
             payload.size_bytes() / sizeof(zbi_mem_range_t)};
         break;
+      }
 
-      case ZBI_TYPE_NVRAM:
+      case ZBI_TYPE_NVRAM: {
+        ktl::span payload = wrapped_payload.get();
         ZX_ASSERT(payload.size_bytes() >= sizeof(zbi_nvram_t));
         const zbi_nvram_t* nvram = reinterpret_cast<const zbi_nvram_t*>(payload.data());
         nvram_range = {
@@ -39,6 +42,7 @@ void InitMemory(const void* zbi_ptr, ktl::optional<EarlyBootZbi> zbi, AddressSpa
             .type = memalloc::Type::kNvram,
         };
         break;
+      }
     }
   }
   if (auto result = zbi->take_error(); result.is_error()) {

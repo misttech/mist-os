@@ -28,10 +28,12 @@ using std::make_index_sequence;
 using std::make_integer_sequence;
 
 using std::get;
+using std::make_pair;
 using std::pair;
 using std::piecewise_construct;
 using std::piecewise_construct_t;
-using std::make_pair;
+
+using std::ignore;
 
 }  // namespace ktl
 

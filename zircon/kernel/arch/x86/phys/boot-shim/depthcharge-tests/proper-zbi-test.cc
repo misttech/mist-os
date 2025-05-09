@@ -5,12 +5,10 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/zbitl/view.h>
-#include <stdio.h>
 #include <zircon/assert.h>
 
-#include <string_view>
-
 #include <ktl/algorithm.h>
+#include <ktl/span.h>
 #include <ktl/string_view.h>
 #include <phys/zbi.h>
 
@@ -25,12 +23,13 @@ int TestMain(void* bootloader_data, ktl::optional<EarlyBootZbi> zbi, arch::Early
   int i = 0;
   int buggy_item_index_1 = 0;
   int buggy_item_index_2 = 0;
-  for (const auto& [header, payload] : *zbi) {
+  for (auto [header, wrapped_payload] : *zbi) {
     switch (header->type) {
       case kArchZbiKernelType:
         ZX_ASSERT(i == 0);
         break;
-      case ZBI_TYPE_BOOTLOADER_FILE:
+      case ZBI_TYPE_BOOTLOADER_FILE: {
+        ktl::span payload = wrapped_payload.get();
         ktl::string_view name(reinterpret_cast<const char*>(&payload[1]),
                               static_cast<size_t>(payload[0]));
         ktl::string_view content(reinterpret_cast<const char*>(&payload[1 + name.length()]),
@@ -41,6 +40,7 @@ int TestMain(void* bootloader_data, ktl::optional<EarlyBootZbi> zbi, arch::Early
           buggy_item_index_2 = i;
         }
         break;
+      }
     }
     i++;
   }

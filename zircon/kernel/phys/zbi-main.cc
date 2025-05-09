@@ -10,6 +10,7 @@
 
 #include <ktl/utility.h>
 #include <phys/boot-options.h>
+#include <phys/early-boot.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
 #include <phys/uart.h>
@@ -35,10 +36,13 @@ void PhysMain(void* zbi_ptr, arch::EarlyTicks ticks) {
   // `uart::all::Config` as we work to remove `uart()` accessor.
   boot_options.serial = uart::all::GetConfig(ktl::move(GetUartDriver()).TakeUart());
 
-  EarlyBootZbi zbi{zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi_ptr))};
+  // Construct a view into our ZBI suitable for early data access while the
+  // data cache is possibly off and dirty.
+  EarlyBootZbiBytes early_zbi_bytes{zbi_ptr};
+  EarlyBootZbi early_zbi{&early_zbi_bytes};
 
   // Obtain proper UART configuration from ZBI, both cmdline items and uart driver items.
-  SetBootOptions(boot_options, zbi);
+  SetBootOptions(boot_options, early_zbi);
 
   // Configure the selected UART.
   //
@@ -48,8 +52,8 @@ void PhysMain(void* zbi_ptr, arch::EarlyTicks ticks) {
   SetUartConsole(boot_options.serial);
 
   // Perform any architecture-specific set up.
-  ArchSetUp(zbi);
+  ArchSetUp(early_zbi);
 
   // Call the real entry point now that it can use printf!  It does not return.
-  ZbiMain(zbi_ptr, zbi, ticks);
+  ZbiMain(zbi_ptr, early_zbi, ticks);
 }

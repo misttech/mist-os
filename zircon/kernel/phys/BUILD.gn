@@ -256,7 +256,6 @@ if (toolchain_environment == "kernel.phys" ||
   # Transitive dependencies for the <phys/main.h> header.
   static_library("main") {
     public = [
-      "include/phys/early-boot.h",
       "include/phys/exception.h",
       "include/phys/main.h",
       "include/phys/stack.h",
@@ -282,13 +281,12 @@ if (toolchain_environment == "kernel.phys" ||
 
   source_set("early-boot") {
     public = [ "include/phys/early-boot.h" ]
-
     public_deps = [
       # "early-boot.h" has #include <lib/zbitl/view.h>
       "//src/lib/zbitl:headers",
     ]
-
     public_configs = [ ":includes" ]
+    sources = [ "$arch_phys/include/phys/arch/early-boot.h" ]
   }
 
   source_set("address-space.header") {

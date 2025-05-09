@@ -36,12 +36,13 @@ struct BootOptions;
 // It is expected that |boot_opts.serial| is set to legacy UART driver(if any) in order to preserve
 // this priority.
 //
-void SetBootOptions(BootOptions& boot_opts, EarlyBootZbi zbi, ktl::string_view legacy_cmdline = {});
+void SetBootOptions(BootOptions& boot_opts, ktl::optional<EarlyBootZbi> zbi,
+                    ktl::string_view legacy_cmdline = {});
 
 // Just like |SetBootOptions| but leaves the entropy from the command-line if
 // available, which will restore the entropy bits. This allows to reuse BootOptions infratructure
 // for parsing specific arguments.
-void SetBootOptionsWithoutEntropy(BootOptions& boot_opts, EarlyBootZbi zbi,
+void SetBootOptionsWithoutEntropy(BootOptions& boot_opts, ktl::optional<EarlyBootZbi> zbi,
                                   ktl::string_view legacy_cmdline = {});
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_BOOT_OPTIONS_H_

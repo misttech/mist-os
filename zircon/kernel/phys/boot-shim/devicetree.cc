@@ -132,7 +132,8 @@ void InitMemory(const void* dtb, ktl::optional<EarlyBootZbi> zbi, AddressSpace* 
   // TODO(https://fxbug.dev/397523685): Match operation returns a config and matcher stores a config
   // instead of a driver object.
   boot_options.serial = chosen.uart_config().value_or(GetUartDriver().config());
-  SetBootOptionsWithoutEntropy(boot_options, EarlyBootZbi{chosen.zbi()},
+  EarlyBootZbiBytes early_zbi_bytes{chosen.zbi()};
+  SetBootOptionsWithoutEntropy(boot_options, EarlyBootZbi{&early_zbi_bytes},
                                chosen.cmdline().value_or(""));
   SetUartConsole(boot_options.serial);
 

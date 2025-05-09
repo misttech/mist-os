@@ -54,7 +54,9 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   if (auto uart_config = chosen.uart_config()) {
     boot_options.serial = *uart_config;
   }
-  SetBootOptions(boot_options, EarlyBootZbi{chosen.zbi()}, chosen.cmdline().value_or(""));
+
+  EarlyBootZbiBytes early_zbi_bytes{chosen.zbi()};
+  SetBootOptions(boot_options, EarlyBootZbi{&early_zbi_bytes}, chosen.cmdline().value_or(""));
   SetUartConsole(boot_options.serial);
 
   ArchSetUp({});
