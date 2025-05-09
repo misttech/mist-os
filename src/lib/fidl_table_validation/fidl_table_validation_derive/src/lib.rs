@@ -229,14 +229,14 @@ impl FidlField {
                             src_vec
                                 .into_iter()
                                 .map(std::convert::TryFrom::try_from)
-                                .map(|r| r.map_err(anyhow::Error::from))
-                                .collect::<std::result::Result<_, anyhow::Error>>()?
+                                .map(|r| r.map_err(::fidl_table_validation::anyhow::Error::from))
+                                .collect::<std::result::Result<_, ::fidl_table_validation::anyhow::Error>>()?
                         },
                     ),
                     false => quote!(
                         #ident: std::convert::TryFrom::try_from(
                             #src_ident.ok_or(#missing_field_error_type::#camel_case)?
-                        ).map_err(anyhow::Error::from)?,
+                        ).map_err(::fidl_table_validation::anyhow::Error::from)?,
                     ),
                 }
             }
@@ -247,8 +247,8 @@ impl FidlField {
                             src_vec
                                 .into_iter()
                                 .map(std::convert::TryFrom::try_from)
-                                .map(|r| r.map_err(anyhow::Error::from))
-                                .collect::<std::result::Result<_, anyhow::Error>>()?
+                                .map(|r| r.map_err(::fidl_table_validation::anyhow::Error::from))
+                                .collect::<std::result::Result<_, ::fidl_table_validation::anyhow::Error>>()?
                         )
                     } else {
                         None
@@ -259,7 +259,7 @@ impl FidlField {
                         Some(
                             std::convert::TryFrom::try_from(
                                 field
-                            ).map_err(anyhow::Error::from)?
+                            ).map_err(::fidl_table_validation::anyhow::Error::from)?
                         )
                     } else {
                         None
@@ -270,21 +270,21 @@ impl FidlField {
                 #ident: #src_ident
                     .map(std::convert::TryFrom::try_from)
                     .transpose()
-                    .map_err(anyhow::Error::from)?
+                    .map_err(::fidl_table_validation::anyhow::Error::from)?
                     .unwrap_or_default(),
             ),
             FidlFieldKind::ExprDefault(default_ident) => quote!(
                 #ident: #src_ident
                     .map(std::convert::TryFrom::try_from)
                     .transpose()
-                    .map_err(anyhow::Error::from)?
+                    .map_err(::fidl_table_validation::anyhow::Error::from)?
                     .unwrap_or(#default_ident),
             ),
             FidlFieldKind::HasDefault(value) => quote!(
                 #ident: #src_ident
                     .map(std::convert::TryFrom::try_from)
                     .transpose()
-                    .map_err(anyhow::Error::from)?
+                    .map_err(::fidl_table_validation::anyhow::Error::from)?
                     .unwrap_or(#value),
             ),
             FidlFieldKind::Converter(path) => {
@@ -540,7 +540,7 @@ fn impl_valid_fidl_table(
             /// Missing Field.
             MissingField(#missing_field_error_type),
             /// Invalid Field.
-            InvalidField(anyhow::Error),
+            InvalidField(::fidl_table_validation::anyhow::Error),
             #custom_validator_error
         }
 
@@ -552,8 +552,8 @@ fn impl_valid_fidl_table(
 
         impl std::error::Error for #error_type_name {}
 
-        impl From<anyhow::Error> for #error_type_name {
-            fn from(src: anyhow::Error) -> Self {
+        impl From<::fidl_table_validation::anyhow::Error> for #error_type_name {
+            fn from(src: ::fidl_table_validation::anyhow::Error) -> Self {
                 #error_type_name::InvalidField(src)
             }
         }
