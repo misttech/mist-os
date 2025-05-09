@@ -5,9 +5,9 @@
 """Runs components, tests components, or register drivers within a package."""
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(":fuchsia_task.bzl", "fuchsia_task_rule")
 load(":providers.bzl", "FuchsiaPackageInfo")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
     sdk = get_fuchsia_sdk_toolchain(ctx)
@@ -127,14 +127,20 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
         "_register_driver_tool": attr.label(
             doc = "The tool used to run components",
             default = "//fuchsia/tools:register_driver",
+            executable = True,
+            cfg = "exec",
         ),
         "_run_test_component_tool": attr.label(
             doc = "The tool used to run components",
             default = "//fuchsia/tools:run_test_component",
+            executable = True,
+            cfg = "exec",
         ),
         "_run_component_tool": attr.label(
             doc = "The tool used to run components",
             default = "//fuchsia/tools:run_component",
+            executable = True,
+            cfg = "exec",
         ),
     } | COMPATIBILITY.HOST_ATTRS,
 )

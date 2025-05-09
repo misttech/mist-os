@@ -6,8 +6,8 @@
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:fuchsia_debug_symbols.bzl", "merge_debug_symbol_infos")
-load(":fuchsia_shell_task.bzl", "shell_task_rule")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
+load(":fuchsia_shell_task.bzl", "shell_task_rule")
 
 def _fuchsia_task_register_debug_symbols_impl(ctx, make_shell_task):
     sdk = get_fuchsia_sdk_toolchain(ctx)
@@ -42,6 +42,8 @@ def _fuchsia_task_register_debug_symbols_impl(ctx, make_shell_task):
         "_tool": attr.label(
             doc = "The tool needed to register debug symbols.",
             default = "//fuchsia/tools:register_debug_symbols",
+            executable = True,
+            cfg = "exec",
         ),
         "deps": attr.label_list(
             doc = """Collects FuchsiaDebugSymbolInfo across multiple dependencies.
