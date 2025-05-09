@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for the utils.py."""
 
-import os
+import pathlib
 import tempfile
 import unittest
 
@@ -19,10 +19,10 @@ class UtilsTest(unittest.TestCase):
         Check that get_associated_runtime_deps_dir() returns successfully.
         """
         with tempfile.TemporaryDirectory() as tmpdir:
-            search_path = os.path.join(tmpdir, "runtime_deps", "dir")
-            os.makedirs(search_path)
+            search_path = pathlib.Path(tmpdir) / "runtime_deps" / "dir"
+            search_path.mkdir(mode=711, parents=True, exist_ok=True)
             res = utils.get_associated_runtime_deps_dir(search_path)
-            self.assertEqual(os.path.join(tmpdir, "runtime_deps"), res)
+            self.assertEqual(pathlib.Path(tmpdir) / "runtime_deps", res)
 
     def test_get_runtime_deps_ancestor_path_not_found(self) -> None:
         """

@@ -16,7 +16,9 @@ DEFAULT_TARGET_RESULTS_PATH: str = (
 DEFAULT_HOST_RESULTS_FILE: str = "results.fuchsiaperf_full.json"
 
 
-def get_associated_runtime_deps_dir(search_dir: os.PathLike) -> os.PathLike:
+def get_associated_runtime_deps_dir(
+    search_dir: str | os.PathLike[str],
+) -> os.PathLike[str]:
     """Return the directory that contains runtime dependencies.
 
     Args:
@@ -30,7 +32,7 @@ def get_associated_runtime_deps_dir(search_dir: os.PathLike) -> os.PathLike:
         cur_path = os.path.dirname(cur_path)
         if cur_path == "/":
             raise ValueError("Couldn't find required runtime_deps directory")
-    return os.path.join(cur_path, "runtime_deps")
+    return pathlib.Path(cur_path) / "runtime_deps"
 
 
 def run_test_component(
