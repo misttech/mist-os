@@ -78,6 +78,10 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
                                   const FlatlandDisplay& display,
                                   scheduling::FramePresentedCallback callback) {
   // Emit a counter called "ScenicRender" for visualization in the Trace Viewer.
+  //
+  // This counter is flipped between 0 and 1 and back on each frame, and is
+  // used to visually delineate successive frames in the sometimes busy trace
+  // view.
   static bool render_edge_flag = false;
   TRACE_COUNTER("gfx", "ScenicRender", 0, "", TA_UINT32(render_edge_flag = !render_edge_flag));
   // NOTE: this name is important for benchmarking.  Do not remove or modify it
