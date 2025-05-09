@@ -231,7 +231,7 @@ constexpr char kSnapshotConfigSchema[] = R"({
 std::optional<SnapshotConfig> ParseSnapshotConfig(const rapidjson::Document& json) {
   SnapshotConfig config;
   for (const auto& k : json["annotation_allowlist"].GetArray()) {
-    config.annotation_allowlist.insert(k.GetString());
+    config.default_annotations.insert(k.GetString());
   }
 
   for (const auto& k : json["attachment_allowlist"].GetArray()) {

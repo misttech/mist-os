@@ -789,7 +789,7 @@ TEST_F(SnapshotConfigTest, AnnotationAllowlistEmpty) {
 })");
 
   ASSERT_TRUE(config.has_value());
-  EXPECT_THAT(config->annotation_allowlist, IsEmpty());
+  EXPECT_THAT(config->default_annotations, IsEmpty());
 }
 
 TEST_F(SnapshotConfigTest, AttachmentAllowlistEmpty) {
@@ -809,7 +809,7 @@ TEST_F(SnapshotConfigTest, AnnotationAllowlistNonEmpty) {
 })");
 
   ASSERT_TRUE(config.has_value());
-  EXPECT_THAT(config->annotation_allowlist, ElementsAreArray({"a", "b"}));
+  EXPECT_THAT(config->default_annotations, ElementsAreArray({"a", "b"}));
 }
 
 TEST_F(SnapshotConfigTest, AttachmentAllowlistNonEmpty) {

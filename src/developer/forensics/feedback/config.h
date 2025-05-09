@@ -46,7 +46,7 @@ struct BuildTypeConfig {
 };
 
 struct SnapshotConfig {
-  std::set<std::string> annotation_allowlist;
+  std::set<std::string> default_annotations;
   std::set<std::string> attachment_allowlist;
 };
 

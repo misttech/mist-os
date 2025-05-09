@@ -33,7 +33,7 @@ FeedbackData::FeedbackData(async_dispatcher_t* dispatcher,
                             redactor, &inspect_data_budget_, options.config.attachment_allowlist,
                             std::move(dlog)),
       data_provider_(dispatcher_, services_, clock_, redactor, options.is_first_instance,
-                     options.config.annotation_allowlist, options.config.attachment_allowlist,
+                     options.config.default_annotations, options.config.attachment_allowlist,
                      cobalt_, annotation_manager, attachment_providers_.GetAttachmentManager(),
                      &inspect_data_budget_) {
   if (options.run_log_persistence) {
