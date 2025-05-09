@@ -257,11 +257,27 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                     DiskImage::Fxfs(_) => {
                         let mut tmp =
                             NamedTempFile::new_in(&instance_root).map_err(|e| bug!("{e}"))?;
+
                         {
                             let mut reader = std::fs::File::open(src_path)
                                 .map_err(|e| bug!("open failed: {e}"))?;
-                            std::io::copy(&mut reader, &mut tmp)
-                                .map_err(|e| bug!("cannot stage Fxfs image: {e}"))?;
+
+                            // The image could be either a sparse or a full image.  If sparse
+                            // then inflate it to the destination.  If not sparse, then just
+                            // copy it.
+                            if sparse::is_sparse_image(&mut reader) {
+                                sparse::unsparse(&mut reader, tmp.as_file_mut())
+                                    .map_err(|e| bug!("cannot stage Fxfs image: {e}"))?;
+                            } else {
+                                // re-open the file because the check for sparseness can fail and
+                                // result in a reader that hasn't seek'd back to the start of the
+                                // file.
+                                let mut reader = std::fs::File::open(src_path)
+                                    .map_err(|e| bug!("re-open failed: {e}"))?;
+
+                                std::io::copy(&mut reader, &mut tmp)
+                                    .map_err(|e| bug!("cannot stage Fxfs image: {e}"))?;
+                            }
                         }
                         if original_size < target_size {
                             // Resize the image if needed.
@@ -1530,6 +1546,10 @@ mod tests {
             eprintln!(
                 "Reading contents from {}",
                 actual.kernel_image.clone().expect("kernel file path").display()
+            );
+            eprintln!(
+                "Reading contents from {}",
+                actual.disk_image.clone().expect("disk_image file path").display()
             );
             let mut kernel = File::open(&actual.kernel_image.expect("kernel file path"))
                 .expect("cannot open reused kernel file for read");

@@ -74,8 +74,8 @@ fn convert_v2_bundle_to_configs(
 
     let mut disk_image: Option<DiskImage> = system.iter().find_map(|i| match (uefi, i) {
         (false, Image::FVM(path)) => Some(DiskImage::Fvm(path.clone().into())),
-        (false, Image::Fxfs { path, .. }) => Some(DiskImage::Fxfs(path.clone().into())),
-        (true, Image::Fxfs { path, .. }) => Some(DiskImage::Gpt(path.clone().into())),
+        (false, Image::FxfsSparse { path, .. }) => Some(DiskImage::Fxfs(path.clone().into())),
+        (true, Image::FxfsSparse { path, .. }) => Some(DiskImage::Gpt(path.clone().into())),
         _ => None,
     });
 
@@ -186,8 +186,8 @@ mod tests {
         // Adjust all of the values that affect the config, then run it again.
         let expected_kernel = Utf8PathBuf::from_path_buf(sdk_root.join("some/new_kernel"))
             .expect("couldn't convert kernel to utf8");
-        let expected_disk_image_path = Utf8PathBuf::from_path_buf(sdk_root.join("fxfs"))
-            .expect("couldn't convert fxfs to utf8");
+        let expected_disk_image_path = Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.sparse.blk"))
+            .expect("couldn't convert fxfs sparse to utf8");
         let expected_zbi = Utf8PathBuf::from_path_buf(sdk_root.join("path/to/new_zbi"))
             .expect("couldn't convert zbi to utf8");
 
@@ -195,6 +195,11 @@ mod tests {
             Image::ZBI { path: expected_zbi.clone(), signed: false },
             Image::QemuKernel(expected_kernel.clone()),
             Image::Fxfs {
+                path: Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.blk"))
+                    .expect("couldn't convert fxfs to utf8"),
+                contents: BlobfsContents::default(),
+            },
+            Image::FxfsSparse {
                 path: expected_disk_image_path.clone(),
                 contents: BlobfsContents::default(),
             },
@@ -257,8 +262,8 @@ mod tests {
 
         let expected_kernel = Utf8PathBuf::from_path_buf(sdk_root.join("some/new_kernel"))
             .expect("couldn't convert kernel to utf8");
-        let expected_disk_image_path = Utf8PathBuf::from_path_buf(sdk_root.join("fxfs"))
-            .expect("couldn't convert fxfs to utf8");
+        let expected_disk_image_path = Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.sparse"))
+            .expect("couldn't convert fxfs sprase to utf8");
         let expected_zbi = Utf8PathBuf::from_path_buf(sdk_root.join("path/to/new_zbi"))
             .expect("couldn't convert zbi to utf8");
 
@@ -271,6 +276,11 @@ mod tests {
                 Image::ZBI { path: expected_zbi.clone(), signed: false },
                 Image::QemuKernel(expected_kernel.clone()),
                 Image::Fxfs {
+                    path: Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.blk"))
+                        .expect("couldn't convert fxfs to utf8"),
+                    contents: BlobfsContents::default(),
+                },
+                Image::FxfsSparse {
                     path: expected_disk_image_path.clone(),
                     contents: BlobfsContents::default(),
                 },
