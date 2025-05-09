@@ -1664,10 +1664,7 @@ config("Wno-nontrivial-memaccess") {
 # TODO(https://fxbug.dev/415133536): Disable "-Wunterminated-string-initialization"
 # until all instances are fixed.
 config("Wno-unterminated-string-initialization") {
-  cflags = [
-    "-Wno-unknown-warning-option",
-    "-Wno-unterminated-string-initialization",
-  ]
+  cflags_c = [ "-Wno-unterminated-string-initialization" ]
 }
 
 config("Wsystem-headers") {
