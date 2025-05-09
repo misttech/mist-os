@@ -17,7 +17,7 @@ use fuchsia_bluetooth::types::Channel;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
-use futures::{SinkExt, StreamExt, TryFutureExt};
+use futures::{StreamExt, TryFutureExt};
 use std::ffi::{CStr, CString};
 use std::thread;
 
@@ -195,7 +195,7 @@ impl WorkThread {
     pub async fn read_local_address(&self, addr_byte_buff: *mut u8) -> Result<(), anyhow::Error> {
         let addr_bytes_slice = unsafe { std::slice::from_raw_parts_mut(addr_byte_buff, 6) };
         let (sender, receiver) = oneshot::channel::<Result<[u8; 6], anyhow::Error>>();
-        self.sender.clone().send(Request::ReadLocalAddress(sender)).await?;
+        self.sender.clone().unbounded_send(Request::ReadLocalAddress(sender))?;
         addr_bytes_slice.clone_from_slice(&receiver.await??);
         Ok(())
     }
@@ -203,27 +203,27 @@ impl WorkThread {
     // Get identifier of peer at `address`.
     pub async fn get_peer_id(&self, address: &CStr) -> Result<PeerId, anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<PeerId, anyhow::Error>>();
-        self.sender.clone().send(Request::GetPeerId(address.to_owned(), sender)).await?;
+        self.sender.clone().unbounded_send(Request::GetPeerId(address.to_owned(), sender))?;
         receiver.await?
     }
 
     pub async fn get_known_peers(&self) -> Result<Vec<Peer>, anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<Vec<Peer>, anyhow::Error>>();
-        self.sender.clone().send(Request::GetKnownPeers(sender)).await?;
+        self.sender.clone().unbounded_send(Request::GetKnownPeers(sender))?;
         receiver.await?
     }
 
     // Connect to peer with given identifier.
     pub async fn connect_peer(&self, peer_id: PeerId) -> Result<(), anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
-        self.sender.clone().send(Request::Connect(peer_id, sender)).await?;
+        self.sender.clone().unbounded_send(Request::Connect(peer_id, sender))?;
         receiver.await?
     }
 
     // Forget peer and delete all bonding information, if peer is found.
     pub async fn forget_peer(&self, peer_id: PeerId) -> Result<(), anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
-        self.sender.clone().send(Request::Forget(peer_id, sender)).await?;
+        self.sender.clone().unbounded_send(Request::Forget(peer_id, sender))?;
         receiver.await?
     }
 
@@ -234,14 +234,14 @@ impl WorkThread {
         psm: u16,
     ) -> Result<(), anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
-        self.sender.clone().send(Request::ConnectL2cap(peer_id, psm, sender)).await?;
+        self.sender.clone().unbounded_send(Request::ConnectL2cap(peer_id, psm, sender))?;
         receiver.await?
     }
 
     // Set discoverability state.
     pub async fn set_discoverability(&self, discoverable: bool) -> Result<(), anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
-        self.sender.clone().send(Request::SetDiscoverability(discoverable, sender)).await?;
+        self.sender.clone().unbounded_send(Request::SetDiscoverability(discoverable, sender))?;
         receiver.await?
     }
 }
