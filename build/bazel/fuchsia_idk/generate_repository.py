@@ -443,10 +443,6 @@ class PathRewriter(object):
                 self.property_inplace(toolfiles, "executable_metadata")
             return
 
-        if atom_type == "fhcp_tests":
-            # no paths to rewrite.
-            return
-
         if atom_type == "fidl_library":
             self.path_list_inplace(meta["sources"])
             return

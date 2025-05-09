@@ -20,7 +20,6 @@ schemas = [
   "documentation.json",
   "experimental_python_e2e_test.json",
   "ffx_tool.json",
-  "fhcp_tests.json",
   "fidl_library.json",
   "host_tool.json",
   "loadable_module.json",
