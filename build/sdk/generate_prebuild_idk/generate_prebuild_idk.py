@@ -197,6 +197,16 @@ class PrebuildMap(object):
         """
         value = info["atom_meta"].get("value")
         if value is not None:
+            # For reference, the following types are currently handled this way:
+            #   "component_manifest"
+            #   "config"
+            #   "data"
+            #   "documentation"
+            #   "ffx_tool"
+            #   "host_tool"
+            #   "loadable_module"
+            #   "sysroot"
+            # "rust_3p_library" does not support prebuild data.
             return (value, [])
 
         generator = {
@@ -213,6 +223,7 @@ class PrebuildMap(object):
             # TODO(https://fxbug.dev/338009514): Add support for Fuchsia
             # packages and add a package to `test_collection.json` along with
             # expected output to `validation_data/expected_idk/`.
+            # "package":
         }.get(info["atom_type"], None)
         return generator(info) if generator else (None, [])
 

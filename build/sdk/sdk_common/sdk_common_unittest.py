@@ -10,8 +10,17 @@ import unittest
 
 from sdk_common import Atom, Validator, detect_category_violations
 
+_TYPE_REQURING_AREA = "fidl_library"
+_TYPE_NOT_REQURING_AREA = "data"
+_VALID_TYPE_ARRAY_STRING = "['bind_library', 'cc_prebuilt_library', 'cc_source_library', 'companion_host_tool', 'dart_library', 'data', 'documentation', 'experimental_python_e2e_test', 'ffx_tool', 'fidl_library', 'host_tool', 'loadable_module', 'package', 'rust_3p_library', 'sysroot', 'version_history']"
 
-def _atom(name: str, category: str, area: str | None = None) -> Atom:
+
+def _atom(
+    name: str,
+    category: str,
+    type: str = _TYPE_NOT_REQURING_AREA,
+    area: str | None = None,
+) -> Atom:
     return Atom(
         {
             "id": name,
@@ -23,7 +32,7 @@ def _atom(name: str, category: str, area: str | None = None) -> Atom:
             "package-deps": [],
             "files": [],
             "tags": [],
-            "type": "schema.json",
+            "type": type,
             "stable": True,
         }
     )
@@ -125,14 +134,16 @@ class SdkCommonTests(unittest.TestCase):
     def test_area_name(self) -> None:
         v = Validator(valid_areas=["Kernel", "Unknown"])
         atoms = [
-            _atom("hello", "internal", "Unknown"),
-            _atom("world", "partner", "Kernel"),
+            _atom("hello", "internal", _TYPE_REQURING_AREA, "Unknown"),
+            _atom("world", "partner", _TYPE_REQURING_AREA, "Kernel"),
         ]
         self.assertEqual([*v.detect_area_violations(atoms)], [])
 
         atoms = [
-            _atom("hello", "internal", "So Not A Real Area"),
-            _atom("world", "partner", "Kernel"),
+            _atom(
+                "hello", "internal", _TYPE_REQURING_AREA, "So Not A Real Area"
+            ),
+            _atom("world", "partner", _TYPE_REQURING_AREA, "Kernel"),
         ]
         self.assertEqual(
             [*v.detect_area_violations(atoms)],
@@ -141,11 +152,36 @@ class SdkCommonTests(unittest.TestCase):
             ],
         )
 
+    def test_invalid_type(self) -> None:
+        v = Validator(valid_areas=["Kernel", "Unknown"])
+        atoms = [
+            _atom("hello", "internal", "not a real type", "Unknown"),
+            _atom("world", "partner", "fidl_library", "Kernel"),
+        ]
+        self.assertEqual(
+            [*v.detect_invalid_types(atoms)],
+            [
+                f"Atom type `not a real type` for `hello` is unsupported. Valid types are: {_VALID_TYPE_ARRAY_STRING}"
+            ],
+        )
+
+        atoms = [
+            _atom("hello", "internal", "not a real type", "Unknown"),
+            _atom("world", "partner", "common", "Kernel"),
+        ]
+        self.assertEqual(
+            [*v.detect_invalid_types(atoms)],
+            [
+                f"Atom type `not a real type` for `hello` is unsupported. Valid types are: {_VALID_TYPE_ARRAY_STRING}",
+                f"Atom type `common` for `world` is unsupported. Valid types are: {_VALID_TYPE_ARRAY_STRING}",
+            ],
+        )
+
     def test_area_required(self) -> None:
         v = Validator(valid_areas=["Kernel", "Unknown"])
         atoms = [
-            _atom("hello", "internal"),
-            _atom("world", "partner", "Kernel"),
+            _atom("hello", "internal", _TYPE_REQURING_AREA),
+            _atom("world", "partner", _TYPE_REQURING_AREA, "Kernel"),
         ]
         self.assertEqual(
             [*v.detect_area_violations(atoms)],
@@ -155,8 +191,8 @@ class SdkCommonTests(unittest.TestCase):
         )
 
         atoms = [
-            _atom("hello", "internal"),
-            _atom("world", "partner"),
+            _atom("hello", "internal", _TYPE_REQURING_AREA),
+            _atom("world", "partner", _TYPE_REQURING_AREA),
         ]
         self.assertEqual(
             [*v.detect_area_violations(atoms)],
@@ -166,12 +202,24 @@ class SdkCommonTests(unittest.TestCase):
             ],
         )
 
+    def test_area_not_required(self) -> None:
+        v = Validator(valid_areas=["Kernel", "Unknown"])
+        atoms = [
+            _atom("hello", "internal", _TYPE_NOT_REQURING_AREA),
+        ]
+        self.assertEqual(
+            [*v.detect_area_violations(atoms)],
+            [],
+        )
+
     def test_validator_detects_all_problems(self) -> None:
         v = Validator(valid_areas=["Unknown"])
         # Category violation
         atoms = [
-            _atom("hello", "internal", "So Not A Real Area"),
-            _atom("hello", "partner"),
+            _atom(
+                "hello", "internal", _TYPE_REQURING_AREA, "So Not A Real Area"
+            ),
+            _atom("hello", "partner", "not a real type"),
         ]
         self.assertEqual(
             [*v.detect_violations("partner", atoms)],
@@ -181,6 +229,7 @@ class SdkCommonTests(unittest.TestCase):
  - //hello
 """,
                 '"hello" has publication level "internal", which is incompatible with "partner".',
+                f"Atom type `not a real type` for `hello` is unsupported. Valid types are: {_VALID_TYPE_ARRAY_STRING}",
                 "hello specifies invalid API area 'So Not A Real Area'. Valid areas: ['Unknown']",
                 "hello must specify an API area. Valid areas: ['Unknown']",
             ],

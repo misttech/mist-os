@@ -129,7 +129,9 @@ def area_names_from_file(parsed_areas: Any) -> list[str]:
     return [area["name"] for area in parsed_areas] + ["Unknown"]
 
 
-_AREA_OPTIONAL_TYPES = [
+_VALID_ATOM_TYPES = [
+    # LINT.IfChange(idk_atom_types)
+    "bind_library",
     "cc_prebuilt_library",
     "cc_source_library",
     "companion_host_tool",
@@ -137,6 +139,7 @@ _AREA_OPTIONAL_TYPES = [
     "data",
     "documentation",
     "experimental_python_e2e_test",
+    "fidl_library",
     "ffx_tool",
     "host_tool",
     "loadable_module",
@@ -144,7 +147,14 @@ _AREA_OPTIONAL_TYPES = [
     "rust_3p_library",
     "sysroot",
     "version_history",
+    # LINT.ThenChange(//build/sdk/generate_prebuild_idk/generate_prebuild_idk.py, //build/sdk/manifest_schema.json, //build/sdk/meta/BUILD.gn:schema_in_idk)
 ]
+
+# Remove the types requiring area from the list of all types to get the types
+# for which area is optional.
+_AREA_OPTIONAL_TYPES = _VALID_ATOM_TYPES[:]
+_AREA_OPTIONAL_TYPES.remove("bind_library")
+_AREA_OPTIONAL_TYPES.remove("fidl_library")
 
 
 class Validator:
@@ -172,7 +182,21 @@ class Validator:
         yield from detect_collisions(atoms)
         if category:
             yield from detect_category_violations(category, atoms)
+        yield from self.detect_invalid_types(atoms)
         yield from self.detect_area_violations(atoms)
+
+    def detect_invalid_types(self, atoms: Sequence[Atom]) -> Iterator[str]:
+        """Yields strings describing any invalid types in `atoms`."""
+        for atom in atoms:
+            if atom.type not in _VALID_ATOM_TYPES:
+                yield (
+                    "Atom type `%s` for `%s` is unsupported. Valid types are: %s"
+                    % (
+                        atom.type,
+                        atom,
+                        sorted(_VALID_ATOM_TYPES),
+                    )
+                )
 
     def detect_area_violations(self, atoms: Sequence[Atom]) -> Iterator[str]:
         """Yields strings describing any invalid API areas in `atoms`."""
