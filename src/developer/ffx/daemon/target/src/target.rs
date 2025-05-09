@@ -43,7 +43,7 @@ use std::rc::{Rc, Weak};
 use std::sync::Arc;
 #[cfg(not(target_os = "macos"))]
 use std::sync::Mutex;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 use usb_bulk::AsyncInterface as Interface;
 use usb_fastboot_discovery::open_interface_with_serial;
 #[cfg(not(target_os = "macos"))]
@@ -116,10 +116,6 @@ impl TargetAddrStatus {
         Self { source: TargetSource::Manual, ..self }
     }
 
-    pub fn manually_added_until(self, expires_after: SystemTime) -> Self {
-        Self { source: TargetSource::Ephemeral { expires_after }, ..self }
-    }
-
     pub fn protocol(&self) -> TargetProtocol {
         self.protocol
     }
@@ -133,7 +129,7 @@ impl TargetAddrStatus {
     }
 
     pub fn is_manual(&self) -> bool {
-        !matches!(self.source, TargetSource::Discovered)
+        self.source == TargetSource::Manual
     }
 }
 
@@ -229,7 +225,6 @@ impl Into<FastbootInterface> for TargetTransport {
 pub enum TargetSource {
     Manual,
     Discovered,
-    Ephemeral { expires_after: SystemTime },
 }
 
 impl TargetSource {
@@ -237,11 +232,7 @@ impl TargetSource {
         use TargetSource::*;
         *self = match (*self, other) {
             (Discovered, _) => other,
-            (Manual, _) | (_, Manual) => Manual,
-            (Ephemeral { expires_after: a }, Ephemeral { expires_after: b }) => {
-                Ephemeral { expires_after: std::cmp::max(a, b) }
-            }
-            (_, Discovered) => return,
+            _ => Manual,
         };
     }
 }
@@ -915,28 +906,20 @@ impl Target {
             TargetConnectionState::Disconnected => {
                 self.clear_ids();
                 if self.is_manual() {
-                    let timeout = self.get_manual_timeout();
-                    let last_seen = if timeout.is_some() { Some(Instant::now()) } else { None };
+                    let last_seen = None;
                     if former_state.is_rcs() {
                         self.update_last_response(Utc::now());
-                        new_state = TargetConnectionState::Manual(last_seen)
+                        new_state = TargetConnectionState::Manual;
                     } else {
-                        let current = SystemTime::now();
-                        if timeout.is_none() || current < timeout.unwrap() {
-                            new_state = match former_state {
-                                TargetConnectionState::Fastboot(old_last_seen) => {
-                                    TargetConnectionState::Fastboot(
-                                        last_seen.unwrap_or(old_last_seen),
-                                    )
-                                }
-                                TargetConnectionState::Zedboot(old_last_seen) => {
-                                    TargetConnectionState::Zedboot(
-                                        last_seen.unwrap_or(old_last_seen),
-                                    )
-                                }
-                                _ => TargetConnectionState::Manual(last_seen),
-                            };
-                        }
+                        new_state = match former_state {
+                            TargetConnectionState::Fastboot(old_last_seen) => {
+                                TargetConnectionState::Fastboot(last_seen.unwrap_or(old_last_seen))
+                            }
+                            TargetConnectionState::Zedboot(old_last_seen) => {
+                                TargetConnectionState::Zedboot(last_seen.unwrap_or(old_last_seen))
+                            }
+                            _ => TargetConnectionState::Manual,
+                        };
                     }
                 }
             }
@@ -944,7 +927,7 @@ impl Target {
             // re-added manually, if the target is presently in an RCS state, that state is
             // preserved, and the last response time is just adjusted to represent the observation.
             TargetConnectionState::Mdns(_)
-            | TargetConnectionState::Manual(_)
+            | TargetConnectionState::Manual
             | TargetConnectionState::Vsock(_) => {
                 // Do not transition connection state for RCS -> MDNS.
                 if former_state.is_rcs() {
@@ -1575,7 +1558,7 @@ impl Target {
                 TargetConnectionState::Mdns(_) => MDNS_MAX_AGE,
                 TargetConnectionState::Fastboot(_) => FASTBOOT_MAX_AGE,
                 TargetConnectionState::Zedboot(_) => ZEDBOOT_MAX_AGE,
-                TargetConnectionState::Manual(_) => MDNS_MAX_AGE,
+                TargetConnectionState::Manual => MDNS_MAX_AGE,
                 _ => Duration::default(),
             };
 
@@ -1584,11 +1567,6 @@ impl Target {
                 | TargetConnectionState::Fastboot(ref last_seen)
                 | TargetConnectionState::Zedboot(ref last_seen)
                     if last_seen.elapsed() > expire_duration =>
-                {
-                    Some(TargetConnectionState::Disconnected)
-                }
-                TargetConnectionState::Manual(ref last_seen)
-                    if last_seen.map(|time| time.elapsed() > expire_duration).unwrap_or(false) =>
                 {
                     Some(TargetConnectionState::Disconnected)
                 }
@@ -1663,14 +1641,6 @@ impl Target {
         self.addrs.borrow().iter().any(|addr_entry| addr_entry.is_manual())
     }
 
-    pub fn get_manual_timeout(&self) -> Option<SystemTime> {
-        let addrs = self.addrs.borrow();
-        addrs.iter().find_map(|addr_entry| match addr_entry.source {
-            TargetSource::Ephemeral { expires_after } => Some(expires_after),
-            _ => None,
-        })
-    }
-
     pub fn is_waiting_for_rcs_identity(&self) -> bool {
         self.is_manual() && self.is_host_pipe_running() && self.identity().is_none()
     }
@@ -1715,7 +1685,7 @@ impl From<&Target> for ffx::TargetInfo {
             rcs_state: Some(target.rcs_state()),
             target_state: Some(match target.state() {
                 TargetConnectionState::Disconnected => TargetState::Disconnected,
-                TargetConnectionState::Manual(_)
+                TargetConnectionState::Manual
                 | TargetConnectionState::Mdns(_)
                 | TargetConnectionState::Rcs(_)
                 | TargetConnectionState::Vsock(_) => TargetState::Product,
@@ -2092,7 +2062,7 @@ mod test {
 
         // Attempt to set the state to TargetConnectionState::Manual, this transition should fail, as in
         // this transition RCS should be retained.
-        t.update_connection_state(|_| TargetConnectionState::Manual(None));
+        t.update_connection_state(|_| TargetConnectionState::Manual);
 
         assert_eq!(t.get_connection_state(), rcs_state);
     }
@@ -2500,30 +2470,6 @@ mod test {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_target_get_manual_timeout() {
-        let target = Target::new();
-        assert_eq!(target.get_manual_timeout(), None);
-
-        target.addrs_insert_entry(TargetAddrEntry::new(
-            TargetAddr::new("::1".parse().unwrap(), 0, 0),
-            Utc::now(),
-            TargetAddrStatus::ssh().manually_added(),
-        ));
-        assert!(target.is_manual());
-        assert_eq!(target.get_manual_timeout(), None);
-
-        let target = Target::new();
-        let now = SystemTime::now();
-        target.addrs_insert_entry(TargetAddrEntry::new(
-            TargetAddr::new("::1".parse().unwrap(), 0, 0),
-            Utc::now(),
-            TargetAddrStatus::ssh().manually_added_until(now),
-        ));
-        assert!(target.is_manual());
-        assert_eq!(target.get_manual_timeout(), Some(now));
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
     async fn test_update_connection_state_manual_disconnect() {
         let local_node = overnet_core::Router::new(None).unwrap();
 
@@ -2533,12 +2479,12 @@ mod test {
             Utc::now(),
             TargetAddrStatus::ssh().manually_added(),
         ));
-        target.set_state(TargetConnectionState::Manual(None));
+        target.set_state(TargetConnectionState::Manual);
 
         // Attempting to transition a manual target into the disconnected state remains in manual,
         // if the target has no timeout set.
         target.update_connection_state(|_| TargetConnectionState::Disconnected);
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Manual(_));
+        assert_eq!(target.get_connection_state(), TargetConnectionState::Manual);
 
         let conn = RcsConnection::new_with_proxy(
             local_node,
@@ -2551,71 +2497,7 @@ mod test {
 
         // A manual target exiting the RCS state to disconnected returns to manual instead.
         target.update_connection_state(|_| TargetConnectionState::Disconnected);
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Manual(_));
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_update_connection_state_expired_ephemeral_disconnect() {
-        let local_node = overnet_core::Router::new(None).unwrap();
-
-        let target = Target::new();
-        target.addrs_insert_entry(TargetAddrEntry::new(
-            TargetAddr::new("::1".parse().unwrap(), 0, 0),
-            Utc::now(),
-            TargetAddrStatus::ssh()
-                .manually_added_until(SystemTime::now() - Duration::from_secs(3600)),
-        ));
-        target.set_state(TargetConnectionState::Manual(Some(Instant::now())));
-
-        // Attempting to transition a manual target into the disconnected state can disconnect,
-        // if the target has a timeout set and it's expired.
-        target.update_connection_state(|_| TargetConnectionState::Disconnected);
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Disconnected);
-
-        let conn = RcsConnection::new_with_proxy(
-            local_node,
-            setup_fake_remote_control_service(false, "abc".to_owned()),
-            &NodeId { id: 1234 },
-        );
-        // A manual target can enter the RCS state.
-        target.update_connection_state(|_| TargetConnectionState::Rcs(conn));
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Rcs(_));
-
-        // A manual target exiting the RCS state to disconnected returns to manual instead.
-        target.update_connection_state(|_| TargetConnectionState::Disconnected);
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Manual(_));
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_update_connection_state_ephemeral_disconnect() {
-        let local_node = overnet_core::Router::new(None).unwrap();
-
-        let target = Target::new();
-        target.addrs_insert_entry(TargetAddrEntry::new(
-            TargetAddr::new("::1".parse().unwrap(), 0, 0),
-            Utc::now(),
-            TargetAddrStatus::ssh()
-                .manually_added_until(SystemTime::now() + Duration::from_secs(3600)),
-        ));
-        target.set_state(TargetConnectionState::Manual(Some(Instant::now())));
-
-        // Attempting to transition a manual target into the disconnected state returns to manual
-        // if the target has a timeout set but there's still time before expiry.
-        target.update_connection_state(|_| TargetConnectionState::Disconnected);
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Manual(_));
-
-        let conn = RcsConnection::new_with_proxy(
-            local_node,
-            setup_fake_remote_control_service(false, "abc".to_owned()),
-            &NodeId { id: 1234 },
-        );
-        // A manual target can enter the RCS state.
-        target.update_connection_state(|_| TargetConnectionState::Rcs(conn));
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Rcs(_));
-
-        // A manual target exiting the RCS state to disconnected returns to manual instead.
-        target.update_connection_state(|_| TargetConnectionState::Disconnected);
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Manual(_));
+        assert_eq!(target.get_connection_state(), TargetConnectionState::Manual);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

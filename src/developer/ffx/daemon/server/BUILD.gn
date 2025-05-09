@@ -26,7 +26,6 @@ rustc_library("lib") {
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/errors:lib",
-    "//src/developer/ffx/lib/manual_targets:lib",
     "//src/developer/ffx/lib/metrics:lib",
     "//src/developer/ffx/lib/protocols:lib",
     "//src/developer/ffx/lib/rcs:lib",
@@ -47,7 +46,6 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/addr:lib",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:futures-lite",
     "//third_party/rust_crates:tempfile",
   ]

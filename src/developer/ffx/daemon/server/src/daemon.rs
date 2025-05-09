@@ -30,7 +30,6 @@ use fuchsia_async::{Task, TimeoutExt, Timer};
 use futures::channel::{mpsc, oneshot};
 use futures::executor::block_on;
 use futures::prelude::*;
-use manual_targets::{Config, ManualTargets};
 use notify::{RecursiveMode, Watcher};
 use overnet_core::ListablePeer;
 use protocols::{DaemonProtocolProvider, ProtocolError, ProtocolRegister};
@@ -589,24 +588,9 @@ impl Daemon {
         self.tasks.push(Rc::new(Task::local(async move {
             loop {
                 Timer::new(frequency).await;
-                let manual_targets = Config::default();
-
                 match target_collection.upgrade() {
                     Some(target_collection) => {
-                        let expired_addrs = target_collection.expire_targets(&overnet_node);
-                        for addr in expired_addrs {
-                            // If a manual target has been allowed to transition to the
-                            // "disconnected" state, it should be removed from the collection.
-                            match manual_targets.remove(format!("{}", addr)).await {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    tracing::error!(
-                                        "Unable to persist ephemeral target removal: {}",
-                                        e
-                                    );
-                                }
-                            }
-                        }
+                        target_collection.expire_targets(&overnet_node);
                     }
                     None => return,
                 }
@@ -920,10 +904,7 @@ impl Hash for PeerSetElement {
 #[cfg(test)]
 mod test {
     use super::*;
-    use addr::TargetAddr;
     use assert_matches::assert_matches;
-    use chrono::Utc;
-    use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrStatus};
     use fidl_fuchsia_developer_ffx::DaemonProxy;
     use fidl_fuchsia_developer_remotecontrol::{
         IdentifyHostResponse, RemoteControlRequest, RemoteControlRequestStream,
@@ -932,7 +913,7 @@ mod test {
     use std::cell::RefCell;
     use std::collections::BTreeSet;
     use std::str::FromStr;
-    use std::time::{Instant, SystemTime};
+    use std::time::Instant;
 
     fn spawn_test_daemon() -> (DaemonProxy, Daemon, Task<Result<()>>) {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
@@ -1050,66 +1031,6 @@ mod test {
         }
 
         assert_eq!(TargetConnectionState::Disconnected, target.get_connection_state());
-    }
-
-    #[fuchsia::test]
-    async fn test_ephemeral_target_expiry() {
-        let local_node = overnet_core::Router::new(None).unwrap();
-        let tempdir = tempfile::tempdir().expect("Creating tempdir");
-        let socket_path = tempdir.path().join("ascendd.sock");
-        let mut daemon = Daemon::new(socket_path);
-        let expiring_target = Target::new_with_addr_entries(
-            Some("goodbye-world"),
-            vec![TargetAddrEntry::new(
-                TargetAddr::from_str("127.0.0.1:8088").unwrap(),
-                Utc::now(),
-                TargetAddrStatus::ssh().manually_added_until(SystemTime::now()),
-            )]
-            .into_iter(),
-        );
-        expiring_target.set_ssh_port(Some(8022));
-
-        let persistent_target = Target::new_with_addr_entries(
-            Some("i-will-stick-around"),
-            vec![TargetAddrEntry::new(
-                TargetAddr::from_str("127.0.0.1:8089").unwrap(),
-                Utc::now(),
-                TargetAddrStatus::ssh().manually_added(),
-            )]
-            .into_iter(),
-        );
-        persistent_target.set_ssh_port(Some(8023));
-
-        let then = Instant::now() - Duration::from_secs(10);
-        expiring_target.update_connection_state(|_| TargetConnectionState::Mdns(then));
-        persistent_target.update_connection_state(|_| TargetConnectionState::Mdns(then));
-
-        assert!(daemon.target_collection.is_empty());
-
-        daemon.target_collection.merge_insert(expiring_target.clone());
-        daemon.target_collection.merge_insert(persistent_target.clone());
-
-        assert_eq!(TargetConnectionState::Mdns(then), expiring_target.get_connection_state());
-        assert_eq!(TargetConnectionState::Mdns(then), persistent_target.get_connection_state());
-
-        daemon.start_target_expiry(Duration::from_millis(1), local_node);
-
-        while expiring_target.get_connection_state() == TargetConnectionState::Mdns(then) {
-            futures_lite::future::yield_now().await
-        }
-        while persistent_target.get_connection_state() == TargetConnectionState::Mdns(then) {
-            futures_lite::future::yield_now().await
-        }
-        assert_eq!(TargetConnectionState::Disconnected, expiring_target.get_connection_state());
-        assert_matches!(
-            persistent_target.get_connection_state(),
-            TargetConnectionState::Manual(None)
-        );
-        let not_found = daemon
-            .target_collection
-            .query_single_enabled_target(&"goodbye-world".into())
-            .expect("Query should not be ambiguous");
-        assert!(not_found.is_none(), "Should've expired: {not_found:?}");
     }
 
     struct NullDaemonEventSynthesizer();
