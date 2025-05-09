@@ -22,6 +22,11 @@ if (is_host) {
     libraries = [ "//src/performance/lib/perf_publish" ]
   }
 
+  python_host_test("runtime_deps_test") {
+    main_source = "runtime_deps_test.py"
+    libraries = [ "//src/performance/lib/perf_publish" ]
+  }
+
   host_test_data("runtime_deps") {
     sources = [ "${root_out_dir}/catapult_converter" ]
     outputs = [ "${target_out_dir}/runtime_deps/{{source_file_part}}" ]
@@ -34,6 +39,7 @@ group("tests") {
   public_deps = [
     ":metrics_allowlist_test($host_toolchain)",
     ":perf_publish_test($host_toolchain)",
+    ":runtime_deps_test($host_toolchain)",
     ":summarize_test($host_toolchain)",
   ]
 }

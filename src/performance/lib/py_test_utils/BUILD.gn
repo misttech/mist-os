@@ -12,8 +12,3 @@ python_library("perf_test_utils") {
     "utils.py",
   ]
 }
-
-group("tests") {
-  testonly = true
-  public_deps = [ "tests" ]
-}

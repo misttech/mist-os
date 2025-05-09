@@ -8,11 +8,11 @@ import pathlib
 import tempfile
 import unittest
 
-from perf_test_utils import utils
+import perf_publish.publish as publish
 
 
-class UtilsTest(unittest.TestCase):
-    """Perf test utils tests"""
+class RuntimeDepsDirTest(unittest.TestCase):
+    """Tests Runtime-deps-dir helper"""
 
     def test_get_associated_runtime_deps_dir_success(self) -> None:
         """
@@ -21,7 +21,7 @@ class UtilsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             search_path = pathlib.Path(tmpdir) / "runtime_deps" / "dir"
             search_path.mkdir(mode=711, parents=True, exist_ok=True)
-            res = utils.get_associated_runtime_deps_dir(search_path)
+            res = publish.get_associated_runtime_deps_dir(search_path)
             self.assertEqual(pathlib.Path(tmpdir) / "runtime_deps", res)
 
     def test_get_runtime_deps_ancestor_path_not_found(self) -> None:
@@ -31,4 +31,4 @@ class UtilsTest(unittest.TestCase):
         """
         with tempfile.TemporaryDirectory() as tmpdir:
             with self.assertRaises(ValueError):
-                utils.get_associated_runtime_deps_dir(tmpdir)
+                publish.get_associated_runtime_deps_dir(tmpdir)
