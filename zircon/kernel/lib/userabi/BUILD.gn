@@ -39,7 +39,7 @@ library_headers("headers") {
   ]
   if (is_kernel) {
     public_deps += [
-      # <lib/userabi/rodso.h> has #include <object/handle.h>.
+      # <lib/userabi/vdso.h> has #include <object/vm_object_dispatcher.h>.
       "//zircon/kernel/object",
     ]
     if (!kernel_no_userabi) {
@@ -161,23 +161,12 @@ rodso("vdso") {
 }
 
 if (is_kernel) {
-  # Support for loading embedded ELF files, used for both vdso and userboot.
-  source_set("rodso") {
-    visibility = [ ":*" ]
-    sources = [ "rodso.cc" ]
-    deps = [
-      ":headers",
-      "//zircon/kernel/vm:headers",
-    ]
-  }
-
   # Initializing, supporting, and validating the vDSO itself.
   source_set("vdso") {
     visibility = [ ":*" ]
     sources = [ "vdso.cc" ]
     deps = [
       ":headers",
-      ":rodso",
       ":vdso-code.h",
       "//zircon/kernel/dev/timer/arm_generic:headers",
       "//zircon/kernel/lib/boot-options",
@@ -240,7 +229,6 @@ if (is_kernel) {
     include_dirs = [ target_gen_dir ]
     deps = [
       ":headers",
-      ":rodso",
       "//src/lib/elfldltl",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/console",

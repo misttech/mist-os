@@ -12,8 +12,7 @@
 #include <arch/arch_ops.h>
 
 zx::result<MappedElf> MapHandoffElf(  //
-    HandoffEnd::Elf elf, VmAddressRegionDispatcher& parent_vmar,
-    ktl::optional<size_t> specific_offset) {
+    HandoffEnd::Elf elf, VmAddressRegionDispatcher& parent_vmar) {
   ktl::array<char, ZX_MAX_NAME_LEN> vmo_name_buffer;
   elf.vmo->get_name(vmo_name_buffer.data(), vmo_name_buffer.size());
   ktl::string_view vmo_name{vmo_name_buffer.data(), vmo_name_buffer.size()};
@@ -23,11 +22,8 @@ zx::result<MappedElf> MapHandoffElf(  //
   zx_rights_t vmar_rights;
   zx_vm_option_t vmar_flags =
       ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_EXECUTE;
-  if (specific_offset) {
-    vmar_flags |= ZX_VM_SPECIFIC;
-  }
-  zx_status_t status = parent_vmar.Allocate(specific_offset.value_or(0), elf.vmar_size, vmar_flags,
-                                            &vmar_handle, &vmar_rights);
+  zx_status_t status =
+      parent_vmar.Allocate(0, elf.vmar_size, vmar_flags, &vmar_handle, &vmar_rights);
   if (status != ZX_OK) {
     dprintf(CRITICAL, "userboot: failed to allocate VMAR of %zu bytes for %.*s ELF image\n",
             elf.vmar_size, static_cast<int>(vmo_name.size()), vmo_name.data());

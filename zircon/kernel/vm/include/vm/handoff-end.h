@@ -31,6 +31,7 @@ struct HandoffEnd {
   // Culled from PhysElfImage.
   struct Elf {
     fbl::RefPtr<VmObject> vmo;
+    size_t content_size;
     size_t vmar_size;
     fbl::Vector<PhysMapping> mappings;
     PhysElfImage::Info info;
@@ -39,8 +40,7 @@ struct HandoffEnd {
   // The data ZBI.
   HandleOwner zbi;
 
-  fbl::RefPtr<VmObject> vdso;
-
+  Elf vdso;
   Elf userboot;
 
   // The VMOs deriving from the phys environment. As returned by EndHandoff(),

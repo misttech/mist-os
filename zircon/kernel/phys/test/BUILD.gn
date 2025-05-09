@@ -555,9 +555,10 @@ kernel_package("physboot-test-data") {
     ":physboot-test-data.cmdline",
     ":physboot-test-data.version-string",
 
-    # This won't actually be used by the test kernel, but physboot will panic
-    # without an appropriately loadable ELF binary for userboot to hand off.
+    # These won't actually be used by the test kernel, but physboot will panic
+    # if it can't hand off loadable ELF files for vdso and userboot.
     "//zircon/kernel/lib/userabi/trivial-test-userboot:trivial-test-userboot.basic",
+    "//zircon/kernel/lib/userabi/vdso",
   ]
 }
 

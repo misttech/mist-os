@@ -37,6 +37,9 @@
 
 namespace {
 
+constexpr uint64_t kVdsoCodeStart = VDSO_CODE_START;
+constexpr size_t kVdsoCodeSize = VDSO_CODE_END - VDSO_CODE_START;
+
 class VDsoMutator {
  public:
   explicit VDsoMutator(const fbl::RefPtr<VmObject>& vmo) : vmo_(vmo) {}
@@ -112,7 +115,7 @@ class VDsoMutator {
     return trap_fill_.get();
   }
 
-  uintptr_t SymtabAddress(size_t idx) {
+  static uintptr_t SymtabAddress(size_t idx) {
     ASSERT(idx < VDSO_DYNSYM_COUNT);
     return VDSO_DATA_START_dynsym + (idx * sizeof(ElfSym));
   }
@@ -351,25 +354,37 @@ void PatchTimeSyscalls(VDsoMutator mutator) {
 
 }  // anonymous namespace
 
-const VDso* VDso::instance_ = NULL;
-
-// Private constructor, can only be called by Create (below).
-VDso::VDso(fbl::RefPtr<VmObject> next) : RoDso(ktl::move(next), VDSO_CODE_END, VDSO_CODE_START) {}
+const VDso* VDso::instance_ = nullptr;
 
 // This is called exactly once, at boot time.
 const VDso* VDso::Create(
-    fbl::RefPtr<VmObject> next,
+    const HandoffEnd::Elf& elf_image,
     ktl::span<KernelHandle<VmObjectDispatcher>, userboot::kNumVdsoVariants> vmo_kernel_handles,
     KernelHandle<VmObjectDispatcher>* time_values_handle) {
   ASSERT(!instance_);
 
+  // Check the ELF segments are valid for the vDSO.
+  for (const PhysMapping& segment : elf_image.mappings) {
+    ZX_ASSERT_MSG(!segment.perms.writable() && segment.paddr != PhysElfImage::kZeroFill,
+                  "vDSO cannot have writable segment [%#" PRIxPTR ", %#" PRIxPTR ")", segment.vaddr,
+                  segment.vaddr + segment.size);
+    if (segment.perms.executable()) {
+      ZX_ASSERT_MSG(segment.vaddr == kVdsoCodeStart && segment.size == kVdsoCodeSize,
+                    "vDSO code segment [%#" PRIxPTR ", %#" PRIxPTR
+                    ") doesn't match expected [%#" PRIxPTR ", %#" PRIxPTR ")",
+                    segment.vaddr, segment.vaddr + segment.size, kVdsoCodeStart, kVdsoCodeSize);
+    }
+  }
+
   fbl::AllocChecker ac;
-  VDso* vdso = new (&ac) VDso(ktl::move(next));
+  VDso* vdso = new (&ac) VDso;
   ASSERT(ac.check());
+
+  vdso->vmo_ = elf_image.vmo;
 
   // build and point a dispatcher at it
   zx_status_t status = VmObjectDispatcher::Create(
-      vdso->vmo(), vdso->size(), VmObjectDispatcher::InitialMutability::kMutable,
+      vdso->vmo(), elf_image.content_size, VmObjectDispatcher::InitialMutability::kMutable,
       &vmo_kernel_handles[variant_index(Variant::NEXT)], &vdso->vmo_rights_);
   ASSERT(status == ZX_OK);
   vdso->vmo_rights_ &= ~ZX_RIGHT_WRITE;
@@ -484,7 +499,8 @@ void VDso::CreateVariant(Variant variant, KernelHandle<VmObjectDispatcher>* vmo_
   DEBUG_ASSERT(!variant_vmo_[variant_index(variant)]);
 
   fbl::RefPtr<VmObject> new_vmo;
-  zx_status_t status = dispatcher()->CreateChild(ZX_VMO_CHILD_SNAPSHOT, 0, size(), false, &new_vmo);
+  zx_status_t status = dispatcher()->CreateChild(ZX_VMO_CHILD_SNAPSHOT, 0,
+                                                 dispatcher()->vmo()->size(), false, &new_vmo);
   ASSERT(status == ZX_OK);
 
   LTRACEF("variant %u\n", static_cast<unsigned int>(variant));
@@ -518,7 +534,7 @@ void VDso::CreateVariant(Variant variant, KernelHandle<VmObjectDispatcher>* vmo_
   }
 
   zx_rights_t rights;
-  status = VmObjectDispatcher::Create(ktl::move(new_vmo), size(),
+  status = VmObjectDispatcher::Create(ktl::move(new_vmo), dispatcher()->GetContentSize(),
                                       VmObjectDispatcher::InitialMutability::kMutable,
                                       vmo_kernel_handle, &rights);
   ASSERT(status == ZX_OK);
@@ -527,4 +543,8 @@ void VDso::CreateVariant(Variant variant, KernelHandle<VmObjectDispatcher>* vmo_
   ASSERT(status == ZX_OK);
 
   variant_vmo_[variant_index(variant)] = vmo_kernel_handle->dispatcher();
+}
+
+bool VDso::valid_code_mapping(uint64_t vmo_offset, size_t size) {
+  return vmo_offset == kVdsoCodeStart && size == kVdsoCodeSize;
 }

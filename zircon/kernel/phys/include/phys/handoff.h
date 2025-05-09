@@ -291,7 +291,7 @@ struct PhysHandoff {
   PhysVmo zbi;
 
   // The vDSO.
-  PhysVmo vdso;
+  PhysElfImage vdso;
 
   // Userboot.
   PhysElfImage userboot;

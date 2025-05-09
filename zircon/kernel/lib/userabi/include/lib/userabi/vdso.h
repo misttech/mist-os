@@ -9,14 +9,15 @@
 
 #include <lib/fasttime/internal/abi.h>
 #include <lib/instrumentation/kernel-mapped-vmo.h>
-#include <lib/userabi/rodso.h>
 #include <lib/userabi/userboot.h>
 
+#include <object/vm_object_dispatcher.h>
+#include <vm/handoff-end.h>
 #include <vm/vm_object.h>
 
 class VmMapping;
 
-class VDso : public RoDso {
+class VDso {
  public:
   // This is called only once, at boot time.
   //
@@ -26,7 +27,7 @@ class VDso : public RoDso {
   // The RoDso VMO is created in vmo_kernel_handles[Variant::NEXT]
   // with the VDso variants in the other slots.
   static const VDso* Create(
-      fbl::RefPtr<VmObject> next,
+      const HandoffEnd::Elf& elf_image,
       ktl::span<KernelHandle<VmObjectDispatcher>, userboot::kNumVdsoVariants> vmo_kernel_handles,
       KernelHandle<VmObjectDispatcher>* time_values_handle);
 
@@ -39,9 +40,7 @@ class VDso : public RoDso {
 #endif
   }
 
-  static bool valid_code_mapping(uint64_t vmo_offset, size_t size) {
-    return instance_->RoDso::valid_code_mapping(vmo_offset, size);
-  }
+  static bool valid_code_mapping(uint64_t vmo_offset, size_t size);
 
   // Given VmAspace::vdso_code_mapping_, return the vDSO base address.
   static uintptr_t base_address(const fbl::RefPtr<VmMapping>& code_mapping)
@@ -66,17 +65,19 @@ class VDso : public RoDso {
 
   zx_rights_t vmo_rights() const { return vmo_rights_; }
 
+  const fbl::RefPtr<VmObject>& vmo() const { return vmo_; }
+
  private:
   using Variant = userboot::VdsoVariant;
 
-  explicit VDso(fbl::RefPtr<VmObject> next);
+  VDso() = default;
 
   void CreateVariant(Variant, KernelHandle<VmObjectDispatcher>* vmo_kernel_handle);
   void CreateTimeValuesVmo(KernelHandle<VmObjectDispatcher>* time_values_handle);
   zx_status_t MapTimeValuesVmo(Variant, const fbl::RefPtr<VmObject>& vdso_vmo);
 
   bool vmo_is_vdso_impl(const fbl::RefPtr<VmObject>& vmo_ref) const {
-    if (vmo_ref == vmo())
+    if (vmo_ref == vmo_)
       return true;
     for (const auto& v : variant_vmo_) {
       if (vmo_ref == v->vmo())
@@ -90,6 +91,7 @@ class VDso : public RoDso {
     return static_cast<size_t>(v);
   }
 
+  fbl::RefPtr<VmObject> vmo_;
   fbl::RefPtr<VmObjectDispatcher> variant_vmo_[static_cast<size_t>(Variant::COUNT)];
   KernelMappedVmo variant_time_mappings_[static_cast<size_t>(Variant::COUNT)];
   fasttime::internal::TimeValues* time_values_[static_cast<size_t>(Variant::COUNT)];

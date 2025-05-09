@@ -286,12 +286,17 @@ void HandoffPrep::UsePackageFiles(KernelStorage::Bootfs kernel_package) {
       SetVersionString(version);
     } else if (it->name == "vdso"sv) {
       ZX_ASSERT(pool.UpdateRamSubranges(memalloc::Type::kVdso, start, aligned_data.size()).is_ok());
-      handoff_->vdso = MakePhysVmo(aligned_data, "vdso/next"sv, data.size());
+      handoff_->vdso = MakePhysElfImage(it, "vdso/next"sv);
     }
   }
   if (auto result = kernel_package.take_error(); result.is_error()) {
     zbitl::PrintBootfsError(result.error_value());
   }
+  ZX_ASSERT_MSG(handoff_->vdso.vmar != PhysVmar{},
+                "\n*** No vdso ELF file found "
+                " in kernel package %.*s (VMO size %#zx) ***",
+                static_cast<int>(kernel_package.directory().size()),
+                kernel_package.directory().data(), handoff_->userboot.vmo.content_size);
   ZX_ASSERT_MSG(handoff_->userboot.vmar != PhysVmar{},
                 "\n*** kernel.select.userboot=%.*s but no such ELF file"
                 " in kernel package %.*s (VMO size %#zx) ***",

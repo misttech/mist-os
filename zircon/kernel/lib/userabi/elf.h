@@ -25,8 +25,6 @@ struct MappedElf {
 // This creates a VMAR within the given parent VMAR, and maps the ELF file in.
 // The new VMAR is returned, so it can be used to change protections for RELRO.
 // The reference can just be dropped to ensure no more changes are possible.
-zx::result<MappedElf> MapHandoffElf(  //
-    HandoffEnd::Elf elf, VmAddressRegionDispatcher& parent_vmar,
-    ktl::optional<size_t> specific_offset);
+zx::result<MappedElf> MapHandoffElf(HandoffEnd::Elf elf, VmAddressRegionDispatcher& parent_vmar);
 
 #endif  // ZIRCON_KERNEL_LIB_USERABI_ELF_H_

@@ -11,7 +11,6 @@
 #include <lib/crashlog.h>
 #include <lib/elfldltl/machine.h>
 #include <lib/instrumentation/vmo.h>
-#include <lib/userabi/rodso.h>
 #include <lib/userabi/userboot.h>
 #include <lib/userabi/userboot_internal.h>
 #include <lib/userabi/vdso.h>
@@ -103,8 +102,32 @@ constexpr const char kBootOptionsVmoname[] = "boot-options.txt";
 KCOUNTER(timeline_userboot, "boot.timeline.userboot")
 KCOUNTER(init_time, "init.userboot.time.msec")
 
-class UserbootImage {
+class Userboot {
  public:
+  Userboot(Userboot&&) = default;
+
+  Userboot(HandoffEnd::Elf userboot, HandoffEnd::Elf vdso)
+      : userboot_elf_{ktl::move(userboot)}, vdso_elf_{ktl::move(vdso)} {}
+
+  [[nodiscard]] zx_status_t Start(ProcessDispatcher& process, VmAddressRegionDispatcher& root_vmar,
+                                  fbl::RefPtr<ThreadDispatcher> thread, HandleOwner arg_handle,
+                                  Handle*& out_vmar) {
+    // Map in the userboot image along with the vDSO.
+    zx::result mapped = Map(root_vmar);
+    ZX_ASSERT_MSG(mapped.is_ok(), "failed to map userboot: %d", mapped.error_value());
+    out_vmar = mapped->userboot_vmar.release();
+    dprintf(SPEW, "userboot: %-31s @  %#" PRIxPTR "\n", "entry point", mapped->userboot_entry);
+
+    // Set up the stack.
+    zx::result<uintptr_t> sp = MapStack(root_vmar, mapped->stack_size);
+    ZX_ASSERT_MSG(sp.is_ok(), "failed to map userboot stack: %d", sp.error_value());
+
+    // Start the process running.
+    return process.Start(ktl::move(thread), mapped->userboot_entry, sp.value(),
+                         ktl::move(arg_handle), mapped->vdso_base);
+  }
+
+ private:
   struct Mapped {
     HandleOwner userboot_vmar;
     zx_vaddr_t userboot_entry;
@@ -112,113 +135,85 @@ class UserbootImage {
     size_t stack_size;
   };
 
-  UserbootImage(UserbootImage&&) = default;
-
-  UserbootImage(HandoffEnd::Elf userboot, const VDso* vdso)
-      : userboot_elf_{ktl::move(userboot)}, vdso_{vdso} {}
-
-  // The whole userboot image consists of the userboot load image immediately
-  // followed by the vDSO image.  This returns the size of that combined image.
-  size_t size() const { return userboot_elf_.vmar_size + vdso_->size(); }
-
   zx::result<Mapped> Map(VmAddressRegionDispatcher& root_vmar) {
-    // Create a VMAR (placed anywhere) to hold the combined image.
-    KernelHandle<VmAddressRegionDispatcher> vmar_handle;
-    zx_rights_t vmar_rights;
-    zx_status_t status = root_vmar.Allocate(
-        0, size(),
-        ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_EXECUTE | ZX_VM_CAN_MAP_SPECIFIC,
-        &vmar_handle, &vmar_rights);
-    if (status != ZX_OK) {
-      return zx::error{status};
-    }
-
     // Map userboot proper.
-    zx::result userboot = MapHandoffElf(ktl::move(userboot_elf_), *vmar_handle.dispatcher(), 0);
+    zx::result userboot = MapHandoffElf(ktl::move(userboot_elf_), root_vmar);
     if (userboot.is_error()) {
       return userboot.take_error();
     }
 
-    // Map the vDSO right after it.
-    // Releasing |vmar_handle| is safe because it has a no-op
-    // on_zero_handles(), otherwise the mapping routines would have
-    // to take ownership of the handle and manage its lifecycle.
-    status = vdso_->Map(vmar_handle.release(), userboot->vaddr_size);
-    if (status != ZX_OK) {
-      return zx::error{status};
+    // Map the vDSO.
+    zx::result vdso = MapHandoffElf(ktl::move(vdso_elf_), root_vmar);
+    if (vdso.is_error()) {
+      return vdso.take_error();
     }
 
-    if (!userboot->stack_size) {
-      // TODO(mcgrathr): rodso.ld makes it impossible to set the stack-size
-      // right in userboot right now.  But soon that won't be an issue and this
-      // can be required.
-      userboot->stack_size = ZIRCON_DEFAULT_STACK_SIZE;
-    }
     ZX_ASSERT_MSG(userboot->stack_size,
                   "userboot image must be linked with explicit -Wl,-z,stack-size=...");
     return zx::ok(Mapped{
         .userboot_vmar = ktl::move(userboot->vmar),
         .userboot_entry = userboot->entry,
-        .vdso_base = userboot->vaddr_start + userboot->vaddr_size,
+        .vdso_base = vdso->vaddr_start,
         .stack_size = *userboot->stack_size,
     });
   }
 
- private:
+  // Map the stack anywhere, in its own VMAR and a one-page guard region below.
+  static zx::result<uintptr_t> MapStack(VmAddressRegionDispatcher& root_vmar, size_t stack_size) {
+    fbl::RefPtr<VmObjectPaged> stack_vmo;
+    zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT, 0u,
+                                               stack_size, &stack_vmo);
+    if (status != ZX_OK) {
+      dprintf(CRITICAL, "userboot: failed to create stack VMO of %zu bytes: %d\n", stack_size,
+              status);
+      return zx::error{status};
+    }
+    stack_vmo->set_name(kStackVmoName, sizeof(kStackVmoName) - 1);
+
+    const size_t vmar_size = stack_size + ZX_PAGE_SIZE;
+    KernelHandle<VmAddressRegionDispatcher> vmar_handle;
+    zx_rights_t vmar_rights;
+    status = root_vmar.Allocate(0, vmar_size,
+                                ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC,
+                                &vmar_handle, &vmar_rights);
+    if (status != ZX_OK) {
+      dprintf(CRITICAL, "userboot: failed allocate stack VMAR of %zu bytes: %d\n", vmar_size,
+              status);
+      return zx::error{status};
+    }
+
+    zx::result<VmAddressRegion::MapResult> map_result =
+        vmar_handle.dispatcher()->Map(ZX_PAGE_SIZE, stack_vmo, 0, stack_size,
+                                      ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC);
+    if (map_result.is_error()) {
+      dprintf(CRITICAL, "userboot: failed to map stack of %zu bytes: %d\n", stack_size,
+              map_result.error_value());
+      return map_result.take_error();
+    }
+    const uintptr_t stack_base = map_result->base;
+    const uintptr_t sp = elfldltl::AbiTraits<>::InitialStackPointer(stack_base, stack_size);
+    dprintf(SPEW, "userboot: %-31s @ [%#" PRIxPTR ", %#" PRIxPTR ")\n", "stack mapped", stack_base,
+            stack_base + stack_size);
+    constexpr auto hex_width = [](auto x) { return 2 + ((ktl::bit_width(x) + 3) / 4); };
+    dprintf(SPEW, "userboot: %-31s @ %#*" PRIxPTR "\n", "sp",
+            hex_width(stack_base) + 3 + hex_width(sp), sp);
+
+    zx_rights_t vmo_rights;
+    KernelHandle<VmObjectDispatcher> vmo_handle;
+    status = VmObjectDispatcher::Create(ktl::move(stack_vmo), stack_size,
+                                        VmObjectDispatcher::InitialMutability::kMutable,
+                                        &vmo_handle, &vmo_rights);
+    if (status != ZX_OK) {
+      dprintf(CRITICAL, "userboot: failed to create stack VMO dispatcher: %d\n", status);
+      return zx::error{status};
+    }
+
+    return zx::ok(sp);
+  }
+
   HandoffEnd::Elf userboot_elf_;
-  const VDso* vdso_;
+  HandoffEnd::Elf vdso_elf_;
 };
-
-// Map the stack anywhere, in its own VMAR with a one-page guard region below.
-zx::result<uintptr_t> MapStack(VmAddressRegionDispatcher& root_vmar, size_t stack_size) {
-  fbl::RefPtr<VmObjectPaged> stack_vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT, 0u,
-                                             stack_size, &stack_vmo);
-  if (status != ZX_OK) {
-    dprintf(CRITICAL, "userboot: failed to create stack VMO of %zu bytes: %d\n", stack_size,
-            status);
-    return zx::error{status};
-  }
-  stack_vmo->set_name(kStackVmoName, sizeof(kStackVmoName) - 1);
-
-  const size_t vmar_size = stack_size + ZX_PAGE_SIZE;
-  KernelHandle<VmAddressRegionDispatcher> vmar_handle;
-  zx_rights_t vmar_rights;
-  status = root_vmar.Allocate(0, vmar_size,
-                              ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC,
-                              &vmar_handle, &vmar_rights);
-  if (status != ZX_OK) {
-    dprintf(CRITICAL, "userboot: failed allocate stack VMAR of %zu bytes: %d\n", vmar_size, status);
-    return zx::error{status};
-  }
-
-  zx::result<VmAddressRegion::MapResult> map_result = vmar_handle.dispatcher()->Map(
-      ZX_PAGE_SIZE, stack_vmo, 0, stack_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC);
-  if (map_result.is_error()) {
-    dprintf(CRITICAL, "userboot: failed to map stack of %zu bytes: %d\n", stack_size,
-            map_result.error_value());
-    return map_result.take_error();
-  }
-  const uintptr_t stack_base = map_result->base;
-  const uintptr_t sp = elfldltl::AbiTraits<>::InitialStackPointer(stack_base, stack_size);
-  dprintf(SPEW, "userboot: %-31s @ [%#" PRIxPTR ", %#" PRIxPTR ")\n", "stack mapped", stack_base,
-          stack_base + stack_size);
-  constexpr auto hex_width = [](auto x) { return 2 + ((ktl::bit_width(x) + 3) / 4); };
-  dprintf(SPEW, "userboot: %-31s @ %#*" PRIxPTR "\n", "sp",
-          hex_width(stack_base) + 3 + hex_width(sp), sp);
-
-  zx_rights_t vmo_rights;
-  KernelHandle<VmObjectDispatcher> vmo_handle;
-  status = VmObjectDispatcher::Create(ktl::move(stack_vmo), stack_size,
-                                      VmObjectDispatcher::InitialMutability::kMutable, &vmo_handle,
-                                      &vmo_rights);
-  if (status != ZX_OK) {
-    dprintf(CRITICAL, "userboot: failed to create stack VMO dispatcher: %d\n", status);
-    return zx::error{status};
-  }
-
-  return zx::ok(sp);
-}
 
 // Keep a global reference to the kcounters vmo so that the kcounters
 // memory always remains valid, even if userspace closes the last handle.
@@ -293,8 +288,8 @@ zx_status_t crashlog_to_vmo(fbl::RefPtr<VmObject>* out, size_t* out_size) {
   return ZX_OK;
 }
 
-UserbootImage bootstrap_vmos(HandoffEnd handoff_end,
-                             ktl::span<Handle*, userboot::kHandleCount> handles) {
+Userboot bootstrap_vmos(HandoffEnd handoff_end,
+                        ktl::span<Handle*, userboot::kHandleCount> handles) {
   // The instrumentation VMOs need to be created prior to the rootfs as the information for these
   // vmos is in the phys handoff region, which becomes inaccessible once the rootfs is created.
   zx_status_t status = InstrumentationData::GetVmos(&handles[userboot::kFirstInstrumentationData]);
@@ -308,13 +303,14 @@ UserbootImage bootstrap_vmos(HandoffEnd handoff_end,
 
   KernelHandle<VmObjectDispatcher> vdso_kernel_handles[userboot::kNumVdsoVariants];
   KernelHandle<VmObjectDispatcher> time_values_handle;
-  const VDso* vdso = VDso::Create(ktl::move(handoff_end.vdso), ktl::span{vdso_kernel_handles},
-                                  &time_values_handle);
+  const VDso* vdso =
+      VDso::Create(handoff_end.vdso, ktl::span{vdso_kernel_handles}, &time_values_handle);
   handles[userboot::kTimeValues] =
       Handle::Make(ktl::move(time_values_handle), (vdso->vmo_rights() & (~ZX_RIGHT_EXECUTE)))
           .release();
   ASSERT(handles[userboot::kTimeValues]);
   for (size_t i = 0; i < userboot::kNumVdsoVariants; ++i) {
+    ASSERT(vdso_kernel_handles[i].dispatcher());
     handles[userboot::kFirstVdso + i] =
         Handle::Make(ktl::move(vdso_kernel_handles[i]), vdso->vmo_rights()).release();
     ASSERT(handles[userboot::kFirstVdso + i]);
@@ -374,7 +370,7 @@ UserbootImage bootstrap_vmos(HandoffEnd handoff_end,
                           &handles[userboot::kCounters]);
   ASSERT(status == ZX_OK);
 
-  return {ktl::move(handoff_end.userboot), vdso};
+  return {ktl::move(handoff_end.userboot), ktl::move(handoff_end.vdso)};
 }
 
 class BootstrapChannel {
@@ -417,25 +413,6 @@ fbl::RefPtr<ThreadDispatcher> MakeThread(fbl::RefPtr<ProcessDispatcher> process,
   return thread;
 }
 
-[[nodiscard]] zx_status_t StartUserboot(UserbootImage userboot, ProcessDispatcher& process,
-                                        VmAddressRegionDispatcher& root_vmar,
-                                        fbl::RefPtr<ThreadDispatcher> thread,
-                                        HandleOwner arg_handle, Handle*& out_vmar) {
-  // Map in the userboot image along with the vDSO.
-  zx::result mapped = userboot.Map(root_vmar);
-  ZX_ASSERT_MSG(mapped.is_ok(), "failed to map userboot: %d", mapped.error_value());
-  out_vmar = mapped->userboot_vmar.release();
-  dprintf(SPEW, "userboot: %-31s @  %#" PRIxPTR "\n", "entry point", mapped->userboot_entry);
-
-  // Set up the stack.
-  zx::result<uintptr_t> sp = MapStack(root_vmar, mapped->stack_size);
-  ZX_ASSERT_MSG(sp.is_ok(), "failed to map userboot stack: %d", sp.error_value());
-
-  // Start the process running.
-  return process.Start(ktl::move(thread), mapped->userboot_entry, sp.value(), ktl::move(arg_handle),
-                       mapped->vdso_base);
-}
-
 }  // namespace
 
 void userboot_init(HandoffEnd handoff_end) {
@@ -475,12 +452,12 @@ void userboot_init(HandoffEnd handoff_end) {
   BootstrapChannel bootstrap_channel{*process_handle.dispatcher()};
 
   // Pack up the miscellaneous VMOs and take the userboot VMO and details.
-  UserbootImage userboot = bootstrap_vmos(ktl::move(handoff_end), handles);
+  Userboot userboot = bootstrap_vmos(ktl::move(handoff_end), handles);
 
   // Start userboot running.  It may block waiting for the bootstrap message.
-  status = StartUserboot(ktl::move(userboot), *process_handle.dispatcher(),
-                         *vmar_handle.dispatcher(), ktl::move(thread),
-                         bootstrap_channel.TakeUserHandle(), handles[userboot::kVmarLoaded]);
+  status =
+      userboot.Start(*process_handle.dispatcher(), *vmar_handle.dispatcher(), ktl::move(thread),
+                     bootstrap_channel.TakeUserHandle(), handles[userboot::kVmarLoaded]);
   ASSERT(status == ZX_OK);
   ASSERT(handles[userboot::kVmarLoaded]);
 
