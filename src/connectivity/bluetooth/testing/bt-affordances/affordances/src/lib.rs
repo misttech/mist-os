@@ -40,162 +40,153 @@ pub struct WorkThread {
 
 impl WorkThread {
     pub fn spawn() -> Self {
-        let (sender, mut receiver) = mpsc::unbounded::<Request>();
+        let (sender, receiver) = mpsc::unbounded::<Request>();
+
         let thread_handle = thread::spawn(move || {
-            LocalExecutor::new().run_singlethreaded(async {
-                let mut access_proxy = connect_to_protocol::<AccessMarker>()?;
-                let mut profile_proxy = connect_to_protocol::<ProfileMarker>()?;
-                let mut host_watcher_stream = HangingGetStream::new_with_fn_ptr(
-                    connect_to_protocol::<HostWatcherMarker>()?,
-                    HostWatcherProxy::watch,
-                );
-                let mut peer_watcher_stream = HangingGetStream::new_with_fn_ptr(
-                    access_proxy.clone(),
-                    AccessProxy::watch_peers,
-                );
-                let mut host_cache: Vec<HostInfo> = Vec::new();
-                let mut peer_cache: Vec<Peer> = Vec::new();
-                #[allow(clippy::collection_is_never_read)]
-                let mut _l2cap_channel: Option<Channel> = None;
-                let mut discoverability_session: Option<ProcedureTokenProxy> = None;
-
-                while let Some(request) = receiver.next().await {
-                    match request {
-                        Request::ReadLocalAddress(sender) => {
-                            sender
-                                .send(
-                                    get_active_host(&mut host_cache, &mut host_watcher_stream)
-                                        .map_ok(|host| {
-                                            host.addresses
-                                                .clone()
-                                                .unwrap()
-                                                .first()
-                                                .expect("Host has no address")
-                                                .bytes
-                                        })
-                                        .await,
-                                )
-                                .expect("Failed to send");
-                        }
-                        Request::GetKnownPeers(sender) => {
-                            if let Err(err) = refresh_peer_cache(
-                                std::time::Duration::ZERO,
-                                &mut peer_cache,
-                                &mut peer_watcher_stream,
-                            )
-                            .await
-                            {
-                                sender
-                                    .send(Err(anyhow!("refresh_peer_cache() error: {}", err)))
-                                    .expect("Failed to send");
-                                continue;
-                            }
-                            sender.send(Ok(peer_cache.clone())).expect("Failed to send");
-                        }
-                        Request::GetPeerId(address, result_sender) => {
-                            let (_discovery_session, discovery_session_server) =
-                                fidl::endpoints::create_proxy();
-                            if let Err(err) =
-                                access_proxy.start_discovery(discovery_session_server).await?
-                            {
-                                result_sender
-                                    .send(Err(anyhow!(
-                                        "fuchsia.bluetooth.sys.Access/StartDiscovery error: {:?}",
-                                        err
-                                    )))
-                                    .expect("Failed to send");
-                                continue;
-                            }
-
-                            match get_peer(
-                                &address,
-                                std::time::Duration::from_secs(1),
-                                &mut peer_cache,
-                                &mut peer_watcher_stream,
-                            )
-                            .await
-                            {
-                                Ok(Some(peer)) => {
-                                    result_sender
-                                        .send(Ok(peer.id.unwrap()))
-                                        .expect("Failed to send");
-                                }
-                                Ok(None) => {
-                                    result_sender
-                                        .send(Err(anyhow!("Peer not found")))
-                                        .expect("Failed to send");
-                                }
-                                Err(err) => {
-                                    result_sender
-                                        .send(Err(anyhow!("wait_for_peer() error: {}", err)))
-                                        .expect("Failed to send");
-                                }
-                            }
-                        }
-                        Request::Forget(peer_id, sender) => {
-                            sender
-                                .send(forget(&peer_id, &mut access_proxy).await)
-                                .expect("Failed to send");
-                        }
-                        Request::Connect(peer_id, result_sender) => {
-                            result_sender
-                                .send(connect(&peer_id, &mut access_proxy).await)
-                                .expect("Failed to send");
-                        }
-                        Request::ConnectL2cap(peer_id, psm, result_sender) => {
-                            match connect_l2cap(&peer_id, psm, &mut profile_proxy).await {
-                                Ok(channel) => {
-                                    _l2cap_channel = Some(channel);
-                                    result_sender.send(Ok(())).expect("Failed to send");
-                                }
-                                Err(err) => {
-                                    result_sender.send(Err(err)).expect("Failed to send");
-                                }
-                            }
-                        }
-                        Request::SetDiscoverability(discoverable, sender) => {
-                            if !discoverable {
-                                if discoverability_session.take().is_none() {
-                                    eprintln!(
-                                        "Asked to revoke nonexistent discoverability session."
-                                    );
-                                }
-                                sender.send(Ok(())).expect("Failed to send");
-                                continue;
-                            }
-                            if discoverability_session.is_some() {
-                                continue;
-                            }
-                            let (token, discoverability_session_server) =
-                                fidl::endpoints::create_proxy();
-                            if let Err(err) = access_proxy
-                                .make_discoverable(discoverability_session_server)
-                                .await?
-                            {
-                                sender
-                                    .send(Err(anyhow!(
-                                        "fuchsia.bluetooth.sys.Access/MakeDiscoverable error: {:?}",
-                                        err
-                                    )))
-                                    .expect("Failed to send");
-                                continue;
-                            }
-                            discoverability_session = Some(token);
-                            sender.send(Ok(())).expect("Failed to send");
-                        }
-                        Request::Stop => {
-                            break;
-                        }
-                    }
-                }
-
-                Ok::<(), anyhow::Error>(())
-            })?;
-
+            LocalExecutor::new().run_singlethreaded(Self::handle_requests(receiver))?;
             Ok(())
         });
 
         Self { thread_handle: Mutex::new(Some(thread_handle)), sender }
+    }
+
+    async fn handle_requests(
+        mut receiver: mpsc::UnboundedReceiver<Request>,
+    ) -> Result<(), anyhow::Error> {
+        let mut access_proxy = connect_to_protocol::<AccessMarker>()?;
+        let mut profile_proxy = connect_to_protocol::<ProfileMarker>()?;
+        let mut host_watcher_stream = HangingGetStream::new_with_fn_ptr(
+            connect_to_protocol::<HostWatcherMarker>()?,
+            HostWatcherProxy::watch,
+        );
+        let mut peer_watcher_stream =
+            HangingGetStream::new_with_fn_ptr(access_proxy.clone(), AccessProxy::watch_peers);
+        let mut host_cache: Vec<HostInfo> = Vec::new();
+        let mut peer_cache: Vec<Peer> = Vec::new();
+        #[allow(clippy::collection_is_never_read)]
+        let mut _l2cap_channel: Option<Channel> = None;
+        let mut discoverability_session: Option<ProcedureTokenProxy> = None;
+
+        while let Some(request) = receiver.next().await {
+            match request {
+                Request::ReadLocalAddress(sender) => {
+                    sender
+                        .send(
+                            get_active_host(&mut host_cache, &mut host_watcher_stream)
+                                .map_ok(|host| {
+                                    host.addresses
+                                        .clone()
+                                        .unwrap()
+                                        .first()
+                                        .expect("Host has no address")
+                                        .bytes
+                                })
+                                .await,
+                        )
+                        .expect("Failed to send");
+                }
+                Request::GetKnownPeers(sender) => {
+                    if let Err(err) = refresh_peer_cache(
+                        std::time::Duration::ZERO,
+                        &mut peer_cache,
+                        &mut peer_watcher_stream,
+                    )
+                    .await
+                    {
+                        sender
+                            .send(Err(anyhow!("refresh_peer_cache() error: {}", err)))
+                            .expect("Failed to send");
+                        continue;
+                    }
+                    sender.send(Ok(peer_cache.clone())).expect("Failed to send");
+                }
+                Request::GetPeerId(address, result_sender) => {
+                    let (_discovery_session, discovery_session_server) =
+                        fidl::endpoints::create_proxy();
+                    if let Err(err) = access_proxy.start_discovery(discovery_session_server).await?
+                    {
+                        result_sender
+                            .send(Err(anyhow!(
+                                "fuchsia.bluetooth.sys.Access/StartDiscovery error: {:?}",
+                                err
+                            )))
+                            .expect("Failed to send");
+                        continue;
+                    }
+
+                    match get_peer(
+                        &address,
+                        std::time::Duration::from_secs(1),
+                        &mut peer_cache,
+                        &mut peer_watcher_stream,
+                    )
+                    .await
+                    {
+                        Ok(Some(peer)) => {
+                            result_sender.send(Ok(peer.id.unwrap())).expect("Failed to send");
+                        }
+                        Ok(None) => {
+                            result_sender
+                                .send(Err(anyhow!("Peer not found")))
+                                .expect("Failed to send");
+                        }
+                        Err(err) => {
+                            result_sender
+                                .send(Err(anyhow!("wait_for_peer() error: {}", err)))
+                                .expect("Failed to send");
+                        }
+                    }
+                }
+                Request::Forget(peer_id, sender) => {
+                    sender.send(forget(&peer_id, &mut access_proxy).await).expect("Failed to send");
+                }
+                Request::Connect(peer_id, result_sender) => {
+                    result_sender
+                        .send(connect(&peer_id, &mut access_proxy).await)
+                        .expect("Failed to send");
+                }
+                Request::ConnectL2cap(peer_id, psm, result_sender) => {
+                    match connect_l2cap(&peer_id, psm, &mut profile_proxy).await {
+                        Ok(channel) => {
+                            _l2cap_channel = Some(channel);
+                            result_sender.send(Ok(())).expect("Failed to send");
+                        }
+                        Err(err) => {
+                            result_sender.send(Err(err)).expect("Failed to send");
+                        }
+                    }
+                }
+                Request::SetDiscoverability(discoverable, sender) => {
+                    if !discoverable {
+                        if discoverability_session.take().is_none() {
+                            eprintln!("Asked to revoke nonexistent discoverability session.");
+                        }
+                        sender.send(Ok(())).expect("Failed to send");
+                        continue;
+                    }
+                    if discoverability_session.is_some() {
+                        continue;
+                    }
+                    let (token, discoverability_session_server) = fidl::endpoints::create_proxy();
+                    if let Err(err) =
+                        access_proxy.make_discoverable(discoverability_session_server).await?
+                    {
+                        sender
+                            .send(Err(anyhow!(
+                                "fuchsia.bluetooth.sys.Access/MakeDiscoverable error: {:?}",
+                                err
+                            )))
+                            .expect("Failed to send");
+                        continue;
+                    }
+                    discoverability_session = Some(token);
+                    sender.send(Ok(())).expect("Failed to send");
+                }
+                Request::Stop => break,
+            }
+        }
+
+        Ok(())
     }
 
     pub fn join(&self) -> Result<(), anyhow::Error> {
