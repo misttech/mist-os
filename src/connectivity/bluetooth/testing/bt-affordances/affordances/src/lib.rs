@@ -83,7 +83,7 @@ impl WorkThread {
                                 })
                                 .await,
                         )
-                        .expect("Failed to send");
+                        .unwrap();
                 }
                 Request::GetKnownPeers(sender) => {
                     if let Err(err) = refresh_peer_cache(
@@ -93,12 +93,10 @@ impl WorkThread {
                     )
                     .await
                     {
-                        sender
-                            .send(Err(anyhow!("refresh_peer_cache() error: {}", err)))
-                            .expect("Failed to send");
+                        sender.send(Err(anyhow!("refresh_peer_cache() error: {}", err))).unwrap();
                         continue;
                     }
-                    sender.send(Ok(peer_cache.clone())).expect("Failed to send");
+                    sender.send(Ok(peer_cache.clone())).unwrap();
                 }
                 Request::GetPeerId(address, result_sender) => {
                     let (_discovery_session, discovery_session_server) =
@@ -110,7 +108,7 @@ impl WorkThread {
                                 "fuchsia.bluetooth.sys.Access/StartDiscovery error: {:?}",
                                 err
                             )))
-                            .expect("Failed to send");
+                            .unwrap();
                         continue;
                     }
 
@@ -123,36 +121,32 @@ impl WorkThread {
                     .await
                     {
                         Ok(Some(peer)) => {
-                            result_sender.send(Ok(peer.id.unwrap())).expect("Failed to send");
+                            result_sender.send(Ok(peer.id.unwrap())).unwrap();
                         }
                         Ok(None) => {
-                            result_sender
-                                .send(Err(anyhow!("Peer not found")))
-                                .expect("Failed to send");
+                            result_sender.send(Err(anyhow!("Peer not found"))).unwrap();
                         }
                         Err(err) => {
                             result_sender
                                 .send(Err(anyhow!("wait_for_peer() error: {}", err)))
-                                .expect("Failed to send");
+                                .unwrap();
                         }
                     }
                 }
                 Request::Forget(peer_id, sender) => {
-                    sender.send(forget(&peer_id, &mut access_proxy).await).expect("Failed to send");
+                    sender.send(forget(&peer_id, &mut access_proxy).await).unwrap();
                 }
                 Request::Connect(peer_id, result_sender) => {
-                    result_sender
-                        .send(connect(&peer_id, &mut access_proxy).await)
-                        .expect("Failed to send");
+                    result_sender.send(connect(&peer_id, &mut access_proxy).await).unwrap();
                 }
                 Request::ConnectL2cap(peer_id, psm, result_sender) => {
                     match connect_l2cap(&peer_id, psm, &mut profile_proxy).await {
                         Ok(channel) => {
                             _l2cap_channel = Some(channel);
-                            result_sender.send(Ok(())).expect("Failed to send");
+                            result_sender.send(Ok(())).unwrap();
                         }
                         Err(err) => {
-                            result_sender.send(Err(err)).expect("Failed to send");
+                            result_sender.send(Err(err)).unwrap();
                         }
                     }
                 }
@@ -161,7 +155,7 @@ impl WorkThread {
                         if discoverability_session.take().is_none() {
                             eprintln!("Asked to revoke nonexistent discoverability session.");
                         }
-                        sender.send(Ok(())).expect("Failed to send");
+                        sender.send(Ok(())).unwrap();
                         continue;
                     }
                     if discoverability_session.is_some() {
@@ -176,11 +170,11 @@ impl WorkThread {
                                 "fuchsia.bluetooth.sys.Access/MakeDiscoverable error: {:?}",
                                 err
                             )))
-                            .expect("Failed to send");
+                            .unwrap();
                         continue;
                     }
                     discoverability_session = Some(token);
-                    sender.send(Ok(())).expect("Failed to send");
+                    sender.send(Ok(())).unwrap();
                 }
                 Request::Stop => break,
             }
@@ -203,40 +197,36 @@ impl WorkThread {
     pub async fn read_local_address(&self, addr_byte_buff: *mut u8) -> Result<(), anyhow::Error> {
         let addr_bytes_slice = unsafe { std::slice::from_raw_parts_mut(addr_byte_buff, 6) };
         let (sender, receiver) = oneshot::channel::<Result<[u8; 6], anyhow::Error>>();
-        self.sender.clone().send(Request::ReadLocalAddress(sender)).await.expect("Failed to send");
-        addr_bytes_slice.clone_from_slice(&receiver.await.expect("Failed to receive")?);
+        self.sender.clone().send(Request::ReadLocalAddress(sender)).await?;
+        addr_bytes_slice.clone_from_slice(&receiver.await??);
         Ok(())
     }
 
     // Get identifier of peer at `address`.
     pub async fn get_peer_id(&self, address: &CStr) -> Result<PeerId, anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<PeerId, anyhow::Error>>();
-        self.sender
-            .clone()
-            .send(Request::GetPeerId(address.to_owned(), sender))
-            .await
-            .expect("Failed to send");
-        receiver.await.expect("Failed to receive")
+        self.sender.clone().send(Request::GetPeerId(address.to_owned(), sender)).await?;
+        receiver.await?
     }
 
     pub async fn get_known_peers(&self) -> Result<Vec<Peer>, anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<Vec<Peer>, anyhow::Error>>();
-        self.sender.clone().send(Request::GetKnownPeers(sender)).await.expect("Failed to send");
-        receiver.await.expect("Failed to receive")
+        self.sender.clone().send(Request::GetKnownPeers(sender)).await?;
+        receiver.await?
     }
 
     // Connect to peer with given identifier.
     pub async fn connect_peer(&self, peer_id: PeerId) -> Result<(), anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
-        self.sender.clone().send(Request::Connect(peer_id, sender)).await.expect("Failed to send");
-        receiver.await.expect("Failed to receive")
+        self.sender.clone().send(Request::Connect(peer_id, sender)).await?;
+        receiver.await?
     }
 
     // Forget peer and delete all bonding information, if peer is found.
     pub async fn forget_peer(&self, peer_id: PeerId) -> Result<(), anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
-        self.sender.clone().send(Request::Forget(peer_id, sender)).await.expect("Failed to send");
-        receiver.await.expect("Failed to receive")
+        self.sender.clone().send(Request::Forget(peer_id, sender)).await?;
+        receiver.await?
     }
 
     // Connect a basic L2CAP channel.
@@ -246,23 +236,15 @@ impl WorkThread {
         psm: u16,
     ) -> Result<(), anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
-        self.sender
-            .clone()
-            .send(Request::ConnectL2cap(peer_id, psm, sender))
-            .await
-            .expect("Failed to send");
-        receiver.await.expect("Failed to receive")
+        self.sender.clone().send(Request::ConnectL2cap(peer_id, psm, sender)).await?;
+        receiver.await?
     }
 
     // Set discoverability state.
     pub async fn set_discoverability(&self, discoverable: bool) -> Result<(), anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
-        self.sender
-            .clone()
-            .send(Request::SetDiscoverability(discoverable, sender))
-            .await
-            .expect("Failed to send");
-        receiver.await.expect("Failed to receive")
+        self.sender.clone().send(Request::SetDiscoverability(discoverable, sender)).await?;
+        receiver.await?
     }
 }
 
