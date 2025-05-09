@@ -27,17 +27,14 @@ async fn handle_peer_request(
                             responder.send(Ok(peers.as_slice()))?;
                         }
                         Err(err) => {
-                            error!("GetKnownPeers encountered error: {}", err);
+                            error!("GetKnownPeers encountered error: {err}");
                             responder
                                 .send(Err(fidl_fuchsia_bluetooth_affordances::Error::Internal))?;
                         }
                     }
                 }
                 PeerControllerRequest::_UnknownMethod { ordinal, .. } => {
-                    error!(
-                        "PeerControllerRequest: unknown method received with ordinal {}",
-                        ordinal
-                    );
+                    error!("PeerControllerRequest: unknown method received with ordinal {ordinal}");
                 }
             }
             Ok(())
@@ -55,7 +52,7 @@ async fn main() -> Result<(), Error> {
 
     fs.for_each_concurrent(None, |request| match request {
         Services::Peer(stream) => {
-            handle_peer_request(stream, &worker).unwrap_or_else(|e| error!("{:?}", e))
+            handle_peer_request(stream, &worker).unwrap_or_else(|e| error!("{e:?}"))
         }
     })
     .await;

@@ -93,7 +93,7 @@ impl WorkThread {
                     )
                     .await
                     {
-                        sender.send(Err(anyhow!("refresh_peer_cache() error: {}", err))).unwrap();
+                        sender.send(Err(anyhow!("refresh_peer_cache() error: {err}"))).unwrap();
                         continue;
                     }
                     sender.send(Ok(peer_cache.clone())).unwrap();
@@ -105,8 +105,7 @@ impl WorkThread {
                     {
                         result_sender
                             .send(Err(anyhow!(
-                                "fuchsia.bluetooth.sys.Access/StartDiscovery error: {:?}",
-                                err
+                                "fuchsia.bluetooth.sys.Access/StartDiscovery error: {err:?}"
                             )))
                             .unwrap();
                         continue;
@@ -128,7 +127,7 @@ impl WorkThread {
                         }
                         Err(err) => {
                             result_sender
-                                .send(Err(anyhow!("wait_for_peer() error: {}", err)))
+                                .send(Err(anyhow!("wait_for_peer() error: {err}")))
                                 .unwrap();
                         }
                     }
@@ -167,8 +166,7 @@ impl WorkThread {
                     {
                         sender
                             .send(Err(anyhow!(
-                                "fuchsia.bluetooth.sys.Access/MakeDiscoverable error: {:?}",
-                                err
+                                "fuchsia.bluetooth.sys.Access/MakeDiscoverable error: {err:?}"
                             )))
                             .unwrap();
                         continue;
@@ -188,7 +186,7 @@ impl WorkThread {
         if let Err(err) =
             self.thread_handle.lock().take().unwrap().join().expect("Failed to join work thread")
         {
-            return Err(anyhow!("Work thread exited with error: {}", err));
+            return Err(anyhow!("Work thread exited with error: {err}"));
         }
         Ok(())
     }
@@ -315,10 +313,10 @@ async fn connect(peer_id: &PeerId, access_proxy: &mut AccessProxy) -> Result<(),
     access_proxy
         .connect(peer_id)
         .await
-        .map_err(|fidl_error| anyhow!("fuchsia.bluetooth.sys.Access/Connect error: {}", fidl_error))
+        .map_err(|fidl_error| anyhow!("fuchsia.bluetooth.sys.Access/Connect error: {fidl_error}"))
         .and_then(|connect_result| {
             connect_result.map_err(|sapphire_err| {
-                anyhow!("fuchsia.bluetooth.sys.Access/Connect error: {:?}", sapphire_err)
+                anyhow!("fuchsia.bluetooth.sys.Access/Connect error: {sapphire_err:?}")
             })
         })
 }
@@ -351,12 +349,10 @@ async fn connect_l2cap(
     {
         Ok(Ok(channel_res)) => Ok(channel_res
             .try_into()
-            .map_err(|err| anyhow!("Couldn't convert FIDL to BT channel: {:?}", err))?),
+            .map_err(|err| anyhow!("Couldn't convert FIDL to BT channel: {err:?}"))?),
         Ok(Err(sapphire_err)) => {
-            Err(anyhow!("fuchsia.bluetooth.bredr.Profile/Connect error: {:?}", sapphire_err))
+            Err(anyhow!("fuchsia.bluetooth.bredr.Profile/Connect error: {sapphire_err:?}"))
         }
-        Err(fidl_err) => {
-            Err(anyhow!("fuchsia.bluetooth.bredr.Profile/Connect error: {}", fidl_err))
-        }
+        Err(fidl_err) => Err(anyhow!("fuchsia.bluetooth.bredr.Profile/Connect error: {fidl_err}")),
     }
 }

@@ -18,7 +18,7 @@ static WORKER: LazyLock<WorkThread> = LazyLock::new(|| WorkThread::spawn());
 pub extern "C" fn stop_rust_affordances() -> zx_status_t {
     println!("Stopping Rust affordances");
     if let Err(err) = WORKER.join() {
-        eprintln!("stop_rust_affordances encountered error: {}", err);
+        eprintln!("stop_rust_affordances encountered error: {err}");
         return zx::Status::INTERNAL.into_raw();
     }
     zx::Status::OK.into_raw()
@@ -34,7 +34,7 @@ pub extern "C" fn stop_rust_affordances() -> zx_status_t {
 #[no_mangle]
 pub extern "C" fn read_local_address(addr_byte_buff: *mut u8) -> zx_status_t {
     if let Err(err) = block_on(WORKER.read_local_address(addr_byte_buff)) {
-        eprintln!("read_local_address encountered error: {}", err);
+        eprintln!("read_local_address encountered error: {err}");
         return zx::Status::INTERNAL.into_raw();
     }
     zx::Status::OK.into_raw()
@@ -54,7 +54,7 @@ pub unsafe extern "C" fn get_peer_id(address: *const core::ffi::c_char) -> u64 {
     match block_on(WORKER.get_peer_id(address)) {
         Ok(peer_id) => peer_id.value,
         Err(err) => {
-            eprintln!("connect_peer encountered error: {}", err);
+            eprintln!("connect_peer encountered error: {err}");
             0
         }
     }
@@ -68,7 +68,7 @@ pub extern "C" fn connect_peer(peer_id: u64) -> zx_status_t {
     let peer_id = PeerId { value: peer_id };
 
     if let Err(err) = block_on(WORKER.connect_peer(peer_id)) {
-        eprintln!("connect_peer encountered error: {}", err);
+        eprintln!("connect_peer encountered error: {err}");
         return zx::Status::INTERNAL.into_raw();
     }
     zx::Status::OK.into_raw()
@@ -82,7 +82,7 @@ pub extern "C" fn forget_peer(peer_id: u64) -> zx_status_t {
     let peer_id = PeerId { value: peer_id };
 
     if let Err(err) = block_on(WORKER.forget_peer(peer_id)) {
-        eprintln!("forget_peer encountered error: {:?}", err);
+        eprintln!("forget_peer encountered error: {err:?}");
         return zx::Status::INTERNAL.into_raw();
     }
     zx::Status::OK.into_raw()
@@ -97,7 +97,7 @@ pub extern "C" fn connect_l2cap_channel(peer_id: u64, psm: u16) -> zx_status_t {
     let peer_id = PeerId { value: peer_id };
 
     if let Err(err) = block_on(WORKER.connect_l2cap_channel(peer_id, psm)) {
-        eprintln!("connect_l2cap_channel encountered error: {:?}", err);
+        eprintln!("connect_l2cap_channel encountered error: {err:?}");
         return zx::Status::INTERNAL.into_raw();
     }
     zx::Status::OK.into_raw()
@@ -109,7 +109,7 @@ pub extern "C" fn connect_l2cap_channel(peer_id: u64, psm: u16) -> zx_status_t {
 #[no_mangle]
 pub extern "C" fn set_discoverability(discoverable: bool) -> zx_status_t {
     if let Err(err) = block_on(WORKER.set_discoverability(discoverable)) {
-        eprintln!("set_discoverability encountered error: {:?}", err);
+        eprintln!("set_discoverability encountered error: {err:?}");
         return zx::Status::INTERNAL.into_raw();
     }
     zx::Status::OK.into_raw()
