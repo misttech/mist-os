@@ -1679,6 +1679,7 @@ impl From<&Target> for ffx::TargetInfo {
                 Some(data) => Some(data.into()),
                 None => None,
             },
+            is_manual: Some(target.is_manual()),
             ..Default::default()
         }
     }
@@ -2541,6 +2542,20 @@ mod test {
 
             let info: ffx::TargetInfo = ffx::TargetInfo::from(target.borrow());
             assert_eq!(info.fastboot_interface, Some(ffx::FastbootInterface::Udp));
+        }
+        {
+            let target = Target::new_with_addr_entries(
+                Some("manual"),
+                [TargetAddrEntry::new(
+                    TargetAddr::new("::1".parse::<IpAddr>().unwrap().into(), 0, 0),
+                    Utc::now(),
+                    TargetAddrStatus::ssh().manually_added(),
+                )]
+                .into_iter(),
+            );
+
+            let info: ffx::TargetInfo = ffx::TargetInfo::from(target.borrow());
+            assert_eq!(info.is_manual, Some(true));
         }
     }
 

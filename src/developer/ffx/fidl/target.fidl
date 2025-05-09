@@ -93,6 +93,8 @@ type TargetInfo = table {
     11: ssh_host_address SshHostAddrInfo;
     /// Compatibility status between host tools and target.
     12: compatibility rc.CompatibilityInfo;
+    /// Whether the target was added manually.
+    13: is_manual bool;
 };
 
 type TargetRebootError = strict enum {

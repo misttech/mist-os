@@ -175,6 +175,7 @@ impl TargetCollection {
                         fastboot_interface,
                         ssh_host_address,
                         compatibility,
+                        is_manual,
                         // Intentionally opt-in to compilation failures when new fields are added.
                         __source_breaking: _,
                     } = info;
@@ -248,6 +249,8 @@ impl TargetCollection {
                             *old = new;
                         }
                     });
+                    // Err on the side of calling something manual
+                    merge(&mut prev.is_manual, is_manual, |old, new| *old = *old || new);
                 }
                 Entry::Vacant(vacant) => {
                     let addrs =
@@ -1208,7 +1211,7 @@ mod tests {
         tc.query_single_enabled_target(query).expect_err("Query not ambiguous");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_insert_new_disabled() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("what");
@@ -1224,7 +1227,7 @@ mod tests {
         assert_eq!(expect_enabled_target(&tc, &query), t);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_insert_new() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("what");
@@ -1238,7 +1241,7 @@ mod tests {
         expect_no_target(&tc, &"oihaoih".into())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_merge_evict_old_addresses() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("schplew");
@@ -1281,7 +1284,7 @@ mod tests {
         assert!(merged_target.addrs().contains(&TargetAddr::new(a3, 1, 0)));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_merge() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("bananas");
@@ -1333,7 +1336,7 @@ mod tests {
         assert!(merged_target.addrs().contains(&TargetAddr::new(a2, 3, 0)));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_merge_disjointed() {
         let tc = TargetCollection::new_with_queue();
 
@@ -1397,7 +1400,41 @@ mod tests {
         assert_eq!(target_info.fastboot_interface, Some(ffx::FastbootInterface::Tcp));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
+    async fn test_target_collection_merge_manual() {
+        let tc = TargetCollection::new_with_queue();
+
+        const NODENAME1: &str = "discovered";
+        const NODENAME2: &str = "manual";
+
+        let _ = tc.merge_insert(Target::new_with_addr_entries(
+            Some(NODENAME1),
+            std::iter::once(TargetAddrEntry::new(
+                SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22).into(),
+                chrono::DateTime::<Utc>::MIN_UTC,
+                TargetAddrStatus::ssh(),
+            )),
+        ));
+
+        let _ = tc.merge_insert(Target::new_with_addr_entries(
+            Some(NODENAME2),
+            std::iter::once(TargetAddrEntry::new(
+                SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22).into(),
+                chrono::DateTime::<Utc>::MIN_UTC,
+                TargetAddrStatus::ssh().manually_added(),
+            )),
+        ));
+
+        let targets = tc.targets(None);
+        let [target_info] = &targets[..] else {
+            panic!("Too many target info structs: {targets:?}");
+        };
+
+        // If either is manual, the description is manual
+        assert_eq!(target_info.is_manual, Some(true));
+    }
+
+    #[fuchsia::test]
     async fn test_target_collection_no_scopeless_ipv6() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("bananas");
@@ -1424,7 +1461,7 @@ mod tests {
         assert!(!merged_target.addrs().contains(&TargetAddr::new(a2, 0, 0)));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_query_target_by_addr() {
         let ipv4_addr: TargetIpAddr = TargetIpAddr::new(IpAddr::from([192, 168, 0, 1]), 0, 0);
 
@@ -1453,7 +1490,7 @@ mod tests {
         assert_ne!(expect_target(&tc, &ipv4_query), t);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_new_target_event_synthesis() {
         let t = Target::new_named("clopperdoop");
         let tc = TargetCollection::new_with_queue();
@@ -1472,7 +1509,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_event_synthesis_all_connected() {
         let t = Target::new_autoconnected("clam-chowder-is-tasty");
         let t2 = Target::new_autoconnected("this-is-a-crunchy-falafel");
@@ -1503,7 +1540,7 @@ mod tests {
             })));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_event_synthesis_none_connected() {
         let t = Target::new_named("clam-chowder-is-tasty");
         let t2 = Target::new_named("this-is-a-crunchy-falafel");
@@ -1543,7 +1580,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_events() {
         let t = Target::new_autoconnected("clam-chowder-is-tasty");
         let t2 = Target::new_autoconnected("this-is-a-crunchy-falafel");
@@ -1563,7 +1600,7 @@ mod tests {
         assert!(results.iter().any(|e| e == &"i-should-probably-eat-lunch".to_owned()));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_discover_target() {
         let default = "clam-chowder-is-tasty";
         let t = Target::new_autoconnected(default);
@@ -1659,7 +1696,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_discover_target_updated_target() {
         let address = "f111::1";
         let ip = address.parse().unwrap();
@@ -1687,7 +1724,7 @@ mod tests {
         assert_eq!(fut.await.nodename().unwrap(), target_name);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_merge_no_name() {
         let ip = "f111::3".parse().unwrap();
 
@@ -1724,7 +1761,7 @@ mod tests {
         assert_eq!(addr.scope_id(), 0xbadf00d);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_does_not_merge_different_ports_with_no_name() {
         let ip = "fe80::1".parse().unwrap();
 
@@ -1761,7 +1798,7 @@ mod tests {
         assert_eq!(found2.ssh_port(), Some(8023));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_does_not_merge_different_ports() {
         let ip = "fe80::1".parse().unwrap();
 
@@ -1795,7 +1832,7 @@ mod tests {
         assert_eq!(found2.nodename(), Some("t2".to_string()));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_merge_enabled_and_transient() {
         let tc = TargetCollection::new();
 
@@ -1825,7 +1862,7 @@ mod tests {
         assert!(target.is_transient());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_remove_unnamed_by_addr() {
         let ip1 = "f111::3".parse().unwrap();
         let ip2 = "f111::4".parse().unwrap();
@@ -1864,7 +1901,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_remove_named_by_addr() {
         let ip1 = "f111::3".parse().unwrap();
         let ip2 = "f111::4".parse().unwrap();
@@ -1902,7 +1939,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_remove_address() {
         let ip1 = "f111::3".parse().unwrap();
         let mut addr_set = BTreeSet::new();
@@ -1939,7 +1976,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_remove_address_no_drop() {
         let ip1 = "f111::3".parse().unwrap();
         let ip2 = "f111::4".parse().unwrap();
@@ -1988,7 +2025,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_remove_by_name() {
         let ip1 = "f111::3".parse().unwrap();
         let ip2 = "f111::4".parse().unwrap();
@@ -2027,7 +2064,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_collection_removal_disconnects_target() {
         use crate::target::HostPipeState;
         let local_node = overnet_core::Router::new(None).unwrap();
@@ -2048,7 +2085,7 @@ mod tests {
         assert!(target.host_pipe.borrow().is_none());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_match_serial() {
         let string = "turritopsis-dohrnii-is-an-immortal-jellyfish";
         let t = Target::new_for_usb(string);
@@ -2060,7 +2097,7 @@ mod tests {
         assert!(found_target.nodename().is_none());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_no_ambiguous_target_when_disabled() {
         let tc = TargetCollection::new_with_queue();
 
@@ -2081,7 +2118,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_no_ambiguous_target_when_matching_identity() {
         let tc = TargetCollection::new_with_queue();
 
@@ -2118,7 +2155,7 @@ mod tests {
 
     /* TARGET QUERIES */
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_query_matches_nodename() {
         let query = TargetInfoQuery::from("foo");
         let target = Rc::new(Target::new_named("foo"));
