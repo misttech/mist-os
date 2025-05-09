@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use carnelian::app::ViewCreationParameters;
 use carnelian::color::Color;
 use carnelian::drawing::{DisplayRotation, FontFace};
 use carnelian::render::rive::load_rive;
@@ -14,8 +15,8 @@ use carnelian::scene::layout::{
 };
 use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{
-    input, App, AppAssistant, AppAssistantPtr, Point, Size, ViewAssistant, ViewAssistantContext,
-    ViewAssistantPtr, ViewKey,
+    input, App, AppAssistant, AppAssistantPtr, AppSender, Point, Size, ViewAssistant,
+    ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };
 use euclid::size2;
 use fidl_fuchsia_input_report::ConsumerControlButton;
@@ -25,6 +26,8 @@ mod menu;
 use menu::Menu;
 mod fdr;
 mod power;
+mod view_sender;
+use view_sender::ViewSender;
 
 const LOGO_IMAGE_PATH: &str = "/system-recovery-config/logo.riv";
 const BG_COLOR: Color = Color::new(); // Black
@@ -49,8 +52,11 @@ impl AppAssistant for RecoveryAppAssistant {
         Ok(())
     }
 
-    fn create_view_assistant(&mut self, view_key: ViewKey) -> Result<ViewAssistantPtr, Error> {
-        Ok(Box::new(RecoveryViewAssistant::new(view_key)?))
+    fn create_view_assistant_with_parameters(
+        &mut self,
+        params: ViewCreationParameters,
+    ) -> Result<ViewAssistantPtr, Error> {
+        Ok(Box::new(RecoveryViewAssistant::new(params.view_key, params.app_sender)?))
     }
 
     fn filter_config(&mut self, config: &mut carnelian::app::Config) {
@@ -60,7 +66,7 @@ impl AppAssistant for RecoveryAppAssistant {
 }
 
 struct RecoveryViewAssistant {
-    view_key: ViewKey,
+    view_sender: ViewSender,
     font_face: FontFace,
     logo_file: Option<rive_rs::File>,
     scene: Option<Scene>,
@@ -68,16 +74,17 @@ struct RecoveryViewAssistant {
     logs: Option<Vec<String>>,
     wheel_diff: i32,
     message: Option<&'static str>,
+    waiting_for_confirmation: bool,
 }
 
 impl RecoveryViewAssistant {
-    fn new(view_key: ViewKey) -> Result<RecoveryViewAssistant, Error> {
+    fn new(view_key: ViewKey, app_sender: AppSender) -> Result<RecoveryViewAssistant, Error> {
         let font_face = recovery_ui::font::get_default_font_face().clone();
         let logo_file = load_rive(LOGO_IMAGE_PATH).ok();
         let menu = Menu::new(menu::MAIN_MENU);
 
         Ok(RecoveryViewAssistant {
-            view_key,
+            view_sender: ViewSender::new(app_sender, view_key),
             font_face,
             logo_file,
             scene: None,
@@ -85,6 +92,7 @@ impl RecoveryViewAssistant {
             logs: None,
             wheel_diff: 0,
             message: None,
+            waiting_for_confirmation: false,
         })
     }
 
@@ -92,12 +100,19 @@ impl RecoveryViewAssistant {
         let log = log.into();
         log::info!("log: {log}");
         self.logs.get_or_insert_default().push(log);
+
+        self.request_render();
+    }
+
+    fn request_render(&mut self) {
+        self.wheel_diff = 0;
+        self.scene = None;
+        self.view_sender.request_render();
     }
 }
 
 impl ViewAssistant for RecoveryViewAssistant {
-    fn setup(&mut self, context: &ViewAssistantContext) -> Result<(), Error> {
-        self.view_key = context.key;
+    fn setup(&mut self, _context: &ViewAssistantContext) -> Result<(), Error> {
         Ok(())
     }
 
@@ -150,17 +165,27 @@ impl ViewAssistant for RecoveryViewAssistant {
                         .cross_align(CrossAxisAlignment::Start)
                         .contents(|builder| {
                             if let Some(logs) = &self.logs {
-                                builder.text(
-                                    self.font_face.clone(),
-                                    &logs.join("\n"),
-                                    text_size,
-                                    Point::zero(),
-                                    TextFacetOptions {
-                                        color: Color::white(),
-                                        horizontal_alignment: TextHorizontalAlignment::Left,
-                                        ..TextFacetOptions::default()
-                                    },
-                                );
+                                builder
+                                    .group()
+                                    .row()
+                                    .max_size()
+                                    .cross_align(CrossAxisAlignment::Start)
+                                    .contents(|builder| {
+                                        // padding on the left of the log
+                                        builder.space(size2(size.width * 0.1, text_size));
+                                        builder.text(
+                                            self.font_face.clone(),
+                                            &logs.join("\n"),
+                                            text_size,
+                                            Point::zero(),
+                                            TextFacetOptions {
+                                                color: Color::white(),
+                                                horizontal_alignment: TextHorizontalAlignment::Left,
+                                                max_width: Some(size.width * 0.8),
+                                                ..TextFacetOptions::default()
+                                            },
+                                        );
+                                    });
                                 return;
                             }
 
@@ -181,6 +206,7 @@ impl ViewAssistant for RecoveryViewAssistant {
                                             TextFacetOptions {
                                                 color: MESSAGE_COLOR,
                                                 horizontal_alignment: TextHorizontalAlignment::Left,
+                                                max_width: Some(size.width * 0.8),
                                                 ..TextFacetOptions::default()
                                             },
                                         );
@@ -246,7 +272,7 @@ impl ViewAssistant for RecoveryViewAssistant {
 
     fn handle_mouse_event(
         &mut self,
-        context: &mut ViewAssistantContext,
+        _context: &mut ViewAssistantContext,
         _event: &input::Event,
         mouse_event: &input::mouse::Event,
     ) -> Result<(), Error> {
@@ -257,15 +283,11 @@ impl ViewAssistant for RecoveryViewAssistant {
             input::mouse::Phase::Wheel(vector) => {
                 self.wheel_diff += vector.y;
                 if self.wheel_diff > 80 {
-                    self.wheel_diff = 0;
                     self.menu.move_up();
-                    self.scene = None;
-                    context.request_render();
+                    self.request_render();
                 } else if self.wheel_diff < -80 {
-                    self.wheel_diff = 0;
                     self.menu.move_down();
-                    self.scene = None;
-                    context.request_render();
+                    self.request_render();
                 }
             }
             _ => {}
@@ -275,11 +297,20 @@ impl ViewAssistant for RecoveryViewAssistant {
 
     fn handle_consumer_control_event(
         &mut self,
-        context: &mut ViewAssistantContext,
+        _context: &mut ViewAssistantContext,
         _event: &input::Event,
         consumer_control_event: &input::consumer_control::Event,
     ) -> Result<(), Error> {
         if self.logs.is_some() {
+            if self.waiting_for_confirmation
+                && consumer_control_event.phase == input::consumer_control::Phase::Up
+            {
+                self.waiting_for_confirmation = false;
+                self.logs = None;
+                self.menu = Menu::new(menu::MAIN_MENU);
+                self.message = None;
+                self.request_render();
+            }
             return Ok(());
         }
         match consumer_control_event {
@@ -288,12 +319,14 @@ impl ViewAssistant for RecoveryViewAssistant {
                 phase: input::consumer_control::Phase::Down,
             } => {
                 self.menu.set_active(true);
+                self.request_render();
             }
             input::consumer_control::Event {
                 button: ConsumerControlButton::Function,
                 phase: input::consumer_control::Phase::Up,
             } => {
                 self.menu.move_down();
+                self.request_render();
             }
             input::consumer_control::Event {
                 button: ConsumerControlButton::Power,
@@ -301,69 +334,112 @@ impl ViewAssistant for RecoveryViewAssistant {
             } => match self.menu.current_item() {
                 menu::MenuItem::Reboot => {
                     self.log("Rebooting...");
-                    fasync::Task::local(async {
-                        // give UI some time to show the log above
-                        fasync::Timer::new(std::time::Duration::from_millis(50)).await;
-                        if let Err(e) = power::reboot().await {
-                            log::error!("Failed to reboot: {e:#}");
-                        }
-                    })
-                    .detach();
+                    self.view_sender.queue_message(RecoveryMessages::Reboot);
                 }
                 menu::MenuItem::RebootBootloader => {
                     self.log("Rebooting to bootloader...");
-                    fasync::Task::local(async {
-                        // give UI some time to show the log above
-                        fasync::Timer::new(std::time::Duration::from_millis(50)).await;
-                        if let Err(e) = power::reboot_to_bootloader().await {
-                            log::error!("Failed to reboot to bootloader: {e:#}");
-                        }
-                    })
-                    .detach();
+                    self.view_sender.queue_message(RecoveryMessages::RebootBootloader);
                 }
                 menu::MenuItem::PowerOff => {
                     self.log("Powering off...");
-                    fasync::Task::local(async {
-                        // give UI some time to show the log above
-                        fasync::Timer::new(std::time::Duration::from_millis(50)).await;
-                        if let Err(e) = power::power_off().await {
-                            log::error!("Failed to power off: {e:#}");
-                        }
-                    })
-                    .detach();
+                    self.view_sender.queue_message(RecoveryMessages::PowerOff);
                 }
                 menu::MenuItem::WipeData => {
                     self.menu = Menu::new(menu::WIPE_DATA_MENU);
-                    self.message = Some("Wipe all user data?\n  THIS CAN NOT BE UNDONE!")
+                    self.message = Some("Wipe all user data?\n  THIS CAN NOT BE UNDONE!");
+                    self.request_render();
                 }
                 menu::MenuItem::WipeDataCancel => {
                     self.menu = Menu::new(menu::MAIN_MENU);
                     self.message = None;
+                    self.request_render();
                 }
                 menu::MenuItem::WipeDataConfirm => {
                     self.log("Wiping data...");
-                    fasync::Task::local(async {
-                        // give UI some time to show the log above
-                        fasync::Timer::new(std::time::Duration::from_millis(50)).await;
-                        if let Err(e) = fdr::factory_data_reset().await {
-                            log::error!("Failed to factory data reset: {e:#}");
-                        }
-                    })
-                    .detach();
+                    self.view_sender.queue_message(RecoveryMessages::WipeData);
                 }
                 menu_item => {
-                    log::error!("Not implemented: {menu_item:?}");
+                    self.log(format!("Not implemented: {menu_item:?}"));
+                    self.view_sender.queue_message(RecoveryMessages::TaskDone);
                 }
             },
             _ => {
                 return Ok(());
             }
         }
-        self.wheel_diff = 0;
-        self.scene = None;
-        context.request_render();
         Ok(())
     }
+
+    fn handle_message(&mut self, message: carnelian::Message) {
+        let Some(message) = message.downcast_ref::<RecoveryMessages>() else {
+            return;
+        };
+        match message {
+            RecoveryMessages::Log(log) => {
+                self.log(log);
+            }
+            RecoveryMessages::TaskDone => {
+                self.waiting_for_confirmation = true;
+            }
+            RecoveryMessages::Reboot => {
+                let view_sender = self.view_sender.clone();
+                fasync::Task::local(async move {
+                    if let Err(e) = power::reboot().await {
+                        view_sender.queue_message(RecoveryMessages::Log(format!(
+                            "Failed to reboot: {e:#}"
+                        )));
+                    }
+                    view_sender.queue_message(RecoveryMessages::TaskDone);
+                })
+                .detach();
+            }
+            RecoveryMessages::RebootBootloader => {
+                let view_sender = self.view_sender.clone();
+                fasync::Task::local(async move {
+                    if let Err(e) = power::reboot_to_bootloader().await {
+                        view_sender.queue_message(RecoveryMessages::Log(format!(
+                            "Failed to reboot to bootloader: {e:#}"
+                        )));
+                    }
+                    view_sender.queue_message(RecoveryMessages::TaskDone);
+                })
+                .detach();
+            }
+            RecoveryMessages::PowerOff => {
+                let view_sender = self.view_sender.clone();
+                fasync::Task::local(async move {
+                    if let Err(e) = power::power_off().await {
+                        view_sender.queue_message(RecoveryMessages::Log(format!(
+                            "Failed to power off: {e:#}"
+                        )));
+                    }
+                    view_sender.queue_message(RecoveryMessages::TaskDone);
+                })
+                .detach();
+            }
+            RecoveryMessages::WipeData => {
+                let view_sender = self.view_sender.clone();
+                fasync::Task::local(async move {
+                    if let Err(e) = fdr::factory_data_reset().await {
+                        view_sender.queue_message(RecoveryMessages::Log(format!(
+                            "Failed to factory data reset: {e:#}"
+                        )));
+                    }
+                    view_sender.queue_message(RecoveryMessages::TaskDone);
+                })
+                .detach();
+            }
+        }
+    }
+}
+
+enum RecoveryMessages {
+    Log(String),
+    TaskDone,
+    Reboot,
+    RebootBootloader,
+    PowerOff,
+    WipeData,
 }
 
 #[fuchsia::main]

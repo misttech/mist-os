@@ -31,5 +31,6 @@ rustc_binary("bin") {
     "src/main.rs",
     "src/menu.rs",
     "src/power.rs",
+    "src/view_sender.rs",
   ]
 }
