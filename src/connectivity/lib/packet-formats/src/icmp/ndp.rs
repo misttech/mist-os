@@ -915,6 +915,21 @@ pub mod options {
 
         /// PREF64 (https://datatracker.ietf.org/doc/html/rfc8781#name-option-format)
         pub const PREF64: u8 = 38;
+
+        /// May return a debug string for a given option type.
+        pub fn debug_name(option_type: u8) -> Option<&'static str> {
+            // Match with preceding `super::...` namespace to avoid accidentally binding
+            // SOME_VARIABLE instead of matching against a named constant.
+            match option_type {
+                super::option_types::PREFIX_INFORMATION => Some("PREFIX_INFORMATION"),
+                super::option_types::RECURSIVE_DNS_SERVER => Some("RECURSIVE_DNS_SERVER"),
+                super::option_types::DNS_SEARCH_LIST => Some("DNS_SEARCH_LIST"),
+                super::option_types::SIXLOWPAN_CONTEXT => Some("SIXLOWPAN_CONTEXT"),
+                super::option_types::CAPTIVE_PORTAL => Some("CAPTIVE_PORTAL"),
+                super::option_types::PREF64 => Some("PREF64"),
+                _ => None,
+            }
+        }
     }
 
     use option_types::{PREFIX_INFORMATION, RECURSIVE_DNS_SERVER};

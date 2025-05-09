@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use std::collections::VecDeque;
+use std::fmt::Debug;
 use std::task::{ready, Poll};
 
 use derivative::Derivative;
@@ -10,6 +11,7 @@ use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::channel::mpsc;
 use futures::{Future, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use log::{debug, error, info, warn};
+use packet_formats::icmp::ndp::options::option_types as ndp_option_types;
 
 use crate::bindings::devices::BindingId;
 use crate::bindings::util::{ErrorLogExt, ResultExt as _};
@@ -164,8 +166,10 @@ use event_queue::EventQueue;
 pub(crate) struct InterfaceIdMustBeNonZeroError;
 
 /// A watcher's interest in NDP options.
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub(crate) struct Interest {
+    #[derivative(Debug(format_with = "format_option_types_vec"))]
     types: Option<bit_vec::BitVec>,
     interface_id: Option<BindingId>,
 }
@@ -205,6 +209,34 @@ impl Interest {
         let Self { types: interest_types, interface_id: interest_interface_id } = self;
         interest_interface_id.map(|id| id == interface_id).unwrap_or(true)
             && interest_types.as_ref().map(|types| types[option_type.into()]).unwrap_or(true)
+    }
+}
+
+fn format_option_types_vec(
+    types: &Option<bit_vec::BitVec>,
+    formatter: &mut std::fmt::Formatter<'_>,
+) -> Result<(), std::fmt::Error> {
+    match types {
+        None => {
+            write!(formatter, "All")
+        }
+        Some(types) => {
+            let mut list = &mut formatter.debug_list();
+            for option_type in types
+                .iter()
+                .enumerate()
+                .filter_map(|(option_type, is_set)| is_set.then_some(option_type))
+            {
+                if let Some(debug_name) =
+                    u8::try_from(option_type).ok().and_then(ndp_option_types::debug_name)
+                {
+                    list = list.entry(&format_args!("{option_type} ({debug_name})"));
+                } else {
+                    list = list.entry(&option_type);
+                }
+            }
+            list.finish()
+        }
     }
 }
 
@@ -533,6 +565,7 @@ mod test {
     use futures::{FutureExt, Stream};
     use itertools::Itertools;
     use packet_formats::icmp::ndp::options as packet_formats_ndp;
+    use test_case::test_case;
 
     impl WorkerWatcherSink {
         fn create_watcher(
@@ -894,5 +927,15 @@ mod test {
         // Need to keep the router advertisement sink alive in order for the
         // worker to continue running until the end of the test.
         drop(ra_sink);
+    }
+
+    #[test_case(None => "Interest { types: All, interface_id: None }")]
+    #[test_case(Some(vec![]) => "Interest { types: [], interface_id: None }")]
+    #[test_case(Some(vec![packet_formats_ndp::NdpOptionType::RecursiveDnsServer.into()])
+        => "Interest { types: [25 (RECURSIVE_DNS_SERVER)], interface_id: None }")]
+    #[test_case(Some(vec![1, packet_formats_ndp::NdpOptionType::RecursiveDnsServer.into()])
+        => "Interest { types: [1, 25 (RECURSIVE_DNS_SERVER)], interface_id: None }")]
+    fn format_interest(types: Option<Vec<OptionType>>) -> String {
+        format!("{:?}", Interest::new(types, None))
     }
 }
