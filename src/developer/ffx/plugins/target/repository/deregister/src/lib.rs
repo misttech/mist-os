@@ -78,16 +78,16 @@ async fn deregister_standalone(
                     "failed to remove registration for {repo_url}: {:#?}",
                     Status::from_raw(err)
                 );
-                tracing::error!("{message}");
+                log::error!("{message}");
                 return_bug!("{message}");
             } else {
-                tracing::info!("registration for {repo_url} was not found. Ignoring.")
+                log::info!("registration for {repo_url} was not found. Ignoring.")
             }
         }
         Err(err) => {
             let message =
                 format!("failed to remove registrtation  due to communication error: {:#?}", err);
-            tracing::error!("{message}");
+            log::error!("{message}");
             return_bug!("{message}");
         }
     };
@@ -121,7 +121,7 @@ async fn remove_aliases(repo_url: &str, rewrite_proxy: EngineProxy) -> Result<()
     })
     .await
     .map_err(|err| {
-        tracing::warn!("failed to create transactions: {:#?}", err);
+        log::warn!("failed to create transactions: {:#?}", err);
         bug!("Failed to create transaction for aliases: {err}")
     })?;
     Ok(())

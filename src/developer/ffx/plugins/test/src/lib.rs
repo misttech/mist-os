@@ -303,7 +303,7 @@ async fn run_test<W: 'static + Write + Send + Sync>(
     let show_realm_warning = outcome == run_test_suite_lib::Outcome::Timedout
         || outcome == run_test_suite_lib::Outcome::Failed
         || outcome == run_test_suite_lib::Outcome::DidNotFinish;
-    tracing::info!("ffx test duration: {:?}", start_time.elapsed().as_secs_f32());
+    log::info!("ffx test duration: {:?}", start_time.elapsed().as_secs_f32());
     if hermetic_test && show_realm_warning {
         eprintln!(
             "The test was executed in the hermetic realm. If your test depends on system \
@@ -455,7 +455,7 @@ async fn get_tests(
         .map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
     let (iterator_proxy, iterator) = create_proxy();
 
-    tracing::info!("launching test suite {}", cmd.test_url);
+    log::info!("launching test suite {}", cmd.test_url);
 
     let mut provided_realm = None;
     if let Some(realm_str) = &cmd.realm {

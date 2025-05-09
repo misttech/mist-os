@@ -69,7 +69,7 @@ impl FfxMain for FidlTool {
         let sdk = context.get_sdk().user_message("Could not load currently active SDK")?;
 
         if let Err(e) = symbol_index::ensure_symbol_index_registered(&context) {
-            tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
+            log::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
 
         let fidlcat_path = ffx_config::get_host_tool(&sdk, "fidlcat")?;

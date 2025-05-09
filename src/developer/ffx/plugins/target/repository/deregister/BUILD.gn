@@ -20,7 +20,7 @@ ffx_plugin("ffx_target_repository_deregister") {
     "//src/developer/ffx/lib/writer:lib",
     "//src/sys/lib/fidl-fuchsia-pkg-rewrite-ext",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
   test_deps = [
     "//src/lib/fidl/rust/fidl",

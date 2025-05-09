@@ -292,7 +292,7 @@ fn write_symbolized_stack_traces(mut w: Writer, stack_trace: String) -> Result<(
     if let Err(e) = symbol_index::ensure_symbol_index_registered(
         &global_env_context().ok_or_else(|| anyhow!("Failed to get global context"))?,
     ) {
-        tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
+        log::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
     }
 
     let path =
@@ -321,7 +321,7 @@ fn write_symbolized_stack_traces(mut w: Writer, stack_trace: String) -> Result<(
         match stdout.read_line(&mut stdout_buf) {
             Ok(_) => {}
             Err(e) => {
-                tracing::warn!("reading from symbolizer stdout failed: {}", e);
+                log::warn!("reading from symbolizer stdout failed: {}", e);
                 continue;
             }
         }

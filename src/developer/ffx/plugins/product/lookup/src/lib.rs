@@ -96,13 +96,13 @@ where
     I: structured_ui::Interface,
 {
     let start = std::time::Instant::now();
-    tracing::info!("---------------------- Lookup Begin ----------------------------");
+    log::info!("---------------------- Lookup Begin ----------------------------");
 
     let products =
         pb_list_impl(auth, override_base_url.clone(), Some(version.to_string()), None, ui, context)
             .await?;
 
-    tracing::debug!("Looking for product bundle {}, version {}", name, version);
+    log::debug!("Looking for product bundle {}, version {}", name, version);
     let mut products = products
         .iter()
         .filter(|x| x.name == name)
@@ -110,19 +110,19 @@ where
         .map(|x| x.to_owned());
 
     let Some(product) = products.next() else {
-        tracing::debug!("products {:?}", products);
+        log::debug!("products {:?}", products);
         return_user_error!("Error: No product matching name {}, version {} found.", name, version);
     };
 
     if products.next().is_some() {
-        tracing::debug!("products {:?}", products);
+        log::debug!("products {:?}", products);
         return_user_error!(
             "More than one matching product found. The base-url may have poorly formed data."
         );
     }
 
-    tracing::debug!("Total ffx product lookup runtime {} seconds.", start.elapsed().as_secs_f32());
-    tracing::debug!("End");
+    log::debug!("Total ffx product lookup runtime {} seconds.", start.elapsed().as_secs_f32());
+    log::debug!("End");
 
     Ok(product)
 }

@@ -145,7 +145,7 @@ async fn exec_get<W: Write>(
 }
 
 async fn exec_set(ctx: &EnvironmentContext, set_cmd: &SetCommand) -> Result<()> {
-    tracing::debug!("Set command running...");
+    log::debug!("Set command running...");
     set_cmd.query(ctx).set(set_cmd.value.clone()).await
 }
 

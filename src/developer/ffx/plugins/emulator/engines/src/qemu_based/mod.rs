@@ -52,7 +52,7 @@ pub(crate) fn get_host_tool(name: &str) -> Result<PathBuf> {
     match ffx_config::get_host_tool(&sdk, name) {
         Ok(path) => Ok(path),
         Err(error) => {
-            tracing::warn!(
+            log::warn!(
                 "failed to get host tool {} from manifest. Trying local SDK dir: {}",
                 name,
                 error
@@ -68,9 +68,7 @@ pub(crate) fn get_host_tool(name: &str) -> Result<PathBuf> {
                 .join(name);
 
             if tool_path.exists() {
-                tracing::info!(
-                    "Using {tool_path:?} based on {ffx_path:?} directory for tool {name}"
-                );
+                log::info!("Using {tool_path:?} based on {ffx_path:?} directory for tool {name}");
                 Ok(tool_path)
             } else {
                 return_bug!("{error}. Host tool '{name}' not found after checking in `ffx` directory as stopgap.")
@@ -146,7 +144,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             })?;
             let kernel_path = instance_root.join(kernel_name);
             if kernel_path.exists() && reuse {
-                tracing::debug!("Using existing file for {:?}", kernel_path.file_name().unwrap());
+                log::debug!("Using existing file for {:?}", kernel_path.file_name().unwrap());
             } else {
                 fs::copy(&kernel_image, &kernel_path)
                     .map_err(|e| bug!("cannot stage kernel file: {e}"))?;
@@ -161,7 +159,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 .join(zbi_image_path.file_name().ok_or_else(|| bug!("cannot read zbi file name"))?);
 
             if zbi_path.exists() && reuse {
-                tracing::debug!("Using existing file for {:?}", zbi_path.file_name().unwrap());
+                log::debug!("Using existing file for {:?}", zbi_path.file_name().unwrap());
                 // TODO(https://fxbug.dev/42063890): Make a decision to reuse zbi with no modifications or not.
                 // There is the potential that the ssh keys have changed, or the ip address
                 // of the host interface has changed, which will cause the connection
@@ -171,7 +169,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 // the guest. Also, in the GPT case, bake in the kernel command line parameters.
                 let kernel_cmdline = if emu_config.guest.is_gpt {
                     let c = emu_config.flags.kernel_args.join("\n");
-                    tracing::debug!("Using kernel parameters in the ZBI: {}", c);
+                    log::debug!("Using kernel parameters in the ZBI: {}", c);
                     Some(c)
                 } else {
                     None
@@ -179,7 +177,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 Self::embed_boot_data(&env, &zbi_image_path, &zbi_path, kernel_cmdline)
                     .await
                     .map_err(|e| bug!("cannot embed boot data: {e}"))?;
-                tracing::debug!(
+                log::debug!(
                     "Staging {:?} into {:?} and embedding SSH keys",
                     zbi_image_path,
                     zbi_path
@@ -208,15 +206,13 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         );
                     }
                     (_, _, _) => {
-                        tracing::debug!(
-                            "Generation of new vbmeta for the modified ZBI not required."
-                        );
+                        log::debug!("Generation of new vbmeta for the modified ZBI not required.");
                     }
                 };
             }
             (Some(zbi_path), vbmeta_path)
         } else {
-            tracing::debug!("Skipping zbi staging; no zbi file in product bundle.");
+            log::debug!("Skipping zbi staging; no zbi file in product bundle.");
             (None, None)
         };
 
@@ -227,12 +223,12 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             );
 
             if dest_path.exists() && reuse {
-                tracing::debug!("Using existing file for {:?}", dest_path.file_name().unwrap());
+                log::debug!("Using existing file for {:?}", dest_path.file_name().unwrap());
             } else {
                 let original_size: u64 = src_path.metadata().map_err(|e| bug!("{e}"))?.len();
 
-                tracing::debug!("Disk image original size: {}", original_size);
-                tracing::debug!(
+                log::debug!("Disk image original size: {}", original_size);
+                log::debug!(
                     "Disk image target size from product bundle {:?}",
                     emu_config.device.storage
                 );
@@ -246,8 +242,8 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 // to 1.1 times the size of the original file.
                 if target_size < original_size {
                     let new_target_size: u64 = original_size + (original_size / 10);
-                    tracing::warn!("Disk image original size is larger than target size.");
-                    tracing::warn!("Forcing target size to {new_target_size}");
+                    log::warn!("Disk image original size is larger than target size.");
+                    log::warn!("Forcing target size to {new_target_size}");
                     target_size = new_target_size;
                 }
 
@@ -310,7 +306,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         if emu_config.guest.is_gpt {
             let zedboot_cmdline_path = instance_root.join("zedboot_cmdline");
             if zedboot_cmdline_path.exists() && reuse {
-                tracing::debug!(
+                log::debug!(
                     "Using existing file for {:?}",
                     zedboot_cmdline_path.file_name().unwrap()
                 );
@@ -324,10 +320,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 return_bug!("No path for the GPT disk image found.");
             };
             if gpt_image_path.exists() && reuse {
-                tracing::debug!(
-                    "Using existing file for {:?}",
-                    gpt_image_path.file_name().unwrap()
-                );
+                log::debug!("Using existing file for {:?}", gpt_image_path.file_name().unwrap());
             } else {
                 let product_path = if let Some(ref path) = emu_config.guest.product_bundle_path {
                     path
@@ -345,7 +338,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                     .use_fxfs(true)
                     .vbmeta(vbmeta_path)
                     .zbi(updated_guest.zbi_image);
-                tracing::debug!("Building image with {image:#?}");
+                log::debug!("Building image with {image:#?}");
                 image.build(&env).await?;
             }
             // Since the one multi-partition GPT image is passed to qemu, no kernel and zbi images
@@ -364,11 +357,11 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         let mut resize_command = Command::new(fvm_tool);
 
         resize_command.arg(&dest_path).arg("extend").arg("--length").arg(target_size.to_string());
-        tracing::debug!("FVM Running command to resize: {:?}", &resize_command);
+        log::debug!("FVM Running command to resize: {:?}", &resize_command);
 
         let resize_result = resize_command.output().map_err(|e| bug!("{e}"))?;
 
-        tracing::debug!("FVM command result: {resize_result:?}");
+        log::debug!("FVM command result: {resize_result:?}");
 
         if !resize_result.status.success() {
             bug!(
@@ -584,7 +577,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             }
         }
 
-        tracing::debug!("Spawning emulator with {emulator_cmd:?}");
+        log::debug!("Spawning emulator with {emulator_cmd:?}");
         let shared_process = SharedChild::spawn(&mut emulator_cmd)
             .map_err(|e| bug!("Cannot spawn emulator: {e}"))?;
         let child_arc = Arc::new(shared_process);
@@ -597,7 +590,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             let now = fuchsia_async::MonotonicInstant::now();
             match self.read_port_mappings().await {
                 Ok(_) => {
-                    tracing::debug!("Writing updated mappings");
+                    log::debug!("Writing updated mappings");
                     self.save_to_disk().await?;
                 }
                 Err(e) => {
@@ -611,7 +604,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 }
             };
             let elapsed_ms = now.elapsed().as_millis();
-            tracing::debug!("reading port mappings took {elapsed_ms}ms");
+            log::debug!("reading port mappings took {elapsed_ms}ms");
         } else {
             self.save_to_disk().await?;
         }
@@ -634,7 +627,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 }
                 Err(e) => {
                     if let Some(stop_error) = self.stop_emulator().await.err() {
-                        tracing::debug!(
+                        log::debug!(
                             "Error encountered in stop when handling failed launch: {:?}",
                             stop_error
                         );
@@ -646,7 +639,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             // Wait until the emulator is considered "active" before returning to the user.
             let startup_timeout = self.emu_config().runtime.startup_timeout.as_secs();
             eprint!("Waiting for Fuchsia to start (up to {} seconds).", startup_timeout);
-            tracing::debug!("Waiting for Fuchsia to start (up to {} seconds)...", startup_timeout);
+            log::debug!("Waiting for Fuchsia to start (up to {} seconds)...", startup_timeout);
             let name = self.emu_config().runtime.name.clone();
             let start = Instant::now();
             let mut connection_errors = Vec::new();
@@ -659,16 +652,13 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 .await;
                 if let Ok(compat) = compat_res {
                     eprintln!("\nEmulator is ready.");
-                    tracing::debug!(
-                        "Emulator is ready after {} seconds.",
-                        start.elapsed().as_secs()
-                    );
+                    log::debug!("Emulator is ready after {} seconds.", start.elapsed().as_secs());
                     let compat = compat.map(|c| ffx::CompatibilityInfo::from(c.into()));
                     match compat {
                         Some(compatibility)
                             if compatibility.state == ffx::CompatibilityState::Supported =>
                         {
-                            tracing::info!("Compatibility status: {:?}", compatibility.state)
+                            log::info!("Compatibility status: {:?}", compatibility.state)
                         }
                         Some(compatibility) => eprintln!(
                             "Compatibility status: {:?} {}",
@@ -681,7 +671,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                     match compat_res.unwrap_err() {
                         KnockError::NonCriticalError(e) => {
                             connection_errors.push(e);
-                            tracing::debug!(
+                            log::debug!(
                                 "Unable to connect to emulator: {:?}",
                                 connection_errors.last().unwrap()
                             );
@@ -701,7 +691,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         Err(e) => format!("could not read log: {e}"),
                     };
                     let message = format!("Emulator process failed to launch.\n{log_contents}");
-                    tracing::error!("{message}");
+                    log::error!("{message}");
                     eprintln!("\n{message}");
                     self.set_engine_state(EngineState::Staged);
                     self.save_to_disk().await?;
@@ -773,7 +763,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 };
             }
 
-            tracing::warn!("Emulator did not respond to a health check before timing out.");
+            log::warn!("Emulator did not respond to a health check before timing out.");
             return Ok(1);
         }
         Ok(0)
@@ -797,9 +787,9 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
 
     async fn stop_emulator(&mut self) -> Result<()> {
         if self.is_running().await {
-            tracing::info!("Terminating running instance {:?}", self.get_pid());
+            log::info!("Terminating running instance {:?}", self.get_pid());
             if let Some(terminate_error) = process::terminate(self.get_pid()).err() {
-                tracing::warn!("Error encountered terminating process: {:?}", terminate_error);
+                log::warn!("Error encountered terminating process: {:?}", terminate_error);
             }
         }
         self.set_engine_state(EngineState::Staged);
@@ -832,7 +822,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
 
         // Now that the threads are reading and writing, we wait for one to send back an error.
         let error = rx.recv().map_err(|e| bug!("recv error: {e}"));
-        tracing::debug!("{error:?}");
+        log::debug!("{error:?}");
         eprintln!("{error:?}");
         stream.shutdown(Shutdown::Both).map_err(|e| bug!("Error shutting down stream: {e}"))?;
         Ok(())
@@ -861,7 +851,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
     async fn read_port_mappings(&mut self) -> Result<()> {
         // Check if there are any ports not already mapped.
         if !self.emu_config().host.port_map.values().any(|m| m.host.is_none()) {
-            tracing::debug!("No unmapped ports found.");
+            log::debug!("No unmapped ports found.");
             return Ok(());
         }
 
@@ -909,7 +899,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                                     if v.host != Some(pair.host) {
                                         v.host = Some(pair.host);
                                         modified = true;
-                                        tracing::info!("port mapped {pair:?}");
+                                        log::info!("port mapped {pair:?}");
                                     }
                                 }
                             }
@@ -923,14 +913,14 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                             return Ok(());
                         }
                     } else {
-                        tracing::debug!("Ignoring non return object {:?}", data);
+                        log::debug!("Ignoring non return object {:?}", data);
                     }
                 }
                 Some(Err(e)) => {
-                    tracing::debug!("Error reading qmp stream {e:?}")
+                    log::debug!("Error reading qmp stream {e:?}")
                 }
                 None => {
-                    tracing::debug!("None returned from qmp iterator");
+                    log::debug!("None returned from qmp iterator");
                     // Pause a moment to allow qemu to make progress.
                     Timer::new(Duration::from_millis(100)).await;
                     continue;
@@ -940,7 +930,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             // Pause a moment to allow qemu to make progress.
             Timer::new(Duration::from_millis(100)).await;
             // Send { "execute": "human-monitor-command", "arguments": { "command-line": "info usernet" } }
-            tracing::debug!("writing info usernet command");
+            log::debug!("writing info usernet command");
             qmp_stream
                 .write_fmt(format_args!(
                     "{}\n",
@@ -959,7 +949,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
     /// the format may change.
     fn parse_return_string(input: &str) -> Result<Vec<PortPair>> {
         let mut pairs: Vec<PortPair> = vec![];
-        tracing::debug!("parsing_return_string return {input}");
+        log::debug!("parsing_return_string return {input}");
         let mut saw_heading = false;
         for l in input.lines() {
             let parts: Vec<&str> = l.split_whitespace().map(|ele| ele.trim()).collect();
@@ -981,18 +971,18 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                             host_port.parse().map_err(|e| bug!("error parsing: {e}"))?;
                         pairs.push(PortPair { guest, host });
                     } else {
-                        tracing::debug!("Skipping non host-forward row: {l}");
+                        log::debug!("Skipping non host-forward row: {l}");
                     }
                 }
-                [] => tracing::debug!("Skipping empty line"),
-                _ => tracing::debug!("Skipping unknown part collecton {parts:?}"),
+                [] => log::debug!("Skipping empty line"),
+                _ => log::debug!("Skipping unknown part collecton {parts:?}"),
             }
         }
         // Check that the heading column names have not changed. This could be a name change or schema change,
         // it could also be that the command did not return the header because the network objects are not available
         // yet, so log an error, but don't return an error.
         if !saw_heading {
-            tracing::error!("Did not see expected header in {input}");
+            log::error!("Did not see expected header in {input}");
         }
         return Ok(pairs);
     }
@@ -1023,12 +1013,12 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                             return Ok(qmp_stream);
                         }
                         None => {
-                            tracing::debug!("Could not open machine socket");
+                            log::debug!("Could not open machine socket");
                         }
                     };
                 }
                 Err(e) => {
-                    tracing::debug!("Could not open machine socket: {e:?}");
+                    log::debug!("Could not open machine socket: {e:?}");
                 }
             };
 
@@ -1291,9 +1281,9 @@ mod tests {
         // block can be removed.
         if disk_image_format == DiskImageFormat::Gpt {
             if let EnvironmentKind::InTree { .. } = env.context.env_kind() {
-                tracing::debug!("Test running in-tree, DiskImageFormat::Gpt is expected to work.");
+                log::debug!("Test running in-tree, DiskImageFormat::Gpt is expected to work.");
             } else {
-                tracing::debug!("Skipping test for DiskImageFormat::Gpt, mkfs-msdosfs is not guaranteed to be available");
+                log::debug!("Skipping test for DiskImageFormat::Gpt, mkfs-msdosfs is not guaranteed to be available");
                 return Ok(());
             }
         }
@@ -1458,9 +1448,9 @@ mod tests {
         // block can be removed.
         if disk_image_format == DiskImageFormat::Gpt {
             if let EnvironmentKind::InTree { .. } = env.context.env_kind() {
-                tracing::debug!("Test running in-tree, DiskImageFormat::Gpt is expected to work.");
+                log::debug!("Test running in-tree, DiskImageFormat::Gpt is expected to work.");
             } else {
-                tracing::debug!("Skipping test for DiskImageFormat::Gpt, mkfs-msdosfs is not guaranteed to be available");
+                log::debug!("Skipping test for DiskImageFormat::Gpt, mkfs-msdosfs is not guaranteed to be available");
                 return Ok(());
             }
         }

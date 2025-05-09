@@ -21,7 +21,7 @@ pub async fn convert_bundle_to_configs(
     uefi: bool,
 ) -> Result<EmulatorConfiguration> {
     let virtual_device = product_bundle.get_device(&device_name)?;
-    tracing::debug!("Found PBM: {:#?}\nVirtual Device: {:#?}", &product_bundle, &virtual_device);
+    log::debug!("Found PBM: {:#?}\nVirtual Device: {:#?}", &product_bundle, &virtual_device);
     match &product_bundle {
         ProductBundle::V2(product_bundle) => {
             convert_v2_bundle_to_configs(&product_bundle, &virtual_device, uefi)

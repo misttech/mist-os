@@ -18,7 +18,7 @@ ffx_plugin("ffx_daemon_start") {
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   test_deps = [ "//src/lib/fuchsia" ]

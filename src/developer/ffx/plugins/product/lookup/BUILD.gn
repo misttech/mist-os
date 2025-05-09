@@ -27,7 +27,7 @@ ffx_plugin("ffx_product_lookup") {
     "//src/developer/ffx/plugins/product/list:ffx_product_list",
     "//src/lib/structured_ui",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   test_deps = [

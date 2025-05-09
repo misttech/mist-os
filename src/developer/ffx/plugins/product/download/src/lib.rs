@@ -115,8 +115,8 @@ pub async fn pb_download_impl<I: structured_ui::Interface>(
     ui: &I,
 ) -> fho::Result<()> {
     let start = std::time::Instant::now();
-    tracing::info!("---------------------- Begin ----------------------------");
-    tracing::debug!("transfer_manifest_url Url::parse");
+    log::info!("---------------------- Begin ----------------------------");
+    log::debug!("transfer_manifest_url Url::parse");
     let transfer_manifest_url = match url::Url::parse(manifest_url) {
         Ok(p) => p,
         _ => return_user_error!(
@@ -124,12 +124,12 @@ pub async fn pb_download_impl<I: structured_ui::Interface>(
             manifest_url
         ),
     };
-    tracing::debug!("make_way_for_output {:?}", product_dir);
+    log::debug!("make_way_for_output {:?}", product_dir);
     make_way_for_output(&product_dir, force).await?;
 
     let parent_dir = product_dir.parent().ok_or_else(|| anyhow!("local dir has no parent"))?;
     let temp_dir = tempfile::TempDir::new_in(&parent_dir).map_err(|e| bug!("{e}"))?;
-    tracing::debug!("transfer_manifest, transfer_manifest_url {:?}", transfer_manifest_url);
+    log::debug!("transfer_manifest, transfer_manifest_url {:?}", transfer_manifest_url);
     transfer_download(
         &transfer_manifest_url,
         &temp_dir.path(),
@@ -165,11 +165,8 @@ pub async fn pb_download_impl<I: structured_ui::Interface>(
     }
     ui.present(&structured_ui::Presentation::Progress(progress))?;
 
-    tracing::debug!(
-        "Total ffx product download runtime {} seconds.",
-        start.elapsed().as_secs_f32()
-    );
-    tracing::debug!("End");
+    log::debug!("Total ffx product download runtime {} seconds.", start.elapsed().as_secs_f32());
+    log::debug!("End");
     Ok(())
 }
 

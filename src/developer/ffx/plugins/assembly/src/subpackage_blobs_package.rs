@@ -8,8 +8,8 @@ use assembly_subpackage_blobs_package::SubpackageBlobsPackageBuilder;
 use camino::Utf8Path;
 use fuchsia_merkle::MerkleTree;
 use fuchsia_pkg::PackageManifest;
+use log::info;
 use std::fs::File;
-use tracing::info;
 
 #[derive(Debug)]
 pub struct SubpackageBlobsPackage {

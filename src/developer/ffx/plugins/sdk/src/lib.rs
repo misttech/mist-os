@@ -119,11 +119,11 @@ fn exec_populate_path(
 ) -> fho::Result<()> {
     let inner_bin_path = bin_path.join("fuchsia-sdk");
     let full_fuchsia_sdk_run_path = inner_bin_path.join("fuchsia-sdk-run");
-    tracing::debug!("Installing host tool stubs to {bin_path:?} (and `fuchsia-sdk-run` to {inner_bin_path:?}) from SDK {sdk_root:?}");
+    log::debug!("Installing host tool stubs to {bin_path:?} (and `fuchsia-sdk-run` to {inner_bin_path:?}) from SDK {sdk_root:?}");
 
     let sdk = sdk_root.get_sdk()?;
     let sdk_run_tool = sdk.get_host_tool("fuchsia-sdk-run").user_message("SDK does not contain `fuchsia-sdk-run` host tool. You may need to update your SDK to use this command.")?;
-    tracing::debug!("Found `fuchsia-sdk-run` in the SDK at {sdk_run_tool:?}");
+    log::debug!("Found `fuchsia-sdk-run` in the SDK at {sdk_run_tool:?}");
 
     std::fs::create_dir_all(&inner_bin_path).with_user_message(|| {
         format!("Could not create {inner_bin_path:?}. Do you have write access to {bin_path:?}?")
@@ -134,7 +134,7 @@ fn exec_populate_path(
     for tool in sdk.get_all_host_tools_metadata() {
         let tool_name = &tool.name;
         if tool.kind != ElementType::HostTool && tool_name != "fuchsia-sdk-run" {
-            tracing::trace!("Skipping companion tool (or other kind of tool) {tool_name}");
+            log::trace!("Skipping companion tool (or other kind of tool) {tool_name}");
         }
 
         writeln!(writer, "Installing {tool_name}").bug()?;

@@ -165,7 +165,7 @@ async fn preprocess_flash_cmd(
         None => {
             if !cmd.oem_stage.iter().any(|f| f.command() == SSH_OEM_COMMAND) {
                 if cmd.skip_authorized_keys {
-                    tracing::warn!("Skipping uploading authorized keys");
+                    log::warn!("Skipping uploading authorized keys");
                 } else {
                     let ssh_keys = SshKeyFiles::load(None)
                         .await
@@ -173,7 +173,7 @@ async fn preprocess_flash_cmd(
                     ssh_keys.create_keys_if_needed(false).context("creating ssh keys if needed")?;
                     if ssh_keys.authorized_keys.exists() {
                         let k = ssh_keys.authorized_keys.display().to_string();
-                        tracing::debug!("No `--authorized-keys` flag, using {}", k);
+                        log::debug!("No `--authorized-keys` flag, using {}", k);
                         cmd.oem_stage.push(OemFile::new(SSH_OEM_COMMAND.to_string(), k));
                     } else {
                         // Since the key will be initialized, this should never happen.
@@ -203,7 +203,7 @@ async fn preprocess_flash_cmd(
             "No product bundle or manifest passed. Inferring product bundle path from config: {}",
             product_path
         );
-        tracing::debug!(message);
+        log::debug!("{}", message);
         writer.machine_or(&FlashMessage::Preflight { message: message.clone() }, message)?;
 
         cmd.product_bundle = Some(product_path);
@@ -222,7 +222,7 @@ async fn preprocess_flash_cmd(
             .strip_suffix('"')
             .unwrap()
             .to_string();
-        tracing::debug!(
+        log::debug!(
             "Passed product bundle was wrapped in quotes, trimming it to: {}",
             cleaned_product_bundle
         );
@@ -258,7 +258,7 @@ async fn rediscover_target(
     let c_clone = criteria.clone();
 
     let filter_target = move |handle: &TargetHandle| {
-        tracing::debug!("Considering handle: {:#?}", handle);
+        log::debug!("Considering handle: {:#?}", handle);
         match &handle.state {
             discovery::TargetState::Fastboot(fts)
                 if Some(fts.serial_number.clone()) == c_clone.serial =>
@@ -266,7 +266,7 @@ async fn rediscover_target(
                 true
             }
             _ => {
-                tracing::debug!("Skipping handle: {:#?}", handle);
+                log::debug!("Skipping handle: {:#?}", handle);
                 false
             }
         }
@@ -291,7 +291,7 @@ async fn rediscover_target(
                             match &h.state {
                                 discovery::TargetState::Fastboot(fts) => match c_clone.serial {
                                     Some(c) if c == fts.serial_number => {
-                                        tracing::debug!("Found the target, firing signal");
+                                        log::debug!("Found the target, firing signal");
                                         found_ev.signal();
                                     }
                                     _ => {}
@@ -343,7 +343,7 @@ async fn reboot_target_to_bootloader_and_rediscover(
     let info = device_proxy.get_info().await.bug_context("Getting target device info")?;
 
     // Tell the target to reboot to the bootloader
-    tracing::debug!("Target in Product state. Rebooting to bootloader...",);
+    log::debug!("Target in Product state. Rebooting to bootloader...",);
 
     // These calls erroring is fine...
     match power_proxy.reboot_to_bootloader().await {
@@ -363,7 +363,7 @@ impl FlashTool {
         let target_state = match &self.target_info.target_state {
             Some(FidlTargetState::Fastboot) => {
                 // Nothing to do
-                tracing::debug!("Target already in Fastboot state");
+                log::debug!("Target already in Fastboot state");
                 let s: discovery::TargetHandle = (*self.target_info).clone().try_into()?;
                 s.state
             }
@@ -394,7 +394,7 @@ Reboot the Target to the bootloader and re-run this command."
                 ffx_bail!("Bootloader operations not supported with Zedboot");
             }
             Some(FidlTargetState::Disconnected) => {
-                tracing::info!("Target: {:#?} not connected bailing", self.target_info);
+                log::info!("Target: {:#?} not connected bailing", self.target_info);
                 ffx_bail!("Target is disconnected...");
             }
             None => {
@@ -534,15 +534,15 @@ fn handle_fidl_connection_err(e: Error) -> fho::Result<()> {
             // Check the 'protocol_name' and if it is 'fuchsia.hardware.power.statecontrol.Admin'
             // then we can be more confident that target reboot/shutdown has succeeded.
             if protocol_name == "fuchsia.hardware.power.statecontrol.Admin" {
-                tracing::info!("Target reboot succeeded.");
+                log::info!("Target reboot succeeded.");
             } else {
-                tracing::info!("Assuming target reboot succeeded. Client received a PEER_CLOSED from '{protocol_name}'");
+                log::info!("Assuming target reboot succeeded. Client received a PEER_CLOSED from '{protocol_name}'");
             }
-            tracing::debug!("{:?}", e);
+            log::debug!("{:?}", e);
             Ok(())
         }
         _ => {
-            tracing::error!("Target communication error: {:?}", e);
+            log::error!("Target communication error: {:?}", e);
             return_bug!("Target communication error: {:?}", e)
         }
     }
@@ -575,7 +575,7 @@ async fn handle_event(
                         writer.machine_or_write(&machine, message)?;
                     }
                     UploadProgress::OnProgress { bytes_written } => {
-                        tracing::trace!("Made progres, wrote: {}", bytes_written);
+                        log::trace!("Made progres, wrote: {}", bytes_written);
                     }
                     UploadProgress::OnFinished => {
                         let (machine, message) = (
@@ -662,7 +662,7 @@ async fn handle_event(
                     writer.machine_or(&machine, message)?;
                 }
                 Event::Variable(variable) => {
-                    tracing::trace!("got variable {:#?}", variable);
+                    log::trace!("got variable {:#?}", variable);
                     let (machine, message) = (
                         FlashMessage::Progress(FlashProgress::GotVariable),
                         "variable".to_string(),

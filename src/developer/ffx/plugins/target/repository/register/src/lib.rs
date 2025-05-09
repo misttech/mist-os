@@ -200,23 +200,19 @@ mod test {
             RepositoryManagerRequest::Add { repo, responder } => {
                 if let Some(expected) = &expected_config {
                     if expected.repo_url != repo.repo_url {
-                        tracing::error!("expected {:?} got {:?}", expected.repo_url, repo.repo_url);
+                        log::error!("expected {:?} got {:?}", expected.repo_url, repo.repo_url);
                         responder.send(Err(-100)).unwrap();
                         return;
                     } else if expected.root_keys != repo.root_keys {
-                        tracing::error!(
-                            "expected {:?} got {:?}",
-                            expected.root_keys,
-                            repo.root_keys
-                        );
+                        log::error!("expected {:?} got {:?}", expected.root_keys, repo.root_keys);
                         responder.send(Err(-101)).unwrap();
                         return;
                     } else if expected.mirrors != repo.mirrors {
-                        tracing::error!("expected {:?} got {:?}", expected.mirrors, repo.mirrors);
+                        log::error!("expected {:?} got {:?}", expected.mirrors, repo.mirrors);
                         responder.send(Err(-102)).unwrap();
                         return;
                     } else if expected.root_version != repo.root_version {
-                        tracing::error!(
+                        log::error!(
                             "expected {:?} got {:?}",
                             expected.root_version,
                             repo.root_version
@@ -224,7 +220,7 @@ mod test {
                         responder.send(Err(-103)).unwrap();
                         return;
                     } else if expected.root_threshold != repo.root_threshold {
-                        tracing::error!(
+                        log::error!(
                             "expected {:?} got {:?}",
                             expected.root_threshold,
                             repo.root_threshold
@@ -232,7 +228,7 @@ mod test {
                         responder.send(Err(-104)).unwrap();
                         return;
                     } else if expected.use_local_mirror != repo.use_local_mirror {
-                        tracing::error!(
+                        log::error!(
                             "expected {:?} got {:?}",
                             expected.use_local_mirror,
                             repo.use_local_mirror
@@ -240,7 +236,7 @@ mod test {
                         responder.send(Err(-105)).unwrap();
                         return;
                     } else if expected.storage_type != repo.storage_type {
-                        tracing::error!(
+                        log::error!(
                             "expected {:?} got {:?}",
                             expected.storage_type,
                             repo.storage_type
@@ -287,7 +283,7 @@ mod test {
                                 if let Some(Rule::Literal(ref expected)) = expected_rule {
                                     if let Rule::Literal(actual) = rule {
                                         if expected.host_match != actual.host_match {
-                                            tracing::error!(
+                                            log::error!(
                                                 "host_match expected {:?} got {:?}",
                                                 expected.host_match,
                                                 actual.host_match
@@ -296,7 +292,7 @@ mod test {
                                             return;
                                         }
                                         if expected.host_replacement != actual.host_replacement {
-                                            tracing::error!(
+                                            log::error!(
                                                 "host_replacement expected {:?} got {:?}",
                                                 expected.host_replacement,
                                                 actual.host_replacement
@@ -305,7 +301,7 @@ mod test {
                                             return;
                                         }
                                         if expected.path_prefix_match != actual.path_prefix_match {
-                                            tracing::error!(
+                                            log::error!(
                                                 "path_prefix_match expected {:?} got {:?}",
                                                 expected.path_prefix_match,
                                                 actual.path_prefix_match
@@ -316,7 +312,7 @@ mod test {
                                         if expected.path_prefix_replacement
                                             != actual.path_prefix_replacement
                                         {
-                                            tracing::error!(
+                                            log::error!(
                                                 "path_prefix_replacement expected {:?} got {:?}",
                                                 expected.path_prefix_replacement,
                                                 actual.path_prefix_replacement

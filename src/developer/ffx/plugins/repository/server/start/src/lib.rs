@@ -116,7 +116,7 @@ impl FfxMain for ServerStartTool {
                             {
                                 Ok(v) => v.into(),
                                 Err(e) => {
-                                    tracing::warn!("Error reading startup timeout: {e}");
+                                    log::warn!("Error reading startup timeout: {e}");
                                     60
                                 }
                             };
@@ -133,13 +133,11 @@ impl FfxMain for ServerStartTool {
                             .await
                             {
                                 Ok(addr) => {
-                                    tracing::debug!("Daemonized server started successfully");
+                                    log::debug!("Daemonized server started successfully");
                                     Ok(Some(addr))
                                 }
                                 Err(e) => {
-                                    tracing::warn!(
-                                        "Daemonized server did not start successfully: {e}"
-                                    );
+                                    log::warn!("Daemonized server did not start successfully: {e}");
                                     Err(e)
                                 }
                             }

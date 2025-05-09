@@ -221,7 +221,7 @@ async fn gather_device_show(
             device.device_id = Some(id_info)
         }
         Err(e) => {
-            tracing::warn!("Error getting device id proxy: {e}");
+            log::warn!("Error getting device id proxy: {e}");
             device.device_id = None;
         }
     };

@@ -18,7 +18,7 @@ use assembly_util::read_config;
 use camino::Utf8PathBuf;
 use ffx_assembly_args::{PackageValidationHandling, ProductArgs};
 use fuchsia_pkg::PackageManifest;
-use tracing::info;
+use log::info;
 
 mod assembly_builder;
 

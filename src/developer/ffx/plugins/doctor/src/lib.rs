@@ -587,13 +587,13 @@ fn collect_log_files(root_dir: PathBuf) -> Result<Vec<PathBuf>> {
             if let Ok(d) = entry {
                 Some(d.path())
             } else {
-                tracing::info!("Skipping read dir was an error: {entry:?}");
+                log::info!("Skipping read dir was an error: {entry:?}");
                 None
             }
         })
         .filter_map(|p| {
             if p.is_dir() {
-                tracing::info!("Skipping dir {:?}", p);
+                log::info!("Skipping dir {:?}", p);
                 None
             } else {
                 Some(p)
@@ -603,21 +603,21 @@ fn collect_log_files(root_dir: PathBuf) -> Result<Vec<PathBuf>> {
             if p.extension().unwrap_or_default() == "log" {
                 true
             } else {
-                tracing::info!("Skipping non .log extension {:?}", p);
+                log::info!("Skipping non .log extension {:?}", p);
                 false
             }
         })
         .filter_map(|p| match fs::metadata(p.clone()) {
             Ok(mdata) => Some((p, mdata)),
             Err(e) => {
-                tracing::error!("could not read metadata for {:?}: {e}", p);
+                log::error!("could not read metadata for {:?}: {e}", p);
                 None
             }
         })
         .filter_map(|(p, mdata)| match mdata.modified() {
             Ok(mdate) => Some((p, mdate)),
             Err(e) => {
-                tracing::error!("could not read modified time for {:?}: {e}", p);
+                log::error!("could not read modified time for {:?}: {e}", p);
                 None
             }
         })
@@ -626,12 +626,12 @@ fn collect_log_files(root_dir: PathBuf) -> Result<Vec<PathBuf>> {
                 if age < MAX_AGE {
                     Some(p)
                 } else {
-                    tracing::info!("Skipping {p:?} too  old {}", age.as_secs());
+                    log::info!("Skipping {p:?} too  old {}", age.as_secs());
                     None
                 }
             }
             Err(e) => {
-                tracing::error!("could not determine duration {p:?}: {e}");
+                log::error!("could not determine duration {p:?}: {e}");
                 None
             }
         })

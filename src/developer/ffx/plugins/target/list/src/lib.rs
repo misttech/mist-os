@@ -155,7 +155,7 @@ async fn get_target_info(
         } else {
             format!("{addr}:{}", addr.port().unwrap())
         };
-        tracing::debug!("Trying to make a connection to spec {spec:?}");
+        log::debug!("Trying to make a connection to spec {spec:?}");
 
         match try_get_target_info(spec, context)
             .on_timeout(ssh_timeout, || {
@@ -167,11 +167,11 @@ async fn get_target_info(
                 return Ok(res);
             }
             Err(KnockError::NonCriticalError(e)) => {
-                tracing::debug!("Could not connect to {addr:?}: {e:?}");
+                log::debug!("Could not connect to {addr:?}: {e:?}");
                 continue;
             }
             e => {
-                tracing::debug!("Got error {e:?} when trying to connect to {addr:?}");
+                log::debug!("Got error {e:?} when trying to connect to {addr:?}");
                 return Ok((ffx::RemoteControlState::Unknown, None, None));
             }
         }

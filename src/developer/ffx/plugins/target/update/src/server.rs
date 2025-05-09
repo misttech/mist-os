@@ -40,7 +40,7 @@ impl std::io::Write for LogWriter {
             Error::new(ErrorKind::InvalidData, format!("Could not convert to UTF8: {e}"))
         })?;
         for s in strings.lines() {
-            tracing::info!("{}{}", self.prefix, s);
+            log::info!("{}{}", self.prefix, s);
         }
         Ok(buf.len())
     }
@@ -62,7 +62,7 @@ pub(crate) async fn package_server_task(
     product_bundle: PathBuf,
     repo_port: u16,
 ) -> Result<Option<PackageServerTask>> {
-    tracing::info!("starting package server for {product_bundle:?}");
+    log::info!("starting package server for {product_bundle:?}");
 
     // Make the name mostly unique, that way it is easier to remove this update source.
     let repo_name_prefix = "pb-update-source-";
@@ -126,7 +126,7 @@ pub(crate) async fn package_server_task(
         let server_writer = VerifiedMachineWriter::new_buffers(None, stdout, stderr);
 
         let server_result = tool.main(server_writer).await;
-        tracing::info!("product bundle server exited: {server_result:?}");
+        log::info!("product bundle server exited: {server_result:?}");
         server_result
     });
     Ok(Some(PackageServerTask { repo_name, task }))
@@ -178,7 +178,7 @@ pub(crate) async fn unregister_pb_repo_server(
     {
         Ok(proxy) => proxy,
         Err(err) => {
-            tracing::info!("repo manager proxy closed, retrying");
+            log::info!("repo manager proxy closed, retrying");
             if retry {
                 fuchsia_async::Timer::new(std::time::Duration::from_secs(1)).await;
                 connect_to_capability::<RepositoryManagerMarker>(
@@ -221,7 +221,7 @@ pub(crate) async fn unregister_pb_repo_server(
             }
             Err(err) => {
                 if err.is_closed() {
-                    tracing::info!("repo manager proxy closed, retrying");
+                    log::info!("repo manager proxy closed, retrying");
                     if retry {
                         retry = false;
                         repo_manager_proxy = connect_to_capability::<RepositoryManagerMarker>(
@@ -282,7 +282,7 @@ async fn deregister_standalone(
     } else {
         &format!("fuchsia-pkg://{repo_name}")
     };
-    tracing::info!("Removing server {repo_url}");
+    log::info!("Removing server {repo_url}");
 
     let repo_proxy = match connect_to_capability::<RepositoryManagerMarker>(
         rcs_proxy_connector.clone(),
@@ -292,7 +292,7 @@ async fn deregister_standalone(
     {
         Ok(proxy) => proxy,
         Err(e) => {
-            tracing::warn!("Got error getting repo_manager_proxy: {e}, retrying");
+            log::warn!("Got error getting repo_manager_proxy: {e}, retrying");
             Timer::new(Duration::from_secs(1)).await;
             connect_to_capability::<RepositoryManagerMarker>(
                 rcs_proxy_connector.clone(),
@@ -311,16 +311,16 @@ async fn deregister_standalone(
                     "failed to remove registration for {repo_url}: {:#?}",
                     Status::from_raw(err)
                 );
-                tracing::error!("{message}");
+                log::error!("{message}");
                 return_bug!("{message}");
             } else {
-                tracing::info!("registration for {repo_url} was not found. Ignoring.")
+                log::info!("registration for {repo_url} was not found. Ignoring.")
             }
         }
         Err(err) => {
             let message =
                 format!("failed to remove registrtation  due to communication error: {:#?}", err);
-            tracing::error!("{message}");
+            log::error!("{message}");
             return_bug!("{message}");
         }
     };
@@ -333,7 +333,7 @@ async fn deregister_standalone(
     {
         Ok(proxy) => proxy,
         Err(e) => {
-            tracing::warn!("Got error getting rewrite_proxy: {e}, retrying");
+            log::warn!("Got error getting rewrite_proxy: {e}, retrying");
             Timer::new(Duration::from_secs(1)).await;
             connect_to_capability::<EngineMarker>(rcs_proxy_connector.clone(), time_to_wait).await?
         }
@@ -343,7 +343,7 @@ async fn deregister_standalone(
 }
 
 async fn remove_aliases(repo_url: &str, rewrite_proxy: EngineProxy) -> Result<()> {
-    tracing::info!("Removing aliases for {repo_url}");
+    log::info!("Removing aliases for {repo_url}");
     // Check flag here for "overwrite" style
     do_transaction(&rewrite_proxy, |transaction| async {
         // Prepend the alias rules to the front so they take priority.
@@ -369,7 +369,7 @@ async fn remove_aliases(repo_url: &str, rewrite_proxy: EngineProxy) -> Result<()
     })
     .await
     .map_err(|err| {
-        tracing::warn!("failed to create transactions: {:#?}", err);
+        log::warn!("failed to create transactions: {:#?}", err);
         bug!("Failed to create transaction for aliases: {err}")
     })?;
     Ok(())
@@ -426,7 +426,7 @@ async fn try_rcs_proxy_connection(
     let rcs_proxy = timeout(
         time_to_wait,
         rcs_proxy_connector.try_connect(|target, _err| {
-            tracing::info!(
+            log::info!(
                 "RCS proxy: Waiting for target '{}' to return",
                 match target {
                     Some(s) => s,

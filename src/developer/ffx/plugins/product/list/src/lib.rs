@@ -156,7 +156,7 @@ where
         if let Some(version) = get_latest_version(bucket, &prefix, auth, ui, &client).await? {
             result.push(format!("{}/{}", base_url, version));
         } else {
-            tracing::debug!("No version found for {base_url}");
+            log::debug!("No version found for {base_url}");
         }
     }
 
@@ -244,7 +244,7 @@ async fn pb_gather_from_url<I>(
 where
     I: structured_ui::Interface,
 {
-    tracing::debug!("transfer_manifest_url Url::parse");
+    log::debug!("transfer_manifest_url Url::parse");
     let mut manifest_url = match url::Url::parse(&base_url) {
         Ok(p) => p,
         _ => {

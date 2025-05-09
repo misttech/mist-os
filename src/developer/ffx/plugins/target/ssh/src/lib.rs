@@ -41,7 +41,7 @@ impl FfxMain for SshTool {
             .await
             .bug_context("Building command to ssh to target")?;
 
-        tracing::debug!("About to ssh with command: {:#?}", ssh_cmd);
+        log::debug!("About to ssh with command: {:#?}", ssh_cmd);
         let mut ssh = ssh_cmd.spawn().user_message("Failed to run ssh command to target")?;
         let status = ssh.wait().user_message("Command 'ssh' exited with error.")?;
 

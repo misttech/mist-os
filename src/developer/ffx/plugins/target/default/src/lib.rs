@@ -234,7 +234,7 @@ async fn ensure_unset_at_level(context: &EnvironmentContext, level: ConfigLevel)
                 Some(ConfigError::KeyNotFound) | Some(ConfigError::EmptyKey) => Ok(false),
                 Some(ConfigError::UnconfiguredLevel { level }) => {
                     // Can happen at ConfigLevel::Build in non in-tree cases.
-                    tracing::warn!(
+                    log::warn!(
                         "Failed to unset the {} level default target \
                         configuration level.\n{:?}",
                         level,

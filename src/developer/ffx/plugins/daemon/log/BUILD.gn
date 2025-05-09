@@ -17,8 +17,8 @@ ffx_plugin("ffx_daemon_log") {
     "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:notify",
-    "//third_party/rust_crates:tracing",
   ]
   test_deps = [
     "//src/lib/fuchsia-async",

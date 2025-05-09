@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use ffx_e2e_emu::IsolatedEmulator;
-use tracing::info;
+use log::info;
 
 #[fuchsia::test]
 async fn override_echo_greeting_and_observe_in_logs() {

@@ -73,7 +73,7 @@ where
         {
             Ok(proxy) => Some(proxy),
             Err(err) => {
-                tracing::debug!(%err, "Protocol {} is unavailable", P::Protocol::PROTOCOL_NAME);
+                log::debug!("Protocol {} is unavailable. err: {}", P::Protocol::PROTOCOL_NAME, err);
                 None
             }
         };

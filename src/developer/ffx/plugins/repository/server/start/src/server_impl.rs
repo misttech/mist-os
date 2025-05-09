@@ -43,14 +43,14 @@ fn start_signal_monitoring(
     mut conn_quit_tx: futures::channel::mpsc::Sender<()>,
     mut server_quit_tx: futures::channel::mpsc::Sender<()>,
 ) {
-    tracing::debug!("Starting monitoring for SIGHUP, SIGINT, SIGTERM");
+    log::debug!("Starting monitoring for SIGHUP, SIGINT, SIGTERM");
     let mut signals = Signals::new(&[SIGHUP, SIGINT, SIGTERM]).unwrap();
     // Can't use async here, as signals.forever() is blocking.
     std::thread::spawn(move || {
         if let Some(signal) = signals.forever().next() {
             match signal {
                 SIGINT | SIGHUP | SIGTERM => {
-                    tracing::info!("Received signal {signal}, quitting");
+                    log::info!("Received signal {signal}, quitting");
                     let _ = block_on(conn_quit_tx.send(())).ok();
                     let _ = block_on(server_quit_tx.send(())).ok();
                 }
@@ -142,7 +142,7 @@ pub async fn serve_impl_validate_args(
     if !cmd.no_device {
         let res = rcs_proxy_connector
             .try_connect(|target, err| {
-                tracing::info!(
+                log::info!(
             "Validating RCS proxy: Waiting for target '{target:?}' to return error: {err:?}"
         );
                 if target.is_none() {
@@ -181,7 +181,7 @@ pub async fn serve_impl_validate_args(
                         _ => (),
                     };
                 } else {
-                    tracing::warn!("Expected error to be downcasted to FfxError but wasn't. Maybe the Error structure changed? {e:?}");
+                    log::warn!("Expected error to be downcasted to FfxError but wasn't. Maybe the Error structure changed? {e:?}");
                 }
             }
             _ => (),
@@ -239,7 +239,7 @@ pub async fn serve_impl_validate_args(
                         .into(),
                 )]
             } else {
-                tracing::warn!("repo-path not found in env: {:?}", context.env_kind());
+                log::warn!("repo-path not found in env: {:?}", context.env_kind());
                 return_user_error!("Either --repo-path or --product-bundle need to be specified");
             }
         }
@@ -248,7 +248,7 @@ pub async fn serve_impl_validate_args(
     if let Some(package_manifest) = &cmd.auto_publish {
         if !package_manifest.exists() {
             let msg = format!("package manifest {package_manifest:?} does not exist");
-            tracing::error!("{msg}");
+            log::error!("{msg}");
             return_user_error!("{msg}");
         }
     }
@@ -367,9 +367,7 @@ pub async fn serve_impl<W: Write + 'static>(
             }
 
             if cmd.refresh_metadata {
-                tracing::warn!(
-                    "--refresh-metadata is not supported with product bundles, ignoring"
-                );
+                log::warn!("--refresh-metadata is not supported with product bundles, ignoring");
             }
 
             product_bundle
@@ -387,7 +385,7 @@ pub async fn serve_impl<W: Write + 'static>(
 
                 build_dir.join(REPO_PATH_RELATIVE_TO_BUILD_DIR)
             } else {
-                tracing::warn!("repo-path not found in env: {:?}", context.env_kind());
+                log::warn!("repo-path not found in env: {:?}", context.env_kind());
                 return_user_error!("Either --repo-path or --product-bundle need to be specified");
             };
 
@@ -457,9 +455,7 @@ pub async fn serve_impl<W: Write + 'static>(
         )
         .await
         {
-            tracing::error!(
-                "failed to write repo server instance information for {repo_name}: {e:?}"
-            );
+            log::error!("failed to write repo server instance information for {repo_name}: {e:?}");
         }
     }
 
@@ -501,7 +497,7 @@ pub async fn serve_impl<W: Write + 'static>(
 
         let auto_publisher = fasync::Task::local(async move {
             let publish_result = cmd_repo_publish(publish_cmd).await;
-            tracing::warn!("Auto-publishing exited: {publish_result:?}");
+            log::warn!("Auto-publishing exited: {publish_result:?}");
         });
 
         auto_publisher.detach();
@@ -510,7 +506,7 @@ pub async fn serve_impl<W: Write + 'static>(
     let result = if cmd.no_device {
         let s = format!("Serving repository '{repo_path}' over address '{}'.", server_addr);
         writeln!(writer, "{}", s).map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
-        tracing::info!("{}", s);
+        log::info!("{}", s);
         Ok(())
     } else {
         let r = target::main_connect_loop(

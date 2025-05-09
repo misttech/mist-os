@@ -133,7 +133,7 @@ impl EmulatorEngine for CrosvmEngine {
 
     async fn stop(&mut self) -> Result<()> {
         if self.is_running().await {
-            tracing::info!("Terminating running instance {:?}", self.get_pid());
+            log::info!("Terminating running instance {:?}", self.get_pid());
 
             let result = Command::new(&self.data.get_emulator_binary())
                 .arg("stop")
@@ -151,11 +151,9 @@ impl EmulatorEngine for CrosvmEngine {
                     }
                 });
             if result.is_err() {
-                tracing::warn!(
-                    "crosvm stop command failed, falling back to killing PID: {result:?}"
-                );
+                log::warn!("crosvm stop command failed, falling back to killing PID: {result:?}");
                 if let Some(terminate_error) = process::terminate(self.get_pid()).err() {
-                    tracing::warn!("Error encountered terminating process: {:?}", terminate_error);
+                    log::warn!("Error encountered terminating process: {:?}", terminate_error);
                 }
             }
         }
@@ -168,7 +166,7 @@ impl EmulatorEngine for CrosvmEngine {
         let result = if self.emu_config().runtime.config_override {
             let message = "Custom configuration provided; bypassing validation.";
             eprintln!("{message}");
-            tracing::info!("{message}");
+            log::info!("{message}");
             Ok(())
         } else {
             self.validate_configuration()
@@ -194,7 +192,7 @@ impl EmulatorEngine for CrosvmEngine {
         if self.engine_state() == EngineState::Running && running == false {
             self.set_engine_state(EngineState::Staged);
             if self.save_to_disk().await.is_err() {
-                tracing::warn!("Problem saving serialized emulator to disk during state update.");
+                log::warn!("Problem saving serialized emulator to disk during state update.");
             }
         }
         running

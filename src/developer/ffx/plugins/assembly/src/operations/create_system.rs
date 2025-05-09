@@ -18,10 +18,10 @@ use assembly_util as util;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_assembly_args::CreateSystemArgs;
 use fuchsia_pkg::{PackageManifest, PackagePath};
+use log::info;
 use serde_json::ser;
 use std::collections::BTreeSet;
 use std::fs::File;
-use tracing::info;
 
 pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
     let CreateSystemArgs {

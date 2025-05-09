@@ -247,7 +247,12 @@ tracing_visibility = [
   "//src/tests/diagnostics:*",
 
   # At this time we are not enforcing restrictions on ffx and related libraries.
-  "//src/developer/ffx/*",
+  "//src/developer/ffx/command/*",
+  "//src/developer/ffx/config/*",
+  "//src/developer/ffx/daemon/*",
+  "//src/developer/ffx/lib/*",
+  "//src/developer/ffx/tests/*",
+  "//src/developer/ffx/tools/*",
   "//src/connectivity/overnet/lib/ascendd:*",
   "//src/developer/fastboot:*",
   "//src/developer/lib/credentials:*",

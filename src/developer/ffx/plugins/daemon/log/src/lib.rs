@@ -7,6 +7,7 @@ use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_daemon_log_args::LogCommand;
 use fho::{FfxContext, FfxMain, FfxTool};
+use log::error;
 use notify::Watcher;
 use std::collections::VecDeque;
 use std::fs::File;
@@ -14,7 +15,6 @@ use std::io::{self, BufRead, BufReader, Seek};
 use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
-use tracing::error;
 
 #[derive(FfxTool)]
 pub struct DaemonLogTool {

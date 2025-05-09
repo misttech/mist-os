@@ -10,8 +10,8 @@ use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_hash::Hash;
 use fuchsia_merkle::MerkleTree;
 use fuchsia_pkg::PackageManifest;
+use log::info;
 use std::fs::File;
-use tracing::info;
 use utf8_path::path_relative_from_current_dir;
 
 #[derive(Debug)]

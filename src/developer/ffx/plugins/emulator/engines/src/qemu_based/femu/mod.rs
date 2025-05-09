@@ -81,7 +81,7 @@ impl EmulatorEngine for FemuEngine {
         let result = if self.emu_config().runtime.config_override {
             let message = "Custom configuration provided; bypassing validation.";
             eprintln!("{message}");
-            tracing::info!("{message}");
+            log::info!("{message}");
             Ok(())
         } else {
             self.validate_configuration()
@@ -107,7 +107,7 @@ impl EmulatorEngine for FemuEngine {
         if self.engine_state() == EngineState::Running && running == false {
             self.set_engine_state(EngineState::Staged);
             if self.save_to_disk().await.is_err() {
-                tracing::warn!("Problem saving serialized emulator to disk during state update.");
+                log::warn!("Problem saving serialized emulator to disk during state update.");
             }
         }
         running

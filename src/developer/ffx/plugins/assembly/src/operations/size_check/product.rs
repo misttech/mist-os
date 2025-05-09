@@ -33,7 +33,7 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
     let blobfs_contents = match extract_blob_contents(&assembly_manifest) {
         Some(contents) => contents,
         None => {
-            tracing::info!("No blobfs image was found in {}", args.assembly_manifest);
+            log::info!("No blobfs image was found in {}", args.assembly_manifest);
             return Ok(true);
         }
     };

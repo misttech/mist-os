@@ -4,7 +4,7 @@
 
 use ffx_e2e_emu::IsolatedEmulator;
 use futures::StreamExt;
-use tracing::info;
+use log::info;
 
 #[fuchsia::test]
 async fn override_echo_greeting_and_observe_in_logs() {

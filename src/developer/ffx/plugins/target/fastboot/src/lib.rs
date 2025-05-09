@@ -226,7 +226,7 @@ async fn cmd_impl(
     let target_state = match &info.target_state {
         Some(FidlTargetState::Fastboot) => {
             // Nothing to do
-            tracing::debug!("Target already in Fastboot state");
+            log::debug!("Target already in Fastboot state");
             let s: discovery::TargetHandle = (**info).clone().try_into()?;
             s.state
         }

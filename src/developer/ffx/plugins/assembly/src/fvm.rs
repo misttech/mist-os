@@ -12,8 +12,8 @@ use assembly_images_config::{Fvm, FvmFilesystem, FvmOutput, SparseFvm};
 use assembly_manifest::{AssemblyManifest, Image};
 use assembly_tool::ToolProvider;
 use camino::{Utf8Path, Utf8PathBuf};
+use log::info;
 use std::collections::HashMap;
-use tracing::info;
 use utf8_path::path_relative_from_current_dir;
 
 /// Constructs up-to four FVM files. Calling this function generates

@@ -4,5 +4,5 @@
 
 #[fuchsia::main]
 fn main() {
-    tracing::info!("{}", echo_config_lib::Config::take_from_startup_handle().greeting);
+    log::info!("{}", echo_config_lib::Config::take_from_startup_handle().greeting);
 }
