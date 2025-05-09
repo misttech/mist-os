@@ -688,6 +688,10 @@ group("pin-project-lite") {
   public_deps = [ ":pin-project-lite-v0_2_13" ]
 }
 
+group("pin-weak") {
+  public_deps = [ ":pin-weak-v1_1_0" ]
+}
+
 if (current_os == "fuchsia") {
   group("pkcs1") {
     public_deps = [ ":pkcs1-v0_7_5" ]
@@ -11550,6 +11554,35 @@ rust_library("pin-utils-v0_1_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":pin-utils-v0_1_0.license" ]
+}
+
+license("pin-weak-v1_1_0.license") {
+  public_package_name = "pin_weak"
+  license_files = [ "//third_party/rust_crates/vendor/pin-weak-1.1.0/LICENSE" ]
+}
+
+rust_library("pin-weak-v1_1_0") {
+  crate_name = "pin_weak"
+  crate_root = "//third_party/rust_crates/vendor/pin-weak-1.1.0/src/lib.rs"
+  output_name = "pin_weak-4435d45ea626c894"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=4435d45ea626c894",
+    "-Cextra-filename=-4435d45ea626c894",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"sync\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":pin-weak-v1_1_0.license" ]
 }
 
 license("pkcs1-v0_7_5.license") {

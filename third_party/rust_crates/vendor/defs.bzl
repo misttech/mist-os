@@ -417,6 +417,7 @@ _NORMAL_DEPENDENCIES = {
             "pest": Label("//third_party/rust_crates/vendor/pest-2.7.8:pest"),
             "pin-project": Label("//third_party/rust_crates/vendor/pin-project-1.0.11:pin_project"),
             "pin-project-lite": Label("//third_party/rust_crates/vendor/pin-project-lite-0.2.13:pin_project_lite"),
+            "pin-weak": Label("//third_party/rust_crates/vendor/pin-weak-1.1.0:pin_weak"),
             "pkcs8": Label("//third_party/rust_crates/vendor/pkcs8-0.10.2:pkcs8"),
             "png": Label("//third_party/rust_crates/vendor/png-0.14.0:png"),
             "pretty": Label("//third_party/rust_crates/vendor/pretty-0.5.2:pretty"),

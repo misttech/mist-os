@@ -1867,6 +1867,18 @@ alias(
 )
 
 alias(
+    name = "pin-weak-1.1.0",
+    actual = "//third_party/rust_crates/vendor/pin-weak-1.1.0:pin_weak",
+    tags = ["manual"],
+)
+
+alias(
+    name = "pin-weak",
+    actual = "//third_party/rust_crates/vendor/pin-weak-1.1.0:pin_weak",
+    tags = ["manual"],
+)
+
+alias(
     name = "pkcs1-0.7.5",
     actual = "//third_party/rust_crates/vendor/pkcs1-0.7.5:pkcs1",
     tags = ["manual"],
