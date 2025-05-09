@@ -61,7 +61,7 @@ pub enum UploadError {
 #[async_trait]
 pub trait InfoListener {
     async fn on_info(&self, info: String) -> Result<()> {
-        tracing::info!("Fastboot Info: \"{}\"", info);
+        log::info!("Fastboot Info: \"{}\"", info);
         Ok(())
     }
 }
@@ -84,14 +84,11 @@ async fn read_from_interface<T: AsyncRead + Unpin>(interface: &mut T) -> Result<
     let trimmed = trimmed.to_vec();
     match Reply::try_from(trimmed.as_slice()) {
         Ok(r) => {
-            tracing::debug!("fastboot: received {r:?}: {}", String::from_utf8_lossy(&trimmed));
+            log::debug!("fastboot: received {r:?}: {}", String::from_utf8_lossy(&trimmed));
             return Ok(r);
         }
         Err(e) => {
-            tracing::debug!(
-                "fastboot: could not parse reply: {}",
-                String::from_utf8_lossy(&trimmed),
-            );
+            log::debug!("fastboot: could not parse reply: {}", String::from_utf8_lossy(&trimmed),);
             bail!(e);
         }
     }
@@ -175,19 +172,18 @@ pub async fn send_with_listener<T: AsyncRead + AsyncWrite + Unpin>(
 ) -> Result<Reply> {
     let _lock = SEND_LOCK.lock().await;
     let bytes = Vec::<u8>::try_from(&cmd)?;
-    tracing::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
+    log::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
     interface.write_all(&bytes).await?;
     read(interface, listener).await
 }
 
-#[tracing::instrument(skip(interface))]
 pub async fn send<T: AsyncRead + AsyncWrite + Unpin>(
     cmd: Command,
     interface: &mut T,
 ) -> Result<Reply> {
     let _lock = SEND_LOCK.lock().await;
     let bytes = Vec::<u8>::try_from(&cmd)?;
-    tracing::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
+    log::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
     interface.write_all(&bytes).await?;
     read_and_log_info(interface).await
 }
@@ -199,7 +195,7 @@ pub async fn send_with_timeout<T: AsyncRead + AsyncWrite + Unpin>(
 ) -> Result<Reply> {
     let _lock = SEND_LOCK.lock().await;
     let bytes = Vec::<u8>::try_from(&cmd)?;
-    tracing::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
+    log::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
     interface.write_all(&bytes).await?;
     read_with_timeout(interface, &LogInfoListener {}, timeout).await
 }
@@ -220,7 +216,6 @@ pub async fn upload<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
     .await
 }
 
-#[tracing::instrument(skip(interface, listener, buf))]
 pub async fn upload_with_read_timeout<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
     size: u32,
     buf: &mut R,
@@ -236,12 +231,12 @@ pub async fn upload_with_read_timeout<T: AsyncRead + AsyncWrite + Unpin, R: Read
         Reply::Data(s) => {
             if s != size {
                 let err = UploadError::WrongSizeResponse { received: s, expected: size };
-                tracing::error!(%err);
+                log::error!("{}", err);
                 listener.on_error(&err).await?;
                 bail!(err);
             }
             listener.on_started(size.try_into().unwrap()).await?;
-            tracing::debug!("fastboot: writing {} bytes", size);
+            log::debug!("fastboot: writing {} bytes", size);
 
             let mut bytes = vec![0; BUFFER_SIZE];
             loop {
@@ -253,25 +248,25 @@ pub async fn upload_with_read_timeout<T: AsyncRead + AsyncWrite + Unpin, R: Read
                         match interface.write_all(&bytes[..n]).await {
                             Err(e) => {
                                 let err = UploadError::CouldNotWriteToInterface(e);
-                                tracing::error!(%err);
+                                log::error!("{}", err);
                                 listener.on_error(&err).await?;
                                 bail!(err);
                             }
                             Ok(()) => {
                                 listener.on_progress(n.try_into().unwrap()).await?;
-                                tracing::trace!("fastboot: wrote {} bytes", n);
+                                log::trace!("fastboot: wrote {} bytes", n);
                             }
                         }
                     }
                     Err(e) => {
                         let err = UploadError::CouldNotReadBytesToUpload { source: e };
-                        tracing::error!(%err);
+                        log::error!("{}", err);
                         listener.on_error(&err).await?;
                         bail!(err);
                     }
                 }
             }
-            tracing::debug!("fastboot: completed writing {} bytes", size);
+            log::debug!("fastboot: completed writing {} bytes", size);
 
             match read_and_log_info_with_timeout(interface, timeout).await {
                 Ok(reply) => {
@@ -280,7 +275,7 @@ pub async fn upload_with_read_timeout<T: AsyncRead + AsyncWrite + Unpin, R: Read
                 }
                 Err(e) => {
                     let err = UploadError::CouldNotVerifyUpload(e);
-                    tracing::error!(%err);
+                    log::error!("{}", err);
                     listener.on_error(&err).await?;
                     bail!(err);
                 }
@@ -298,7 +293,7 @@ pub async fn download<T: AsyncRead + AsyncWrite + Unpin>(
     // We are sending "Upload" in our "download" function because we are the
     // host -- from the device's point of view, it is an upload
     let reply = send(Command::Upload, interface).await?;
-    tracing::debug!("got reply from upload command: {:?}", reply);
+    log::debug!("got reply from upload command: {:?}", reply);
     match reply {
         Reply::Data(s) => {
             let size = usize::try_from(s)?;
@@ -314,7 +309,7 @@ pub async fn download<T: AsyncRead + AsyncWrite + Unpin>(
                 match interface.read(&mut buffer[..]).await {
                     Err(e) => bail!(DownloadError::CouldNotReadToInterface(e)),
                     Ok(len) => {
-                        tracing::debug!("fastboot: upload got {bytes_read}/{size} bytes");
+                        log::debug!("fastboot: upload got {bytes_read}/{size} bytes");
                         bytes_read += len;
                         file.write_all(&buffer[..len]).await?;
                     }

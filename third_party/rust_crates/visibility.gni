@@ -254,7 +254,6 @@ tracing_visibility = [
   "//src/developer/ffx/tests/*",
   "//src/developer/ffx/tools/*",
   "//src/connectivity/overnet/lib/ascendd:*",
-  "//src/developer/fastboot:*",
   "//src/developer/lib/credentials:*",
   "//src/lib/fuchsia-lockfile:*",
   "//src/lib/usb_bulk/rust:*",
