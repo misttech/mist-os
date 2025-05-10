@@ -154,7 +154,8 @@ mod test {
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
                 connection_state: FastbootConnectionState::Udp(vec![addr])
-            })
+            }),
+            manual: false,
         }));
         // Fails: wrong name
         assert!(!filter.filter_target(&TargetHandle {
@@ -162,7 +163,8 @@ mod test {
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
                 connection_state: FastbootConnectionState::Udp(vec![addr])
-            })
+            }),
+            manual: false,
         }));
         // Fails: wrong state
         assert!(!filter.filter_target(&TargetHandle {
@@ -170,7 +172,8 @@ mod test {
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
                 connection_state: FastbootConnectionState::Tcp(vec![addr])
-            })
+            }),
+            manual: false,
         }));
         // Fails: Bad name
         assert!(!filter.filter_target(&TargetHandle {
@@ -178,7 +181,8 @@ mod test {
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
                 connection_state: FastbootConnectionState::Udp(vec![addr])
-            })
+            }),
+            manual: false,
         }));
         Ok(())
     }

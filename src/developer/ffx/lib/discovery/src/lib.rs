@@ -428,14 +428,17 @@ pub mod test {
                 Ok(TargetEvent::Added(TargetHandle {
                     node_name: Some("magnus".to_string()),
                     state: TargetState::Unknown,
+                    manual: false,
                 })),
                 Ok(TargetEvent::Added(TargetHandle {
                     node_name: Some("abagail".to_string()),
                     state: TargetState::Unknown,
+                    manual: false,
                 })),
                 Ok(TargetEvent::Removed(TargetHandle {
                     node_name: Some("abagail".to_string()),
                     state: TargetState::Unknown,
+                    manual: false,
                 })),
             ]))),
         };
@@ -538,18 +541,21 @@ pub mod test {
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Removed(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         assert_eq!(
             stream.next().await.unwrap().ok().unwrap(),
             TargetEvent::Added(TargetHandle {
                 node_name: Some("Vin".to_string()),
-                state: TargetState::Zedboot
+                state: TargetState::Zedboot,
+                manual: false,
             })
         );
 
@@ -557,7 +563,8 @@ pub mod test {
             stream.next().await.unwrap().ok().unwrap(),
             TargetEvent::Removed(TargetHandle {
                 node_name: Some("Vin".to_string()),
-                state: TargetState::Zedboot
+                state: TargetState::Zedboot,
+                manual: false,
             })
         );
 
@@ -584,18 +591,21 @@ pub mod test {
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Removed(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         assert_eq!(
             stream.next().await.unwrap().ok().unwrap(),
             TargetEvent::Removed(TargetHandle {
                 node_name: Some("Vin".to_string()),
-                state: TargetState::Zedboot
+                state: TargetState::Zedboot,
+                manual: false,
             })
         );
 
@@ -622,18 +632,21 @@ pub mod test {
         sender.unbounded_send(Ok(TargetEvent::Removed(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         assert_eq!(
             stream.next().await.unwrap().ok().unwrap(),
             TargetEvent::Added(TargetHandle {
                 node_name: Some("Vin".to_string()),
-                state: TargetState::Zedboot
+                state: TargetState::Zedboot,
+                manual: false,
             })
         );
 
@@ -663,18 +676,21 @@ pub mod test {
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Kelsier".to_string()),
             state: TargetState::Product { addrs: vec![addr], serial: None },
+            manual: false,
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         assert_eq!(
             stream.next().await.unwrap().ok().unwrap(),
             TargetEvent::Added(TargetHandle {
                 node_name: Some("Vin".to_string()),
-                state: TargetState::Zedboot
+                state: TargetState::Zedboot,
+                manual: false,
             })
         );
 
@@ -760,6 +776,7 @@ pub mod test {
                     addrs: vec![TargetAddr::from_str("127.0.0.1:3322")?],
                     serial: None
                 },
+                manual: false,
             })
         );
 
@@ -784,6 +801,7 @@ pub mod test {
                     addrs: vec![TargetAddr::from_str("127.0.0.1:3322")?],
                     serial: None
                 },
+                manual: false,
             })
         );
 

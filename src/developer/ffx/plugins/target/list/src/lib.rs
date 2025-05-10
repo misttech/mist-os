@@ -233,6 +233,7 @@ async fn handle_to_info(
         target_state: Some(target_state),
         board_config,
         product_config,
+        is_manual: Some(handle.manual),
         ..Default::default()
     })
 }
@@ -641,6 +642,7 @@ mod test {
                 serial_number: "12345678".to_string(),
                 connection_state: discovery::FastbootConnectionState::Usb,
             }),
+            manual: false,
         });
         let stream = futures::stream::once(async { handle });
         let targets = handles_to_infos(stream, &env.context, true).await;
