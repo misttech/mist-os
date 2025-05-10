@@ -207,6 +207,7 @@ pub fn serve_telemetry(
                         // or plumb this from callers once suspend mechanisms are integrated
                         SuspendImminent => {
                             power_logger.handle_suspend_imminent().await;
+                            connect_disconnect.handle_suspend_imminent().await;
                         }
                         UnclearPowerDemand(demand) => {
                             power_logger.handle_unclear_power_demand(demand).await;

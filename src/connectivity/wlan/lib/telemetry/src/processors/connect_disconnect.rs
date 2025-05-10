@@ -220,8 +220,6 @@ impl ConnectDisconnectLogger {
         let mut downtime_duration = None;
         if result == fidl_ieee80211::StatusCode::Success {
             self.update_connection_state(ConnectionState::Connected(ConnectedState {}));
-            // TODO(https://fxbug.dev/412460463): Also flush and log
-            // successive_connect_attempt_failures metric on suspend
             flushed_successive_failures =
                 Some(self.successive_connect_attempt_failures.swap(0, Ordering::SeqCst));
             downtime_duration =
@@ -237,7 +235,7 @@ impl ConnectDisconnectLogger {
             .await;
     }
 
-    pub fn log_connect_attempt_inspect(
+    fn log_connect_attempt_inspect(
         &self,
         result: fidl_ieee80211::StatusCode,
         bss: &BssDescription,
@@ -257,7 +255,7 @@ impl ConnectDisconnectLogger {
     }
 
     #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
-    pub async fn log_connect_attempt_cobalt(
+    async fn log_connect_attempt_cobalt(
         &self,
         result: fidl_ieee80211::StatusCode,
         flushed_successive_failures: Option<usize>,
@@ -286,7 +284,7 @@ impl ConnectDisconnectLogger {
             });
         }
 
-        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "log_connect_attempt_cobalt_metrics");
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "log_connect_attempt_cobalt");
     }
 
     pub async fn log_disconnect(&self, info: &DisconnectInfo) {
@@ -339,7 +337,7 @@ impl ConnectDisconnectLogger {
             payload: MetricEventPayload::IntegerValue(info.connected_duration.into_millis()),
         });
 
-        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "log_disconnect_cobalt_metrics");
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "log_disconnect_cobalt");
     }
 
     pub async fn handle_periodic_telemetry(&self) {
@@ -360,6 +358,24 @@ impl ConnectDisconnectLogger {
 
         if !metric_events.is_empty() {
             log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_periodic_telemetry");
+        }
+    }
+
+    pub async fn handle_suspend_imminent(&self) {
+        let mut metric_events = vec![];
+
+        let flushed_successive_failures =
+            self.successive_connect_attempt_failures.swap(0, Ordering::SeqCst);
+        if flushed_successive_failures > 0 {
+            metric_events.push(MetricEvent {
+                metric_id: metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID,
+                event_codes: vec![],
+                payload: MetricEventPayload::IntegerValue(flushed_successive_failures as i64),
+            });
+        }
+
+        if !metric_events.is_empty() {
+            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_suspend_imminent");
         }
     }
 }
@@ -801,6 +817,79 @@ mod tests {
             test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
             Poll::Ready(())
         );
+        let metrics =
+            test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
+        assert!(metrics.is_empty());
+    }
+
+    #[fuchsia::test]
+    fn test_zero_successive_connect_attempt_failures_on_suspend() {
+        let mut test_helper = setup_test();
+        let logger = ConnectDisconnectLogger::new(
+            test_helper.cobalt_proxy.clone(),
+            &test_helper.inspect_node,
+            &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
+            test_helper.persistence_sender.clone(),
+            &test_helper.mock_time_matrix_client,
+        );
+
+        let mut test_fut = pin!(logger.handle_suspend_imminent());
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let metrics =
+            test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
+        assert!(metrics.is_empty());
+    }
+
+    #[test_case(1; "one_failure")]
+    #[test_case(2; "two_failures")]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_one_or_more_successive_connect_attempt_failures_on_suspend(n_failures: usize) {
+        let mut test_helper = setup_test();
+        let logger = ConnectDisconnectLogger::new(
+            test_helper.cobalt_proxy.clone(),
+            &test_helper.inspect_node,
+            &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
+            test_helper.persistence_sender.clone(),
+            &test_helper.mock_time_matrix_client,
+        );
+
+        let bss_description = random_bss_description!(Wpa2);
+        for _i in 0..n_failures {
+            let mut test_fut = pin!(logger.handle_connect_attempt(
+                fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                &bss_description
+            ));
+            assert_eq!(
+                test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+                Poll::Ready(())
+            );
+        }
+
+        let mut test_fut = pin!(logger.handle_suspend_imminent());
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let metrics =
+            test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(n_failures as i64));
+
+        test_helper.clear_cobalt_events();
+        let mut test_fut = pin!(logger.handle_suspend_imminent());
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        // Count of successive failures shouldn't be logged again since it was already logged
         let metrics =
             test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
         assert!(metrics.is_empty());
