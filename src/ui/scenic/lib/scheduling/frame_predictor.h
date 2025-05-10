@@ -13,7 +13,7 @@ namespace scheduling {
 
 struct PredictedTimes {
   // The point at which a client should begin an update and render a frame,
-  // so that it is done by the |presentation_time|.
+  // so that it can (with acceptable probability) be displayed by |presentation_time|.
   zx::time latch_point_time;
   // The predicted presentation time. This corresponds to a future VSYNC.
   zx::time presentation_time;
@@ -69,17 +69,21 @@ class FramePredictor {
   // calculating a prediction.
   // ---------------------------------------------------------------------------
 
-  // Returns the |PredictionTimes| for a |PredictionRequest|, allowing for the
-  // |required_frame_time|.
+  // Returns the |PredictionTimes| for a |PredictionRequest|.  |frame_preparation_time| is the
+  // a duration long enough to prepare a frame for display (i.e. to update the global scene graph,
+  // optionally do GPU composition, and whatever else is necessary).
   static PredictedTimes ComputePredictionFromDuration(PredictionRequest request,
-                                                      zx::duration required_frame_duration);
+                                                      zx::duration frame_preparation_time);
 
-  // Returns the next time to synchronize to. Helper function for all FramePredictors.
-  // |last_sync_time| The last known good sync time.
-  // |sync_interval| The expected time between syncs.
-  // |min_sync_time| The minimum time allowed to return.
-  static zx::time ComputeNextSyncTime(zx::time last_sync_time, zx::duration sync_interval,
-                                      zx::time min_sync_time);
+  // Conceptually, starts at |base_vsync_time| and repeatedly adds |vsync_interval| until arriving
+  // at a time that is >= |min_vsync_time|, which is then returned.  The actual implementation is
+  // more efficient.
+  //
+  // |base_vsync_time| Assumed to be close to a past or future vsync time.
+  // |vsync_interval| The expected time between vsyncs.
+  // |min_vsync_time| The minimum time allowed to return.
+  static zx::time ComputeNextVsyncTime(zx::time base_vsync_time, zx::duration vsync_interval,
+                                       zx::time min_vsync_time);
 };
 
 }  // namespace scheduling
