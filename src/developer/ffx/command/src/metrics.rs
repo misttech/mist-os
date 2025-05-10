@@ -92,7 +92,7 @@ impl MetricsSession {
                     add_ffx_launch_event(sanitized_args, timing_in_millis, exit_code, error_message)
                         .await
                 {
-                    tracing::error!("metrics submission failed: {}", e);
+                    log::error!("metrics submission failed: {}", e);
                 }
                 Instant::now()
             });
@@ -100,7 +100,7 @@ impl MetricsSession {
             let analytics_done = analytics_task
                 // TODO(66918): make configurable, and evaluate chosen time value.
                 .on_timeout(Duration::from_secs(2), || {
-                    tracing::error!("metrics submission timed out");
+                    log::error!("metrics submission timed out");
                     // Metrics timeouts should not impact user flows.
                     Instant::now()
                 })
@@ -114,8 +114,8 @@ impl MetricsSession {
         let success = exit_code == 0;
         let stats = CommandStats { success, command_duration, analytics_duration };
         match success {
-            true => tracing::info!("{stats}",),
-            false => tracing::warn!("{stats}",),
+            true => log::info!("{stats}",),
+            false => log::warn!("{stats}",),
         }
         Ok(stats)
     }
