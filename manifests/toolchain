@@ -49,7 +49,7 @@
          TODO(phosek): repo/bot link about provenance
     -->
     <package name="fuchsia/go/${platform}"
-             version="git_revision:e9e3a9cbf1f5f43a54876380c448c8dc97f10867"
+             version="git_revision:f7d2e89741edde812c560a63aefd9091be1e7433"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/go/{{.OS}}-{{.Arch}}"/>
 
