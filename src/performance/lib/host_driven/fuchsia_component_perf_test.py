@@ -14,9 +14,9 @@ import test_data
 # LINT.ThenChange(//build/testing/perf/test.gni)
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.fuchsia_device import fuchsia_device
+from host_driven import run_test_component
 from mobly import test_runner
 from perf_publish import publish
-from perf_test_utils import utils
 
 
 class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
@@ -69,7 +69,9 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
                 "test_component_args", []
             )
 
-            results_file_path: str = utils.DEFAULT_TARGET_RESULTS_PATH
+            results_file_path: str = (
+                run_test_component.DEFAULT_TARGET_RESULTS_PATH
+            )
             if results_path_test_arg:
                 if results_path_test_arg.endswith("="):
                     test_component_args.append(
@@ -83,7 +85,7 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
             else:
                 test_component_args.append(results_file_path)
 
-        result_files: list[str] = utils.run_test_component(
+        result_files: list[str] = run_test_component.repeatedly(
             device.ffx,
             ffx_test_url,
             self.test_case_path,

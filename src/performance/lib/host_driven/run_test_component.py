@@ -16,7 +16,7 @@ DEFAULT_TARGET_RESULTS_PATH: str = (
 DEFAULT_HOST_RESULTS_FILE: str = "results.fuchsiaperf_full.json"
 
 
-def run_test_component(
+def repeatedly(
     ffx: Any,
     test_url: str,
     host_output_path: str,
@@ -43,7 +43,7 @@ def run_test_component(
     for i in range(process_runs):
         test_dir = os.path.join(host_output_path, f"ffx_test_{i}")
         result_files.append(
-            single_run_test_component(
+            once(
                 ffx,
                 test_url,
                 test_dir,
@@ -55,7 +55,7 @@ def run_test_component(
     return result_files
 
 
-def single_run_test_component(
+def once(
     ffx: Any,
     test_url: str,
     host_output_path: str,

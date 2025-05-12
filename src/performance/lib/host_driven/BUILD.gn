@@ -4,11 +4,11 @@
 
 import("//build/python/python_library.gni")
 
-python_library("perf_test_utils") {
+python_library("host_driven") {
   testonly = true
-  library_name = "perf_test_utils"
+  library_name = "host_driven"
   sources = [
     "__init__.py",
-    "utils.py",
+    "run_test_component.py",
   ]
 }
