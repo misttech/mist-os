@@ -62,8 +62,8 @@ common:exec_log --experimental_enable_execution_graph_log
 
 # Prevent repository downloads with custom downloader config file.
 common --experimental_downloader_config=build/bazel/config/no_downloads_allowed.config
-build --vendor_dir=third_party/bazel_vendor
-build --registry=file://%workspace%/third_party/bazel_vendor/_registries/bcr.bazel.build
+common --vendor_dir=third_party/bazel_vendor
+common --registry=file://%workspace%/third_party/bazel_vendor/_registries/bcr.bazel.build
 
 # Disable verbose Bazel output with --config=quiet
 # Note that --show_result=0 is not supported by `bazel query`.
