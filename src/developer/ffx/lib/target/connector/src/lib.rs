@@ -214,7 +214,7 @@ async fn direct_connector_try_connect<T: TryFromEnv>(
             Ok(()) => {}
             Err(err) => {
                 let e = err.downcast_non_fatal()?;
-                tracing::debug!("error when attempting to connect with connector: {e}");
+                log::debug!("error when attempting to connect with connector: {e}");
                 log_target_wait(&dc.target_spec(), &Some(Error::User(e)))?;
                 // This is just a small wait to prevent busy-looping. The delay is arbitrary.
                 fuchsia_async::Timer::new(Duration::from_millis(50)).await;
@@ -224,7 +224,7 @@ async fn direct_connector_try_connect<T: TryFromEnv>(
         return match T::try_from_env(env).await {
             Err(conn_error) => {
                 let e = conn_error.downcast_non_fatal()?;
-                tracing::debug!("error when trying to connect using TryFromEnv: {e}");
+                log::debug!("error when trying to connect using TryFromEnv: {e}");
                 log_target_wait(&dc.target_spec(), &Some(Error::User(e)))?;
                 continue;
             }

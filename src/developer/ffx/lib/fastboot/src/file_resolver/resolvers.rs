@@ -118,7 +118,7 @@ impl FileResolver for ZipArchiveResolver {
                 create_dir_all(&p)?;
             }
         }
-        tracing::debug!("Extracting to {}", self.temp_dir.path().display());
+        log::debug!("Extracting to {}", self.temp_dir.path().display());
         let mut outfile = File::create(&outpath)?;
         copy(&mut file, &mut outfile)?;
         Ok(outpath.to_str().ok_or_else(|| anyhow!("invalid temp file name"))?.to_owned())
@@ -134,7 +134,7 @@ impl TarResolver {
         let temp_dir = tempdir()?;
         let file = File::open(path.clone())
             .map_err(|e| ffx_error!("Could not open archive file: {}", e))?;
-        tracing::debug!("Extracting to {}", temp_dir.path().display());
+        log::debug!("Extracting to {}", temp_dir.path().display());
         // Tarballs can't do per file extraction well like Zip, so just unpack it all.
         match path.extension() {
             Some(ext) if ext == "tar.gz" || ext == "tgz" => {

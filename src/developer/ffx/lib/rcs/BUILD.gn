@@ -13,8 +13,8 @@ rcs_deps = [
   "//src/lib/fidl/rust/fidl",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:futures",
+  "//third_party/rust_crates:log",
   "//third_party/rust_crates:thiserror",
-  "//third_party/rust_crates:tracing",
 ]
 
 rcs_sources = [

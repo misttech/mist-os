@@ -113,7 +113,7 @@ impl LibNotifier {
                 match stream_tx.write_u32_le(raw_handle).await {
                     Ok(_) => {}
                     Err(e) => {
-                        tracing::info!("Exiting pipe reader task. Error: {e:?}");
+                        log::info!("Exiting pipe reader task. Error: {e:?}");
                         break;
                     }
                 }

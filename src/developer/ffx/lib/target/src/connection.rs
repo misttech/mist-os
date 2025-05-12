@@ -172,7 +172,7 @@ impl Connection {
                 &fio_f::Options::default(),
                 server.into(),
             ) {
-                tracing::debug!(?error, "Could not open svc folder in toolbox namespace");
+                log::debug!("Could not open svc folder in toolbox namespace: {}", error);
             };
             Ok(client)
         }))

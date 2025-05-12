@@ -24,9 +24,9 @@ if (is_host) {
       "//src/developer/ffx/lib/e2e_emu",
       "//src/developer/ffx/lib/profiler:profiler",
       "//src/lib/fuchsia",
+      "//third_party/rust_crates:log",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:tempfile",
-      "//third_party/rust_crates:tracing",
     ]
 
     product_bundle = ":product_bundle($default_toolchain)"

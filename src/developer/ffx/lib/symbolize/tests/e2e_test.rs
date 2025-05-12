@@ -4,8 +4,8 @@
 
 use ffx_e2e_emu::IsolatedEmulator;
 use ffx_symbolize::{MappingDetails, MappingFlags, ResolveError, Symbolizer};
+use log::info;
 use symbolize_test_utils::{Module, SymbolizationTestOutputs};
-use tracing::info;
 
 #[fuchsia::test(logging_minimum_severity = "TRACE")]
 async fn symbolize_fn_ptr() {

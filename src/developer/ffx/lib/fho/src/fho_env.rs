@@ -31,7 +31,7 @@ pub struct FhoEnvironment {
 
 impl FhoEnvironment {
     pub fn new(context: &EnvironmentContext, ffx: &FfxCommandLine) -> Self {
-        tracing::info!("FhoEnvironment created");
+        log::info!("FhoEnvironment created");
         FhoEnvironment {
             ffx: ffx.clone(),
             context: context.clone(),
@@ -41,7 +41,7 @@ impl FhoEnvironment {
 
     /// Create new instance for use in tests.
     pub fn new_with_args(context: &EnvironmentContext, argv: &[impl AsRef<str>]) -> Self {
-        tracing::info!("FhoEnvironment test instance with args created");
+        log::info!("FhoEnvironment test instance with args created");
         FhoEnvironment {
             ffx: FfxCommandLine::new(None, argv).unwrap(),
             context: context.clone(),
@@ -78,7 +78,7 @@ impl FhoEnvironment {
                 self.context.get(ffx_config::logging::LOG_DIR).unwrap_or_else(|_| ".".into());
             let mut log_file = dir.join(basename);
             log_file.set_extension("log");
-            tracing::info!("Switching log file to {log_file:?}");
+            log::info!("Switching log file to {log_file:?}");
             eprintln!("Switching log file to {log_file:?}");
             ffx_config::logging::change_log_file(&log_file)?;
         }

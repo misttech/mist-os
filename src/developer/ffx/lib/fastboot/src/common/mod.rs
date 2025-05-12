@@ -112,7 +112,7 @@ pub async fn stage_file<F: FileResolver + Sync, T: FastbootInterface>(
     } else {
         file.to_string()
     };
-    tracing::debug!("Preparing to stage {}", file_to_upload);
+    log::debug!("Preparing to stage {}", file_to_upload);
     fastboot_interface
         .stage(&file_to_upload, prog_client)
         .await
@@ -164,7 +164,7 @@ async fn flash_partition_sparse<F: FastbootInterface>(
     max_download_size: u64,
     timeout: Duration,
 ) -> Result<()> {
-    tracing::debug!("Preparing to flash {} in sparse mode", file_to_upload);
+    log::debug!("Preparing to flash {} in sparse mode", file_to_upload);
 
     let sparse_files = build_sparse_files(
         name,
@@ -191,7 +191,7 @@ pub async fn flash_partition<F: FileResolver + Sync, T: FastbootInterface>(
 ) -> Result<()> {
     let file_to_upload =
         file_resolver.get_file(file).await.context("reconciling file for upload")?;
-    tracing::debug!("Preparing to upload {}", file_to_upload);
+    log::debug!("Preparing to upload {}", file_to_upload);
     flash_partition_impl(
         messenger,
         name,
@@ -229,21 +229,21 @@ pub async fn flash_partition_impl<T: FastbootInterface>(
     let mut timeout = megabytes / timeout_rate;
     timeout = std::cmp::max(timeout, min_timeout);
     let timeout = Duration::seconds(timeout as i64);
-    tracing::debug!("Estimated timeout: {}s for {}MB", timeout, megabytes);
+    log::debug!("Estimated timeout: {}s for {}MB", timeout, megabytes);
 
     let max_download_size_var = fastboot_interface
         .get_var(MAX_DOWNLOAD_SIZE_VAR)
         .await
         .map_err(|e| anyhow!("Communication error with the device: {:?}", e))?;
 
-    tracing::trace!("Got max download size from device: {}", max_download_size_var);
+    log::trace!("Got max download size from device: {}", max_download_size_var);
     let trimmed_max_download_size_var = max_download_size_var.trim_start_matches("0x");
 
     let max_download_size: u64 = u64::from_str_radix(trimmed_max_download_size_var, 16)
         .expect("Fastboot max download size var was not a valid u32");
 
-    tracing::trace!("Device Max Download Size: {}", max_download_size);
-    tracing::trace!("File size: {}", file_size);
+    log::trace!("Device Max Download Size: {}", max_download_size);
+    log::trace!("File size: {}", file_size);
 
     let start_time = Utc::now();
 
@@ -251,13 +251,13 @@ pub async fn flash_partition_impl<T: FastbootInterface>(
         // Next check if the file given is ALREADY in the sparse image format
         match SparseReader::is_sparse_file(&mut file_handle) {
             Ok(true) => {
-                tracing::debug!(
+                log::debug!(
                     "Image is too big to fit into target RAM and is a sparse image. Re-sparsing"
                 );
 
-                tracing::debug!("Is already a sparse file. Building Reader");
+                log::debug!("Is already a sparse file. Building Reader");
                 let mut reader = SparseReader::new(file_handle)?;
-                tracing::debug!("Building sparse image");
+                log::debug!("Building sparse image");
                 let sparse_files = resparse_sparse_img(
                     &mut reader,
                     std::env::temp_dir().as_path(),
@@ -270,9 +270,7 @@ pub async fn flash_partition_impl<T: FastbootInterface>(
                 }
             }
             Err(_) | Ok(false) => {
-                tracing::debug!(
-                    "Image is  too big to fit into target RAM; flashing in sparse mode"
-                );
+                log::debug!("Image is  too big to fit into target RAM; flashing in sparse mode");
                 flash_partition_sparse(
                     name,
                     &messenger,
@@ -323,7 +321,7 @@ pub async fn verify_variable_value(
     value: &str,
     fastboot_interface: &mut impl FastbootInterface,
 ) -> Result<bool> {
-    tracing::debug!("Verifying value for variable {} equals {}", var, value);
+    log::debug!("Verifying value for variable {} equals {}", var, value);
     fastboot_interface
         .get_var(var)
         .await
@@ -354,7 +352,7 @@ pub async fn reboot_bootloader<F: FastbootInterface>(
     )?;
 
     let d = Utc::now().signed_duration_since(start_time);
-    tracing::debug!("Reboot duration: {:.2}s", (d.num_milliseconds() / 1000));
+    log::debug!("Reboot duration: {:.2}s", (d.num_milliseconds() / 1000));
     messenger.send(Event::Rebooted(d)).await?;
     Ok(())
 }
@@ -394,7 +392,7 @@ pub async fn stage_oem_files<F: FileResolver + Sync, T: FastbootInterface>(
 
 pub async fn set_slot_a_active(fastboot_interface: &mut impl FastbootInterface) -> Result<()> {
     if fastboot_interface.erase("misc").await.is_err() {
-        tracing::debug!("Could not erase misc partition");
+        log::debug!("Could not erase misc partition");
     }
     fastboot_interface.set_active("a").await?;
     Ok(())

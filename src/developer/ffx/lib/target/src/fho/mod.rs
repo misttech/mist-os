@@ -60,10 +60,10 @@ impl FhoTargetEnvironment {
     }
 
     pub fn set_behavior(&self, new_behavior: FhoConnectionBehavior) {
-        tracing::debug!("setting behavior");
+        log::debug!("setting behavior");
         let mut behavior = self.behavior.lock().expect("poisoned behavior lock");
         *behavior = Some(Box::new(new_behavior));
-        tracing::debug!("setting behavior done");
+        log::debug!("setting behavior done");
     }
     /// While the surface of this function is a little awkward, this is necessary to provide a
     /// readable error. Authors shouldn't use this directly, they should instead use

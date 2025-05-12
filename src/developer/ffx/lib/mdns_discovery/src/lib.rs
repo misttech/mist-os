@@ -224,11 +224,11 @@ where
                     }
                 }
                 _ => {
-                    tracing::warn!("Got an mdns event, but it wasnt a TargetFound so skipping it");
+                    log::warn!("Got an mdns event, but it wasnt a TargetFound so skipping it");
                 }
             },
             Err(e) => {
-                tracing::warn!("Got error receiving items");
+                log::warn!("Got error receiving items");
                 return Err(anyhow!("Got error receiving mDNS events: {}", e));
             }
         }
@@ -427,14 +427,14 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
                     let rcv_task =
                         Task::local(recv_loop(sock, mdns_protocol.clone(), checker.clone()));
                     if recv_ipv4_task.is_some() {
-                        tracing::warn!("the IpV4 listen socket was none but we had a task receiving data on it. Replacing the old task")
+                        log::warn!("the IpV4 listen socket was none but we had a task receiving data on it. Replacing the old task")
                     }
                     recv_ipv4_task.replace(rcv_task);
                     should_log_v4_listen_error = true;
                 }
                 Err(err) => {
                     if should_log_v4_listen_error {
-                        tracing::error!(
+                        log::error!(
                             "unable to bind IPv4 listen socket: {}. Discovery may fail.",
                             err
                         );
@@ -454,14 +454,14 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
                     let rcv_task =
                         Task::local(recv_loop(sock, mdns_protocol.clone(), checker.clone()));
                     if recv_ipv6_task.is_some() {
-                        tracing::warn!("the IpV6 listen socket was none but we had a task receiving data on it. Replacing the old task")
+                        log::warn!("the IpV6 listen socket was none but we had a task receiving data on it. Replacing the old task")
                     }
                     recv_ipv6_task.replace(rcv_task);
                     should_log_v6_listen_error = true;
                 }
                 Err(err) => {
                     if should_log_v6_listen_error {
-                        tracing::error!(
+                        log::error!(
                             "unable to bind IPv6 listen socket: {}. Discovery may fail.",
                             err
                         );
@@ -488,7 +488,7 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
                     }
                 }
                 Err(err) => {
-                    tracing::warn!("{}", err);
+                    log::warn!("{}", err);
                 }
             }
 
@@ -527,7 +527,7 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
                             // Because this function is a discovery loop, we retry automatically
                             // and we eventually bind once the avahi service successfully registers
                             // the address.
-                            tracing::debug!("mdns: failed to bind {}: {}", &addr, err);
+                            log::debug!("mdns: failed to bind {}: {}", &addr, err);
                             None
                         }
                     })
@@ -587,7 +587,7 @@ fn make_target<B: SplitByteSlice + Copy>(
             dns::Type::Txt => {
                 if let Some(data) = record.rdata.bytes() {
                     let txt_lines: Vec<String> = decode_txt_rdata(data).unwrap_or_default();
-                    tracing::debug!("found text lines: {:#?}", txt_lines);
+                    log::debug!("found text lines: {:#?}", txt_lines);
                     let mut ip_addr: Option<IpAddress> = None;
                     for txt in &txt_lines {
                         if let Some((name, value)) = txt.split_once(':') {
@@ -625,9 +625,9 @@ fn make_target<B: SplitByteSlice + Copy>(
                             port: ssh_port,
                         }));
                     }
-                    tracing::debug!("emulator mdns txt {:?} {:?}", &txt_lines, record.domain);
+                    log::debug!("emulator mdns txt {:?} {:?}", &txt_lines, record.domain);
                 } else {
-                    tracing::debug!("no data in txt record {:?}", record.domain);
+                    log::debug!("no data in txt record {:?}", record.domain);
                 }
             }
             dns::Type::A | dns::Type::Aaaa => {
@@ -643,7 +643,7 @@ fn make_target<B: SplitByteSlice + Copy>(
         };
     }
 
-    tracing::debug!(
+    log::debug!(
         "Making target from message. nodename: {} address: {:#?} fastboot_interface: {:#?} serial: {:#?}",
         nodename,
         src,
@@ -711,7 +711,7 @@ async fn recv_loop(
                 addr
             }
             Err(err) => {
-                tracing::error!("listen socket recv error: {}, mdns listener closed", err);
+                log::error!("listen socket recv error: {}, mdns listener closed", err);
                 return;
             }
         };
@@ -724,7 +724,7 @@ async fn recv_loop(
         let msg = match buf.parse::<dns::Message<_>>() {
             Ok(msg) => msg,
             Err(e) => {
-                tracing::trace!(
+                log::trace!(
                     "unable to parse message received on {} from {}: {:?}",
                     sock.local_addr()
                         .map(|s| s.to_string())
@@ -736,28 +736,25 @@ async fn recv_loop(
             }
         };
 
-        tracing::trace!("Socket: {:#?} received message", sock);
+        log::trace!("Socket: {:#?} received message", sock);
 
         // Only interested in fuchsia services or fastboot.
         if !is_fuchsia_response(&msg) && is_fastboot_response(&msg).is_none() {
-            tracing::trace!(
-                "Socket: {:#?} skipping message: as it is not fuchsia or fastboot",
-                sock
-            );
+            log::trace!("Socket: {:#?} skipping message: as it is not fuchsia or fastboot", sock);
             continue;
         }
         // Source addresses need to be present in the response, or be a TXT record which
         // contains address information about user mode networking being used by an emulator
         // instance.
         if !contains_source_address(&addr, &msg) && !contains_txt_response(&msg) {
-            tracing::debug!("Socket: {:#?} skipping message as it does not contain source address {} or does not contain txt resposne", sock, addr);
+            log::debug!("Socket: {:#?} skipping message as it does not contain source address {} or does not contain txt resposne", sock, addr);
             continue;
         }
 
         if let Some(mdns_protocol) = mdns_protocol.upgrade() {
             #[allow(clippy::or_fun_call)] // TODO(https://fxbug.dev/379717780)
             if let Some((t, ttl)) = make_target(addr, msg) {
-                tracing::trace!(
+                log::trace!(
                     "packet from {} ({}) on {}",
                     addr,
                     t.nodename.as_ref().unwrap_or(&target_errors::UNKNOWN_TARGET_NAME.to_string()),
@@ -801,7 +798,7 @@ async fn query_loop(sock: Rc<UdpSocket>, interval: Duration, mdns_port: u16) {
         Ok(SocketAddr::V4(_)) => (MDNS_MCAST_V4, mdns_port).into(),
         Ok(SocketAddr::V6(_)) => (MDNS_MCAST_V6, mdns_port).into(),
         Err(err) => {
-            tracing::error!("resolving local socket addr failed with: {}", err);
+            log::error!("resolving local socket addr failed with: {}", err);
             return;
         }
     };
@@ -815,7 +812,7 @@ async fn query_loop(sock: Rc<UdpSocket>, interval: Duration, mdns_port: u16) {
                 // But the premise is that we see this during suspend / resume cycle of the host
                 // because the mDNS services for the relevant address and interface are not ready
                 // yet.
-                tracing::debug!(
+                log::debug!(
                     "mdns query failed from {}: {}",
                     sock.local_addr()
                         .map(|a| a.to_string())
@@ -845,12 +842,12 @@ async fn query_recv_loop(
     let addr = match sock.local_addr() {
         Ok(addr) => addr,
         Err(err) => {
-            tracing::error!("mdns: failed to shutdown: {:?}", err);
+            log::error!("mdns: failed to shutdown: {:?}", err);
             return;
         }
     };
 
-    tracing::debug!("mdns: started query socket {}", &addr);
+    log::debug!("mdns: started query socket {}", &addr);
 
     futures::select!(
         _ = recv => {},
@@ -863,7 +860,7 @@ async fn query_recv_loop(
     if let Some(a) = tasks.lock().await.remove(&addr.ip()) {
         drop(a)
     }
-    tracing::debug!("mdns: shut down query socket {}", &addr);
+    log::debug!("mdns: shut down query socket {}", &addr);
 }
 
 // Exclude any mdns packets received where the source address of the packet does not appear in any
@@ -889,7 +886,7 @@ fn contains_source_address<B: zerocopy::SplitByteSlice + Copy>(
     // There is nothing actionable for the user.
     // This warning is most obvious when launching an emulator in user mode (which is the default)
     // and causes a lot of noise in the logs.
-    tracing::debug!(
+    log::debug!(
         "Dubious mdns from: {:?} does not contain an answer that includes the source address, therefore it is ignored.",
         addr
     );

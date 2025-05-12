@@ -30,7 +30,7 @@ impl HandleReadWaker {
         if let Some(ref sender) = this.deref().notification_sender {
             let _ = sender
                 .try_send(this.deref().handle)
-                .map_err(|e| tracing::debug!("failed sending notification {e:?}"));
+                .map_err(|e| log::debug!("failed sending notification {e:?}"));
         }
     }
 

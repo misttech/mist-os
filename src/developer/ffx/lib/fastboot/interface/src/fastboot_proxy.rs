@@ -41,7 +41,7 @@ pub struct FastbootProxy<T: AsyncRead + AsyncWrite + Unpin> {
 fn handle_timeout_as_okay(r: Result<Reply>) -> Result<Reply> {
     match r {
         Err(e) if matches!(e.downcast_ref::<SendError>(), Some(SendError::Timeout)) => {
-            tracing::debug!("Timed out waiting for bootloader response; assuming it's okay");
+            log::debug!("Timed out waiting for bootloader response; assuming it's okay");
             Ok(Reply::Okay("".to_string()))
         }
         _ => r,
@@ -63,10 +63,10 @@ impl VariableListener {
 impl fastboot::InfoListener for VariableListener {
     async fn on_info(&self, info: String) -> Result<()> {
         if let Some((name, val)) = info.split_once(':') {
-            tracing::debug!("Got a variable string: {}", info);
+            log::debug!("Got a variable string: {}", info);
             self.0.send(Variable { name: name.to_string(), value: val.to_string() }).await?;
         } else {
-            tracing::warn!("Expected to get a variable string. Got: {}", info);
+            log::warn!("Expected to get a variable string. Got: {}", info);
         }
         Ok(())
     }
@@ -119,12 +119,12 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> FastbootProxy<T> {
         self.interface = None;
 
         // Wait for it to show up again
-        tracing::debug!("About to rediscover target");
+        log::debug!("About to rediscover target");
         self.interface_factory.rediscover().await?;
 
         //Reconnect
         self.interface.replace(self.interface_factory.open().await?);
-        tracing::warn!("Reconnected");
+        log::warn!("Reconnected");
         Ok(())
     }
 
@@ -196,7 +196,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         .await
         .context(format!("uploading {}", path))?;
         match upload_reply {
-            Reply::Okay(s) => tracing::debug!("Received response from download command: {}", s),
+            Reply::Okay(s) => log::debug!("Received response from download command: {}", s),
             Reply::Fail(s) => {
                 return Err(FastbootError::StageError(StageError::UploadFailed {
                     path: path.to_string(),
@@ -255,7 +255,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
             send(command.clone(), self.interface().await?).await.context("sending erase")?;
         match reply {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully erased parition: {}", partition_name);
+                log::debug!("Successfully erased parition: {}", partition_name);
                 Ok(())
             }
             Reply::Fail(s) => {
@@ -280,7 +280,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         .context("sending boot")?;
         match reply {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully sent boot");
+                log::debug!("Successfully sent boot");
                 Ok(())
             }
 
@@ -301,7 +301,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         .context("sending reboot")?;
         match reply {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully sent reboot");
+                log::debug!("Successfully sent reboot");
                 Ok(())
             }
             Reply::Fail(s) => return Err(FastbootError::RebootFailed(s)),
@@ -329,10 +329,10 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         .context("sending reboot bootloader")?;
         match reply {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully sent reboot bootloader");
+                log::debug!("Successfully sent reboot bootloader");
                 let send_res = listener.send(RebootEvent::OnReboot).await;
                 if send_res.is_err() {
-                    tracing::debug!(
+                    log::debug!(
                         "reboot_bootloader hit error sending the reboot event to caller: {:#?}",
                         send_res
                     );
@@ -361,7 +361,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         .context("sending continue")?;
         match reply {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully sent continue");
+                log::debug!("Successfully sent continue");
                 Ok(())
             }
             Reply::Fail(s) => return Err(FastbootError::ContinueBootFailed(s)),
@@ -378,7 +378,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
             .context(format!("downloading to {}", path))?
         {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully downloaded to \"{}\"", path);
+                log::debug!("Successfully downloaded to \"{}\"", path);
                 Ok(())
             }
             Reply::Fail(message) => {
@@ -400,13 +400,13 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         let mut file_to_stage = File::open(path).map_err(StageError::from)?;
         let size = file_to_stage.metadata().map_err(StageError::from)?.len();
         let size = u32::try_from(size).map_err(|e| StageError::InvalidFileSize(e))?;
-        tracing::debug!("uploading file size: {}", size);
+        log::debug!("uploading file size: {}", size);
         match upload(size, &mut file_to_stage, self.interface().await?, &progress_listener)
             .await
             .context(format!("uploading {}", path))?
         {
             Reply::Okay(s) => {
-                tracing::debug!("Received response from download command: {}", s);
+                log::debug!("Received response from download command: {}", s);
                 Ok(())
             }
             Reply::Fail(s) => {
@@ -433,7 +433,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         .context("set active")?;
         match reply {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully sent set_active");
+                log::debug!("Successfully sent set_active");
                 Ok(())
             }
             Reply::Fail(message) => {
@@ -450,7 +450,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         let command = Command::Oem(command.to_string());
         match send(command.clone(), self.interface().await?).await.context("sending oem")? {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully sent oem command \"{}\"", command);
+                log::debug!("Successfully sent oem command \"{}\"", command);
                 Ok(())
             }
             Reply::Fail(message) => {

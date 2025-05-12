@@ -138,7 +138,7 @@ impl SshConfig {
                         if let Some(key_str) = CONFIG_KEYS.iter().find(|k| k == &&key) {
                             self.data.insert(key_str, value);
                         } else if IGNORED_KEYS.contains(&key) {
-                            tracing::info!("ignoring ssh config key {key}");
+                            log::info!("ignoring ssh config key {key}");
                         } else {
                             bail!("Unknown configuration key \"{key}\" in {l}");
                         }

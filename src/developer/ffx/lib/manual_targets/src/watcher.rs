@@ -60,28 +60,25 @@ impl ManualTargetTester for TcpOpenManualTargetTester {
         {
             Ok(_) => {
                 // If we can get a fastboot var then we're fastboot
-                tracing::trace!("Could connect to SocketAddr: {}. Testing if Fastboot TCP", target);
+                log::trace!("Could connect to SocketAddr: {}. Testing if Fastboot TCP", target);
                 match tcp_proxy(&target).await {
                     Ok(mut fastboot_interface) => {
                         if fastboot_interface.get_var("version").await.is_ok() {
-                            tracing::trace!("SocketAddr: {}. Is in Fastboot TCP", target);
+                            log::trace!("SocketAddr: {}. Is in Fastboot TCP", target);
                             ManualTargetState::Fastboot
                         } else {
-                            tracing::trace!("SocketAddr: {}. Could not get the version varaible. Is Product state.", target);
+                            log::trace!("SocketAddr: {}. Could not get the version varaible. Is Product state.", target);
                             ManualTargetState::Product
                         }
                     }
                     _ => {
-                        tracing::trace!("SocketAddr: {}. Could not create TCP Fastboot Proxy. Is Product state.", target);
+                        log::trace!("SocketAddr: {}. Could not create TCP Fastboot Proxy. Is Product state.", target);
                         ManualTargetState::Product
                     }
                 }
             }
             Err(_) => {
-                tracing::trace!(
-                    "SocketAddr: {}. Could not Connect over TCP. Is Disconnected.",
-                    target
-                );
+                log::trace!("SocketAddr: {}. Could not Connect over TCP. Is Disconnected.", target);
                 ManualTargetState::Disconnected
             }
         }
@@ -166,7 +163,7 @@ where
         let (addr, scope, port) = match netext::parse_address_parts(unparsed_addr.as_str()) {
             Ok(res) => res,
             Err(e) => {
-                tracing::error!("Skipping load of manual target address due to parsing error '{unparsed_addr}': {e}");
+                log::error!("Skipping load of manual target address due to parsing error '{unparsed_addr}': {e}");
                 continue;
             }
         };
@@ -174,7 +171,7 @@ where
             match netext::get_verified_scope_id(scope) {
                 Ok(res) => res,
                 Err(e) => {
-                    tracing::error!("Scope load of manual address '{unparsed_addr}', which had a scope ID of '{scope}', which was not verifiable: {e}");
+                    log::error!("Scope load of manual address '{unparsed_addr}', which had a scope ID of '{scope}', which was not verifiable: {e}");
                     continue;
                 }
             }
@@ -211,41 +208,41 @@ where
         // Enumerate interfaces
         let new_targets = parse_manual_targets(&finder).await;
         let new_targets = BTreeSet::from_iter(new_targets);
-        tracing::trace!("found targets: {:#?}", new_targets);
+        log::trace!("found targets: {:#?}", new_targets);
         // Update Cache
         for target in &new_targets {
             // Just because the target is found doesnt mean that the target is ready
             let state = opener.target_state(target.addr).await;
             if state == ManualTargetState::Disconnected {
-                tracing::debug!("Skipping adding target number: {target} as although it appears to be a product device it is not readily accepting connections");
+                log::debug!("Skipping adding target number: {target} as although it appears to be a product device it is not readily accepting connections");
                 if targets.contains(target) {
                     targets.remove(&target);
-                    tracing::trace!("Sening lost event for target: {}", target);
+                    log::trace!("Sening lost event for target: {}", target);
                     let _ = events_out.send(ManualTargetEvent::Lost(target.clone())).await;
-                    tracing::trace!("Sent lost event for target: {}", target);
+                    log::trace!("Sent lost event for target: {}", target);
                 }
                 continue;
             }
 
-            tracing::trace!("Inserting new target: {}", target);
+            log::trace!("Inserting new target: {}", target);
             if targets.insert(target.clone()) {
-                tracing::trace!("Sending discovered event for target: {}", target);
+                log::trace!("Sending discovered event for target: {}", target);
                 let _ = events_out.send(ManualTargetEvent::Discovered(target.clone(), state)).await;
-                tracing::trace!("Sent discovered event for target: {}", target);
+                log::trace!("Sent discovered event for target: {}", target);
             }
         }
 
         // Check for any missing targets
         let missing_targets: Vec<_> = targets.difference(&new_targets).cloned().collect();
-        tracing::trace!("missing targets: {:#?}", missing_targets);
+        log::trace!("missing targets: {:#?}", missing_targets);
         for target in missing_targets {
             targets.remove(&target);
-            tracing::trace!("Sening lost event for target: {}", target);
+            log::trace!("Sening lost event for target: {}", target);
             let _ = events_out.send(ManualTargetEvent::Lost(target.clone())).await;
-            tracing::trace!("Sent lost event for target: {}", target);
+            log::trace!("Sent lost event for target: {}", target);
         }
 
-        tracing::trace!("discovery loop... waiting for {:#?}", discovery_interval);
+        log::trace!("discovery loop... waiting for {:#?}", discovery_interval);
         Timer::new(discovery_interval).await;
     }
 }
@@ -256,7 +253,7 @@ where
 {
     loop {
         let event = receiver.recv().await.map_err(|e| anyhow!(e));
-        tracing::trace!("Event loop received event: {:#?}", event);
+        log::trace!("Event loop received event: {:#?}", event);
         handler.handle_event(event);
     }
 }
@@ -305,7 +302,7 @@ impl InterfaceFactoryBase<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>> for
     }
 
     async fn close(&self) {
-        tracing::debug!("Closing Oneshot Fastboot TCP Factory for: {}", self.addr);
+        log::debug!("Closing Oneshot Fastboot TCP Factory for: {}", self.addr);
     }
 
     async fn rediscover(&mut self) -> Result<(), InterfaceFactoryError> {

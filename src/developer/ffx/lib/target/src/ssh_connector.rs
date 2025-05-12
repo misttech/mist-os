@@ -96,7 +96,7 @@ impl SshConnector {
             match ffx_ssh::parse::parse_ssh_output(&mut stdout, &mut stderr, false, &self.env_context).await {
                 Ok(res) => res,
                 Err(e) => {
-                    tracing::warn!("SSH pipe error encountered {e:?}");
+                    log::warn!("SSH pipe error encountered {e:?}");
                     try_ssh_cmd_cleanup(
                         self.overnet_cmd.take().expect("ssh command must have started")
                     )
@@ -214,7 +214,7 @@ async fn start_fdomain_ssh_command(
     let mut ssh = tokio::process::Command::from(
         build_ssh_command_with_env(ssh_path, target, env_context, args).await?,
     );
-    tracing::debug!("SshConnector starting start_fdomain_ssh invoking:  {ssh:?}");
+    log::debug!("SshConnector starting start_fdomain_ssh invoking:  {ssh:?}");
     let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
     Ok(ssh_cmd.spawn().bug_context("spawning ssh command")?)
 }
@@ -243,7 +243,7 @@ async fn start_overnet_ssh_command(
     let mut ssh = tokio::process::Command::from(
         build_ssh_command_with_env(ssh_path, target, env_context, args).await?,
     );
-    tracing::debug!("SshConnector starting overnet invoking: {ssh:?}");
+    log::debug!("SshConnector starting overnet invoking: {ssh:?}");
     let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
     Ok(ssh_cmd.spawn().bug_context("spawning ssh command")?)
 }
@@ -254,14 +254,14 @@ async fn try_ssh_cmd_cleanup(mut cmd: Child) -> Result<()> {
         match status.code() {
             // Possible to catch more error codes here, hence the use of a match.
             Some(255) => {
-                tracing::warn!("SSH ret code: 255. Unexpected session termination.")
+                log::warn!("SSH ret code: 255. Unexpected session termination.")
             }
-            _ => tracing::error!("SSH exited with error code: {status}. "),
+            _ => log::error!("SSH exited with error code: {status}. "),
         }
     } else {
-        tracing::error!("ssh child has not ended, trying one more time then ignoring it.");
+        log::error!("ssh child has not ended, trying one more time then ignoring it.");
         fuchsia_async::Timer::new(std::time::Duration::from_secs(2)).await;
-        tracing::error!("ssh child status is {:?}", cmd.try_wait());
+        log::error!("ssh child status is {:?}", cmd.try_wait());
     }
     Ok(())
 }
@@ -286,7 +286,7 @@ impl TargetConnector for SshConnector {
                     // FDomain authoritative about whether the device is
                     // connectable. For now we'll fall through because it's less
                     // likely to cause breakages prior to migration.
-                    tracing::warn!("Connecting with FDomain encountered error {other:?}");
+                    log::warn!("Connecting with FDomain encountered error {other:?}");
                     None
                 }
             }
@@ -317,22 +317,20 @@ impl Drop for SshConnector {
             let pid = Pid::from_raw(cmd.id().unwrap() as i32);
             match cmd.try_wait() {
                 Ok(Some(result)) => {
-                    tracing::info!("FidlPipe exited with {}", result);
+                    log::info!("FidlPipe exited with {}", result);
                 }
                 Ok(None) => {
                     let _ = kill(pid, SIGKILL)
-                        .map_err(|e| tracing::warn!("failed to kill FidlPipe command: {:?}", e));
-                    let _ = waitpid(pid, None).map_err(|e| {
-                        tracing::warn!("failed to clean up FidlPipe command: {:?}", e)
-                    });
+                        .map_err(|e| log::warn!("failed to kill FidlPipe command: {:?}", e));
+                    let _ = waitpid(pid, None)
+                        .map_err(|e| log::warn!("failed to clean up FidlPipe command: {:?}", e));
                 }
                 Err(e) => {
-                    tracing::warn!("failed to soft-wait FidlPipe command: {:?}", e);
+                    log::warn!("failed to soft-wait FidlPipe command: {:?}", e);
                     let _ = kill(pid, SIGKILL)
-                        .map_err(|e| tracing::warn!("failed to kill FidlPipe command: {:?}", e));
-                    let _ = waitpid(pid, None).map_err(|e| {
-                        tracing::warn!("failed to clean up FidlPipe command: {:?}", e)
-                    });
+                        .map_err(|e| log::warn!("failed to kill FidlPipe command: {:?}", e));
+                    let _ = waitpid(pid, None)
+                        .map_err(|e| log::warn!("failed to clean up FidlPipe command: {:?}", e));
                 }
             };
         }

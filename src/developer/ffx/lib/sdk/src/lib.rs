@@ -4,6 +4,7 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use errors::{ffx_bail, ffx_error};
+use log::warn;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -11,7 +12,6 @@ use std::fs;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use tracing::warn;
 
 use metadata::{CpuArchitecture, ElementType, FfxTool, HostTool, Manifest, Part};
 pub use sdk_metadata as metadata;
@@ -145,7 +145,7 @@ impl SdkRoot {
                 match Self::find_sdk_root(&Path::new(&exe_path)) {
                     Ok(Some(root)) => root,
                     Ok(None) => {
-                        tracing::error!(
+                        log::error!(
                             "Could not find an SDK manifest in any parent of ffx's directory.\
                              Using {:?} as HostTools root",
                             exe_path.parent().unwrap()
@@ -163,11 +163,11 @@ impl SdkRoot {
 
         match module {
             Some(module) => {
-                tracing::debug!("Found modular Fuchsia SDK at {sdk_root:?} with module {module}");
+                log::debug!("Found modular Fuchsia SDK at {sdk_root:?} with module {module}");
                 Ok(SdkRoot::Modular { root: sdk_root, module })
             }
             _ => {
-                tracing::debug!("Found full Fuchsia SDK at {sdk_root:?}");
+                log::debug!("Found full Fuchsia SDK at {sdk_root:?}");
                 Ok(SdkRoot::Full { root: sdk_root, manifest: None })
             }
         }
@@ -177,7 +177,7 @@ impl SdkRoot {
         let cwd = std::env::current_dir()
             .context("Could not resolve working directory while searching for the Fuchsia SDK")?;
         let mut path = cwd.join(start_path);
-        tracing::debug!("Attempting to find the sdk root from {path:?}");
+        log::debug!("Attempting to find the sdk root from {path:?}");
 
         loop {
             path = if let Some(parent) = path.parent() {
@@ -187,7 +187,7 @@ impl SdkRoot {
             };
 
             if SdkRoot::is_sdk_root(&path) {
-                tracing::debug!("Found sdk root through recursive search in {path:?}");
+                log::debug!("Found sdk root through recursive search in {path:?}");
                 return Ok(Some(path));
             }
         }
@@ -225,7 +225,7 @@ impl SdkRoot {
 
     /// Does a full load of the sdk configuration.
     pub fn get_sdk(self) -> Result<Sdk> {
-        tracing::debug!("get_sdk from {self:?}");
+        log::debug!("get_sdk from {self:?}");
         match self {
             Self::Modular { root, module } => {
                 // Modular only ever makes sense as part of a build directory
@@ -291,7 +291,7 @@ fn find_exe_path() -> Result<PathBuf> {
     let args_path = match std::env::args_os().next() {
         Some(arg) => PathBuf::from(&arg),
         None => {
-            tracing::trace!("FFX was run without an argv[0] somehow");
+            log::trace!("FFX was run without an argv[0] somehow");
             return Ok(binary_path);
         }
     };
@@ -302,7 +302,7 @@ fn find_exe_path() -> Result<PathBuf> {
     let canonical_args_path = match args_path.canonicalize() {
         Ok(path) => path,
         Err(e) => {
-            tracing::trace!(
+            log::trace!(
                 "Could not canonicalize the path ffx was run with, \
                 which might mean the working directory has changed or the file \
                 doesn't exist anymore: {e:?}"
@@ -318,7 +318,7 @@ fn find_exe_path() -> Result<PathBuf> {
         // absolute.
         Ok(cwd.join(args_path))
     } else {
-        tracing::trace!(
+        log::trace!(
             "FFX's argv[0] ({args_path:?}) resolved to {canonical_args_path:?} \
             instead of the binary's path {binary_path:?}, falling back to the \
             binary path."
@@ -345,7 +345,7 @@ impl Sdk {
         })?;
         let manifest_path = match module_manifest {
             None => {
-                tracing::info!("Creating build-dir SDK without a manifest");
+                log::info!("Creating build-dir SDK without a manifest");
                 return Ok(Self::new());
             }
             Some(module) => module_manifest_path(&path, module)?,
@@ -478,10 +478,10 @@ impl Sdk {
         let full_path = self.path_prefix.join(relative_path);
 
         if full_path.exists() {
-            tracing::info!("Path {full_path:?} found for {name}");
+            log::info!("Path {full_path:?} found for {name}");
             Ok(full_path)
         } else {
-            tracing::info!("No path  found for {name}");
+            log::info!("No path  found for {name}");
             Err(anyhow!("No path  found for {name}"))
         }
     }
@@ -609,7 +609,7 @@ impl Sdk {
                     stable: atom.stable,
                 });
             } else {
-                tracing::debug!("Atom did not contain a meta file, skipping it: {atom:?}");
+                log::debug!("Atom did not contain a meta file, skipping it: {atom:?}");
             }
         }
 

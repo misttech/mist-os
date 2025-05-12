@@ -39,16 +39,12 @@ pub fn repo_spec_to_backend(
         }
         RepositorySpec::Http { metadata_repo_url, blob_repo_url, aliases } => {
             let metadata_repo_url = Url::parse(metadata_repo_url.as_str()).map_err(|err| {
-                tracing::error!(
-                    "Unable to parse metadata repo url {}: {:#}",
-                    metadata_repo_url,
-                    err
-                );
+                log::error!("Unable to parse metadata repo url {}: {:#}", metadata_repo_url, err);
                 RepositoryError::InvalidUrl
             })?;
 
             let blob_repo_url = Url::parse(blob_repo_url.as_str()).map_err(|err| {
-                tracing::error!("Unable to parse blob repo url {}: {:#}", blob_repo_url, err);
+                log::error!("Unable to parse blob repo url {}: {:#}", blob_repo_url, err);
                 RepositoryError::InvalidUrl
             })?;
 
@@ -61,7 +57,7 @@ pub fn repo_spec_to_backend(
         }
         RepositorySpec::Gcs { .. } => {
             // FIXME(https://fxbug.dev/42181388): Implement support for daemon-side GCS repositories.
-            tracing::error!("Trying to register a GCS repository, but that's not supported yet");
+            log::error!("Trying to register a GCS repository, but that's not supported yet");
             Err(RepositoryError::UnknownRepositorySpec)
         }
     }
@@ -72,7 +68,7 @@ async fn update_repository(
     repo: &RwLock<RepoClient<Box<dyn RepoProvider>>>,
 ) -> Result<bool, RepositoryError> {
     repo.write().await.update().await.map_err(|err| {
-        tracing::error!("Unable to update repository {}: {:#?}", repo_name, err);
+        log::error!("Unable to update repository {}: {:#?}", repo_name, err);
 
         match err {
             repository::Error::Tuf(tuf::Error::ExpiredMetadata { .. }) => {
@@ -95,7 +91,7 @@ pub async fn register_target_with_repo_instance(
     let repo_name: &str = &repo_target_info.repo_name;
     let target_ssh_host_address = target.ssh_host_address.clone();
 
-    tracing::info!(
+    log::info!(
         "Registering repository {:?} for target {:?}",
         repo_name,
         repo_target_info.target_identifier
@@ -108,7 +104,7 @@ pub async fn register_target_with_repo_instance(
     let (_, repo_host_addr) = create_repo_host(
         repo_server_listen_addr,
         target_ssh_host_address.ok_or_else(|| {
-            tracing::error!(
+            log::error!(
                 "target {:?} does not have a host address",
                 repo_target_info.target_identifier
             );
@@ -131,7 +127,7 @@ pub async fn register_target_with_repo_instance(
             for alias in &aliases {
                 if let Some(repos) = alias_repos.get(alias) {
                     if !repos.contains(&repo_name.to_string()) {
-                        tracing::error!(
+                        log::error!(
                             "Alias registration conflict for {alias} replaced by {} ",
                             repos.join(", ")
                         );
@@ -152,19 +148,19 @@ pub async fn register_target_with_repo_instance(
     // now add repo_host_addr as the mirror
     let mirror_url = format!("http://{repo_host_addr}/{}", repo_instance.name);
     let mirror_url: http::Uri = mirror_url.parse().map_err(|err| {
-        tracing::error!("failed to parse mirror url {}: {:#}", mirror_url, err);
+        log::error!("failed to parse mirror url {}: {:#}", mirror_url, err);
         RepositoryError::InvalidUrl
     })?;
 
     let mut mirror = MirrorConfigBuilder::new(mirror_url.clone()).map_err(|err| {
-        tracing::error!("failed to parse mirror url {}: {:#}", mirror_url, err);
+        log::error!("failed to parse mirror url {}: {:#}", mirror_url, err);
         RepositoryError::InvalidUrl
     })?;
     mirror = mirror.subscribe(subscribe);
 
     let mut config = RepositoryConfigBuilder::new(
         RepositoryUrl::parse_host(repo_name.to_string()).map_err(|err| {
-            tracing::error!("failed to parse repo url {}: {:#}", repo_name, err);
+            log::error!("failed to parse repo url {}: {:#}", repo_name, err);
             RepositoryError::InvalidUrl
         })?,
     )
@@ -181,11 +177,11 @@ pub async fn register_target_with_repo_instance(
     match repo_proxy.add(&config.build().into()).await {
         Ok(Ok(())) => {}
         Ok(Err(err)) => {
-            tracing::error!("failed to add config: {:#?}", Status::from_raw(err));
+            log::error!("failed to add config: {:#?}", Status::from_raw(err));
             return Err(RepositoryError::RepositoryManagerError);
         }
         Err(err) => {
-            tracing::error!("failed to add config: {:#?}", err);
+            log::error!("failed to add config: {:#?}", err);
             return Err(RepositoryError::TargetCommunicationFailure);
         }
     }
@@ -203,7 +199,7 @@ async fn read_alias_repos(
     let (rule_iterator, rule_iterator_server) = fidl::endpoints::create_proxy();
 
     engine_proxy.list(rule_iterator_server).map_err(|e| {
-        tracing::error!("Failed to list rules: {e}");
+        log::error!("Failed to list rules: {e}");
         RepositoryError::RewriteEngineError
     })?;
 
@@ -212,7 +208,7 @@ async fn read_alias_repos(
     let mut rules: Vec<Rule> = vec![];
     loop {
         let rule = rule_iterator.next().await.map_err(|e| {
-            tracing::error!("Failed iterating while listing rules: {e}");
+            log::error!("Failed iterating while listing rules: {e}");
             RepositoryError::RewriteEngineError
         })?;
         if rule.is_empty() {
@@ -246,7 +242,7 @@ pub async fn register_target_with_fidl_proxies(
     let repo_name: &str = &repo_target_info.repo_name;
     let target_ssh_host_address = target.ssh_host_address.clone();
 
-    tracing::info!(
+    log::info!(
         "Registering repository {:?} for target {:?}",
         repo_name,
         repo_target_info.target_identifier
@@ -259,7 +255,7 @@ pub async fn register_target_with_fidl_proxies(
     let (_, repo_host) = create_repo_host(
         repo_server_listen_addr,
         target_ssh_host_address.ok_or_else(|| {
-            tracing::error!(
+            log::error!(
                 "target {:?} does not have a host address",
                 repo_target_info.target_identifier
             );
@@ -271,13 +267,13 @@ pub async fn register_target_with_fidl_proxies(
     update_repository(repo_name, &repo).await?;
 
     let repo_url = RepositoryUrl::parse_host(repo_name.to_owned()).map_err(|err| {
-        tracing::error!("failed to parse repository name {}: {:#}", repo_name, err);
+        log::error!("failed to parse repository name {}: {:#}", repo_name, err);
         RepositoryError::InvalidUrl
     })?;
 
     let mirror_url = format!("http://{}/{}", repo_host, repo_name);
     let mirror_url = mirror_url.parse().map_err(|err| {
-        tracing::error!("failed to parse mirror url {}: {:#}", mirror_url, err);
+        log::error!("failed to parse mirror url {}: {:#}", mirror_url, err);
         RepositoryError::InvalidUrl
     })?;
 
@@ -294,7 +290,7 @@ pub async fn register_target_with_fidl_proxies(
                     .map(|storage_type| storage_type.clone().into()),
             )
             .map_err(|e| {
-                tracing::error!("failed to get config: {}", e);
+                log::error!("failed to get config: {}", e);
                 return RepositoryError::RepositoryManagerError;
             })?;
 
@@ -311,11 +307,11 @@ pub async fn register_target_with_fidl_proxies(
     match repo_proxy.add(&config.into()).await {
         Ok(Ok(())) => {}
         Ok(Err(err)) => {
-            tracing::error!("failed to add config: {:#?}", Status::from_raw(err));
+            log::error!("failed to add config: {:#?}", Status::from_raw(err));
             return Err(RepositoryError::RepositoryManagerError);
         }
         Err(err) => {
-            tracing::error!("failed to add config: {:#?}", err);
+            log::error!("failed to add config: {:#?}", err);
             return Err(RepositoryError::TargetCommunicationFailure);
         }
     }
@@ -346,7 +342,7 @@ fn aliases_to_rules(
         })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|err| {
-            tracing::warn!("failed to construct rule: {:#?}", err);
+            log::warn!("failed to construct rule: {:#?}", err);
             RepositoryError::RewriteEngineError
         })?;
 
@@ -386,7 +382,7 @@ async fn create_aliases_fidl(
     })
     .await
     .map_err(|err| {
-        tracing::warn!("failed to create transactions: {:#?}", err);
+        log::warn!("failed to create transactions: {:#?}", err);
         RepositoryError::RewriteEngineError
     })?;
 

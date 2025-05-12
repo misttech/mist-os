@@ -77,7 +77,7 @@ pub fn get_file_hash(file: &Path) -> Result<u64, Error> {
     }
     let new_hash = hasher.finish();
     let elapsed = start.elapsed().as_millis();
-    tracing::debug!("File hash for {file:?} calculated in {elapsed:?}");
+    log::debug!("File hash for {file:?} calculated in {elapsed:?}");
     Ok(new_hash)
 }
 

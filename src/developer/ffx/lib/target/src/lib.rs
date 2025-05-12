@@ -18,12 +18,12 @@ use fidl_fuchsia_net as net;
 use fuchsia_async::Timer;
 use futures::future::{pending, Either};
 use futures::{select, Future, FutureExt, TryStreamExt};
+use log::{debug, info};
 use std::net::IpAddr;
 use std::time::Duration;
 use target_errors::FfxTargetError;
 use thiserror::Error;
 use timeout::timeout;
-use tracing::{debug, info};
 
 #[cfg(test)]
 use mockall::predicate::*;
@@ -91,7 +91,7 @@ pub async fn get_remote_proxy(
                     _ => {
                         let retry_info =
                             format!("Retrying connection after non-fatal error encountered: {e}");
-                        tracing::info!("{}", retry_info.as_str());
+                        log::info!("{}", retry_info.as_str());
                         // Insert a small delay to prevent too tight of a spinning loop.
                         fuchsia_async::Timer::new(Duration::from_millis(20)).await;
                         continue;
@@ -287,14 +287,14 @@ async fn wait_for_device_inner(
             futures_lite::future::yield_now().await;
             break match knocker.knock_rcs(target_spec_clone.clone(), &env).await {
                 Err(e) => {
-                    tracing::debug!("unable to knock target: {e:?}");
+                    log::debug!("unable to knock target: {e:?}");
                     if let WaitFor::DeviceOffline = behavior {
                         Ok(())
                     } else {
                         if let KnockError::CriticalError(e) = e {
                             Err(ffx_command_error::Error::Unexpected(e.into()))
                         } else {
-                            tracing::debug!("error non-critical. retrying.");
+                            log::debug!("error non-critical. retrying.");
                             Timer::new(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
                             continue;
                         }
@@ -365,7 +365,7 @@ impl RcsKnocker for LocalRcsKnockerImpl {
                 Some(c) => format!("Received compat info: {c:?}"),
                 None => format!("No compat info received"),
             };
-            tracing::debug!("Knocked target. {msg}");
+            log::debug!("Knocked target. {msg}");
         })
     }
 }
@@ -447,7 +447,7 @@ pub async fn knock_target_daemonless(
 ) -> Result<Option<CompatibilityInfo>, KnockError> {
     let knock_timeout = knock_timeout.unwrap_or(DEFAULT_RCS_KNOCK_TIMEOUT * 2);
     let res_future = async {
-        tracing::debug!("resolving target spec address from {target_spec:?}");
+        log::debug!("resolving target spec address from {target_spec:?}");
         let res =
             resolve::resolve_target_address(target_spec, context).await.map_err(|e| match e {
                 // When knocking, it's not critical if we have not yet found the target. The caller should just retry
@@ -457,7 +457,7 @@ pub async fn knock_target_daemonless(
                 } => KnockError::NonCriticalError(e.into()),
                 _ => KnockError::CriticalError(e.into()),
             })?;
-        tracing::debug!("daemonless knock connecting to address {}", res.addr()?);
+        log::debug!("daemonless knock connecting to address {}", res.addr()?);
         let conn = match res.connection {
             Some(c) => c,
             None => {
@@ -467,7 +467,7 @@ pub async fn knock_target_daemonless(
                 )?)
                 .await
                 .map_err(|e| KnockError::CriticalError(e.into()))?;
-                tracing::debug!("daemonless knock connection established");
+                log::debug!("daemonless knock connection established");
                 let _ = conn
                     .rcs_proxy_fdomain()
                     .await

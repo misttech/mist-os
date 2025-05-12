@@ -30,7 +30,7 @@ impl FastbootWatcher {
         let watcher = fastboot_file_discovery::recommended_watcher(
             move |res: Result<fastboot_file_discovery::FastbootEvent>| {
                 // Translate the result to a TargetEvent
-                tracing::trace!("discovery watcher got fastboot file event: {:#?}", res);
+                log::trace!("discovery watcher got fastboot file event: {:#?}", res);
                 let event = match res {
                     Ok(r) => {
                         let event: TargetEvent = r.into();

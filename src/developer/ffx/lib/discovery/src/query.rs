@@ -54,7 +54,7 @@ impl TargetInfoQuery {
     }
 
     pub fn match_description(&self, t: &Description) -> bool {
-        tracing::debug!("Matching description {t:?} against query {self:?}");
+        log::debug!("Matching description {t:?} against query {self:?}");
         match self {
             Self::NodenameOrSerial(arg) => {
                 if let Some(ref nodename) = t.nodename {
@@ -224,7 +224,7 @@ impl From<String> for TargetInfoQuery {
         let (addr, scope, port) = match netext::parse_address_parts(s.as_str()) {
             Ok(r) => r,
             Err(e) => {
-                tracing::trace!(
+                log::trace!(
                     "Failed to parse address from '{s}'. Interpreting as nodename: {:?}",
                     e
                 );

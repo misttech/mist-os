@@ -157,11 +157,11 @@ pub async fn reverse_port(
                 .await
                 {
                     Err(e) => {
-                        tracing::warn!("Listen socket failed: {e:?}");
+                        log::warn!("Listen socket failed: {e:?}");
                         return None;
                     }
                     Ok(s) if s.contains(fidl::Signals::OBJECT_PEER_CLOSED) => {
-                        tracing::debug!("Socket hung up");
+                        log::debug!("Socket hung up");
                         return None;
                     }
                     Ok(_) => (),
@@ -171,7 +171,7 @@ pub async fn reverse_port(
                 match got_socket {
                     Ok(Ok((addr, got_socket))) => {
                         let Some(addr) = addr else {
-                            tracing::warn!("Reverse forward accepted socket with no address from");
+                            log::warn!("Reverse forward accepted socket with no address from");
                             continue;
                         };
 
@@ -180,14 +180,14 @@ pub async fn reverse_port(
                         let socket = match socket_fidl.describe().await {
                             Ok(socket) => socket,
                             Err(error) => {
-                                tracing::warn!(
+                                log::warn!(
                                 "Reverse forward incoming socket didn't respond to describe: {error:?}");
                                 continue;
                             }
                         };
 
                         let Some(socket) = socket.socket else {
-                            tracing::warn!("Reverse forward socket not provided in describe");
+                            log::warn!("Reverse forward socket not provided in describe");
                             continue;
                         };
 
@@ -201,11 +201,11 @@ pub async fn reverse_port(
                     }
 
                     Ok(Err(error)) => {
-                        tracing::warn!("Reverse forward error accepting connection: {error:?}");
+                        log::warn!("Reverse forward error accepting connection: {error:?}");
                         return None;
                     }
                     Err(error) => {
-                        tracing::warn!("Reverse forward listening socket failed: {error:?}");
+                        log::warn!("Reverse forward listening socket failed: {error:?}");
                         return None;
                     }
                 }

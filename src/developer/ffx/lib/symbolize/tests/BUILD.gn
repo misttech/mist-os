@@ -27,8 +27,8 @@ if (is_host) {
       "//src/developer/ffx/lib/symbolize/test-utils:symbolize_test_utils",
       "//src/lib/diagnostics/log/rust_cpp_bridge",
       "//src/lib/fuchsia",
+      "//third_party/rust_crates:log",
       "//third_party/rust_crates:serde_json",
-      "//third_party/rust_crates:tracing",
     ]
 
     product_bundle = ":product_bundle($default_toolchain)"

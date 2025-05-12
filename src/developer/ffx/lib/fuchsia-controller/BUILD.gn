@@ -35,8 +35,8 @@ rustc_staticlib("lib") {
     "//third_party/rust_crates:async-channel",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:tokio",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [

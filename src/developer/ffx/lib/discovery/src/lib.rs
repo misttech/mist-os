@@ -232,7 +232,7 @@ where
         let fastboot_sender = sender.clone();
         Some(fastboot_watcher(move |res: Result<FastbootEvent>| {
             // Translate the result to a TargetEvent
-            tracing::debug!("discovery watcher got fastboot event: {:#?}", res);
+            log::debug!("discovery watcher got fastboot event: {:#?}", res);
             let event = match res {
                 Ok(r) => {
                     let event: TargetEvent = r.into();
@@ -251,7 +251,7 @@ where
         let manual_targets_sender = sender.clone();
         Some(manual_recommended_watcher(move |res: Result<ManualTargetEvent>| {
             // Translate the result to a TargetEvent
-            tracing::trace!("discovery watcher got manual target event: {:#?}", res);
+            log::trace!("discovery watcher got manual target event: {:#?}", res);
             let event = match res {
                 Ok(r) => {
                     let event: TargetEvent = r.into();
@@ -319,7 +319,7 @@ impl Stream for TargetStream {
             };
 
             if !filter.filter_target(handle) {
-                tracing::trace!(
+                log::trace!(
                     "Skipping event for target handle: {} as it did not match our filter",
                     handle
                 );

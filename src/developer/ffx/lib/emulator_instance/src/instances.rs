@@ -27,10 +27,10 @@ impl EmulatorInstances {
         let path = self.instance_root.join(&instance_name);
         if !path.exists() {
             if create {
-                tracing::debug!("Creating {:?} for {}", path, instance_name);
+                log::debug!("Creating {:?} for {}", path, instance_name);
                 create_dir_all(&path.as_path())?;
             } else {
-                tracing::debug!(
+                log::debug!(
                     "Path {} doesn't exist. Check the spelling of the instance name.",
                     instance_name
                 );
@@ -44,7 +44,7 @@ impl EmulatorInstances {
     pub fn clean_up_instance_dir(&self, instance_name: &str) -> Result<()> {
         let path = self.get_instance_dir(instance_name, false)?;
         if path.exists() {
-            tracing::debug!("Removing {:?} for {:?}", path, path.as_path().file_name().unwrap());
+            log::debug!("Removing {:?} for {:?}", path, path.as_path().file_name().unwrap());
             std::fs::remove_dir_all(&path.as_path()).context("Request to remove directory failed")
         } else {
             // It's already gone, so just return Ok(()).
@@ -74,7 +74,7 @@ impl EmulatorInstances {
                                         ))
                                     }
                                     Err(e) => {
-                                        tracing::error!(
+                                        log::error!(
                                             "Cannot read emulator instance data for {}: {:?}",
                                             name,
                                             e
@@ -105,7 +105,7 @@ pub fn read_from_disk(instance_directory: &PathBuf) -> Result<EngineOption> {
         let res: Result<EmulatorInstanceData> =
             serde_json::from_reader(file).context(format!("Invalid JSON syntax in {:?}", filepath));
         if res.is_err() {
-            tracing::warn!("Failed to parse emulator instance: {res:?}");
+            log::warn!("Failed to parse emulator instance: {res:?}");
         }
         let value = res?;
         Ok(EngineOption::DoesExist(value))
@@ -138,7 +138,7 @@ pub fn write_to_disk(data: &EmulatorInstanceData, instance_directory: &PathBuf) 
     let filepath = instance_directory.join(SERIALIZE_FILE_NAME);
     let file = File::create(&filepath)
         .context(format!("Unable to create file {:?} for serialization", filepath))?;
-    tracing::debug!("Writing serialized engine out to {:?}", filepath);
+    log::debug!("Writing serialized engine out to {:?}", filepath);
     match serde_json::to_writer(file, data) {
         Ok(_) => Ok(()),
         Err(e) => Err(anyhow!(e)),

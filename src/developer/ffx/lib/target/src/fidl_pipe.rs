@@ -57,12 +57,12 @@ pub fn create_overnet_socket(
                 }
                 .await
                 {
-                    tracing::warn!("FIDL pipe circuit closed: {:?}", e);
+                    log::warn!("FIDL pipe circuit closed: {:?}", e);
                 }
             },
             errors
                 .map(|e| {
-                    tracing::warn!("A FIDL pipe circuit stream failed: {e:?}");
+                    log::warn!("A FIDL pipe circuit stream failed: {e:?}");
                 })
                 .collect::<()>(),
         )
@@ -110,7 +110,7 @@ impl FidlPipe {
             };
 
             let error = format!("non-fatal error connecting to device. Retrying again after {wait_duration:?}: {error:?}");
-            tracing::debug!(error);
+            log::debug!("{}", error);
             eprintln!("{}", error);
             Timer::new(wait_duration).await;
             wait_duration *= 2;

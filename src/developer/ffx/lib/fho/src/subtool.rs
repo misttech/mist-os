@@ -36,7 +36,7 @@ pub trait FfxTool: FfxMain + Sized {
         let should_format = match FfxCommandLine::from_env() {
             Ok(cli) => cli.global.machine.is_some(),
             Err(e) => {
-                tracing::warn!("Received error getting command line: {}", e);
+                log::warn!("Received error getting command line: {}", e);
                 match e {
                     Error::Help { .. } => false,
                     _ => true,

@@ -261,7 +261,7 @@ pub async fn open(addr: SocketAddr) -> Result<UdpNetworkInterface> {
         _ => bail!("Unexpected response to init packet"),
     };
     let maximum_size = std::cmp::min(max, MAX_SIZE);
-    tracing::debug!(
+    log::debug!(
         "Fastboot over UDP connection established. Version {}. Max Size: {}",
         version,
         maximum_size
@@ -282,7 +282,7 @@ async fn send_to_device(buf: &[u8], socket: &UdpSocket) -> Result<([u8; 1500], u
     match wait_for_response(socket).await {
         Ok(r) => Ok(r),
         Err(e) => {
-            tracing::error!("Could not get reply from Fastboot device - trying again: {}", e);
+            log::error!("Could not get reply from Fastboot device - trying again: {}", e);
             socket.send(buf).await?;
             wait_for_response(socket)
                 .await

@@ -111,7 +111,7 @@ impl PkgServerInfo {
                             match waitpid(pid, Some(options)) {
                                 Err(e) => bail!("Terminate error: {}", e),
                                 Ok(WaitStatus::Exited(p, code)) => {
-                                    tracing::debug!("process {p} exited with code {code}");
+                                    log::debug!("process {p} exited with code {code}");
                                     return Ok(());
                                 }
                                 Ok(WaitStatus::Signaled(_, _, _)) => return Ok(()),
@@ -123,7 +123,7 @@ impl PkgServerInfo {
                     {
                         Ok(_) => return Ok(()),
                         Err(e) => {
-                            tracing::info!("error terminating {}: {e}", self.name);
+                            log::info!("error terminating {}: {e}", self.name);
                             return nix::sys::signal::kill(
                                 pid,
                                 Some(nix::sys::signal::Signal::SIGKILL),
@@ -234,7 +234,7 @@ impl PkgServerInstanceInfo for PkgServerInstances {
                                 }
                             }
                             Err(e) => {
-                                tracing::warn!(
+                                log::warn!(
                                     "Error deserializing {:?} into PkgServerInfo: {e}",
                                     entry.path()
                                 );
@@ -243,7 +243,7 @@ impl PkgServerInstanceInfo for PkgServerInstances {
                                 fs::rename(entry.path(), &bad_name).with_context(|| {
                                     format!("rename {:?} to {:?}", entry.path(), bad_name)
                                 })?;
-                                tracing::warn!(
+                                log::warn!(
                                     "Renamed instance file {old} to {new}",
                                     old = entry.path().display(),
                                     new = bad_name.display()
@@ -347,7 +347,7 @@ pub async fn write_instance_info(
             bail!("Cannot overrite running server with same name and a different pid: {name} existing pid: {} new pid: {}", existing.pid, info.pid);
         }
         let message = format!("WARNING: Overwriting server info for {name}: {existing:?}");
-        tracing::error!("{message}");
+        log::error!("{message}");
     }
     mgr.write_instance(&info).map_err(Into::into)
 }

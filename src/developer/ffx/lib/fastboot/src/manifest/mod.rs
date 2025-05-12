@@ -94,11 +94,11 @@ impl FlashManifestVersion {
     }
 
     fn from_product_bundle_v2(product_bundle: &ProductBundleV2) -> Result<Self> {
-        tracing::debug!("Begin loading flash manifest from ProductBundleV2: {:#?}", product_bundle);
+        log::debug!("Begin loading flash manifest from ProductBundleV2: {:#?}", product_bundle);
         // Copy the unlock credentials from the partitions config to the flash manifest.
         let mut credentials = vec![];
         for c in &product_bundle.partitions.unlock_credentials {
-            tracing::debug!("Adding unlock credential: {}", c.to_string());
+            log::debug!("Adding unlock credential: {}", c.to_string());
             credentials.push(c.to_string());
         }
 
@@ -111,7 +111,7 @@ impl FlashManifestVersion {
                     path: p.image.to_string(),
                     condition: None,
                 };
-                tracing::debug!("Adding bootloader partition: {:#?}", partition);
+                log::debug!("Adding bootloader partition: {:#?}", partition);
                 bootloader_partitions.push(partition);
             }
         }
@@ -126,7 +126,7 @@ impl FlashManifestVersion {
             };
             let partition =
                 v3::Partition { name: p.name.to_string(), path: p.image.to_string(), condition };
-            tracing::debug!("Adding bootstrap partition: {:#?}", partition);
+            log::debug!("Adding bootstrap partition: {:#?}", partition);
             bootstrap_partitions.push(partition);
         }
         // Append the bootloader partitions, bootstrapping a device means flashing any initial
@@ -139,17 +139,17 @@ impl FlashManifestVersion {
         let mut image_map = PartitionImageMapper::new(product_bundle.partitions.clone())?;
         if let Some(manifest) = &product_bundle.system_a {
             let slot = Slot::A;
-            tracing::debug!("Mapping images: {:?} to slot: {}", manifest, slot);
+            log::debug!("Mapping images: {:?} to slot: {}", manifest, slot);
             image_map.map_images_to_slot(&manifest, slot)?;
         }
         if let Some(manifest) = &product_bundle.system_b {
             let slot = Slot::B;
-            tracing::debug!("Mapping images: {:?} to slot: {}", manifest, slot);
+            log::debug!("Mapping images: {:?} to slot: {}", manifest, slot);
             image_map.map_images_to_slot(&manifest, slot)?;
         }
         if let Some(manifest) = &product_bundle.system_r {
             let slot = Slot::R;
-            tracing::debug!("Mapping images: {:?} to slot: {}", manifest, slot);
+            log::debug!("Mapping images: {:?} to slot: {}", manifest, slot);
             image_map.map_images_to_slot(&manifest, slot)?;
         }
 
@@ -193,7 +193,7 @@ impl FlashManifestVersion {
             products,
         };
 
-        tracing::debug!("Created FlashManifest: {:#?}", ret);
+        log::debug!("Created FlashManifest: {:#?}", ret);
 
         Ok(Self::V3(ret))
     }
@@ -288,7 +288,7 @@ pub async fn from_sdk<F: FastbootInterface>(
     fastboot_interface: &mut F,
     cmd: ManifestParams,
 ) -> Result<()> {
-    tracing::debug!("fastboot manifest from_sdk");
+    log::debug!("fastboot manifest from_sdk");
     match cmd.product_bundle.as_ref() {
         Some(b) => {
             let product_bundle = load_product_bundle(&Some(b.to_string())).await?.into();
@@ -311,7 +311,7 @@ pub async fn from_local_product_bundle<F: FastbootInterface>(
     fastboot_interface: &mut F,
     cmd: ManifestParams,
 ) -> Result<()> {
-    tracing::debug!("fastboot manifest from_local_product_bundle");
+    log::debug!("fastboot manifest from_local_product_bundle");
     let path = Utf8Path::from_path(&*path).ok_or_else(|| anyhow!("Error getting path"))?;
     let product_bundle = ProductBundle::try_load_from(path)?;
 
@@ -343,9 +343,9 @@ pub async fn from_in_tree<T: FastbootInterface>(
     fastboot_interface: &mut T,
     cmd: ManifestParams,
 ) -> Result<()> {
-    tracing::debug!("fastboot manifest from_in_tree");
+    log::debug!("fastboot manifest from_in_tree");
     if cmd.product_bundle.is_some() {
-        tracing::debug!("in tree, but product bundle specified, use in-tree sdk");
+        log::debug!("in tree, but product bundle specified, use in-tree sdk");
         from_sdk(messenger, fastboot_interface, cmd).await
     } else {
         bail!("manifest or product_bundle must be specified")
@@ -358,7 +358,7 @@ pub async fn from_path<T: FastbootInterface>(
     fastboot_interface: &mut T,
     cmd: ManifestParams,
 ) -> Result<()> {
-    tracing::debug!("fastboot manifest from_path");
+    log::debug!("fastboot manifest from_path");
     match path.extension() {
         Some(ext) => {
             if ext == "zip" {

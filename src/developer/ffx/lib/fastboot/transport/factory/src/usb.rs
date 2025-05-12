@@ -41,31 +41,31 @@ struct UsbTargetHandler {
 impl FastbootEventHandler for UsbTargetHandler {
     async fn handle_event(&mut self, event: Result<FastbootEvent>) {
         if self.tx.is_none() {
-            tracing::warn!("Handling an event but our sender is none. Returning early.");
+            log::warn!("Handling an event but our sender is none. Returning early.");
             return;
         }
         match event {
             Ok(ev) => match ev {
                 FastbootEvent::Discovered(s) if s == self.target_serial => {
-                    tracing::debug!(
+                    log::debug!(
                         "Discovered target with serial: {} we were looking for!",
                         self.target_serial
                     );
                     let _ = self.tx.take().unwrap().send(());
                 }
-                FastbootEvent::Discovered(s) => tracing::debug!(
+                FastbootEvent::Discovered(s) => log::debug!(
                     "Attempting to rediscover target with serial: {}. Found target: {}",
                     self.target_serial,
                     s,
                 ),
-                FastbootEvent::Lost(l) => tracing::debug!(
+                FastbootEvent::Lost(l) => log::debug!(
                     "Attempting to rediscover target with serial: {}. Lost target: {}",
                     self.target_serial,
                     l,
                 ),
             },
             Err(e) => {
-                tracing::error!(
+                log::error!(
                     "Attempting to rediscover target with serial: {}. Got an error: {}. Continuing",
                     self.target_serial,
                     e
@@ -91,16 +91,16 @@ impl InterfaceFactoryBase<AsyncInterface> for UsbFactory {
         let interface = open_interface_with_serial(&self.serial).await.with_context(|| {
             format!("Failed to open target usb interface by serial {}", self.serial)
         })?;
-        tracing::debug!("serial now in use: {}", self.serial);
+        log::debug!("serial now in use: {}", self.serial);
         Ok(interface)
     }
 
     async fn close(&self) {
-        tracing::debug!("dropping UsbFactory for serial: {}", self.serial);
+        log::debug!("dropping UsbFactory for serial: {}", self.serial);
     }
 
     async fn rediscover(&mut self) -> Result<(), InterfaceFactoryError> {
-        tracing::debug!("Rediscovering devices");
+        log::debug!("Rediscovering devices");
 
         let (tx, rx) = channel::<()>();
         // Handler will handle the found usb devices.
@@ -126,10 +126,7 @@ impl InterfaceFactoryBase<AsyncInterface> for UsbFactory {
         drop(watcher);
 
         let mut tester = StrictGetVarFastbootUsbLiveTester { serial: self.serial.clone() };
-        tracing::debug!(
-            "Rediscovered device with serial {}. Waiting for it to be live",
-            self.serial,
-        );
+        log::debug!("Rediscovered device with serial {}. Waiting for it to be live", self.serial,);
         wait_for_live(self.serial.as_str(), &mut tester, MonotonicDuration::from_millis(500)).await;
 
         Ok(())

@@ -196,14 +196,10 @@ impl notify::EventHandler for FastbootFileHandler {
                     if p.file_name() == Some(OsStr::new("devices")) {
                         // Cool. Open the file, parse and send events
 
-                        tracing::warn!("triggered by {p:?}");
+                        log::warn!("triggered by {p:?}");
                         match File::open(&p) {
                             Err(e) => {
-                                tracing::error!(
-                                    "Error opening fastboot devices file: {:?}: {}",
-                                    &p,
-                                    e
-                                );
+                                log::error!("Error opening fastboot devices file: {:?}: {}", &p, e);
                             }
                             Ok(file) => {
                                 let lines = BufReader::new(file).lines();
@@ -211,7 +207,7 @@ impl notify::EventHandler for FastbootFileHandler {
                                 for line in lines.flatten() {
                                     match line.parse::<FastbootEntry>() {
                                         Err(e) => {
-                                            tracing::error!(
+                                            log::error!(
                                                 "Error parsing fastboot devices file line: {}. {}",
                                                 line,
                                                 e
@@ -227,7 +223,7 @@ impl notify::EventHandler for FastbootFileHandler {
                                                         device.clone(),
                                                     ))
                                                     .map_err(|e| {
-                                                        tracing::error!(
+                                                        log::error!(
                                                     "Error sending fastboot event: {:?} {e:?}",
                                                     &p
                                                 )
@@ -244,14 +240,14 @@ impl notify::EventHandler for FastbootFileHandler {
             }
             Ok(Event { kind: Remove(_), paths, .. }) => {
                 for p in paths {
-                    tracing::debug!("Removal of {p:?} is being processed");
+                    log::debug!("Removal of {p:?} is being processed");
                     if p.file_name() == Some(OsStr::new("devices")) {
                         for device in &self.seen_devices {
                             let _ = self
                                 .fastboot_file_tx
                                 .try_send(FastbootEvent::Lost(device.clone()))
                                 .map_err(|e| {
-                                    tracing::error!("Error sending fastbodt event: {:?} {e:?}", &p)
+                                    log::error!("Error sending fastbodt event: {:?} {e:?}", &p)
                                 });
                         }
                         self.seen_devices.clear();
@@ -261,12 +257,12 @@ impl notify::EventHandler for FastbootFileHandler {
             Err(ref e @ notify::Error { ref kind, .. }) => {
                 match kind {
                     notify::ErrorKind::Io(ioe) => {
-                        tracing::debug!("IO error. Ignoring {ioe:?}");
+                        log::debug!("IO error. Ignoring {ioe:?}");
                     }
                     _ => {
                         // If we get a non-spurious error, treat that as something that
                         // should cause us to exit.
-                        tracing::warn!("Exiting due to file watcher error: {e:?}");
+                        log::warn!("Exiting due to file watcher error: {e:?}");
                     }
                 }
             }
@@ -281,7 +277,7 @@ where
 {
     loop {
         let event = receiver.next().await.ok_or_else(|| anyhow!("no event"));
-        tracing::trace!("Event loop received event: {:#?}", event);
+        log::trace!("Event loop received event: {:#?}", event);
         handler.handle_event(event).await;
     }
 }

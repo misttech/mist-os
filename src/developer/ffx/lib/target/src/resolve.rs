@@ -47,7 +47,7 @@ pub async fn maybe_locally_resolve_target_spec(
     if crate::is_discovery_enabled(env_context).await {
         Ok(target_spec)
     } else {
-        tracing::warn!("crate::is_discovery_enabled is false - using local target resolution. is_usb_discovery_disabled is {}, is_mdns_discovery_disabled is {}",
+        log::warn!("crate::is_discovery_enabled is false - using local target resolution. is_usb_discovery_disabled is {}, is_mdns_discovery_disabled is {}",
         ffx_config::is_usb_discovery_disabled(env_context).await,
         ffx_config::is_mdns_discovery_disabled(env_context).await);
 
@@ -80,10 +80,7 @@ async fn locally_resolve_target_spec<T: QueryResolverT>(
         TargetInfoQuery::Serial(sn) => format!("serial:{sn}"),
         _ => {
             let resolution = resolver.resolve_single_target(&target_spec, env_context).await?;
-            tracing::debug!(
-                "Locally resolved target '{target_spec:?}' to {:?}",
-                resolution.discovered
-            );
+            log::debug!("Locally resolved target '{target_spec:?}' to {:?}", resolution.discovered);
             resolution.target.to_spec()
         }
     };
@@ -119,7 +116,7 @@ trait QueryResolverT {
         let res = self.resolve_single_target(&target_spec, ctx).await?;
         let target_spec_info =
             target_spec.clone().unwrap_or_else(|| crate::UNSPECIFIED_TARGET_NAME.to_owned());
-        tracing::debug!("resolved target spec {target_spec_info} to address {:?}", res.addr());
+        log::debug!("resolved target spec {target_spec_info} to address {:?}", res.addr());
         Ok(res)
     }
 
@@ -142,7 +139,7 @@ trait QueryResolverT {
                 select! {
                     mtr = manual_target_fut => match mtr {
                         Err(e) => {
-                            tracing::debug!("Failed to resolve target {s} as manual target: {e:?}");
+                            log::debug!("Failed to resolve target {s} as manual target: {e:?}");
                             // Keep going, waiting for the discovery to complete
                         }
                         Ok(Some(res)) => return Ok(res), // We found a manual target, so we're done
@@ -258,7 +255,7 @@ impl RetrievedTargetInfo {
             };
             // Ensure there's a port
             let addr = ScopedSocketAddr::from_socket_addr(replace_default_port(addr))?;
-            tracing::debug!("Trying to make a connection to {addr:?}");
+            log::debug!("Trying to make a connection to {addr:?}");
 
             match try_get_target_info(&addr, context)
                 .on_timeout(ssh_timeout, || {
@@ -277,11 +274,11 @@ impl RetrievedTargetInfo {
                     });
                 }
                 Err(crate::KnockError::NonCriticalError(e)) => {
-                    tracing::debug!("Could not connect to {addr:?}: {e:?}");
+                    log::debug!("Could not connect to {addr:?}: {e:?}");
                     continue;
                 }
                 e => {
-                    tracing::debug!("Got error {e:?} when trying to connect to {addr:?}");
+                    log::debug!("Got error {e:?} when trying to connect to {addr:?}");
                     return Ok(Self {
                         rcs_state: ffx::RemoteControlState::Unknown,
                         product_config: None,
@@ -380,7 +377,7 @@ async fn resolve_target_query_with_sources(
     ctx: &EnvironmentContext,
     sources: DiscoverySources,
 ) -> Result<Vec<TargetHandle>> {
-    tracing::debug!("Resolving query: {:#?} with sources: {:#?}", query, sources);
+    log::debug!("Resolving query: {:#?} with sources: {:#?}", query, sources);
     // Get nodename, in case we're trying to find an exact match
     QueryResolver::new(sources).resolve_target_query(query, ctx).await
 }
@@ -493,7 +490,7 @@ impl QueryResolver {
                                 None
                             } else {
                                 if query_matches_handle(&q_clone, h) {
-                                    tracing::debug!(
+                                    log::debug!(
                                         "Signaling early as discovered target matches query"
                                     );
                                     found_ev.signal();
@@ -594,7 +591,7 @@ impl QueryResolverT for QueryResolver {
     ) -> Result<Vec<TargetHandle>> {
         let results: Vec<Result<_>> = self.get_discovery_stream(query, ctx).await?.collect().await;
         // Fail if any results are Err
-        tracing::debug!("target events results: {results:?}");
+        log::debug!("target events results: {results:?}");
         // If any of the results in the stream are Err, cause the whole thing to
         // be an Err.
         results.into_iter().collect()
@@ -809,7 +806,7 @@ impl TryFromEnvContext for Resolution {
             } else {
                 target_spec.as_ref().unwrap_or(&unspecified_target)
             };
-            tracing::trace!("resolving target spec address from {}", target_spec_unwrapped);
+            log::trace!("resolving target spec address from {}", target_spec_unwrapped);
             let resolution = resolve_target_address(&target_spec, env)
                 .await
                 .map_err(|e| ffx_command_error::Error::User(NonFatalError(e.into()).into()))?;

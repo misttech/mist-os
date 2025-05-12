@@ -104,7 +104,7 @@ fn is_fastboot_match(info: &InterfaceInfo) -> bool {
 
     let serial = extract_debug_serial_number(info);
     if !errs.is_empty() {
-        tracing::debug!(
+        log::debug!(
             "Interface with serial {} is not valid fastboot match. Encountered errors: \n\t{}",
             serial,
             errs.into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n\t")
@@ -112,12 +112,12 @@ fn is_fastboot_match(info: &InterfaceInfo) -> bool {
         false
     } else {
         if let Err(e) = valid_dev_product(info) {
-            tracing::debug!(
+            log::debug!(
                 "Interface {serial} is a valid Fastboot match, but may not be a Fuchsia Product: {}",
                 e
             );
         } else {
-            tracing::debug!("Found valid device: {serial}");
+            log::debug!("Found valid device: {serial}");
         }
         true
     }
@@ -127,7 +127,7 @@ fn enumerate_interfaces<F>(mut cb: F)
 where
     F: FnMut(&InterfaceInfo),
 {
-    tracing::debug!("Enumerating USB fastboot interfaces");
+    log::debug!("Enumerating USB fastboot interfaces");
     let mut cb = |info: &InterfaceInfo| -> bool {
         if is_fastboot_match(info) {
             cb(info)
@@ -154,7 +154,7 @@ fn open_interface<F>(mut cb: F) -> Result<Interface>
 where
     F: FnMut(&InterfaceInfo) -> bool,
 {
-    tracing::debug!("Selecting USB fastboot interface to open");
+    log::debug!("Selecting USB fastboot interface to open");
 
     let mut open_cb = |info: &InterfaceInfo| -> bool {
         if is_fastboot_match(info) {
@@ -206,17 +206,17 @@ fn info_matches_serial(info: &InterfaceInfo, serial: &str) -> bool {
 }
 
 pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
-    tracing::debug!("Opening USB fastboot interface with serial number: {}", serial);
+    log::debug!("Opening USB fastboot interface with serial number: {}", serial);
     let mut interface =
         open_interface(|info: &InterfaceInfo| -> bool { info_matches_serial(info, serial) })
             .with_context(|| format!("opening interface with serial number: {}", serial))?;
     match send(Command::GetVar(ClientVariable::Version), &mut interface).await {
         Ok(Reply::Okay(version)) => {
-            tracing::debug!("USB serial {serial}: fastboot version: {version}");
+            log::debug!("USB serial {serial}: fastboot version: {version}");
             Ok(interface)
         }
         Ok(Reply::Fail(message)) => {
-            tracing::warn!("Failed to get variable \"version\" with message: \"{message}\". but we communicated over fastboot protocol... continuing");
+            log::warn!("Failed to get variable \"version\" with message: \"{message}\". but we communicated over fastboot protocol... continuing");
             Ok(interface)
         }
         Err(e) => bail!(format!(
@@ -370,36 +370,36 @@ where
         // Enumerate interfaces
         let new_serials = finder.find_serial_numbers();
         let new_serials = BTreeSet::from_iter(new_serials);
-        tracing::debug!("found serials: {:#?}", new_serials);
+        log::debug!("found serials: {:#?}", new_serials);
         // Update Cache
         for serial in &new_serials {
             // Just because the serial is found doesnt mean that the target is ready
             if !opener.is_fastboot_usb(serial.as_str()).await {
-                tracing::debug!(
+                log::debug!(
                     "Skipping adding serial number: {serial} as it is not a Fastboot interface"
                 );
                 continue;
             }
 
-            tracing::debug!("Inserting new serial: {}", serial);
+            log::debug!("Inserting new serial: {}", serial);
             if serials.insert(serial.clone()) {
-                tracing::debug!("Sending discovered event for serial: {}", serial);
+                log::debug!("Sending discovered event for serial: {}", serial);
                 let _ = events_out.send(FastbootEvent::Discovered(serial.clone())).await;
-                tracing::trace!("Sent discovered event for serial: {}", serial);
+                log::trace!("Sent discovered event for serial: {}", serial);
             }
         }
 
         // Check for any missing Serials
         let missing_serials: Vec<_> = serials.difference(&new_serials).cloned().collect();
-        tracing::trace!("missing serials: {:#?}", missing_serials);
+        log::trace!("missing serials: {:#?}", missing_serials);
         for serial in missing_serials {
             serials.remove(&serial);
-            tracing::trace!("Sending lost event for serial: {}", serial);
+            log::trace!("Sending lost event for serial: {}", serial);
             let _ = events_out.send(FastbootEvent::Lost(serial.clone())).await;
-            tracing::trace!("Sent lost event for serial: {}", serial);
+            log::trace!("Sent lost event for serial: {}", serial);
         }
 
-        tracing::trace!("discovery loop... waiting for {:#?}", discovery_interval);
+        log::trace!("discovery loop... waiting for {:#?}", discovery_interval);
         Timer::new(discovery_interval).await;
     }
 }
@@ -410,7 +410,7 @@ where
 {
     loop {
         let event = receiver.recv().await.map_err(|e| anyhow!(e));
-        tracing::trace!("Event loop received event: {:#?}", event);
+        log::trace!("Event loop received event: {:#?}", event);
         handler.handle_event(event).await;
     }
 }

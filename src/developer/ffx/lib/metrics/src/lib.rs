@@ -71,20 +71,20 @@ pub async fn add_daemon_metrics_event(request_str: &str) {
     let analytics_start = Instant::now();
     let analytics_task = fuchsia_async::Task::local(async move {
         match add_custom_event(Some("ffx_daemon"), Some(&request), None, BTreeMap::new()).await {
-            Err(e) => tracing::error!("metrics submission failed: {}", e),
-            Ok(_) => tracing::debug!("metrics succeeded"),
+            Err(e) => log::error!("metrics submission failed: {}", e),
+            Ok(_) => log::debug!("metrics succeeded"),
         }
         Instant::now()
     });
     let analytics_done = analytics_task
         // TODO(66918): make configurable, and evaluate chosen time value.
         .on_timeout(Duration::from_secs(2), || {
-            tracing::error!("metrics submission timed out");
+            log::error!("metrics submission timed out");
             // Metrics timeouts should not impact user flows.
             Instant::now()
         })
         .await;
-    tracing::debug!("analytics time: {}", (analytics_done - analytics_start).as_secs_f32());
+    log::debug!("analytics time: {}", (analytics_done - analytics_start).as_secs_f32());
 }
 
 pub async fn add_daemon_launch_event() {

@@ -21,7 +21,7 @@ async fn connect_helper<T: TryFromEnvContext + TargetConnector + 'static>(
             let c = match Connection::new(overnet_connector).await {
                 Ok(c) => Ok(c),
                 Err(ConnectionError::ConnectionStartError(cmd_info, error)) => {
-                    tracing::info!("connector encountered start error: {cmd_info}, '{error}'");
+                    log::info!("connector encountered start error: {cmd_info}, '{error}'");
                     Err(user_error!(
                         "Unable to connect to device via {}: {error}",
                         <T as TargetConnector>::CONNECTION_TYPE
@@ -72,7 +72,7 @@ impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for Netwo
         Box::pin(async {
             let mut conn = self.connection.lock().expect("connect: connection lock poisoned");
             if conn.is_some() {
-                tracing::info!("Dropping current connection and reconnecting.");
+                log::info!("Dropping current connection and reconnecting.");
             }
             drop(conn.take());
             connect_helper::<T>(&self.env, &mut conn).await
