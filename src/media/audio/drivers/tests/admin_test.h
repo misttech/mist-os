@@ -87,7 +87,6 @@ class AdminTest : public TestBase {
 
   void SignalProcessingConnect();
   void RequestElements();
-  static bool ValidateElement(const fuchsia::hardware::audio::signalprocessing::Element& element);
   void ValidateElements();
   void ValidateDaiElements();
   void ValidateDynamicsElements();
@@ -142,6 +141,18 @@ class AdminTest : public TestBase {
   // This is not needed at this point (cooldown is set to 0), but the mechanism is in place.
   static constexpr zx::duration kSignalProcessingDisconnectCooldownDuration = zx::msec(0);
   static void CooldownAfterSignalProcessingDisconnect();
+
+  static void ValidateElement(const fuchsia::hardware::audio::signalprocessing::Element& element);
+  static void ValidateDaiElement(
+      const fuchsia::hardware::audio::signalprocessing::Element& element);
+  static void ValidateDynamicsElement(
+      const fuchsia::hardware::audio::signalprocessing::Element& element);
+  static void ValidateEqualizerElement(
+      const fuchsia::hardware::audio::signalprocessing::Element& element);
+  static void ValidateGainElement(
+      const fuchsia::hardware::audio::signalprocessing::Element& element);
+  static void ValidateVendorSpecificElement(
+      const fuchsia::hardware::audio::signalprocessing::Element& element);
 
   fidl::InterfacePtr<fuchsia::hardware::audio::RingBuffer> ring_buffer_;
   std::optional<bool> ring_buffer_is_incoming_ = std::nullopt;

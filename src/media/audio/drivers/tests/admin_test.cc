@@ -28,32 +28,24 @@ inline constexpr bool kDisplayElementsAndTopologies = false;
 
 namespace {
 
-void DisplayElements(
-    const std::vector<fuchsia::hardware::audio::signalprocessing::Element>& elements) {
+void DisplayElements(const std::vector<fhasp::Element>& elements) {
   std::stringstream ss;
   ss << "Elements[" << elements.size() << "]:" << '\n';
   auto element_idx = 0u;
   for (const auto& element : elements) {
-    ss << "        [" << element_idx++ << "] id " << element.id() << ", type " << element.type()
-       << (element.type() ==
-                   fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT
-               ? " (DAI)"
-               : "")
-       << (element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER
-               ? " (RING_BUFFER)"
-               : "")
-       << '\n';
+    ss << "        [" << element_idx++ << "] ID " << element.id() << ", type " << element.type()
+       << (element.type() == fhasp::ElementType::DAI_INTERCONNECT ? " (DAI)" : "")
+       << (element.type() == fhasp::ElementType::RING_BUFFER ? " (RING_BUFFER)" : "") << '\n';
   }
   printf("%s", ss.str().c_str());
 }
 
-void DisplayTopologies(
-    const std::vector<fuchsia::hardware::audio::signalprocessing::Topology>& topologies) {
+void DisplayTopologies(const std::vector<fhasp::Topology>& topologies) {
   std::stringstream ss;
   ss << "Topologies[" << topologies.size() << "]:" << '\n';
   auto topology_idx = 0u;
   for (const auto& topology : topologies) {
-    ss << "          [" << topology_idx++ << "] id " << topology.id() << ", edges["
+    ss << "          [" << topology_idx++ << "] ID " << topology.id() << ", edges["
        << topology.processing_elements_edge_pairs().size() << "]:" << '\n';
     auto edge_idx = 0u;
     for (const auto& edge_pair : topology.processing_elements_edge_pairs()) {
@@ -116,14 +108,12 @@ void AdminTest::ResetAndExpectResponse() {
   ExpectCallbacks();
 }
 
-// Is this id a RingBuffer element?
+// Is this ID a RingBuffer element?
 bool AdminTest::ElementIsRingBuffer(fuchsia::hardware::audio::ElementId element_id) {
-  return std::ranges::any_of(
-      elements_, [element_id](const fuchsia::hardware::audio::signalprocessing::Element& element) {
-        return element.has_id() && element.id() == element_id && element.has_type() &&
-               element.type() ==
-                   fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER;
-      });
+  return std::ranges::any_of(elements_, [element_id](const fhasp::Element& element) {
+    return element.has_id() && element.id() == element_id && element.has_type() &&
+           element.type() == fhasp::ElementType::RING_BUFFER;
+  });
 }
 
 // Is this RingBuffer element Incoming (its contents are READ-ONLY) or Outgoing (also WRITABLE)?
@@ -151,7 +141,7 @@ std::optional<bool> AdminTest::ElementIsIncoming(
     return std::nullopt;
   }
 
-  std::vector<fuchsia::hardware::audio::signalprocessing::EdgePair> edge_pairs;
+  std::vector<fhasp::EdgePair> edge_pairs;
   for (const auto& t : topologies_) {
     if (t.has_id() && t.id() == *current_topology_id_) {
       edge_pairs = t.processing_elements_edge_pairs();
@@ -163,13 +153,11 @@ std::optional<bool> AdminTest::ElementIsIncoming(
     return std::nullopt;
   }
   bool has_outgoing = std::ranges::any_of(
-      edge_pairs, [element_id = *ring_buffer_element_id](
-                      const fuchsia::hardware::audio::signalprocessing::EdgePair& edge_pair) {
+      edge_pairs, [element_id = *ring_buffer_element_id](const fhasp::EdgePair& edge_pair) {
         return (edge_pair.processing_element_id_from == element_id);
       });
   bool has_incoming = std::ranges::any_of(
-      edge_pairs, [element_id = *ring_buffer_element_id](
-                      const fuchsia::hardware::audio::signalprocessing::EdgePair& edge_pair) {
+      edge_pairs, [element_id = *ring_buffer_element_id](const fhasp::EdgePair& edge_pair) {
         return (edge_pair.processing_element_id_to == element_id);
       });
 
@@ -467,7 +455,7 @@ void AdminTest::RetrieveDaiFormats() {
 
   RequestTopologies();
 
-  // If there is a dai id, request the DAI formats for this interconnect.
+  // If dai_id_ is set, request the DAI formats for this interconnect.
   if (dai_id_.has_value()) {
     composite()->GetDaiFormats(
         *dai_id_,
@@ -640,9 +628,8 @@ void AdminTest::SignalProcessingConnect() {
   if (signal_processing().is_bound()) {
     return;  // Already connected.
   }
-  fidl::InterfaceHandle<fuchsia::hardware::audio::signalprocessing::SignalProcessing> sp_client;
-  fidl::InterfaceRequest<fuchsia::hardware::audio::signalprocessing::SignalProcessing> sp_server =
-      sp_client.NewRequest();
+  fidl::InterfaceHandle<fhasp::SignalProcessing> sp_client;
+  fidl::InterfaceRequest<fhasp::SignalProcessing> sp_server = sp_client.NewRequest();
   composite()->SignalProcessingConnect(std::move(sp_server));
   signal_processing() = sp_client.Bind();
 
@@ -666,17 +653,16 @@ void AdminTest::RequestElements() {
   zx_status_t status = ZX_OK;
   ring_buffer_id_.reset();
   dai_id_.reset();
-  signal_processing()->GetElements(AddCallback(
-      "signalprocessing::Reader::GetElements",
-      [this,
-       &status](fuchsia::hardware::audio::signalprocessing::Reader_GetElements_Result result) {
-        status = result.is_err() ? result.err() : ZX_OK;
-        if (status == ZX_OK) {
-          elements_ = std::move(result.response().processing_elements);
-        } else {
-          signalprocessing_is_supported_ = false;
-        }
-      }));
+  signal_processing()->GetElements(
+      AddCallback("signalprocessing::Reader::GetElements",
+                  [this, &status](fhasp::Reader_GetElements_Result result) {
+                    status = result.is_err() ? result.err() : ZX_OK;
+                    if (status == ZX_OK) {
+                      elements_ = std::move(result.response().processing_elements);
+                    } else {
+                      signalprocessing_is_supported_ = false;
+                    }
+                  }));
   ExpectCallbacks();
 
   // Either we get elements or the API method is not supported.
@@ -695,20 +681,19 @@ void AdminTest::RequestElements() {
 
   signalprocessing_is_supported_ = true;
 
-  std::unordered_set<fuchsia::hardware::audio::signalprocessing::ElementId> element_ids;
+  std::unordered_set<fhasp::ElementId> element_ids;
   for (auto& element : elements_) {
-    // All elements must have an id and type
+    // All elements must have an ID and type
     ASSERT_TRUE(element.has_id());
     ASSERT_TRUE(element.has_type());
-    if (element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER) {
+    if (element.type() == fhasp::ElementType::RING_BUFFER) {
       ring_buffer_id_.emplace(element.id());  // Override any previous.
-    } else if (element.type() ==
-               fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT) {
+    } else if (element.type() == fhasp::ElementType::DAI_INTERCONNECT) {
       dai_id_.emplace(element.id());  // Override any previous.
     }
 
-    // No element id may be a duplicate.
-    ASSERT_FALSE(element_ids.contains(element.id())) << "Duplicate element id " << element.id();
+    // No element ID may be a duplicate.
+    ASSERT_FALSE(element_ids.contains(element.id())) << "Duplicate element ID " << element.id();
     element_ids.insert(element.id());
   }
 }
@@ -728,8 +713,7 @@ void AdminTest::RequestTopologies() {
   }
 
   signal_processing()->GetTopologies(AddCallback(
-      "signalprocessing::Reader::GetTopologies",
-      [this](fuchsia::hardware::audio::signalprocessing::Reader_GetTopologies_Result result) {
+      "signalprocessing::Reader::GetTopologies", [this](fhasp::Reader_GetTopologies_Result result) {
         if (result.is_err()) {
           signalprocessing_is_supported_ = false;
           FAIL() << "GetTopologies returned err " << result.err();
@@ -746,17 +730,17 @@ void AdminTest::RequestTopologies() {
     __UNREACHABLE;
   }
 
-  std::unordered_set<fuchsia::hardware::audio::signalprocessing::TopologyId> topology_ids;
+  std::unordered_set<fhasp::TopologyId> topology_ids;
   for (const auto& topology : topologies_) {
-    // All topologies must have an id and a non-empty list of edges.
+    // All topologies must have an ID and a non-empty list of edges.
     ASSERT_TRUE(topology.has_id());
     ASSERT_TRUE(topology.has_processing_elements_edge_pairs())
         << "Topology " << topology.id() << " processing_elements_edge_pairs is null";
     ASSERT_FALSE(topology.processing_elements_edge_pairs().empty())
         << "Topology " << topology.id() << " processing_elements_edge_pairs is empty";
 
-    // No topology id may be a duplicate.
-    ASSERT_FALSE(topology_ids.contains(topology.id())) << "Duplicate topology id " << topology.id();
+    // No topology ID may be a duplicate.
+    ASSERT_FALSE(topology_ids.contains(topology.id())) << "Duplicate topology ID " << topology.id();
     topology_ids.insert(topology.id());
   }
 }
@@ -774,8 +758,7 @@ void AdminTest::RetrieveInitialTopology() {
   }
 
   signal_processing()->WatchTopology(AddCallback(
-      "signalprocessing::Reader::WatchTopology",
-      [this](fuchsia::hardware::audio::signalprocessing::Reader_WatchTopology_Result result) {
+      "signalprocessing::Reader::WatchTopology", [this](fhasp::Reader_WatchTopology_Result result) {
         ASSERT_TRUE(result.is_response());
         initial_topology_id_ = result.response().topology_id;
         current_topology_id_ = initial_topology_id_;
@@ -794,7 +777,7 @@ void AdminTest::RetrieveInitialTopology() {
   }
 }
 
-void AdminTest::WatchForTopology(fuchsia::hardware::audio::signalprocessing::TopologyId id) {
+void AdminTest::WatchForTopology(fhasp::TopologyId id) {
   ASSERT_TRUE(signalprocessing_is_supported_.value_or(false))
       << "signalprocessing is required for this test";
   // We only call WatchTopology if we support signalprocessing, so a topology should already be set.
@@ -810,13 +793,13 @@ void AdminTest::WatchForTopology(fuchsia::hardware::audio::signalprocessing::Top
     __UNREACHABLE;
   }
 
-  signal_processing()->WatchTopology(AddCallbackUnordered(
-      "signalprocessing::Reader::WatchTopology(update)",
-      [this, id](fuchsia::hardware::audio::signalprocessing::Reader_WatchTopology_Result result) {
-        ASSERT_TRUE(result.is_response());
-        ASSERT_EQ(id, result.response().topology_id);
-        current_topology_id_ = result.response().topology_id;
-      }));
+  signal_processing()->WatchTopology(
+      AddCallbackUnordered("signalprocessing::Reader::WatchTopology(update)",
+                           [this, id](fhasp::Reader_WatchTopology_Result result) {
+                             ASSERT_TRUE(result.is_response());
+                             ASSERT_EQ(id, result.response().topology_id);
+                             current_topology_id_ = result.response().topology_id;
+                           }));
 }
 
 void AdminTest::FailOnWatchTopologyCompletion() {
@@ -848,22 +831,19 @@ void AdminTest::SetAllTopologies() {
   SetTopologyAndExpectCallback(*initial_topology_id_);
 }
 
-void AdminTest::SetTopologyAndExpectCallback(
-    fuchsia::hardware::audio::signalprocessing::TopologyId id) {
+void AdminTest::SetTopologyAndExpectCallback(fhasp::TopologyId id) {
   ASSERT_NE(id, current_topology_id_);
   ASSERT_FALSE(pending_set_topology_id_.has_value());
   pending_set_topology_id_ = id;
   signal_processing()->SetTopology(
-      id,
-      AddCallbackUnordered(
-          "SetTopology(" + std::to_string(id) + ")",
-          [this, id](fuchsia::hardware::audio::signalprocessing::SignalProcessing_SetTopology_Result
-                         result) {
-            ASSERT_FALSE(result.is_err()) << "SetTopology(" << id << ") failed";
-            ASSERT_TRUE(pending_set_topology_id_.has_value());
-            ASSERT_EQ(*pending_set_topology_id_, id);
-            pending_set_topology_id_.reset();
-          }));
+      id, AddCallbackUnordered("SetTopology(" + std::to_string(id) + ")",
+                               [this, id](fhasp::SignalProcessing_SetTopology_Result result) {
+                                 ASSERT_FALSE(result.is_err())
+                                     << "SetTopology(" << id << ") failed";
+                                 ASSERT_TRUE(pending_set_topology_id_.has_value());
+                                 ASSERT_EQ(*pending_set_topology_id_, id);
+                                 pending_set_topology_id_.reset();
+                               }));
   ASSERT_TRUE(signal_processing().is_bound()) << "SignalProcessing failed to set the topology";
   WatchForTopology(id);
   ExpectCallbacks();
@@ -879,7 +859,7 @@ void AdminTest::SetUnknownTopologyAndExpectError() {
   RequestTopologies();
   ASSERT_FALSE(pending_set_topology_id_.has_value());
 
-  fuchsia::hardware::audio::signalprocessing::TopologyId unknown_id = 0;
+  fhasp::TopologyId unknown_id = 0;
   while (std::ranges::any_of(topologies_, [unknown_id](const auto& topo) {
     return topo.has_id() && topo.id() == unknown_id;
   })) {
@@ -889,15 +869,13 @@ void AdminTest::SetUnknownTopologyAndExpectError() {
   pending_set_topology_id_ = unknown_id;
   signal_processing()->SetTopology(
       unknown_id,
-      AddCallback(
-          "SetTopology(" + std::to_string(unknown_id) + ")",
-          [this, unknown_id](
-              fuchsia::hardware::audio::signalprocessing::SignalProcessing_SetTopology_Result
-                  result) {
-            pending_set_topology_id_.reset();
-            ASSERT_TRUE(result.is_err()) << "SetTopology(" << unknown_id << ") did not fail";
-            ASSERT_EQ(result.err(), ZX_ERR_INVALID_ARGS);
-          }));
+      AddCallback("SetTopology(" + std::to_string(unknown_id) + ")",
+                  [this, unknown_id](fhasp::SignalProcessing_SetTopology_Result result) {
+                    pending_set_topology_id_.reset();
+                    ASSERT_TRUE(result.is_err())
+                        << "SetTopology(" << unknown_id << ") did not fail";
+                    ASSERT_EQ(result.err(), ZX_ERR_INVALID_ARGS);
+                  }));
   ASSERT_TRUE(signal_processing().is_bound())
       << "SignalProcessing disconnected after setting an unknown topology";
   FailOnWatchTopologyCompletion();
@@ -907,11 +885,12 @@ void AdminTest::SetUnknownTopologyAndExpectError() {
 // Validate that the collection of element IDs found in the topology list are complete and correct.
 void AdminTest::ValidateElementTopologyClosure() {
   ASSERT_FALSE(elements().empty());
-  std::unordered_set<fhasp::ElementId> unused_element_ids;
+  std::unordered_set<fhasp::ElementId> all_element_ids;
   for (const auto& element : elements()) {
-    unused_element_ids.insert(element.id());
+    ASSERT_FALSE(all_element_ids.contains(element.id()));
+    all_element_ids.insert(element.id());
   }
-  const std::unordered_set<fhasp::ElementId> all_element_ids = unused_element_ids;
+  std::unordered_set<fhasp::ElementId> unused_element_ids = all_element_ids;
 
   ASSERT_FALSE(topologies().empty());
   for (const auto& topology : topologies()) {
@@ -919,10 +898,10 @@ void AdminTest::ValidateElementTopologyClosure() {
     std::unordered_set<fhasp::ElementId> edge_dest_ids;
     for (const auto& edge_pair : topology.processing_elements_edge_pairs()) {
       ASSERT_TRUE(all_element_ids.contains(edge_pair.processing_element_id_from))
-          << "Topology " << topology.id() << " contains unknown element "
+          << "Topology " << topology.id() << " contains unknown element ID "
           << edge_pair.processing_element_id_from;
       ASSERT_TRUE(all_element_ids.contains(edge_pair.processing_element_id_to))
-          << "Topology " << topology.id() << " contains unknown element "
+          << "Topology " << topology.id() << " contains unknown element ID "
           << edge_pair.processing_element_id_to;
       unused_element_ids.erase(edge_pair.processing_element_id_from);
       unused_element_ids.erase(edge_pair.processing_element_id_to);
@@ -967,33 +946,19 @@ void AdminTest::ValidateElementTopologyClosure() {
     }
   }
   ASSERT_TRUE(unused_element_ids.empty())
-      << unused_element_ids.size() << "elements (including id " << *unused_element_ids.cbegin()
+      << unused_element_ids.size() << "elements (including ID " << *unused_element_ids.cbegin()
       << ") were not referenced in any topology";
 }
 
-bool AdminTest::ValidateElement(
-    const fuchsia::hardware::audio::signalprocessing::Element& element) {
-  if (!element.has_id()) {
-    ADD_FAILURE() << "ElementId is a required field";
-    return false;
+void AdminTest::ValidateElements() {
+  ASSERT_FALSE(elements().empty());
+  std::unordered_set<fhasp::ElementId> ids;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_id());
+    ASSERT_FALSE(ids.contains(element.id()));
+    ids.insert(element.id());
+    ValidateElement(element);
   }
-  if (!element.has_type()) {
-    ADD_FAILURE() << "ElementType is a required field";
-    return false;
-  }
-  bool should_have_type_specific =
-      (element.type() ==
-           fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT ||
-       element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::DYNAMICS ||
-       element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::EQUALIZER ||
-       element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::GAIN ||
-       element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::VENDOR_SPECIFIC);
-  if (element.has_type_specific() != should_have_type_specific) {
-    ADD_FAILURE() << "ElementTypeSpecific should " << (should_have_type_specific ? "" : "not")
-                  << " be set, for this ElementType";
-    return false;
-  }
-  return true;
 }
 
 void AdminTest::ValidateDaiElements() {
@@ -1001,11 +966,9 @@ void AdminTest::ValidateDaiElements() {
   bool found_one = false;
   for (const auto& element : elements()) {
     ASSERT_TRUE(element.has_type());
-    if (element.type() ==
-        fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT) {
-      ASSERT_TRUE(element.has_type_specific());
-      ASSERT_TRUE(element.type_specific().is_dai_interconnect());
-      ASSERT_TRUE(element.type_specific().dai_interconnect().has_plug_detect_capabilities());
+    if (element.type() == fhasp::ElementType::DAI_INTERCONNECT) {
+      found_one = true;
+      ValidateDaiElement(element);
     }
   }
   if (!found_one) {
@@ -1018,14 +981,9 @@ void AdminTest::ValidateDynamicsElements() {
   bool found_one = false;
   for (const auto& element : elements()) {
     ASSERT_TRUE(element.has_type());
-    if (element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::DYNAMICS) {
-      ASSERT_TRUE(element.has_type_specific());
-      ASSERT_TRUE(element.type_specific().is_dynamics());
-      ASSERT_TRUE(element.type_specific().dynamics().has_bands());
-      ASSERT_FALSE(element.type_specific().dynamics().bands().empty());
-      for (const auto& band : element.type_specific().dynamics().bands()) {
-        ASSERT_TRUE(band.has_id());
-      }
+    if (element.type() == fhasp::ElementType::DYNAMICS) {
+      found_one = true;
+      ValidateDynamicsElement(element);
     }
   }
   if (!found_one) {
@@ -1038,37 +996,9 @@ void AdminTest::ValidateEqualizerElements() {
   bool found_one = false;
   for (const auto& element : elements()) {
     ASSERT_TRUE(element.has_type());
-    if (element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::EQUALIZER) {
-      ASSERT_TRUE(element.has_type_specific());
-      ASSERT_TRUE(element.type_specific().is_equalizer());
-      const auto& eq = element.type_specific().equalizer();
-
-      ASSERT_TRUE(eq.has_bands());
-      ASSERT_FALSE(eq.bands().empty());
-      for (const auto& band : element.type_specific().equalizer().bands()) {
-        ASSERT_TRUE(band.has_id());
-      }
-
-      ASSERT_TRUE(eq.has_min_frequency());
-      ASSERT_TRUE(eq.has_max_frequency());
-      ASSERT_LE(eq.min_frequency(), eq.max_frequency());
-      ASSERT_TRUE(!eq.has_max_q() || (std::isfinite(eq.max_q()) && eq.max_q() > 0.0f));
-
-      bool requires_gain_db_vals =
-          eq.has_supported_controls() && (fuchsia::hardware::audio::signalprocessing::
-                                              EqualizerSupportedControls::SUPPORTS_TYPE_PEAK ||
-                                          fuchsia::hardware::audio::signalprocessing::
-                                              EqualizerSupportedControls::SUPPORTS_TYPE_LOW_SHELF ||
-                                          fuchsia::hardware::audio::signalprocessing::
-                                              EqualizerSupportedControls::SUPPORTS_TYPE_HIGH_SHELF);
-      ASSERT_TRUE(
-          !requires_gain_db_vals ||
-          (eq.has_min_gain_db() && std::isfinite(eq.min_gain_db()) && eq.min_gain_db() > 0.0f));
-      ASSERT_TRUE(
-          !requires_gain_db_vals ||
-          (eq.has_max_gain_db() && std::isfinite(eq.max_gain_db()) && eq.max_gain_db() > 0.0f));
-      ASSERT_TRUE(!eq.has_min_gain_db() || !eq.has_max_gain_db() ||
-                  eq.min_gain_db() <= eq.max_gain_db());
+    if (element.type() == fhasp::ElementType::EQUALIZER) {
+      found_one = true;
+      ValidateEqualizerElement(element);
     }
   }
   if (!found_one) {
@@ -1081,25 +1011,9 @@ void AdminTest::ValidateGainElements() {
   bool found_one = false;
   for (const auto& element : elements()) {
     ASSERT_TRUE(element.has_type());
-    if (element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::GAIN) {
-      ASSERT_TRUE(element.has_type_specific());
-      ASSERT_TRUE(element.type_specific().is_gain());
-      ASSERT_TRUE(element.type_specific().gain().has_type());
-
-      ASSERT_TRUE(element.type_specific().gain().has_min_gain());
-      ASSERT_TRUE(std::isfinite(element.type_specific().gain().min_gain()));
-
-      ASSERT_TRUE(element.type_specific().gain().has_max_gain());
-      ASSERT_TRUE(std::isfinite(element.type_specific().gain().max_gain()));
-      ASSERT_LE(element.type_specific().gain().min_gain(),
-                element.type_specific().gain().max_gain());
-
-      ASSERT_TRUE(element.type_specific().gain().has_min_gain_step());
-      ASSERT_TRUE(std::isfinite(element.type_specific().gain().min_gain_step()));
-      ASSERT_LE(
-          element.type_specific().gain().min_gain_step(),
-          element.type_specific().gain().max_gain() - element.type_specific().gain().min_gain());
-      ASSERT_GE(element.type_specific().gain().min_gain_step(), 0.0f);
+    if (element.type() == fhasp::ElementType::GAIN) {
+      found_one = true;
+      ValidateGainElement(element);
     }
   }
   if (!found_one) {
@@ -1112,10 +1026,9 @@ void AdminTest::ValidateVendorSpecificElements() {
   bool found_one = false;
   for (const auto& element : elements()) {
     ASSERT_TRUE(element.has_type());
-    if (element.type() ==
-        fuchsia::hardware::audio::signalprocessing::ElementType::VENDOR_SPECIFIC) {
-      ASSERT_TRUE(element.has_type_specific());
-      ASSERT_TRUE(element.type_specific().is_vendor_specific());
+    if (element.type() == fhasp::ElementType::VENDOR_SPECIFIC) {
+      found_one = true;
+      ValidateVendorSpecificElement(element);
     }
   }
   if (!found_one) {
@@ -1123,13 +1036,104 @@ void AdminTest::ValidateVendorSpecificElements() {
   }
 }
 
-void AdminTest::ValidateElements() {
-  ASSERT_FALSE(elements().empty());
-  for (const auto& element : elements()) {
-    if (!ValidateElement(element)) {
-      break;
-    }
+void AdminTest::ValidateElement(const fhasp::Element& element) {
+  ASSERT_TRUE(element.has_id()) << "ElementId is a required field";
+  ASSERT_TRUE(element.has_type()) << "ElementType is a required field";
+  bool should_have_type_specific = (element.type() == fhasp::ElementType::DAI_INTERCONNECT ||
+                                    element.type() == fhasp::ElementType::DYNAMICS ||
+                                    element.type() == fhasp::ElementType::EQUALIZER ||
+                                    element.type() == fhasp::ElementType::GAIN ||
+                                    element.type() == fhasp::ElementType::VENDOR_SPECIFIC);
+  ASSERT_EQ(element.has_type_specific(), should_have_type_specific)
+      << "ElementTypeSpecific should " << (should_have_type_specific ? "" : "not")
+      << " be set, for this ElementType";
+}
+
+void AdminTest::ValidateDaiElement(
+    const fuchsia::hardware::audio::signalprocessing::Element& element) {
+  ASSERT_TRUE(element.has_type_specific());
+  ASSERT_TRUE(element.type_specific().is_dai_interconnect());
+  ASSERT_TRUE(element.type_specific().dai_interconnect().has_plug_detect_capabilities());
+}
+
+void AdminTest::ValidateDynamicsElement(
+    const fuchsia::hardware::audio::signalprocessing::Element& element) {
+  ASSERT_TRUE(element.has_type_specific());
+  ASSERT_TRUE(element.type_specific().is_dynamics());
+  ASSERT_TRUE(element.type_specific().dynamics().has_bands());
+  ASSERT_FALSE(element.type_specific().dynamics().bands().empty());
+
+  // Each band ID should be unique within this element.
+  std::unordered_set<uint64_t> band_ids;
+  for (const auto& band : element.type_specific().dynamics().bands()) {
+    ASSERT_TRUE(band.has_id());
+    ASSERT_FALSE(band_ids.contains(band.id()));
+    band_ids.insert(band.id());
   }
+}
+
+void AdminTest::ValidateEqualizerElement(
+    const fuchsia::hardware::audio::signalprocessing::Element& element) {
+  ASSERT_TRUE(element.has_type_specific());
+  ASSERT_TRUE(element.type_specific().is_equalizer());
+  const auto& eq = element.type_specific().equalizer();
+
+  ASSERT_TRUE(eq.has_bands());
+  ASSERT_FALSE(eq.bands().empty());
+
+  // Each band ID should be unique within this element.
+  std::unordered_set<uint64_t> band_ids;
+  for (const auto& band : element.type_specific().equalizer().bands()) {
+    ASSERT_TRUE(band.has_id());
+    ASSERT_FALSE(band_ids.contains(band.id()));
+    band_ids.insert(band.id());
+  }
+
+  ASSERT_TRUE(eq.has_min_frequency());
+  ASSERT_TRUE(eq.has_max_frequency());
+  ASSERT_LE(eq.min_frequency(), eq.max_frequency());
+  ASSERT_TRUE(!eq.has_max_q() || (std::isfinite(eq.max_q()) && eq.max_q() > 0.0f));
+
+  bool requires_gain_db_vals =
+      eq.has_supported_controls() && (fhasp::EqualizerSupportedControls::SUPPORTS_TYPE_PEAK ||
+                                      fhasp::EqualizerSupportedControls::SUPPORTS_TYPE_LOW_SHELF ||
+                                      fhasp::EqualizerSupportedControls::SUPPORTS_TYPE_HIGH_SHELF);
+  ASSERT_TRUE(!requires_gain_db_vals || (eq.has_min_gain_db() && std::isfinite(eq.min_gain_db())));
+  ASSERT_TRUE(!requires_gain_db_vals || (eq.has_max_gain_db() && std::isfinite(eq.max_gain_db())));
+  ASSERT_TRUE(!eq.has_min_gain_db() || !eq.has_max_gain_db() ||
+              eq.min_gain_db() <= eq.max_gain_db());
+}
+
+void AdminTest::ValidateGainElement(
+    const fuchsia::hardware::audio::signalprocessing::Element& element) {
+  ASSERT_TRUE(element.has_type_specific());
+  ASSERT_TRUE(element.type_specific().is_gain());
+  ASSERT_TRUE(element.type_specific().gain().has_type());
+
+  ASSERT_TRUE(element.type_specific().gain().has_min_gain());
+  ASSERT_TRUE(std::isfinite(element.type_specific().gain().min_gain()));
+  // If GainType is PERCENT, then min_gain must be >= 0%
+  ASSERT_TRUE(element.type_specific().gain().type() != fhasp::GainType::PERCENT ||
+              element.type_specific().gain().min_gain() >= 0.0);
+
+  ASSERT_TRUE(element.type_specific().gain().has_max_gain());
+  ASSERT_TRUE(std::isfinite(element.type_specific().gain().max_gain()));
+  // If GainType is PERCENT, then max_gain must be <= 100%
+  ASSERT_TRUE(element.type_specific().gain().type() != fhasp::GainType::PERCENT ||
+              element.type_specific().gain().max_gain() <= 100.0);
+  ASSERT_LE(element.type_specific().gain().min_gain(), element.type_specific().gain().max_gain());
+
+  ASSERT_TRUE(element.type_specific().gain().has_min_gain_step());
+  ASSERT_TRUE(std::isfinite(element.type_specific().gain().min_gain_step()));
+  ASSERT_LE(element.type_specific().gain().min_gain_step(),
+            element.type_specific().gain().max_gain() - element.type_specific().gain().min_gain());
+  ASSERT_GE(element.type_specific().gain().min_gain_step(), 0.0f);
+}
+
+void AdminTest::ValidateVendorSpecificElement(
+    const fuchsia::hardware::audio::signalprocessing::Element& element) {
+  ASSERT_TRUE(element.has_type_specific());
+  ASSERT_TRUE(element.type_specific().is_vendor_specific());
 }
 
 #define DEFINE_ADMIN_TEST_CLASS(CLASS_NAME, CODE)                               \
