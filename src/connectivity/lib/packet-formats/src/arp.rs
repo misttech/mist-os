@@ -41,6 +41,8 @@ pub trait HType: FromBytes + IntoBytes + Immutable + Unaligned + Copy + Clone + 
     const HLEN: u8;
     /// The broadcast address for this type.
     const BROADCAST: Self;
+    /// The all-zeros address for this type.
+    const UNSPECIFIED: Self;
 }
 
 /// A trait to represent an ARP protocol type.
@@ -55,6 +57,7 @@ impl HType for Mac {
     const HTYPE: ArpHardwareType = ArpHardwareType::Ethernet;
     const HLEN: u8 = mem::size_of::<Mac>() as u8;
     const BROADCAST: Mac = Mac::BROADCAST;
+    const UNSPECIFIED: Mac = Mac::UNSPECIFIED;
 }
 
 impl PType for Ipv4Addr {

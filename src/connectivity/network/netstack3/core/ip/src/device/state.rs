@@ -41,7 +41,7 @@ use crate::internal::types::RawMetric;
 /// The default value for *RetransTimer* as defined in [RFC 4861 section 10].
 ///
 /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-pub const RETRANS_TIMER_DEFAULT: NonZeroDuration = NonZeroDuration::from_secs(1).unwrap();
+pub const IPV6_RETRANS_TIMER_DEFAULT: NonZeroDuration = NonZeroDuration::from_secs(1).unwrap();
 
 /// The default value for the default hop limit to be used when sending IP
 /// packets.
@@ -643,7 +643,7 @@ impl Ipv6NetworkLearnedParameters {
     /// Returns the learned retransmission timer or the default stack value if a
     /// network-learned one isn't available.
     pub fn retrans_timer_or_default(&self) -> NonZeroDuration {
-        self.retrans_timer.clone().unwrap_or(RETRANS_TIMER_DEFAULT)
+        self.retrans_timer.clone().unwrap_or(IPV6_RETRANS_TIMER_DEFAULT)
     }
 
     /// Forgets any learned network parameters, resetting to the default values.
@@ -1231,11 +1231,7 @@ impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> IpAddressEntry<I, BT
         dad_state: DadState<I, BT>,
         config: I::AddressConfig<BT::Instant>,
     ) -> Self {
-        let assigned = match dad_state {
-            DadState::Assigned => true,
-            DadState::Tentative { .. } | DadState::Uninitialized => false,
-        };
-
+        let assigned = dad_state.is_assigned();
         Self {
             addr_sub,
             dad_state: Mutex::new(dad_state),

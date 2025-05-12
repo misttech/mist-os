@@ -20,6 +20,7 @@ use netstack3_base::{
     IpAddressId as _, IpDeviceAddr, IpDeviceAddressIdContext, Ipv4DeviceAddr, Ipv6DeviceAddr,
     NotFoundError, RemoveResourceResultWithContext, ResourceCounterContext,
 };
+use netstack3_device::ethernet::EthernetDeviceId;
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_filter::FilterImpl;
 use netstack3_ip::device::{
@@ -30,12 +31,13 @@ use netstack3_ip::device::{
     DefaultHopLimit, DelIpAddr, DualStackIpDeviceState, IpAddressData, IpAddressEntry,
     IpAddressFlags, IpAddressState, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceEvent,
     IpDeviceFlags, IpDeviceIpExt, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes,
-    IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId, Ipv4DeviceConfiguration,
-    Ipv6AddrConfig, Ipv6AddrSlaacConfig, Ipv6DadAddressContext, Ipv6DadSentProbeData,
-    Ipv6DeviceConfiguration, Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
-    Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext,
-    RsState, RsTimerId, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
-    SlaacConfigAndState, SlaacContext, SlaacCounters, SlaacState, WeakAddressId,
+    IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId, Ipv4DadSentProbeData,
+    Ipv4DeviceConfiguration, Ipv4DeviceTimerId, Ipv6AddrConfig, Ipv6AddrSlaacConfig,
+    Ipv6DadAddressContext, Ipv6DadSentProbeData, Ipv6DeviceConfiguration, Ipv6DeviceTimerId,
+    Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters,
+    Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext, RsState, RsTimerId,
+    SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacConfigAndState, SlaacContext,
+    SlaacCounters, SlaacState, WeakAddressId,
 };
 use netstack3_ip::gmp::{
     GmpGroupState, GmpState, GmpStateRef, IgmpContext, IgmpContextMarker, IgmpSendContext,
@@ -716,6 +718,51 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
     }
 }
 
+/// Returns `Some` if the provided device supports the ARP protocol.
+fn into_arp_compatible_device<BT: BindingsTypes>(
+    device_id: &DeviceId<BT>,
+) -> Option<&EthernetDeviceId<BT>> {
+    match device_id {
+        DeviceId::Loopback(_) | DeviceId::PureIp(_) | DeviceId::Blackhole(_) => None,
+        // At the moment, Ethernet is the only device type that supports ARP.
+        // However, in the future that may change as we introduce new device
+        // types (e.g. Token Ring devices as specified in IEEE 802.5).
+        DeviceId::Ethernet(id) => Some(id),
+    }
+}
+
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddressData<Ipv4>>>
+    DadAddressContext<Ipv4, BC>
+    for CoreCtxWithIpDeviceConfiguration<'_, &'_ Ipv4DeviceConfiguration, L, BC>
+{
+    fn with_address_assigned<O, F: FnOnce(&mut bool) -> O>(
+        &mut self,
+        _: &Self::DeviceId,
+        addr: &Self::AddressId,
+        cb: F,
+    ) -> O {
+        let mut locked = self.core_ctx.adopt(addr.deref());
+        let mut state = locked
+            .write_lock_with::<crate::lock_ordering::IpDeviceAddressData<Ipv4>, _>(|c| c.right());
+        let IpAddressData { flags: IpAddressFlags { assigned }, config: _ } = &mut *state;
+
+        cb(assigned)
+    }
+
+    fn should_perform_dad(&mut self, device: &Self::DeviceId, addr: &Self::AddressId) -> bool {
+        // NB: DAD can only be performed for IPv4 addresses on devices that
+        // support ARP. Short circuit for devices that are unsupported.
+        if into_arp_compatible_device(device).is_none() {
+            return false;
+        }
+
+        let mut locked = self.core_ctx.adopt(addr.deref());
+        let state = locked
+            .write_lock_with::<crate::lock_ordering::IpDeviceAddressData<Ipv4>, _>(|c| c.right());
+        state.should_perform_dad()
+    }
+}
+
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddressData<Ipv6>>>
     DadAddressContext<Ipv6, BC>
     for CoreCtxWithIpDeviceConfiguration<'_, &'_ Ipv6DeviceConfiguration, L, BC>
@@ -781,6 +828,86 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>
     }
 }
 
+impl<
+        'a,
+        Config: Borrow<Ipv4DeviceConfiguration>,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::IpDeviceAddressDad<Ipv4>>,
+    > DadContext<Ipv4, BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+{
+    type DadAddressCtx<'b> = CoreCtxWithIpDeviceConfiguration<
+        'b,
+        &'b Ipv4DeviceConfiguration,
+        WrapLockLevel<crate::lock_ordering::IpDeviceAddressDad<Ipv4>>,
+        BC,
+    >;
+
+    fn with_dad_state<O, F: FnOnce(DadStateRef<'_, Ipv4, Self::DadAddressCtx<'_>, BC>) -> O>(
+        &mut self,
+        _device_id: &Self::DeviceId,
+        addr: &Self::AddressId,
+        cb: F,
+    ) -> O {
+        let Self { config, core_ctx } = self;
+        let mut core_ctx = core_ctx.adopt(addr.deref());
+        let config = Borrow::borrow(&*config);
+
+        let (mut dad_state, mut locked) = core_ctx
+            .lock_with_and::<crate::lock_ordering::IpDeviceAddressDad<Ipv4>, _>(|c| c.right());
+        let mut core_ctx =
+            CoreCtxWithIpDeviceConfiguration { config, core_ctx: locked.cast_core_ctx() };
+
+        cb(DadStateRef {
+            state: DadAddressStateRef { dad_state: dad_state.deref_mut(), core_ctx: &mut core_ctx },
+            retrans_timer_data: &(),
+            max_dad_transmits: &config.ip_config.dad_transmits,
+        })
+    }
+
+    fn send_dad_probe(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device_id: &Self::DeviceId,
+        Ipv4DadSentProbeData { target_ip }: Ipv4DadSentProbeData,
+    ) {
+        // NB: Safe to `unwrap` here because DAD is disabled for IPv4 addresses
+        // on devices that don't support ARP. See the implementation of
+        // [`DadAddressContext::should_perform_dad`] for IPv4.
+        let device_id = into_arp_compatible_device(device_id).unwrap_or_else(|| {
+            panic!("shouldn't run IPv4 DAD on devices that don't support ARP. dev={device_id:?}")
+        });
+
+        // As per RFC 5227 Section 2.1.1:
+        //   A host probes to see if an address is already in use by broadcasting
+        //   an ARP Request for the desired address.  The client MUST fill in the
+        //  'sender hardware address' field of the ARP Request with the hardware
+        //   address of the interface through which it is sending the packet.  The
+        //   'sender IP address' field MUST be set to all zeroes; this is to avoid
+        //   polluting ARP caches in other hosts on the same link in the case
+        //   where the address turns out to be already in use by another host.
+        //   The 'target hardware address' field is ignored and SHOULD be set to
+        //   all zeroes.  The 'target IP address' field MUST be set to the address
+        //   being probed.  An ARP Request constructed this way, with an all-zero
+        //   'sender IP address', is referred to as an 'ARP Probe'.
+        //
+        // Setting the `target_link_addr` to `None` causes `send_arp_request` to
+        // 1) broadcast the request, and 2) set the target hardware address to
+        // all 0s.
+        let sender_ip = Ipv4::UNSPECIFIED_ADDRESS;
+        let target_link_addr = None;
+
+        let Self { config: _, core_ctx } = self;
+        netstack3_device::send_arp_request(
+            core_ctx,
+            bindings_ctx,
+            device_id,
+            sender_ip,
+            target_ip,
+            target_link_addr,
+        )
+    }
+}
+
 impl<'a, I: IpDeviceIpExt, Config, BC, L> CoreEventContext<DadEvent<I, DeviceId<BC>>>
     for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 where
@@ -841,7 +968,7 @@ impl<
 
         cb(DadStateRef {
             state: DadAddressStateRef { dad_state: dad_state.deref_mut(), core_ctx: &mut core_ctx },
-            retrans_timer: &retrans_timer,
+            retrans_timer_data: &retrans_timer,
             max_dad_transmits: &config.ip_config.dad_transmits,
         })
     }
@@ -1478,6 +1605,17 @@ impl<
 impl<BC: BindingsContext, I: Ip, L> CounterContext<NudCounters<I>> for CoreCtx<'_, BC, L> {
     fn counters(&self) -> &NudCounters<I> {
         self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.nud_counters::<I>()
+    }
+}
+
+impl<L, BT: BindingsTypes>
+    CoreTimerContext<DadTimerId<Ipv4, WeakDeviceId<BT>, WeakAddressId<Ipv4, BT>>, BT>
+    for CoreCtx<'_, BT, L>
+{
+    fn convert_timer(
+        dispatch_id: DadTimerId<Ipv4, WeakDeviceId<BT>, WeakAddressId<Ipv4, BT>>,
+    ) -> BT::DispatchId {
+        IpDeviceTimerId::<Ipv4, _, _>::from(Ipv4DeviceTimerId::from(dispatch_id)).into()
     }
 }
 

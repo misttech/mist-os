@@ -6,6 +6,8 @@
 
 use core::fmt::Debug;
 use core::num::{NonZero, NonZeroU16};
+use core::ops::RangeInclusive;
+use core::time::Duration;
 
 use arrayvec::ArrayVec;
 use derivative::Derivative;
@@ -20,6 +22,7 @@ use netstack3_base::{
 use packet_formats::icmp::ndp::options::{NdpNonce, MIN_NONCE_LENGTH};
 use packet_formats::icmp::ndp::NeighborSolicitation;
 use packet_formats::utils::NonZeroDuration;
+use rand::Rng;
 
 use crate::internal::device::nud::DEFAULT_MAX_MULTICAST_SOLICIT;
 use crate::internal::device::{IpAddressState, IpDeviceIpExt, WeakIpAddressId};
@@ -38,6 +41,8 @@ pub trait DadIpExt: Ip {
     type TentativeState: Debug + Default + Send + Sync;
     /// Metadata associated with the result of handling and incoming DAD probe.
     type IncomingProbeResultMeta;
+    /// Data used to determine the interval to wait between DAD probes.
+    type RetransmitTimerData;
 
     /// Generate data to accompany a sent probe from the tentative state.
     fn generate_sent_probe_data<BC: RngContext>(
@@ -45,6 +50,12 @@ pub trait DadIpExt: Ip {
         addr: Self::Addr,
         bindings_ctx: &mut BC,
     ) -> Self::SentProbeData;
+
+    /// Generate the delay to wait before the next DAD probe.
+    fn get_retransmission_interval<BC: RngContext>(
+        data: &Self::RetransmitTimerData,
+        bindings_ctx: &mut BC,
+    ) -> NonZeroDuration;
 }
 
 // TODO(https://fxbug.dev/42077260): Actually support DAD for IPv4.
@@ -65,17 +76,25 @@ impl DadIpExt for Ipv4 {
     /// dhclient, a common DHCP client on Linux).
     const DEFAULT_DAD_ENABLED: bool = false;
 
-    type SentProbeData = ();
+    type SentProbeData = Ipv4DadSentProbeData;
     type ReceivedProbeData<'a> = ();
     type TentativeState = ();
     type IncomingProbeResultMeta = ();
+    type RetransmitTimerData = ();
 
     fn generate_sent_probe_data<BC: RngContext>(
         _state: &mut (),
-        _addr: Ipv4Addr,
+        addr: Ipv4Addr,
         _bindings_ctx: &mut BC,
     ) -> Self::SentProbeData {
-        ()
+        Ipv4DadSentProbeData { target_ip: addr }
+    }
+
+    fn get_retransmission_interval<BC: RngContext>(
+        _data: &(),
+        bindings_ctx: &mut BC,
+    ) -> NonZeroDuration {
+        ipv4_dad_probe_interval(bindings_ctx)
     }
 }
 
@@ -91,6 +110,7 @@ impl DadIpExt for Ipv6 {
     type ReceivedProbeData<'a> = Option<NdpNonce<&'a [u8]>>;
     type TentativeState = Ipv6TentativeDadState;
     type IncomingProbeResultMeta = Ipv6ProbeResultMetadata;
+    type RetransmitTimerData = NonZeroDuration;
 
     fn generate_sent_probe_data<BC: RngContext>(
         state: &mut Ipv6TentativeDadState,
@@ -107,6 +127,20 @@ impl DadIpExt for Ipv6 {
             nonce: nonces.evicting_create_and_store_nonce(bindings_ctx.rng()),
         }
     }
+
+    fn get_retransmission_interval<BC: RngContext>(
+        data: &NonZeroDuration,
+        _bindings_ctx: &mut BC,
+    ) -> NonZeroDuration {
+        *data
+    }
+}
+
+/// The data needed to send an IPv4 DAD probe.
+#[derive(Debug)]
+pub struct Ipv4DadSentProbeData {
+    /// The Ipv4Addr to probe.
+    pub target_ip: Ipv4Addr,
 }
 
 /// The data needed to send an IPv6 DAD probe.
@@ -153,8 +187,8 @@ pub struct DadAddressStateRef<'a, I: DadIpExt, CC, BT: DadBindingsTypes> {
 pub struct DadStateRef<'a, I: DadIpExt, CC, BT: DadBindingsTypes> {
     /// A reference to the DAD address state.
     pub state: DadAddressStateRef<'a, I, CC, BT>,
-    /// The time between DAD message retransmissions.
-    pub retrans_timer: &'a NonZeroDuration,
+    /// Data used to calculate the time between DAD probe retransmissions.
+    pub retrans_timer_data: &'a I::RetransmitTimerData,
     /// The maximum number of DAD messages to send.
     pub max_dad_transmits: &'a Option<NonZeroU16>,
 }
@@ -170,7 +204,8 @@ pub trait DadAddressContext<I: Ip, BC>: IpDeviceAddressIdContext<I> {
         cb: F,
     ) -> O;
 
-    /// Returns whether or not DAD should be performed for the given address.
+    /// Returns whether or not DAD should be performed for the given device and
+    /// address.
     fn should_perform_dad(&mut self, device_id: &Self::DeviceId, addr: &Self::AddressId) -> bool;
 }
 
@@ -248,6 +283,15 @@ pub enum DadState<I: DadIpExt, BT: DadBindingsTypes> {
 
     /// The address has not yet been initialized.
     Uninitialized,
+}
+
+impl<I: DadIpExt, BT: DadBindingsTypes> DadState<I, BT> {
+    pub(crate) fn is_assigned(&self) -> bool {
+        match self {
+            DadState::Assigned => true,
+            DadState::Tentative { .. } | DadState::Uninitialized => false,
+        }
+    }
 }
 
 /// DAD state specific to tentative IPv6 addresses.
@@ -456,7 +500,7 @@ fn initialize_duplicate_address_detection<
     core_ctx.with_dad_state(
         device_id,
         addr,
-        |DadStateRef { state, retrans_timer: _, max_dad_transmits }| {
+        |DadStateRef { state, retrans_timer_data: _, max_dad_transmits }| {
             let DadAddressStateRef { dad_state, core_ctx } = state;
             let needs_dad = match (core_ctx.should_perform_dad(device_id, addr), max_dad_transmits)
             {
@@ -509,7 +553,7 @@ fn do_duplicate_address_detection<
     let should_send_probe = core_ctx.with_dad_state(
         device_id,
         addr,
-        |DadStateRef { state, retrans_timer, max_dad_transmits: _ }| {
+        |DadStateRef { state, retrans_timer_data, max_dad_transmits: _ }| {
             let DadAddressStateRef { dad_state, core_ctx } = state;
 
             let (remaining, timer, ip_specific_state) = match dad_state {
@@ -554,8 +598,10 @@ fn do_duplicate_address_detection<
                     //      time a node waits after sending the last Neighbor
                     //      Solicitation before ending the Duplicate Address Detection
                     //      process.
+                    let retrans_interval =
+                        I::get_retransmission_interval(retrans_timer_data, bindings_ctx);
                     assert_eq!(
-                        bindings_ctx.schedule_timer(retrans_timer.get(), timer),
+                        bindings_ctx.schedule_timer(retrans_interval.get(), timer),
                         None,
                         "Unexpected DAD timer; addr={}, device_id={:?}",
                         addr.addr(),
@@ -598,7 +644,7 @@ fn stop_duplicate_address_detection<
     core_ctx.with_dad_state(
         device_id,
         addr,
-        |DadStateRef { state, retrans_timer: _, max_dad_transmits: _ }| {
+        |DadStateRef { state, retrans_timer_data: _, max_dad_transmits: _ }| {
             let DadAddressStateRef { dad_state, core_ctx } = state;
 
             match dad_state {
@@ -628,10 +674,7 @@ fn stop_duplicate_address_detection<
 }
 
 // TODO(https://fxbug.dev/42077260): Actually support DAD for IPv4.
-impl<BC, CC> DadHandler<Ipv4, BC> for CC
-where
-    CC: IpDeviceAddressIdContext<Ipv4> + DeviceIdContext<AnyDevice>,
-{
+impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<Ipv4, BC>> DadHandler<Ipv4, BC> for CC {
     fn initialize_duplicate_address_detection<'a>(
         &mut self,
         _bindings_ctx: &mut BC,
@@ -757,7 +800,7 @@ where
         self.with_dad_state(
             device_id,
             addr,
-            |DadStateRef { state, retrans_timer: _, max_dad_transmits: _ }| {
+            |DadStateRef { state, retrans_timer_data: _, max_dad_transmits: _ }| {
                 let DadAddressStateRef { dad_state, core_ctx: _ } = state;
                 match dad_state {
                     DadState::Assigned => DadIncomingProbeResult::Assigned,
@@ -812,9 +855,27 @@ impl<I: IpDeviceIpExt, BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<I,
     }
 }
 
+/// As defined in RFC 5227, section 1.1:
+///  PROBE_MIN            1 second   (minimum delay until repeated probe)
+///  PROBE_MAX            2 seconds  (maximum delay until repeated probe)
+const IPV4_PROBE_RANGE: RangeInclusive<Duration> = Duration::from_secs(1)..=Duration::from_secs(2);
+
+/// Generate the interval between repeated IPv4 DAD probes.
+pub fn ipv4_dad_probe_interval<BC: RngContext>(bindings_ctx: &mut BC) -> NonZeroDuration {
+    // As per RFC 5227, section 2.2.1:
+    //   ... and should then send PROBE_NUM probe packets, each of these
+    // probe packets spaced randomly and uniformly, PROBE_MIN to PROBE_MAX
+    // seconds apart.
+    let retrans_interval = bindings_ctx.rng().gen_range(IPV4_PROBE_RANGE);
+    // NB: Safe to unwrap because `IPV4_PROBE_RANGE` contains only non-zero
+    // values.
+    NonZeroDuration::new(retrans_interval).unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::collections::hash_map::{Entry, HashMap};
+    use core::ops::RangeBounds;
     use core::time::Duration;
 
     use assert_matches::assert_matches;
@@ -822,8 +883,8 @@ mod tests {
     use net_types::ip::{AddrSubnet, IpAddress as _, Ipv4Addr};
     use net_types::{NonMappedAddr, NonMulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
     use netstack3_base::testutil::{
-        FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeTimerCtxExt as _, FakeWeakAddressId,
-        FakeWeakDeviceId,
+        FakeBindingsCtx, FakeCoreCtx, FakeCryptoRng, FakeDeviceId, FakeInstant,
+        FakeTimerCtxExt as _, FakeWeakAddressId, FakeWeakDeviceId,
     };
     use netstack3_base::{
         AssignedAddrIpExt, CtxPair, InstantContext as _, Ipv4DeviceAddr, Ipv6DeviceAddr,
@@ -845,6 +906,12 @@ mod tests {
 
     trait TestDadIpExt: IpDeviceIpExt {
         const DAD_ADDRESS: Self::AssignedWitness;
+
+        const DEFAULT_RETRANS_TIMER_DATA: Self::RetransmitTimerData;
+
+        // Returns the range of `FakeInstant` that a timer is expected
+        // to be installed within.
+        fn expected_timer_range(now: FakeInstant) -> impl RangeBounds<FakeInstant> + Debug;
     }
 
     impl TestDadIpExt for Ipv4 {
@@ -853,6 +920,14 @@ mod tests {
                 SpecifiedAddr::new_unchecked(Ipv4Addr::new([192, 168, 0, 1])),
             ))
         };
+
+        const DEFAULT_RETRANS_TIMER_DATA: () = ();
+
+        fn expected_timer_range(now: FakeInstant) -> impl RangeBounds<FakeInstant> + Debug {
+            let FakeInstant { offset } = now;
+            FakeInstant::from(offset + *IPV4_PROBE_RANGE.start())
+                ..=FakeInstant::from(offset + *IPV4_PROBE_RANGE.end())
+        }
     }
 
     impl TestDadIpExt for Ipv6 {
@@ -861,6 +936,15 @@ mod tests {
                 0xa, 0, 0, 0, 0, 0, 0, 1,
             ])))
         };
+
+        const DEFAULT_RETRANS_TIMER_DATA: NonZeroDuration =
+            NonZeroDuration::new(Duration::from_secs(1)).unwrap();
+
+        fn expected_timer_range(now: FakeInstant) -> impl RangeBounds<FakeInstant> + Debug {
+            let FakeInstant { offset } = now;
+            let expected_timer = FakeInstant::from(offset + Self::DEFAULT_RETRANS_TIMER_DATA.get());
+            expected_timer..=expected_timer
+        }
     }
 
     impl<I: TestDadIpExt> Default for FakeDadAddressContext<I> {
@@ -932,7 +1016,6 @@ mod tests {
 
     struct FakeDadContext<I: IpDeviceIpExt> {
         state: DadState<I, FakeBindingsCtxImpl<I>>,
-        retrans_timer: NonZeroDuration,
         max_dad_transmits: Option<NonZeroU16>,
         address_ctx: FakeAddressCtxImpl<I>,
     }
@@ -970,7 +1053,7 @@ mod tests {
         }
     }
 
-    impl<I: IpDeviceIpExt> DadContext<I, FakeBindingsCtxImpl<I>> for FakeCoreCtxImpl<I> {
+    impl<I: TestDadIpExt> DadContext<I, FakeBindingsCtxImpl<I>> for FakeCoreCtxImpl<I> {
         type DadAddressCtx<'a> = FakeAddressCtxImpl<I>;
 
         fn with_dad_state<
@@ -982,8 +1065,7 @@ mod tests {
             request_addr: &Self::AddressId,
             cb: F,
         ) -> O {
-            let FakeDadContext { state, retrans_timer, max_dad_transmits, address_ctx } =
-                &mut self.state;
+            let FakeDadContext { state, max_dad_transmits, address_ctx } = &mut self.state;
             let ctx_addr = address_ctx.state.addr;
             let requested_addr = request_addr.addr();
             assert!(
@@ -992,7 +1074,7 @@ mod tests {
             );
             cb(DadStateRef {
                 state: DadAddressStateRef { dad_state: state, core_ctx: address_ctx },
-                retrans_timer,
+                retrans_timer_data: &I::DEFAULT_RETRANS_TIMER_DATA,
                 max_dad_transmits,
             })
         }
@@ -1007,8 +1089,6 @@ mod tests {
         }
     }
 
-    const RETRANS_TIMER: NonZeroDuration = NonZeroDuration::new(Duration::from_secs(1)).unwrap();
-
     type FakeCtx<I> = CtxPair<FakeCoreCtxImpl<I>, FakeBindingsCtxImpl<I>>;
 
     #[ip_test(I)]
@@ -1017,7 +1097,6 @@ mod tests {
         let FakeCtx::<I> { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: DadState::Assigned,
-                retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
                 address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
             }));
@@ -1040,7 +1119,6 @@ mod tests {
                         timer: bindings_ctx.new_timer(dad_timer_id()),
                         ip_specific_state: Default::default(),
                     },
-                    retrans_timer: RETRANS_TIMER,
                     max_dad_transmits: None,
                     address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
                 })
@@ -1074,7 +1152,6 @@ mod tests {
         bindings_ctx: &FakeBindingsCtxImpl<Ipv6>,
         frames_len: usize,
         dad_transmits_remaining: Option<NonZeroU16>,
-        retrans_timer: NonZeroDuration,
     ) {
         let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
         let nonces = assert_matches!(state, DadState::Tentative {
@@ -1106,17 +1183,17 @@ mod tests {
 
         let options = Options::parse(&frame[..]).expect("parse NDP options");
         assert_eq!(options.iter().count(), 0);
-        bindings_ctx
-            .timers
-            .assert_timers_installed([(dad_timer_id(), bindings_ctx.now() + retrans_timer.get())]);
+
+        bindings_ctx.timers.assert_timers_installed_range([(
+            dad_timer_id(),
+            Ipv6::expected_timer_range(bindings_ctx.now()),
+        )]);
     }
 
     // TODO(https://fxbug.dev/42077260): Run this test against IPv4.
     #[test]
     fn perform_dad() {
         const DAD_TRANSMITS_REQUIRED: u16 = 5;
-        const RETRANS_TIMER: NonZeroDuration =
-            NonZeroDuration::new(Duration::from_secs(1)).unwrap();
 
         let mut ctx = FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeDadContext {
@@ -1125,7 +1202,6 @@ mod tests {
                     timer: bindings_ctx.new_timer(dad_timer_id()),
                     ip_specific_state: Default::default(),
                 },
-                retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
                 address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
             })
@@ -1147,7 +1223,6 @@ mod tests {
                 bindings_ctx,
                 usize::from(count + 1),
                 NonZeroU16::new(DAD_TRANSMITS_REQUIRED - count - 1),
-                RETRANS_TIMER,
             );
             assert_eq!(bindings_ctx.trigger_next_timer(core_ctx), Some(dad_timer_id()));
         }
@@ -1166,8 +1241,6 @@ mod tests {
     #[test]
     fn stop_dad() {
         const DAD_TRANSMITS_REQUIRED: u16 = 2;
-        const RETRANS_TIMER: NonZeroDuration =
-            NonZeroDuration::new(Duration::from_secs(2)).unwrap();
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
@@ -1177,7 +1250,6 @@ mod tests {
                         timer: bindings_ctx.new_timer(dad_timer_id()),
                         ip_specific_state: Default::default(),
                     },
-                    retrans_timer: RETRANS_TIMER,
                     max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
                     address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
                 })
@@ -1196,13 +1268,7 @@ mod tests {
             token,
         );
 
-        check_dad(
-            &core_ctx,
-            &bindings_ctx,
-            1,
-            NonZeroU16::new(DAD_TRANSMITS_REQUIRED - 1),
-            RETRANS_TIMER,
-        );
+        check_dad(&core_ctx, &bindings_ctx, 1, NonZeroU16::new(DAD_TRANSMITS_REQUIRED - 1));
 
         DadHandler::<Ipv6, _>::stop_duplicate_address_detection(
             &mut core_ctx,
@@ -1228,12 +1294,9 @@ mod tests {
         nonce: Option<OwnedNdpNonce>,
     ) {
         const MAX_DAD_TRANSMITS: u16 = 1;
-        const RETRANS_TIMER: NonZeroDuration =
-            NonZeroDuration::new(Duration::from_secs(1)).unwrap();
 
         let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
             state: if assigned { DadState::Assigned } else { DadState::Uninitialized },
-            retrans_timer: RETRANS_TIMER,
             max_dad_transmits: NonZeroU16::new(MAX_DAD_TRANSMITS),
             address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
         }));
@@ -1264,8 +1327,6 @@ mod tests {
     #[test_case(false ; "acts on non-looped-back NS")]
     fn handle_incoming_dad_neighbor_solicitation_during_tentative(looped_back: bool) {
         const DAD_TRANSMITS_REQUIRED: u16 = 1;
-        const RETRANS_TIMER: NonZeroDuration =
-            NonZeroDuration::new(Duration::from_secs(1)).unwrap();
 
         let mut ctx = FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeDadContext {
@@ -1274,7 +1335,6 @@ mod tests {
                     timer: bindings_ctx.new_timer(dad_timer_id()),
                     ip_specific_state: Default::default(),
                 },
-                retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
                 address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
             })
@@ -1292,7 +1352,7 @@ mod tests {
         let token = assert_matches!(start_dad, NeedsDad::Yes(token) => token);
         DadHandler::<Ipv6, _>::start_duplicate_address_detection(core_ctx, bindings_ctx, token);
 
-        check_dad(core_ctx, bindings_ctx, 1, None, RETRANS_TIMER);
+        check_dad(core_ctx, bindings_ctx, 1, None);
 
         let sent_nonce: OwnedNdpNonce = {
             let (Ipv6DadSentProbeData { dst_ip: _, message: _, nonce }, _frame) =
@@ -1360,7 +1420,6 @@ mod tests {
                 bindings_ctx,
                 usize::from(count) + frames_len_before_extra_transmits + 1,
                 NonZeroU16::new(extra_dad_transmits_required - count - 1),
-                RETRANS_TIMER,
             );
             assert_eq!(bindings_ctx.trigger_next_timer(core_ctx), Some(dad_timer_id()));
         }
@@ -1373,5 +1432,15 @@ mod tests {
             bindings_ctx.take_events(),
             &[DadEvent::AddressAssigned { device: FakeDeviceId, addr: Ipv6::DAD_ADDRESS }][..]
         );
+    }
+
+    #[test]
+    fn ipv4_dad_probe_interval_is_valid() {
+        // Verify that the IPv4 Dad Probe delay is always valid with a handful
+        // of different RNG seeds.
+        FakeCryptoRng::with_fake_rngs(100, |mut bindings_ctx| {
+            let duration = ipv4_dad_probe_interval(&mut bindings_ctx).get();
+            assert!(IPV4_PROBE_RANGE.contains(&duration), "actual={duration:?}");
+        })
     }
 }

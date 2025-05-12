@@ -108,7 +108,7 @@ impl TestIpExt for Ipv4 {
             ArpOp::Request,
             DEVICE_MAC,
             Self::DEVICE_ADDR,
-            Mac::BROADCAST,
+            Mac::UNSPECIFIED,
             Self::NEIGHBOR_ADDR,
         )
         .into_serializer()

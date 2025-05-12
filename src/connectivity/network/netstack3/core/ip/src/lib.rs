@@ -47,7 +47,8 @@ pub mod device {
     };
     pub use crate::internal::device::dad::{
         DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadHandler, DadState,
-        DadStateRef, DadTimerId, Ipv6DadAddressContext, Ipv6DadSentProbeData, OwnedNdpNonce,
+        DadStateRef, DadTimerId, Ipv4DadSentProbeData, Ipv6DadAddressContext, Ipv6DadSentProbeData,
+        OwnedNdpNonce,
     };
     pub use crate::internal::device::opaque_iid::{IidSecret, OpaqueIid, OpaqueIidNonce};
     pub use crate::internal::device::route_discovery::{
@@ -156,7 +157,7 @@ pub mod nud {
         NudTimerId, NudUserConfig, NudUserConfigUpdate, Reachable, Stale, UseDelegateNudContext,
         MAX_ENTRIES,
     };
-    pub use crate::internal::device::state::RETRANS_TIMER_DEFAULT;
+    pub use crate::internal::device::state::IPV6_RETRANS_TIMER_DEFAULT;
 
     /// NUD test utilities.
     #[cfg(any(test, feature = "testutils"))]

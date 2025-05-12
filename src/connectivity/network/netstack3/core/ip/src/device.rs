@@ -17,7 +17,6 @@ pub(crate) mod state;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Display};
 use core::hash::Hash;
-use core::marker::PhantomData;
 use core::num::NonZeroU8;
 
 use derivative::Derivative;
@@ -90,8 +89,6 @@ pub struct IpDeviceTimerId<
     BT: IpDeviceStateBindingsTypes,
 >(I::Timer<D, BT>);
 
-// TODO(https://fxbug.dev/42077260): Remove the `PhantomData` once this holds
-// a `DadTimer`.
 /// A timer ID for IPv4 devices.
 #[derive(Derivative)]
 #[derivative(
@@ -101,16 +98,20 @@ pub struct IpDeviceTimerId<
     Hash(bound = ""),
     PartialEq(bound = "")
 )]
-pub struct Ipv4DeviceTimerId<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>(
-    IgmpTimerId<D>,
-    PhantomData<BT>,
-);
+pub enum Ipv4DeviceTimerId<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> {
+    /// The timer ID is specific to the IGMP protocol suite.
+    Igmp(IgmpTimerId<D>),
+    /// The timer ID is specific to duplicate address detection.
+    Dad(DadTimerId<Ipv4, D, WeakAddressId<Ipv4, BT>>),
+}
 
 impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> Ipv4DeviceTimerId<D, BT> {
     /// Gets the device ID from this timer IFF the device hasn't been destroyed.
     fn device_id(&self) -> Option<D::Strong> {
-        let Self(this, _phantom) = self;
-        this.device_id().upgrade()
+        match self {
+            Ipv4DeviceTimerId::Igmp(igmp) => igmp.device_id().upgrade(),
+            Ipv4DeviceTimerId::Dad(dad) => dad.device_id().upgrade(),
+        }
     }
 
     /// Transforms this timer ID into the common [`IpDeviceTimerId`] version.
@@ -139,19 +140,30 @@ impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<IgmpTimerId<D
     for Ipv4DeviceTimerId<D, BT>
 {
     fn from(id: IgmpTimerId<D>) -> Ipv4DeviceTimerId<D, BT> {
-        Ipv4DeviceTimerId(id, PhantomData)
+        Ipv4DeviceTimerId::Igmp(id)
+    }
+}
+
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>
+    From<DadTimerId<Ipv4, D, WeakAddressId<Ipv4, BT>>> for Ipv4DeviceTimerId<D, BT>
+{
+    fn from(id: DadTimerId<Ipv4, D, WeakAddressId<Ipv4, BT>>) -> Ipv4DeviceTimerId<D, BT> {
+        Ipv4DeviceTimerId::Dad(id)
     }
 }
 
 impl<
         D: WeakDeviceIdentifier,
         BC: IpDeviceStateBindingsTypes,
-        CC: TimerHandler<BC, IgmpTimerId<D>>,
+        CC: TimerHandler<BC, IgmpTimerId<D>>
+            + TimerHandler<BC, DadTimerId<Ipv4, D, WeakAddressId<Ipv4, BC>>>,
     > HandleableTimer<CC, BC> for Ipv4DeviceTimerId<D, BC>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
-        let Self(id, _phantom) = self;
-        core_ctx.handle_timer(bindings_ctx, id, timer);
+        match self {
+            Ipv4DeviceTimerId::Igmp(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
+            Ipv4DeviceTimerId::Dad(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
+        }
     }
 }
 

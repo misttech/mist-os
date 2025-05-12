@@ -270,7 +270,24 @@ where
         remote_link_addr: Option<<D as LinkDevice>::Address>,
     ) {
         let Self(core_ctx) = self;
-        send_arp_request(core_ctx, bindings_ctx, device_id, lookup_addr.get(), remote_link_addr)
+
+        if let Some(sender_addr) = core_ctx.get_protocol_addr(device_id) {
+            send_arp_request(
+                core_ctx,
+                bindings_ctx,
+                device_id,
+                sender_addr,
+                *lookup_addr,
+                remote_link_addr,
+            );
+        } else {
+            // RFC 826 does not specify what to do if we don't have a local address,
+            // but there is no reasonable way to send an ARP request without one (as
+            // the receiver will cache our local address on receiving the packet).
+            // So, if this is the case, we do not send an ARP request.
+            core_ctx.counters().tx_requests_dropped_no_local_addr.increment();
+            debug!("Not sending ARP request, since we don't know our local protocol address");
+        }
     }
 }
 
@@ -575,9 +592,13 @@ fn handle_packet<
 // TODO(https://fxbug.dev/42075782): allow this default to be overridden.
 //
 // [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-const DEFAULT_ARP_REQUEST_PERIOD: Duration = nud::RETRANS_TIMER_DEFAULT.get();
+const DEFAULT_ARP_REQUEST_PERIOD: Duration = nud::IPV6_RETRANS_TIMER_DEFAULT.get();
 
-fn send_arp_request<
+/// Sends an Arp Request for the provided lookup_addr.
+///
+/// If remote_link_addr is provided, it will be the destination of the request.
+/// If unset, the request will be broadcast.
+pub fn send_arp_request<
     D: ArpDevice,
     BC: ArpBindingsContext<D, CC::DeviceId>,
     CC: ArpContext<D, BC> + CounterContext<ArpCounters>,
@@ -585,43 +606,39 @@ fn send_arp_request<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
+    sender_addr: Ipv4Addr,
     lookup_addr: Ipv4Addr,
     remote_link_addr: Option<D::Address>,
 ) {
-    if let Some(sender_protocol_addr) = core_ctx.get_protocol_addr(device_id) {
-        let self_hw_addr = core_ctx.get_hardware_addr(bindings_ctx, device_id);
-        let dst_addr = remote_link_addr.unwrap_or(D::Address::BROADCAST);
-        core_ctx.counters().tx_requests.increment();
-        debug!("sending ARP request for {lookup_addr} to {dst_addr:?}");
-        SendFrameContext::send_frame(
-            core_ctx,
-            bindings_ctx,
-            ArpFrameMetadata { device_id: device_id.clone(), dst_addr },
-            ArpPacketBuilder::new(
-                ArpOp::Request,
-                self_hw_addr.get(),
-                sender_protocol_addr,
-                // This is meaningless, since RFC 826 does not specify the
-                // behaviour. However, `dst_addr` is sensible, as this is the
-                // actual address we are sending the packet to.
-                dst_addr,
-                lookup_addr,
-            )
-            .into_serializer(),
+    let self_hw_addr = core_ctx.get_hardware_addr(bindings_ctx, device_id);
+    let dst_addr = remote_link_addr.unwrap_or(D::Address::BROADCAST);
+    core_ctx.counters().tx_requests.increment();
+    debug!("sending ARP request for {lookup_addr} to {dst_addr:?}");
+    SendFrameContext::send_frame(
+        core_ctx,
+        bindings_ctx,
+        ArpFrameMetadata { device_id: device_id.clone(), dst_addr },
+        ArpPacketBuilder::new(
+            ArpOp::Request,
+            self_hw_addr.get(),
+            sender_addr,
+            // This field is relatively meaningless, since RFC 826 does not
+            // specify the behavior. However, RFC 5227 section 2.1.1. specifies
+            // that the target hardware address SHOULD be set to all 0s when
+            // sending an Address Conflict Detection probe.
+            //
+            // To accommodate this, we use the `remote_link_addr` if provided,
+            // or otherwise the unspecified address. Notably this makes the
+            // ARP target hardware address field differ from the destination
+            // address in the Frame Metadata.
+            remote_link_addr.unwrap_or(D::Address::UNSPECIFIED),
+            lookup_addr,
         )
-        .unwrap_or_else(|serializer| {
-            warn!("failed to send ARP request for {lookup_addr} to {dst_addr:?}: {serializer:?}")
-        });
-    } else {
-        // RFC 826 does not specify what to do if we don't have a local address,
-        // but there is no reasonable way to send an ARP request without one (as
-        // the receiver will cache our local address on receiving the packet.
-        // So, if this is the case, we do not send an ARP request.
-        // TODO(wesleyac): Should we cache these, and send packets once we have
-        // an address?
-        core_ctx.counters().tx_requests_dropped_no_local_addr.increment();
-        debug!("Not sending ARP request, since we don't know our local protocol address");
-    }
+        .into_serializer(),
+    )
+    .unwrap_or_else(|serializer| {
+        warn!("failed to send ARP request for {lookup_addr} to {dst_addr:?}: {serializer:?}")
+    });
 }
 
 /// The state associated with an instance of the Address Resolution Protocol
@@ -653,6 +670,7 @@ mod tests {
     use core::iter;
     use net_types::ip::Ip;
 
+    use assert_matches::assert_matches;
     use net_types::ethernet::Mac;
     use netstack3_base::socket::SocketIpAddr;
     use netstack3_base::testutil::{
@@ -1213,7 +1231,7 @@ mod tests {
                 local_proto_addr,
                 requested_remote_proto_addr,
                 local_hw_addr,
-                Mac::BROADCAST,
+                Mac::UNSPECIFIED,
             );
         });
         // Step once to deliver the ARP request to the remotes.
@@ -1376,5 +1394,35 @@ mod tests {
 
         // We should not have sent an ARP response.
         assert_eq!(core_ctx.frames().len(), 0);
+    }
+
+    // Test sending an ARP probe as specified in Address Conflict Detection.
+    #[test]
+    fn test_send_arp_probe() {
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
+
+        const LOCAL_IP: Ipv4Addr = Ipv4::UNSPECIFIED_ADDRESS;
+        send_arp_request(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &FakeLinkDeviceId,
+            LOCAL_IP,
+            TEST_REMOTE_IPV4,
+            None,
+        );
+
+        // We should have sent 1 ARP Request.
+        let (meta, frame) = assert_matches!(core_ctx.frames(), [frame] => frame);
+        // The request should have been broadcast, with the destination MAC
+        // left unspecified.
+        assert_eq!(meta.dst_addr, Mac::BROADCAST);
+        validate_arp_packet(
+            frame,
+            ArpOp::Request,
+            LOCAL_IP,
+            TEST_REMOTE_IPV4,
+            TEST_LOCAL_MAC,
+            Mac::UNSPECIFIED,
+        );
     }
 }
