@@ -31,7 +31,6 @@ feature_flag = rule(
           "is passed on the command-line, the value will be True.",
     attrs = {
         "feature_name": attr.string(),
-        "_cc_toolchain": attr.label(default = Label("@bazel_tools//tools/cpp:current_cc_toolchain")),
     },
     fragments = ["cpp"],
     toolchains = use_cpp_toolchain(),
