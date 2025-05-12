@@ -891,6 +891,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.test.manager/RunSuiteOptions.break_on_failure",
+        "ordinal": "11",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.test.manager/RunSuiteOptions.log_interest",
         "ordinal": "8",
         "type": "vector<fuchsia.diagnostics/LogInterestSelector>:64"

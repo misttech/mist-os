@@ -163,6 +163,13 @@ type RunSuiteOptions = resource table {
     /// is false.
     @available(added=26)
     10: no_exception_channel bool;
+
+    /// If true, the test runner should halt (if supported) the test suite when
+    /// a failure is encountered such that a debugger may attach to the process
+    /// in the future. Test runners may safely ignore this if they do not
+    /// support stopping running test suites.
+    @available(added=NEXT)
+    11: break_on_failure bool;
 };
 
 /// Options specifying the realm in which a test suite should be run. These options are
