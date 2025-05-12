@@ -17,7 +17,7 @@ use compat_info::{CompatibilityInfo, CompatibilityState};
 use ffx::{TargetIpAddrInfo, TargetIpPort};
 use ffx_daemon_core::events::{self, EventSynthesizer};
 use ffx_daemon_events::{TargetConnectionState, TargetEvent};
-use ffx_fastboot::common::fastboot::{
+use ffx_fastboot_connection_factory::{
     ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind,
 };
 use ffx_ssh::parse::HostAddr;

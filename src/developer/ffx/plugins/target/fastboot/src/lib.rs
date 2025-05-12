@@ -8,11 +8,11 @@ use async_trait::async_trait;
 use discovery::{FastbootConnectionState, TargetState};
 use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
-use ffx_fastboot::common::fastboot::{
-    tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
-};
 use ffx_fastboot::common::flash_partition_impl;
 use ffx_fastboot::common::vars::MAX_DOWNLOAD_SIZE_VAR;
+use ffx_fastboot_connection_factory::{
+    tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
+};
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, Variable};
 use ffx_fastboot_tool_args::{FastbootCommand, FastbootSubcommand};
 use ffx_writer::VerifiedMachineWriter;

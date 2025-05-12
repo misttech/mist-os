@@ -25,6 +25,7 @@ ffx_plugin("ffx_bootloader") {
     "//src/developer/ffx/lib/discovery:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fastboot:lib",
+    "//src/developer/ffx/lib/fastboot/connection_factory:lib",
     "//src/developer/ffx/lib/fastboot/interface:lib",
     "//src/developer/ffx/lib/fastboot_file_discovery:lib",
     "//src/developer/ffx/lib/fho:lib",

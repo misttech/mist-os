@@ -36,7 +36,7 @@ pub async fn info<F: FastbootInterface>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test::setup;
+    use ffx_fastboot_interface::test::setup;
     use tokio::sync::mpsc;
 
     #[fuchsia_async::run_singlethreaded(test)]

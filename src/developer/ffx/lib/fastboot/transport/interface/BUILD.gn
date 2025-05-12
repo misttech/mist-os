@@ -18,6 +18,7 @@ rustc_library("lib") {
   visibility = [
     ":*",
     "//src/developer/ffx/lib/fastboot:*",
+    "//src/developer/ffx/lib/fastboot/connection_factory:*",
     "//src/developer/ffx/lib/fastboot/transport/factory:*",
     "//src/developer/ffx/lib/manual_targets:*",
     "//src/developer/ffx/plugins/target/fastboot:*",

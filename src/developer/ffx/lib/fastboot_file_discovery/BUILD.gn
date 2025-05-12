@@ -19,6 +19,7 @@ rustc_library("lib") {
     "//src/developer/ffx/daemon/protocols/fastboot_target_stream:*",
     "//src/developer/ffx/lib/discovery:*",
     "//src/developer/ffx/lib/fastboot:*",
+    "//src/developer/ffx/lib/fastboot/connection_factory:*",
     "//src/developer/ffx/lib/target:*",
     "//src/developer/ffx/plugins/target/bootloader:*",
     "//src/developer/ffx/plugins/target/fastboot:*",

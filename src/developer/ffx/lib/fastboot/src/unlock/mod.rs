@@ -43,7 +43,7 @@ mod test {
     use super::*;
     use crate::common::vars::LOCKED_VAR;
     use crate::file_resolver::resolvers::EmptyResolver;
-    use crate::test::setup;
+    use ffx_fastboot_interface::test::setup;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_unlocked_device_throws_err() -> Result<()> {

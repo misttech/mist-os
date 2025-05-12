@@ -16,15 +16,15 @@ use ffx_bootloader_args::SubCommand::{Boot, Info, Lock, Unlock};
 use ffx_bootloader_args::{BootCommand, BootloaderCommand, UnlockCommand};
 use ffx_config::EnvironmentContext;
 use ffx_fastboot::boot::boot;
-use ffx_fastboot::common::fastboot::{
-    tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
-};
 use ffx_fastboot::common::from_manifest;
 use ffx_fastboot::file_resolver::resolvers::EmptyResolver;
 use ffx_fastboot::info::info;
 use ffx_fastboot::lock::lock;
 use ffx_fastboot::unlock::unlock;
 use ffx_fastboot::util::{Event, UnlockEvent};
+use ffx_fastboot_connection_factory::{
+    tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
+};
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, UploadProgress, Variable};
 use ffx_writer::VerifiedMachineWriter;
 use fho::{deferred, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool};
@@ -605,7 +605,7 @@ mod test {
     use super::*;
     use ffx_bootloader_args::LockCommand;
     use ffx_fastboot::common::vars::LOCKED_VAR;
-    use ffx_fastboot::test::setup;
+    use ffx_fastboot_interface::test::setup;
     use ffx_writer::Format;
     use tempfile::NamedTempFile;
 

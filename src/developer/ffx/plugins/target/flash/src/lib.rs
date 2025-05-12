@@ -14,11 +14,11 @@ use errors::ffx_bail;
 use fastboot_file_discovery::FASTBOOT_FILE_PATH;
 use ffx_config::EnvironmentContext;
 use ffx_fastboot::common::cmd::OemFile;
-use ffx_fastboot::common::fastboot::{
-    tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
-};
 use ffx_fastboot::common::from_manifest;
 use ffx_fastboot::util::{Event, UnlockEvent};
+use ffx_fastboot_connection_factory::{
+    tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
+};
 use ffx_fastboot_interface::fastboot_interface::UploadProgress;
 use ffx_flash_args::FlashCommand;
 use ffx_ssh::SshKeyFiles;

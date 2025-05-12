@@ -35,6 +35,46 @@ pub enum FastbootConnectionKind {
     Udp(String, SocketAddr),
 }
 
+#[async_trait(?Send)]
+pub trait FastbootConnectionFactory {
+    async fn build_interface(
+        &self,
+        connection: FastbootConnectionKind,
+    ) -> Result<Box<dyn FastbootInterface>>;
+}
+
+pub struct ConnectionFactory {}
+
+#[async_trait(?Send)]
+impl FastbootConnectionFactory for ConnectionFactory {
+    async fn build_interface(
+        &self,
+        connection: FastbootConnectionKind,
+    ) -> Result<Box<dyn FastbootInterface>> {
+        match connection {
+            FastbootConnectionKind::Usb(serial_number) => {
+                Ok(Box::new(usb_proxy(serial_number).await?))
+            }
+            FastbootConnectionKind::Tcp(target_name, addr) => {
+                let config = FastbootNetworkConnectionConfig::new_tcp().await;
+                let fastboot_device_file_path: Option<PathBuf> =
+                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
+                Ok(Box::new(
+                    tcp_proxy(target_name, fastboot_device_file_path, &addr, config).await?,
+                ))
+            }
+            FastbootConnectionKind::Udp(target_name, addr) => {
+                let config = FastbootNetworkConnectionConfig::new_udp().await;
+                let fastboot_device_file_path: Option<PathBuf> =
+                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
+                Ok(Box::new(
+                    udp_proxy(target_name, fastboot_device_file_path, &addr, config).await?,
+                ))
+            }
+        }
+    }
+}
+
 const UDP_RETRY_COUNT: &str = "fastboot.network.udp.retry_count";
 const UDP_RETRY_COUNT_DEFAULT: u64 = 3;
 const UDP_WAIT_SECONDS: &str = "fastboot.network.udp.retry_wait_seconds";
@@ -83,46 +123,6 @@ impl FastbootNetworkConnectionConfig {
             UDP_WAIT_SECONDS_DEFAULT,
         )
         .await
-    }
-}
-
-#[async_trait(?Send)]
-pub trait FastbootConnectionFactory {
-    async fn build_interface(
-        &self,
-        connection: FastbootConnectionKind,
-    ) -> Result<Box<dyn FastbootInterface>>;
-}
-
-pub struct ConnectionFactory {}
-
-#[async_trait(?Send)]
-impl FastbootConnectionFactory for ConnectionFactory {
-    async fn build_interface(
-        &self,
-        connection: FastbootConnectionKind,
-    ) -> Result<Box<dyn FastbootInterface>> {
-        match connection {
-            FastbootConnectionKind::Usb(serial_number) => {
-                Ok(Box::new(usb_proxy(serial_number).await?))
-            }
-            FastbootConnectionKind::Tcp(target_name, addr) => {
-                let config = FastbootNetworkConnectionConfig::new_tcp().await;
-                let fastboot_device_file_path: Option<PathBuf> =
-                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
-                Ok(Box::new(
-                    tcp_proxy(target_name, fastboot_device_file_path, &addr, config).await?,
-                ))
-            }
-            FastbootConnectionKind::Udp(target_name, addr) => {
-                let config = FastbootNetworkConnectionConfig::new_udp().await;
-                let fastboot_device_file_path: Option<PathBuf> =
-                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
-                Ok(Box::new(
-                    udp_proxy(target_name, fastboot_device_file_path, &addr, config).await?,
-                ))
-            }
-        }
     }
 }
 
@@ -200,4 +200,30 @@ pub async fn udp_proxy(
         .await
         .with_context(|| format!("connecting via UDP to Fastboot address: {addr}"))?;
     Ok(FastbootProxy::<UdpNetworkInterface>::new(addr.to_string(), interface, factory))
+}
+
+pub mod test {
+    use super::*;
+    use ffx_fastboot_interface::test::{FakeServiceCommands, TestFastbootInterface};
+    use std::sync::{Arc, Mutex};
+
+    pub struct TestConnectionFactory {
+        state: Arc<Mutex<FakeServiceCommands>>,
+    }
+
+    #[async_trait(?Send)]
+    impl FastbootConnectionFactory for TestConnectionFactory {
+        async fn build_interface(
+            &self,
+            _connection: FastbootConnectionKind,
+        ) -> Result<Box<dyn FastbootInterface>> {
+            Ok(Box::new(TestFastbootInterface::new(self.state.clone())))
+        }
+    }
+
+    pub fn setup_connection_factory(
+    ) -> (Arc<Mutex<FakeServiceCommands>>, impl FastbootConnectionFactory) {
+        let state = Arc::new(Mutex::new(FakeServiceCommands::default()));
+        (state.clone(), TestConnectionFactory { state: state })
+    }
 }

@@ -8,7 +8,7 @@ use async_utils::async_once::Once;
 use ffx_daemon_events::TargetConnectionState;
 use ffx_daemon_target::target::Target;
 use ffx_daemon_target::zedboot::{reboot, reboot_to_bootloader, reboot_to_recovery};
-use ffx_fastboot::common::fastboot::{
+use ffx_fastboot_connection_factory::{
     ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind,
 };
 use ffx_fastboot_interface::fastboot_interface::RebootEvent;
@@ -387,7 +387,7 @@ mod tests {
     use super::*;
     use anyhow::anyhow;
     use assert_matches::assert_matches;
-    use ffx_fastboot::test::setup_connection_factory;
+    use ffx_fastboot_connection_factory::test::setup_connection_factory;
     use fidl::endpoints::{create_proxy_and_stream, RequestStream};
     use fidl_fuchsia_developer_ffx::{TargetMarker, TargetProxy, TargetRequest};
     use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlRequest};
