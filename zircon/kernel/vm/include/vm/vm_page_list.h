@@ -637,7 +637,7 @@ class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmP
   void MergeOnto(F migrate_fn, VmPageListNode& other, uint64_t skew) {
     for (size_t i = 0; i < kPageFanOut; i++) {
       if (!pages_[i].IsEmpty()) {
-        migrate_fn(&pages_[i], &other.pages_[i], obj_offset_ + i * PAGE_SIZE - skew);
+        migrate_fn(&pages_[i], &other.pages_[i], other.obj_offset_ + i * PAGE_SIZE - skew);
       }
     }
   }
@@ -1198,7 +1198,7 @@ class VmPageList final {
       // If there is a target node we need to merge the nodes, otherwise we migrate this node over.
       if (cur_other && cur_other->offset() == target_node_offset) {
         DEBUG_ASSERT(cur_other->HasNoIntervalSentinel());
-        node->MergeOnto(migrate_fn, *cur_other, list_skew_);
+        node->MergeOnto(migrate_fn, *cur_other, other.list_skew_);
         // Done merging this node, move to the next node. This might not be the correct node if
         // |this| has a gap, but we will search for the right one in that case.
         auto prev = cur_other++;
