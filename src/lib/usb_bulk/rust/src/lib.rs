@@ -213,7 +213,7 @@ impl AsyncInterface {
     where
         F: FnMut(&InterfaceInfo) -> bool,
     {
-        tracing::debug!("AsyncInterface checking interface");
+        log::debug!("AsyncInterface checking interface");
         Self::open_interface(matcher, false).is_ok()
     }
 
@@ -292,7 +292,7 @@ impl AsyncInterface {
             // to drain from the queue we'll just be waiting forever.
             let mut iface = Interface::open_interface(&mut drain_cb, 200)?;
             // Clears out anything that was in the usb buffer waiting.
-            tracing::debug!("AsyncInterface about to drain input queue");
+            log::debug!("AsyncInterface about to drain input queue");
             let mut buffer = Vec::new();
             let _read_res = iface.read_to_end(&mut buffer);
             drop(iface);
@@ -319,7 +319,7 @@ impl AsyncInterface {
         match serial.lock() {
             Ok(guard) => match *guard {
                 Some(ref s) => {
-                    tracing::debug!("AsyncInterface open_interface() for serial {}.", s);
+                    log::debug!("AsyncInterface open_interface() for serial {}.", s);
                     let mut write_guard = IFACE_REGISTRY
                         .write()
                         .expect("could not acquire write lock on interface registry");

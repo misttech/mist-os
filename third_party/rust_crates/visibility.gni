@@ -254,7 +254,6 @@ tracing_visibility = [
   "//src/connectivity/overnet/lib/ascendd:*",
   "//src/developer/lib/credentials:*",
   "//src/lib/fuchsia-lockfile:*",
-  "//src/lib/usb_bulk/rust:*",
 
   # At this time we are not enforcing restrictions on the below since the
   # sources are in a 3P library.
