@@ -29,6 +29,7 @@ source_set("cpp") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/stdcompat",
     "//src/graphics/display/lib/api-types/cpp",
+    "//zircon/system/ulib/zx",
   ]
 }
 
