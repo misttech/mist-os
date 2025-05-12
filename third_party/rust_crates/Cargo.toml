@@ -82,7 +82,7 @@ clap = "2.34"
 cmac = "0.7.2"
 crc = "1.8.1"
 criterion = { version = "0.2", default-features = false }
-crossbeam = "0.8.0"
+crossbeam = "0.8.4"
 crossbeam-channel = "0.5.15"
 crossbeam-utils = "0.8.21"
 crypto-common = "0.1.6"
@@ -685,9 +685,6 @@ testonly = true
 
 [gn.package.md-5."0.10.6"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "md5_visibility" }
-
-[gn.package.memoffset."0.6.3"]
-rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cfg=doctests", "--cfg=raw_ref_macros"]
 
 [gn.package.memoffset."0.7.1"]
 rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cfg=doctests", "--cfg=raw_ref_macros"]

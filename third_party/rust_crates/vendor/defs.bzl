@@ -334,7 +334,7 @@ _NORMAL_DEPENDENCIES = {
             "cmac": Label("//third_party/rust_crates/vendor/cmac-0.7.2:cmac"),
             "crc": Label("//third_party/rust_crates/vendor/crc-1.8.1:crc"),
             "criterion": Label("//third_party/rust_crates/vendor/criterion-0.2.11:criterion"),
-            "crossbeam": Label("//third_party/rust_crates/vendor/crossbeam-0.8.0:crossbeam"),
+            "crossbeam": Label("//third_party/rust_crates/vendor/crossbeam-0.8.4:crossbeam"),
             "crossbeam-channel": Label("//third_party/rust_crates/vendor/crossbeam-channel-0.5.15:crossbeam_channel"),
             "crossbeam-utils": Label("//third_party/rust_crates/vendor/crossbeam-utils-0.8.21:crossbeam_utils"),
             "crypto-common": Label("//third_party/rust_crates/vendor/crypto-common-0.1.6:crypto_common"),
