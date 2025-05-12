@@ -387,6 +387,9 @@ struct Config {
     /// the influence of `interface_naming_policy`.
     #[serde(default)]
     pub blackhole_interfaces: Vec<String>,
+    // Whether to use protocols provided by the socketproxy component.
+    #[serde(default)]
+    pub enable_socket_proxy: bool,
 }
 
 impl Config {
@@ -632,6 +635,11 @@ pub struct NetCfg<'a> {
     interface_naming_config: interface::InterfaceNamingConfig,
     // Policy configuration to determine whether to provision an interface.
     interface_provisioning_policy: Vec<interface::ProvisioningRule>,
+
+    // TODO(https://fxbug.dev/416012531): Conditionally connect to the
+    // socketproxy's protocols when this is set to true.
+    #[allow(unused)]
+    enable_socket_proxy: bool,
 }
 
 /// Returns a [`fnet_name::DnsServer_`] with a static source from a [`std::net::IpAddr`].
@@ -860,6 +868,7 @@ impl<'a> NetCfg<'a> {
         allowed_upstream_device_classes: &'a HashSet<DeviceClass>,
         interface_naming_policy: Vec<interface::NamingRule>,
         interface_provisioning_policy: Vec<interface::ProvisioningRule>,
+        enable_socket_proxy: bool,
     ) -> Result<NetCfg<'a>, anyhow::Error> {
         let svc_dir = clone_namespace_svc().context("error cloning svc directory handle")?;
         let stack = svc_connect::<fnet_stack::StackMarker>(&svc_dir)
@@ -941,6 +950,7 @@ impl<'a> NetCfg<'a> {
             dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
             allowed_upstream_device_classes,
             interface_provisioning_policy,
+            enable_socket_proxy,
         })
     }
 
@@ -3396,6 +3406,7 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
         interface_naming_policy,
         interface_provisioning_policy,
         blackhole_interfaces,
+        enable_socket_proxy,
     } = Config::load(config_data)?;
 
     let mut netcfg = NetCfg::new(
@@ -3406,6 +3417,7 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
         &allowed_upstream_device_classes,
         interface_naming_policy,
         interface_provisioning_policy,
+        enable_socket_proxy,
     )
     .await
     .context("error creating new netcfg instance")?;
@@ -3695,6 +3707,7 @@ mod tests {
                     vec![],
                 ),
                 interface_provisioning_policy: Default::default(),
+                enable_socket_proxy: false,
             },
             ServerEnds {
                 lookup_admin: lookup_admin_server.into_stream(),
@@ -5556,7 +5569,8 @@ mod tests {
         "matchers": [ {"interface_name": "xyz" } ],
         "provisioning": "local"
     } ],
-   "blackhole_interfaces": [ "ifb0" ]
+   "blackhole_interfaces": [ "ifb0" ],
+   "enable_socket_proxy": true
 }
 "#;
 
@@ -5572,6 +5586,7 @@ mod tests {
             interface_naming_policy,
             interface_provisioning_policy,
             blackhole_interfaces,
+            enable_socket_proxy,
         } = Config::load_str(config_str).unwrap();
 
         assert_eq!(vec!["8.8.8.8".parse::<std::net::IpAddr>().unwrap()], servers);
@@ -5659,7 +5674,9 @@ mod tests {
         ]);
         assert_eq!(interface_provisioning_policy, expected_provisioning_policy);
 
-        assert_eq!(blackhole_interfaces, vec!["ifb0".to_string()])
+        assert_eq!(blackhole_interfaces, vec!["ifb0".to_string()]);
+
+        assert_eq!(enable_socket_proxy, true)
     }
 
     #[test]
@@ -5688,6 +5705,7 @@ mod tests {
             interface_naming_policy,
             interface_provisioning_policy,
             blackhole_interfaces,
+            enable_socket_proxy,
         } = Config::load_str(config_str).unwrap();
 
         assert_eq!(allowed_upstream_device_classes, Default::default());
@@ -5697,6 +5715,7 @@ mod tests {
         assert_eq!(interface_naming_policy.len(), 0);
         assert_eq!(interface_provisioning_policy.len(), 0);
         assert_eq!(blackhole_interfaces, Vec::<String>::new());
+        assert_eq!(enable_socket_proxy, false);
     }
 
     #[test_case(
@@ -5738,6 +5757,7 @@ mod tests {
             interface_naming_policy: _,
             interface_provisioning_policy: _,
             blackhole_interfaces: _,
+            enable_socket_proxy: _,
         } = Config::load_str(&config_str).unwrap();
 
         let expected_metrics =
