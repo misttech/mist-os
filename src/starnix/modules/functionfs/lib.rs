@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::SynchronousProxy;
-use fidl_fuchsia_hardware_adb as fadb;
 use futures_util::StreamExt;
 use starnix_core::power::{create_proxy_for_wake_events_counter_zero, mark_proxy_message_handled};
 use starnix_core::task::{CurrentTask, Kernel};
@@ -28,6 +27,7 @@ use std::collections::VecDeque;
 use std::ops::Deref;
 use std::sync::mpsc;
 use zerocopy::IntoBytes;
+use {fidl_fuchsia_hardware_adb as fadb, fuchsia_async as fasync};
 
 // The node identifiers of different nodes in FunctionFS.
 const ROOT_NODE_ID: ino_t = 1;
@@ -47,6 +47,10 @@ const INPUT_ENDPOINT_NODE_ID: ino_t = 4;
 const FUNCTIONFS_MAGIC: u32 = 0xa647361;
 
 const ADB_DIRECTORY: &str = "/svc/fuchsia.hardware.adb.Service";
+
+// How long to keep Starnix awake after an ADB interaction. If no ADB reads or
+// writes occur within this time period, Starnix will be allowed to suspend.
+const ADB_INTERACTION_TIMEOUT: zx::Duration<zx::MonotonicTimeline> = zx::Duration::from_seconds(2);
 
 struct ReadCommand {
     response_sender: mpsc::Sender<Result<Vec<u8>, Errno>>,
@@ -84,21 +88,48 @@ async fn handle_adb(
         }
     }
 
+    /// Consumes a stream of instants and decrements `message_counter` after
+    /// each one. As long as one of the instants written to this channel is
+    /// still in the future, we want to keep the container awake.
+    ///
+    /// NOTE: We're reusing `message_counter` in a way that's perhaps confusing:
+    /// both as the number of "in flight" requests, and to track whether the ADB
+    /// session seems to be idle or not. It may be clearer to have two separate
+    /// counters.
+    async fn handle_idle_timeouts(
+        timeouts: async_channel::Receiver<zx::MonotonicInstant>,
+        message_counter: &Option<zx::Counter>,
+    ) {
+        timeouts
+            .for_each(|timeout| async move {
+                use fasync::WakeupTime;
+                timeout.into_timer().await;
+                message_counter.as_ref().map(mark_proxy_message_handled);
+            })
+            .await
+    }
+
     /// Handle the commands coming from the main thread.
     async fn handle_read_commands(
         proxy: &fadb::UsbAdbImpl_Proxy,
-        message_counter: &Option<zx::Counter>,
+        timeouts_sender: async_channel::Sender<zx::MonotonicInstant>,
         commands: async_channel::Receiver<ReadCommand>,
     ) {
+        let timeouts_sender = &timeouts_sender;
         commands
             .for_each(|ReadCommand { response_sender }| async move {
                 // Queue up our receive future. We want to do this before we decrement the counter,
                 // which potentially allows the container to suspend.
                 let receive_future = proxy.receive();
 
-                // The message is queued in the channel, so now we can decrement the unhandled
-                // message counter to make sure we aren't preventing the container from suspending.
-                message_counter.as_ref().map(mark_proxy_message_handled);
+                // Don't decrement the message counter immediately. Instead, we
+                // keep the container awake for some amount of time to allow
+                // Starnix to react to the message. Otherwise, the container
+                // might go directly to sleep without doing anything.
+                timeouts_sender
+                    .send(zx::MonotonicInstant::after(ADB_INTERACTION_TIMEOUT))
+                    .await
+                    .expect("Should be able to send timeout");
 
                 let response = match receive_future.await {
                     Err(err) => {
@@ -123,9 +154,10 @@ async fn handle_adb(
     /// Handle the commands coming from the main thread.
     async fn handle_write_commands(
         proxy: &fadb::UsbAdbImpl_Proxy,
-        message_counter: &Option<zx::Counter>,
+        timeouts_sender: async_channel::Sender<zx::MonotonicInstant>,
         commands: async_channel::Receiver<WriteCommand>,
     ) {
+        let timeouts_sender = &timeouts_sender;
         commands
             .for_each(|WriteCommand { data, response_sender }| async move {
                 let response = match proxy.queue_tx(&data).await {
@@ -140,9 +172,13 @@ async fn handle_adb(
                     Ok(Ok(_)) => Ok(data.len()),
                 };
 
-                // We can simply decrement this after getting a response because responses to
-                // writes from the container to the host are not expected to wake the container.
-                message_counter.as_ref().map(mark_proxy_message_handled);
+                // Don't decrement the message counter immediately. We use the
+                // ADB output as a signal that the ADB session is still
+                // interactive.
+                timeouts_sender
+                    .send(zx::MonotonicInstant::after(ADB_INTERACTION_TIMEOUT))
+                    .await
+                    .expect("Should be able to send timeout");
 
                 response_sender
                     .send(response)
@@ -152,11 +188,13 @@ async fn handle_adb(
             .await;
     }
 
-    // Run our three futures at the same time.
+    let (timeouts_sender, timeouts_receiver) = async_channel::unbounded();
     let event_future = handle_events(proxy.take_event_stream(), &message_counter);
-    let write_commands_future = handle_write_commands(&proxy, &message_counter, write_commands);
-    let read_commands_future = handle_read_commands(&proxy, &message_counter, read_commands);
-    futures::join!(event_future, write_commands_future, read_commands_future);
+    let write_commands_future =
+        handle_write_commands(&proxy, timeouts_sender.clone(), write_commands);
+    let read_commands_future = handle_read_commands(&proxy, timeouts_sender, read_commands);
+    let timeout_future = handle_idle_timeouts(timeouts_receiver, &message_counter);
+    futures::join!(event_future, write_commands_future, read_commands_future, timeout_future);
 }
 
 pub struct FunctionFs;
