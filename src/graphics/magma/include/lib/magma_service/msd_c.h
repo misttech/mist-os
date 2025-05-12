@@ -63,7 +63,11 @@ magma_status_t msd_connection_map_buffer(struct MsdConnection* msd_connection,
 void msd_connection_release_buffer2(struct MsdConnection* msd_connection,
                                     struct MsdBuffer* msd_buffer, int32_t shutting_down);
 
+// TODO(b/402461734) - remove after transition to msd_connection_create_context2
 struct MsdContext* msd_connection_create_context(struct MsdConnection* msd_connection);
+
+struct MsdContext* msd_connection_create_context2(struct MsdConnection* msd_connection,
+                                                  magma_priority_t priority);
 
 struct MsdContext* msd_context_release(struct MsdContext* msd_context);
 
