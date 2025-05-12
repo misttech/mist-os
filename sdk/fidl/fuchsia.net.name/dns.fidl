@@ -6,12 +6,13 @@ library fuchsia.net.name;
 using fuchsia.net;
 
 /// A DNS server configuration.
+@available(added=HEAD)
 type DnsServer = table {
     /// The server's address, must be provided.
     1: address fuchsia.net.SocketAddress;
     /// The configuration source for this server. Defaults to
     /// [`fuchsia.net.name/DnsServerSource.static_source`].
-    2: source @generated_name("DnsServerSource") strict union {
+    2: source @generated_name("DnsServerSource") flexible union {
         /// The server is statically configured through
         /// [`fuchsia.net.name/LookupAdmin.SetDefaultServers`].
         1: static_source @generated_name("StaticDnsServerSource") table {};

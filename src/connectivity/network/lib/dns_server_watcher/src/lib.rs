@@ -179,7 +179,9 @@ impl DnsServers {
             Some(&DnsServerSource::Dhcpv6(Dhcpv6DnsServerSource {
                 source_interface: _, ..
             })) => 2,
-            Some(&DnsServerSource::StaticSource(StaticDnsServerSource { .. })) | None => 3,
+            Some(&DnsServerSource::StaticSource(StaticDnsServerSource { .. }))
+            | Some(&DnsServerSource::__SourceBreaking { .. })
+            | None => 3,
         };
         let a = ordering(a.source.as_ref());
         let b = ordering(b.source.as_ref());
