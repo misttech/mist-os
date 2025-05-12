@@ -441,12 +441,6 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.driver.framework/NodeAddArgs.offers",
-        "ordinal": "2",
-        "type": "vector<fuchsia.component.decl/Offer>:128"
-    },
-    {
-        "kind": "table/member",
         "name": "fuchsia.driver.framework/NodeAddArgs.properties",
         "ordinal": "4",
         "type": "vector<fuchsia.driver.framework/NodeProperty>:64"

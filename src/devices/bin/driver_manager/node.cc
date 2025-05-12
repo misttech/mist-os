@@ -880,12 +880,6 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
       std::make_shared<Node>(name, std::vector<std::weak_ptr<Node>>{weak_from_this()},
                              *node_manager_, dispatcher_, std::move(inspect));
 
-  if (args.offers().has_value()) {
-    LOGF(ERROR, "Failed to add Node '%.*s', offers() is no longer supported.",
-         static_cast<int>(name.size()), name.data());
-    return fit::as_error(fdf::wire::NodeError::kUnsupportedArgs);
-  }
-
   auto& fdf_offers = args.offers2();
   std::vector<fuchsia_driver_framework::NodeProperty2> properties;
 

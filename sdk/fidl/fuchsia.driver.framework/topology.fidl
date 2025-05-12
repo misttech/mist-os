@@ -197,15 +197,6 @@ type NodeAddArgs = resource table {
     /// Name of the node.
     1: name NodeName;
 
-    /// Capabilities to offer to the driver that is bound to this node.
-    /// The driver must ensure these capabilities are added to its outgoing directory
-    /// before adding the child node.
-    @available(
-            deprecated=18,
-            removed=19,
-            note="Replaced with 'offers2' which can carry the transport type.")
-    2: offers vector<fuchsia.component.decl.Offer>:MAX_OFFER_COUNT;
-
     /// Functions to provide to the driver that is bound to this node.
     3: symbols vector<NodeSymbol>:MAX_SYMBOL_COUNT;
 
