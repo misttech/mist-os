@@ -59,7 +59,7 @@
   <string name="line_granularity">Linje</string>
   <string name="word_granularity">Ord</string>
   <string name="character_granularity">Tecken</string>
-  <string name="double_tap_hint">Aktivera genom att trycka snabbt två gånger</string>
+  <string name="double_tap_hint">Aktivera genom att dubbeltrycka</string>
   <string name="adjust_value_hint">Svep till vänster eller höger för att justera värdet.</string>
   <string name="last_element">Sista</string>
   <string name="first_element">Första</string>
