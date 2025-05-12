@@ -12,13 +12,51 @@
 
 #include <trace-reader/reader.h>
 
+Tracing::Tracing() {
+#if EXPERIMENTAL_KTRACE_STREAMING_ENABLED
+  // In streaming mode, we need to pass in a buffer large enough to store all of the ktrace data.
+  // We can ask ktrace how large that buffer needs to be by calling zx_ktrace_read with nullptr.
+  const zx_status_t status = zx_ktrace_read(tracing_resource_, nullptr, 0, 0, &buffer_capacity_);
+  if (status != ZX_OK) {
+    FX_PLOGS(FATAL, status) << "failed to query ktrace size in constructor " << status;
+  }
+  buffer_ = std::make_unique<uint8_t[]>(buffer_capacity_);
+  // There is no data in this intermediate buffer to start.
+  buffer_size_ = 0;
+#endif
+  Stop();
+}
+
 // Performs same action as zx_ktrace_read and does necessary checks.
 void Tracing::ReadKernelBuffer(zx_handle_t handle, void* data_buf, uint32_t offset, size_t len,
                                size_t* bytes_read) {
+#if EXPERIMENTAL_KTRACE_STREAMING_ENABLED
+  // In streaming mode, ktrace requires that we copy out all available data in one go. However, the
+  // caller of this method is trying to read chunked data, so we emulate that behavior here.
+  if (data_buf == nullptr) {
+    // If the caller passed in a nullptr, then they're starting a new read of ktrace data and
+    // querying the amount of data that's available. So, copy all of the ktrace data into userspace,
+    // then return the amount of data available.
+    const zx_status_t status =
+        zx_ktrace_read(handle, buffer_.get(), 0, buffer_capacity_, &buffer_size_);
+    if (status != ZX_OK) {
+      FX_PLOGS(FATAL, status) << "zx_trace_read";
+    }
+    *bytes_read = buffer_size_;
+    return;
+  }
+
+  // Copy out however much the caller actually wanted to read.
+  ZX_DEBUG_ASSERT(buffer_size_ >= offset);
+  size_t to_copy = std::min(len, buffer_size_ - offset);
+  memcpy(data_buf, buffer_.get() + offset, to_copy);
+  *bytes_read = to_copy;
+#else
   const zx_status_t status = zx_ktrace_read(handle, data_buf, offset, len, bytes_read);
   if (status != ZX_OK) {
     FX_PLOGS(FATAL, status) << "zx_trace_read";
   }
+#endif
 }
 
 // Rewinds kernel trace buffer.
