@@ -595,14 +595,14 @@ alias(
 )
 
 alias(
-    name = "crossbeam-channel-0.5.1",
-    actual = "//third_party/rust_crates/vendor/crossbeam-channel-0.5.1:crossbeam_channel",
+    name = "crossbeam-channel-0.5.15",
+    actual = "//third_party/rust_crates/vendor/crossbeam-channel-0.5.15:crossbeam_channel",
     tags = ["manual"],
 )
 
 alias(
     name = "crossbeam-channel",
-    actual = "//third_party/rust_crates/vendor/crossbeam-channel-0.5.1:crossbeam_channel",
+    actual = "//third_party/rust_crates/vendor/crossbeam-channel-0.5.15:crossbeam_channel",
     tags = ["manual"],
 )
 

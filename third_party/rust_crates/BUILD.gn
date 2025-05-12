@@ -206,7 +206,7 @@ group("crossbeam") {
 }
 
 group("crossbeam-channel") {
-  public_deps = [ ":crossbeam-channel-v0_5_1" ]
+  public_deps = [ ":crossbeam-channel-v0_5_15" ]
 }
 
 group("crossbeam-utils") {
@@ -4054,7 +4054,7 @@ rust_library("crossbeam-v0_8_0") {
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":crossbeam-channel-v0_5_1" ]
+  deps += [ ":crossbeam-channel-v0_5_15" ]
   deps += [ ":crossbeam-deque-v0_8_1" ]
   deps += [ ":crossbeam-epoch-v0_9_4" ]
   deps += [ ":crossbeam-queue-v0_3_1" ]
@@ -4081,41 +4081,39 @@ rust_library("crossbeam-v0_8_0") {
   applicable_licenses = [ ":crossbeam-v0_8_0.license" ]
 }
 
-license("crossbeam-channel-v0_5_1.license") {
+license("crossbeam-channel-v0_5_15.license") {
   public_package_name = "crossbeam_channel"
   license_files = [
-    "//third_party/rust_crates/vendor/crossbeam-channel-0.5.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/crossbeam-channel-0.5.1/LICENSE-MIT",
-    "//third_party/rust_crates/vendor/crossbeam-channel-0.5.1/LICENSE-THIRD-PARTY",
+    "//third_party/rust_crates/vendor/crossbeam-channel-0.5.15/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/crossbeam-channel-0.5.15/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/crossbeam-channel-0.5.15/LICENSE-THIRD-PARTY",
   ]
 }
 
-rust_library("crossbeam-channel-v0_5_1") {
+rust_library("crossbeam-channel-v0_5_15") {
   crate_name = "crossbeam_channel"
   crate_root =
-      "//third_party/rust_crates/vendor/crossbeam-channel-0.5.1/src/lib.rs"
-  output_name = "crossbeam_channel-4f2cca7fb0f4b481"
+      "//third_party/rust_crates/vendor/crossbeam-channel-0.5.15/src/lib.rs"
+  output_name = "crossbeam_channel-b8677b88ac423bff"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":crossbeam-utils-v0_8_21" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=4f2cca7fb0f4b481",
-    "-Cextra-filename=-4f2cca7fb0f4b481",
-    "--cfg=feature=\"crossbeam-utils\"",
+    "--edition=2021",
+    "-Cmetadata=b8677b88ac423bff",
+    "-Cextra-filename=-b8677b88ac423bff",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":crossbeam-channel-v0_5_1.license" ]
+  applicable_licenses = [ ":crossbeam-channel-v0_5_15.license" ]
 }
 
 license("crossbeam-deque-v0_8_1.license") {
