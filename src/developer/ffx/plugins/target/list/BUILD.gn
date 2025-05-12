@@ -20,6 +20,7 @@ ffx_plugin("ffx_list") {
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/target/list/target_formatter",
+    "//src/lib/analytics/rust:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",

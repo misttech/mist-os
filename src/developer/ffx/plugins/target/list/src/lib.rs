@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use analytics::add_custom_event;
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_bail_with_code};
@@ -55,6 +56,7 @@ impl FfxMain for ListTool {
             } else {
                 local_list_targets(&self.context, &cmd).await?
             };
+        emit_device_stats_event(infos.len(), &cmd.nodename).await;
         show_targets(cmd, infos, &mut writer, &self.context).await?;
         Ok(())
     }
@@ -308,8 +310,29 @@ async fn list_targets(
     Ok(res)
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// tests
+fn query_type(query: &str) -> &str {
+    match query.into() {
+        TargetInfoQuery::NodenameOrSerial(_) => "nodename_or_serial",
+        TargetInfoQuery::Serial(_) => "serial",
+        TargetInfoQuery::Addr(_) => "addr",
+        TargetInfoQuery::VSock(_) => "vsock",
+        TargetInfoQuery::Usb(_) => "usb",
+        TargetInfoQuery::First => "first",
+    }
+}
+
+/// Emit an event indicating how many devices were in the result.
+pub async fn emit_device_stats_event(num_devices: usize, query: &Option<String>) {
+    let query = query.as_ref().map_or("", |v| v);
+    let _ = add_custom_event(
+        Some("ffx_target_list_devices"),
+        Some(query_type(query)),
+        None,
+        [("devices", (num_devices as u64).into())].into_iter().collect(),
+    )
+    .await;
+} ///////////////////////////////////////////////////////////////////////////////
+  // tests
 
 #[cfg(test)]
 mod test {
