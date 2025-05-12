@@ -188,16 +188,16 @@ impl MetadataHeader {
         );
 
         self.partitions
-            .validate_table_bounds(self.tables_size)
+            .validate(self.tables_size)
             .map_err(|_| anyhow!("partitions tables failed table bounds check."))?;
         self.extents
-            .validate_table_bounds(self.tables_size)
+            .validate(self.tables_size)
             .map_err(|_| anyhow!("extents tables failed table bounds check."))?;
         self.groups
-            .validate_table_bounds(self.tables_size)
+            .validate(self.tables_size)
             .map_err(|_| anyhow!("groups tables failed table bounds check."))?;
         self.block_devices
-            .validate_table_bounds(self.tables_size)
+            .validate(self.tables_size)
             .map_err(|_| anyhow!("block_devices tables failed table bounds check."))?;
 
         ensure!(
@@ -235,13 +235,15 @@ pub struct MetadataTableDescriptor {
 }
 
 impl MetadataTableDescriptor {
-    fn validate_table_bounds(&self, total_tables_size: u32) -> Result<(), Error> {
-        ensure!(self.offset < total_tables_size, "Invalid table bounds.");
-        let table_size = self
-            .num_entries
+    pub fn get_table_size(&self) -> Result<u32, Error> {
+        self.num_entries
             .checked_mul(self.entry_size)
-            .ok_or_else(|| anyhow!("Invalid table bounds. num_entries * entry_size overflowed."))?;
-        ensure!(table_size < total_tables_size, "Invalid table bounds.");
+            .ok_or_else(|| anyhow!("num_entries * entry_size overflowed."))
+    }
+
+    fn validate(&self, total_tables_size: u32) -> Result<(), Error> {
+        ensure!(self.offset < total_tables_size, "Invalid table bounds.");
+        ensure!(self.get_table_size()? < total_tables_size, "Invalid table bounds.");
         Ok(())
     }
 }
@@ -622,6 +624,15 @@ mod tests {
             let mut invalid_header = valid_header.clone();
             invalid_header.block_devices.offset *= 2;
             invalid_header.header_checksum = invalid_header.compute_checksum();
+            invalid_header.validate().expect_err(
+                "metadata header with invalid entry offset passed validation unexpectedly",
+            );
+        }
+
+        // Check that there is validation check for the table size overflow.
+        {
+            let mut invalid_header = valid_header.clone();
+            invalid_header.block_devices.num_entries = u32::MAX;
             invalid_header.validate().expect_err(
                 "metadata header with invalid entry offset passed validation unexpectedly",
             );

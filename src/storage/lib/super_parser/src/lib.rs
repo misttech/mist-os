@@ -57,7 +57,10 @@ impl SuperParser {
         // Get tables bytes
         let metadata_header_offset = PARTITION_RESERVED_BYTES + 2 * METADATA_GEOMETRY_RESERVED_SIZE;
         ensure!(metadata_header_offset % device.block_size() == 0, "Reads must be block aligned.");
-        let header_and_tables_size = metadata_header.header_size + metadata_header.tables_size;
+        let header_and_tables_size = metadata_header
+            .header_size
+            .checked_add(metadata_header.tables_size)
+            .ok_or_else(|| anyhow!("arithmetic overflow: cannot calculate header and tables size to read from device"))?;
         let buffer_len = round_up_to_alignment(header_and_tables_size, device.block_size())?;
         let mut buffer = device.allocate_buffer(buffer_len as usize).await;
         device.read(metadata_header_offset as u64, buffer.as_mut()).await?;
@@ -82,12 +85,9 @@ impl SuperParser {
         .await
         .unwrap();
 
-        // Parse extent table entries. Note that `num_entries * entry_size` has already been checked
-        // that it does not overflow when parsing MetadataHeader above.
+        // Parse extent table entries.
         let tables_offset = tables_offset
-            .checked_add(
-                metadata_header.partitions.num_entries * metadata_header.partitions.entry_size,
-            )
+            .checked_add(metadata_header.partitions.get_table_size()?)
             .ok_or_else(|| anyhow!("Adding offset + num_entries * entry_size overflowed."))?;
         let extents = Self::parse_table::<MetadataExtent>(
             tables_bytes,
@@ -100,7 +100,7 @@ impl SuperParser {
 
         // Parse partition group table entries.
         let tables_offset = tables_offset
-            .checked_add(metadata_header.extents.num_entries * metadata_header.extents.entry_size)
+            .checked_add(metadata_header.extents.get_table_size()?)
             .ok_or_else(|| anyhow!("Adding offset + num_entries * entry_size overflowed."))?;
         let partition_groups = Self::parse_table::<MetadataPartitionGroup>(
             tables_bytes,
@@ -113,7 +113,7 @@ impl SuperParser {
 
         // Parse block device table entries.
         let tables_offset = tables_offset
-            .checked_add(metadata_header.groups.num_entries * metadata_header.groups.entry_size)
+            .checked_add(metadata_header.groups.get_table_size()?)
             .ok_or_else(|| anyhow!("Adding offset + num_entries * entry_size overflowed."))?;
         let block_devices = Self::parse_table::<MetadataBlockDevice>(
             tables_bytes,
