@@ -23,6 +23,9 @@ class ProductInfoProvider
  public:
   using StaticSingleFidlMethodAnnotationProvider::StaticSingleFidlMethodAnnotationProvider;
 
+  virtual ~ProductInfoProvider() = default;
+
+  static std::set<std::string> GetAnnotationKeys();
   std::set<std::string> GetKeys() const override;
 };
 

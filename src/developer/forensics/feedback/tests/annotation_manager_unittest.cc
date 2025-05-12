@@ -15,6 +15,7 @@
 
 #include "src/developer/forensics/feedback/annotations/provider.h"
 #include "src/developer/forensics/feedback/annotations/types.h"
+#include "src/developer/forensics/testing/gpretty_printers.h"  // IWYU pragma: keep
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 
 namespace forensics::feedback {
@@ -106,6 +107,20 @@ TEST_F(AnnotationManagerTest, StaticAllowlist) {
                                                     MakePair("num_calls", "3"),
                                                 }));
   }
+}
+
+TEST_F(AnnotationManagerTest, AddsProductExcludedAnnotations) {
+  AnnotationManager manager(dispatcher(), /*allowlist=*/{}, /*static_annotations=*/{},
+                            /*non_platform_provider=*/nullptr,
+                            /*dynamic_sync_providers=*/{}, /*static_async_providers=*/{},
+                            /*cached_async_providers=*/{}, /*dynamic_async_providers=*/{},
+                            /*product_exclude_list=*/{"annotation1", "annotation2"});
+
+  EXPECT_THAT(manager.ImmediatelyAvailable(),
+              UnorderedElementsAreArray({
+                  MakePair("annotation1", Error::kNotAvailableInProduct),
+                  MakePair("annotation2", Error::kNotAvailableInProduct),
+              }));
 }
 
 TEST_F(AnnotationManagerTest, IsNotMissingNonPlatform) {

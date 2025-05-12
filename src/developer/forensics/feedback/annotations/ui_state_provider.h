@@ -34,6 +34,7 @@ class UIStateProvider : public fuchsia::ui::activity::Listener,
                   std::unique_ptr<timekeeper::Clock> clock,
                   std::unique_ptr<backoff::Backoff> backoff);
 
+  static std::set<std::string> GetAnnotationKeys();
   std::set<std::string> GetKeys() const override;
 
   // Returns the duration since the last state change

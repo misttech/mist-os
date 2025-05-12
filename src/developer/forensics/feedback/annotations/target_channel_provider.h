@@ -26,6 +26,9 @@ class TargetChannelProvider
  public:
   using DynamicSingleFidlMethodAnnotationProvider::DynamicSingleFidlMethodAnnotationProvider;
 
+  virtual ~TargetChannelProvider() = default;
+
+  static std::set<std::string> GetAnnotationKeys();
   std::set<std::string> GetKeys() const override;
 };
 

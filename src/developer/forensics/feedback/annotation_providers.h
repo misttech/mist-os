@@ -32,7 +32,9 @@ class AnnotationProviders {
  public:
   AnnotationProviders(async_dispatcher_t* dispatcher,
                       std::shared_ptr<sys::ServiceDirectory> services,
-                      std::set<std::string> allowlist, Annotations static_annotations,
+                      std::set<std::string> allowlist,
+                      const std::set<std::string>& product_exclude_list,
+                      Annotations static_annotations,
                       std::unique_ptr<CachedAsyncAnnotationProvider> device_id_provider);
 
   AnnotationManager* GetAnnotationManager() { return &annotation_manager_; }
@@ -42,17 +44,38 @@ class AnnotationProviders {
   static std::unique_ptr<backoff::Backoff> AnnotationProviderBackoff();
 
  private:
+  std::vector<DynamicSyncAnnotationProvider*> GetDynamicSyncProviders(
+      const std::shared_ptr<sys::ServiceDirectory>& services,
+      const std::set<std::string>& allowlist);
+
+  std::vector<StaticAsyncAnnotationProvider*> GetStaticAsyncProviders(
+      const std::shared_ptr<sys::ServiceDirectory>& services,
+      const std::set<std::string>& allowlist);
+
+  std::vector<CachedAsyncAnnotationProvider*> GetCachedAsyncProviders(
+      const std::shared_ptr<sys::ServiceDirectory>& services,
+      const std::set<std::string>& allowlist);
+
+  std::vector<DynamicAsyncAnnotationProvider*> GetDynamicAsyncProviders(
+      const std::shared_ptr<sys::ServiceDirectory>& services,
+      const std::set<std::string>& allowlist);
+
+  UIStateProvider* GetOrConstructUIStateProvider(
+      const std::shared_ptr<sys::ServiceDirectory>& services);
+
   async_dispatcher_t* dispatcher_;
 
   DataRegister data_register_;
-  TimeProvider time_provider_;
-  BoardInfoProvider board_info_provider_;
-  ProductInfoProvider product_info_provider_;
-  CurrentChannelProvider current_channel_provider_;
-  IntlProvider intl_provider_;
   std::unique_ptr<CachedAsyncAnnotationProvider> device_id_provider_;
-  TargetChannelProvider target_channel_provider_;
-  UIStateProvider ui_state_provider_;
+
+  // These providers may not be constructed if they're not needed.
+  std::unique_ptr<TimeProvider> time_provider_;
+  std::unique_ptr<BoardInfoProvider> board_info_provider_;
+  std::unique_ptr<ProductInfoProvider> product_info_provider_;
+  std::unique_ptr<CurrentChannelProvider> current_channel_provider_;
+  std::unique_ptr<IntlProvider> intl_provider_;
+  std::unique_ptr<TargetChannelProvider> target_channel_provider_;
+  std::unique_ptr<UIStateProvider> ui_state_provider_;
 
   AnnotationManager annotation_manager_;
 };

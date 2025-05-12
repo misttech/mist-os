@@ -11,6 +11,7 @@
 
 #include <map>
 #include <memory>
+#include <utility>
 #include <vector>
 
 namespace forensics::feedback {
@@ -74,7 +75,8 @@ AnnotationManager::AnnotationManager(
     const std::vector<DynamicSyncAnnotationProvider*> dynamic_sync_providers,
     const std::vector<StaticAsyncAnnotationProvider*> static_async_providers,
     const std::vector<CachedAsyncAnnotationProvider*> cached_async_providers,
-    const std::vector<DynamicAsyncAnnotationProvider*> dynamic_async_providers)
+    const std::vector<DynamicAsyncAnnotationProvider*> dynamic_async_providers,
+    const std::set<std::string>& product_exclude_list)
     : dispatcher_(dispatcher),
       allowlist_(std::move(allowlist)),
       static_annotations_(),
@@ -110,6 +112,11 @@ AnnotationManager::AnnotationManager(
   }
 
   InsertUnique(static_annotations, allowlist_, &static_annotations_);
+
+  for (const std::string& annotation : product_exclude_list) {
+    FX_CHECK(!static_annotations_.contains(annotation)) << "Attempting to re-insert " << annotation;
+    static_annotations_.insert({annotation, ErrorOrString(Error::kNotAvailableInProduct)});
+  }
 
   // Create a weak pointer because |this| isn't guaranteed to outlive providers.
   auto self = ptr_factory_.GetWeakPtr();

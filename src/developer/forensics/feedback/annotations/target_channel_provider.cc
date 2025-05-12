@@ -20,10 +20,14 @@ Annotations TargetChannelToAnnotations::operator()(const Error error) {
   };
 }
 
-std::set<std::string> TargetChannelProvider::GetKeys() const {
+std::set<std::string> TargetChannelProvider::GetAnnotationKeys() {
   return {
       kSystemUpdateChannelTargetKey,
   };
+}
+
+std::set<std::string> TargetChannelProvider::GetKeys() const {
+  return TargetChannelProvider::GetAnnotationKeys();
 }
 
 }  // namespace forensics::feedback
