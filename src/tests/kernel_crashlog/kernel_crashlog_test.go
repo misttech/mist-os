@@ -125,7 +125,7 @@ func TestKernelCrashlog(t *testing.T) {
 // See that when the kernel crashes because of an assert failure the crashlog contains the assert
 // message.
 func TestKernelCrashlogAssert(t *testing.T) {
-	i := testCommon(t, "k crash_assert", "ZIRCON KERNEL PANIC", "KERNEL PANIC")
+	i := testCommon(t, "k crash assert", "ZIRCON KERNEL PANIC", "KERNEL PANIC")
 	// Similar checks to a non-assert crash, except that we expect a panic buffer
 	// with the details of the assert now, and no registers.
 	i.WaitForLogMessage("VERSION")

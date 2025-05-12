@@ -43,16 +43,6 @@ static int cmd_memtest(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_copy_mem(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_sleep(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_crash(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_stackstomp(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_recurse(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_crash_user_read(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_crash_user_execute(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_crash_pmm_use_after_free(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_crash_assert(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_crash_stack_guard(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_crash_illegal_instruction(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_crash_break_instruction(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_crash_syscall_instruction(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_build_instrumentation(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_pop(int argc, const cmd_args* argv, uint32_t flags);
 
@@ -70,21 +60,6 @@ STATIC_COMMAND_MASKED("fb", "fill range of memory by byte", &cmd_fill_mem, CMD_A
 STATIC_COMMAND_MASKED("mc", "copy a range of memory", &cmd_copy_mem, CMD_AVAIL_ALWAYS)
 STATIC_COMMAND("mtest", "simple memory test", &cmd_memtest)
 STATIC_COMMAND("crash", "intentionally crash", &cmd_crash)
-STATIC_COMMAND("crash_stackstomp", "intentionally overrun the stack", &cmd_stackstomp)
-STATIC_COMMAND("crash_recurse", "intentionally overrun the stack by recursing", &cmd_recurse)
-STATIC_COMMAND("crash_user_read", "intentionally read user memory", &cmd_crash_user_read)
-STATIC_COMMAND("crash_user_execute", "intentionally execute user memory", &cmd_crash_user_execute)
-STATIC_COMMAND("crash_pmm_use_after_free", "intentionally corrupt the pmm free list",
-               &cmd_crash_pmm_use_after_free)
-STATIC_COMMAND("crash_assert", "intentionally crash by failing an assert", &cmd_crash_assert)
-STATIC_COMMAND("crash_stack_guard", "attempt to crash by overwriting the stack guard",
-               &cmd_crash_stack_guard)
-STATIC_COMMAND("crash_illegal_instruction", "attempt to crash by running an illegal instruction",
-               &cmd_crash_illegal_instruction)
-STATIC_COMMAND("crash_break_instruction", "attempt to crash by running a break isntruction",
-               &cmd_crash_break_instruction)
-STATIC_COMMAND("crash_syscall_instruction", "attempt to crash by running a syscall isntruction",
-               &cmd_crash_syscall_instruction)
 STATIC_COMMAND("sleep", "sleep number of seconds", &cmd_sleep)
 STATIC_COMMAND("sleepm", "sleep number of milliseconds", &cmd_sleep)
 STATIC_COMMAND(
@@ -356,15 +331,14 @@ static int crash_thread(void*) {
   return 0;
 }
 
-static int cmd_crash(int argc, const cmd_args* argv, uint32_t flags) {
-  if (argc > 1) {
-    if (!strcmp(argv[1].str, "thread")) {
-      Thread* t = Thread::Create("crasher", &crash_thread, NULL, DEFAULT_PRIORITY);
-      t->Resume();
+static int crash_deref(bool thread) {
+  if (thread) {
+    Thread* t = Thread::Create("crasher", &crash_thread, NULL, DEFAULT_PRIORITY);
+    t->Resume();
 
-      t->Join(NULL, ZX_TIME_INFINITE);
-      return 0;
-    }
+    t->Join(NULL, ZX_TIME_INFINITE);
+
+    return 0;
   }
 
   crash_thread(nullptr);
@@ -382,7 +356,7 @@ __attribute__((noinline)) static int recurse(void* _func) {
   return func(_func) + 1;
 }
 
-static int cmd_recurse(int argc, const cmd_args* argv, uint32_t flags) {
+static int crash_recurse() {
   recurse(reinterpret_cast<void*>(&recurse));
 
   printf("survived.\n");
@@ -398,7 +372,7 @@ __attribute__((noinline)) static void stomp_stack(size_t size) {
   Thread::Current::SleepRelative(ZX_USEC(1));
 }
 
-static int cmd_stackstomp(int argc, const cmd_args* argv, uint32_t flags) {
+static int crash_stackstomp() {
   for (size_t i = 0; i < DEFAULT_STACK_SIZE * 2; i++)
     stomp_stack(i);
 
@@ -434,7 +408,7 @@ static bool has_user_code_execution_protection() {
 #endif
 }
 
-static int cmd_crash_user_execute(int argc, const cmd_args* argv, uint32_t flags) {
+static int crash_user_execute() {
   if (!has_user_code_execution_protection()) {
     printf(
         "missing protection to avoid executing userspace code from a privileged context; will not "
@@ -505,7 +479,7 @@ static int cmd_crash_user_execute(int argc, const cmd_args* argv, uint32_t flags
 // Marked with NO_ASAN because this will be called with a pointer to user memory.
 NO_ASAN static uint8_t read_byte(const uint8_t* p) { return *p; }
 
-static int cmd_crash_user_read(int argc, const cmd_args* argv, uint32_t flags) {
+static int crash_user_read() {
 #if defined(__x86_64__)
   if (!g_x86_feature_has_smap) {
     printf("cpu does not support smap; will not crash.\n");
@@ -536,7 +510,7 @@ static int cmd_crash_user_read(int argc, const cmd_args* argv, uint32_t flags) {
   return -1;
 }
 
-static int cmd_crash_pmm_use_after_free(int argc, const cmd_args* argv, uint32_t flags) {
+static int crash_pmm_use_after_free() {
   // We want to corrupt one of the pages on the pmm's free list.  To do so, we'll allocate a bunch
   // of pages, keep track of the address of the last page, then free them all.  The free list is
   // LIFO so by allocating and freeing a bunch of pages we'll have a pointer "to the middle" and our
@@ -570,13 +544,13 @@ static int cmd_crash_pmm_use_after_free(int argc, const cmd_args* argv, uint32_t
   return -1;
 }
 
-static int cmd_crash_assert(int argc, const cmd_args* argv, uint32_t flags) {
+static int crash_assert() {
   constexpr int kValue = 42;
   ASSERT_MSG(kValue == 0, "value %d\n", kValue);
   return -1;
 }
 
-static int cmd_crash_stack_guard(int argc, const cmd_args* argv, uint32_t flags) {
+static int crash_stack_guard() {
   printf("attempting to crash\n");
   // Attempt to crash by overwriting the compiler-inserted stack guard.
   constexpr size_t kSize = 128;
@@ -586,7 +560,7 @@ static int cmd_crash_stack_guard(int argc, const cmd_args* argv, uint32_t flags)
   return -1;
 }
 
-static int cmd_crash_illegal_instruction(int argc, const cmd_args* argv, uint32_t flags) {
+static int crash_illegal_instruction() {
   printf("attempting to crash with an illegal instruction\n");
 #if defined(__riscv)
   __asm__ volatile("unimp");
@@ -601,7 +575,7 @@ static int cmd_crash_illegal_instruction(int argc, const cmd_args* argv, uint32_
   return 0;
 }
 
-static int cmd_crash_break_instruction(int argc, const cmd_args* argv, uint32_t flags) {
+static int crash_break_instruction() {
   printf("attempting to crash with a break instruction\n");
 #if defined(__riscv)
   __asm__ volatile("ebreak");
@@ -616,7 +590,7 @@ static int cmd_crash_break_instruction(int argc, const cmd_args* argv, uint32_t 
   return 0;
 }
 
-static int cmd_crash_syscall_instruction(int argc, const cmd_args* argv, uint32_t flags) {
+static int crash_syscall_instruction() {
   printf("attempting to crash with a syscall instruction\n");
 #if defined(__riscv)
   // Actually not a good idea, this will probably call into firmware with undefined args.
@@ -630,6 +604,65 @@ static int cmd_crash_syscall_instruction(int argc, const cmd_args* argv, uint32_
 #endif
 
   return 0;
+}
+
+static int cmd_crash(int argc, const cmd_args* argv, uint32_t flags) {
+  auto usage = [&]() {
+    printf("usage:\n");
+    printf("%s deref [thread]      : intentionally dereference an invalid pointer\n", argv[0].str);
+    printf("%s stackstomp          : intentionally overrun the stack\n", argv[0].str);
+    printf("%s recurse             : intentionally overrun the stack by recursing\n", argv[0].str);
+    printf("%s user_read           : intentionally read user memory\n", argv[0].str);
+    printf("%s user_execute        : intentionally execute user memory\n", argv[0].str);
+    printf("%s pmm_use_after_free  : intentionally corrupt the pmm free list\n", argv[0].str);
+    printf("%s assert              : intentionally crash by failing an assert\n", argv[0].str);
+    printf("%s stack_guard         : attempt to crash by overwriting the stack guard\n",
+           argv[0].str);
+    printf("%s illegal_instruction : attempt to crash by running an illegal instruction\n",
+           argv[0].str);
+    printf("%s break_instruction   : attempt to crash by running a break instruction\n",
+           argv[0].str);
+    printf("%s syscall_instruction : attempt to crash by running a syscall instruction\n",
+           argv[0].str);
+    return ZX_ERR_INTERNAL;
+  };
+
+  if (argc < 2) {
+    printf("not enough arguments\n");
+    return usage();
+  }
+  if (!strcmp(argv[1].str, "deref")) {
+    if (argc > 2 && !strcmp(argv[2].str, "thread")) {
+      return crash_deref(true);
+    } else {
+      return crash_deref(false);
+    }
+  } else if (!strcmp(argv[1].str, "stackstomp")) {
+    return crash_stackstomp();
+  } else if (!strcmp(argv[1].str, "recurse")) {
+    return crash_recurse();
+  } else if (!strcmp(argv[1].str, "user_read")) {
+    return crash_user_read();
+  } else if (!strcmp(argv[1].str, "user_execute")) {
+    return crash_user_execute();
+  } else if (!strcmp(argv[1].str, "pmm_use_after_free")) {
+    return crash_pmm_use_after_free();
+  } else if (!strcmp(argv[1].str, "assert")) {
+    return crash_assert();
+  } else if (!strcmp(argv[1].str, "stack_guard")) {
+    return crash_stack_guard();
+  } else if (!strcmp(argv[1].str, "illegal_instruction")) {
+    return crash_illegal_instruction();
+  } else if (!strcmp(argv[1].str, "break_instruction")) {
+    return crash_break_instruction();
+  } else if (!strcmp(argv[1].str, "syscall_instruction")) {
+    return crash_syscall_instruction();
+  } else {
+    printf("unknown command\n");
+    return usage();
+  }
+
+  return ZX_OK;
 }
 
 static int cmd_build_instrumentation(int argc, const cmd_args* argv, uint32_t flags) {
