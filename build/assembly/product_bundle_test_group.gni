@@ -29,8 +29,17 @@ import("//build/python/python_action.gni")
 #
 # Parameters:
 #
-#   tests (required)
+#   tests (optional; default=[])
+#     DEPRECATED: prefer target_tests or host_tests
 #     [list] List of targets to walk to find test specs.
+#
+#   target_tests (optional; default=[])
+#     [list] List of target targets to walk to find test specs.
+#     Either this or host_tests must be defined.
+#
+#   host_tests (optional; default=[])
+#     [list] List of host targets to walk to find test specs.
+#     Either this or target_tests must be defined.
 #
 #   product_bundle_name (optional; default = target_name)
 #     [str] The name of the product bundle to assign the tests to.
@@ -40,7 +49,9 @@ import("//build/python/python_action.gni")
 #     See //docs/contribute/testing/environments.md.
 #
 template("product_bundle_test_group") {
-  assert(defined(invoker.tests), "tests is a required parameter")
+  assert(defined(invoker.tests) || defined(invoker.target_tests) ||
+             defined(invoker.host_tests),
+         "Either 'tests' or 'target_tests' or 'host_tests' must be defined")
 
   # Ensure this template is only used in approved locations.
   # This ensures that they are resolved by gn-gen.
@@ -78,11 +89,25 @@ template("product_bundle_test_group") {
 
     generated_file(target_name) {
       testonly = true
-      deps = invoker.tests
       data_keys = [ "tests" ]
       walk_keys = [ "tests_barrier" ]
       outputs = [ _tests_json ]
       output_conversion = "json"
+
+      deps = []
+      if (defined(invoker.tests)) {
+        deps += invoker.tests
+      }
+      if (defined(invoker.target_tests)) {
+        deps += invoker.target_tests
+      }
+      if (defined(invoker.host_tests)) {
+        foreach(host_test, invoker.host_tests) {
+          host_test_label = get_label_info(host_test, "label_no_toolchain") +
+                            "($host_toolchain)"
+          deps += [ host_test_label ]
+        }
+      }
 
       metadata = {
         tests_barrier = []

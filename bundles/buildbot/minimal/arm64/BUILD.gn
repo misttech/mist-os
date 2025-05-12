@@ -8,5 +8,5 @@ import("//build/testing/environments.gni")
 product_bundle_test_group("arm64") {
   product_bundle_name = "minimal.arm64"
   environments = [ qemu_env ]
-  tests = [ "//examples:hermetic_tests($default_toolchain)" ]
+  tests = [ "//examples:hermetic_tests" ]
 }
