@@ -86,6 +86,6 @@ rust_library(
         "//third_party/rust_crates/vendor/crossbeam-deque-0.8.1:crossbeam_deque",
         "//third_party/rust_crates/vendor/crossbeam-epoch-0.9.4:crossbeam_epoch",
         "//third_party/rust_crates/vendor/crossbeam-queue-0.3.1:crossbeam_queue",
-        "//third_party/rust_crates/vendor/crossbeam-utils-0.8.14:crossbeam_utils",
+        "//third_party/rust_crates/vendor/crossbeam-utils-0.8.21:crossbeam_utils",
     ],
 )

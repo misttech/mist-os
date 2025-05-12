@@ -210,7 +210,7 @@ group("crossbeam-channel") {
 }
 
 group("crossbeam-utils") {
-  public_deps = [ ":crossbeam-utils-v0_8_14" ]
+  public_deps = [ ":crossbeam-utils-v0_8_21" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -3741,7 +3741,7 @@ rust_library("concurrent-queue-v2_5_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":crossbeam-utils-v0_8_14" ]
+  deps += [ ":crossbeam-utils-v0_8_21" ]
 
   rustenv = []
 
@@ -4058,7 +4058,7 @@ rust_library("crossbeam-v0_8_0") {
   deps += [ ":crossbeam-deque-v0_8_1" ]
   deps += [ ":crossbeam-epoch-v0_9_4" ]
   deps += [ ":crossbeam-queue-v0_3_1" ]
-  deps += [ ":crossbeam-utils-v0_8_14" ]
+  deps += [ ":crossbeam-utils-v0_8_21" ]
 
   rustenv = []
 
@@ -4099,7 +4099,7 @@ rust_library("crossbeam-channel-v0_5_1") {
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":crossbeam-utils-v0_8_14" ]
+  deps += [ ":crossbeam-utils-v0_8_21" ]
 
   rustenv = []
 
@@ -4136,7 +4136,7 @@ rust_library("crossbeam-deque-v0_8_1") {
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":crossbeam-epoch-v0_9_4" ]
-  deps += [ ":crossbeam-utils-v0_8_14" ]
+  deps += [ ":crossbeam-utils-v0_8_21" ]
 
   rustenv = []
 
@@ -4173,7 +4173,7 @@ rust_library("crossbeam-epoch-v0_9_4") {
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":crossbeam-utils-v0_8_14" ]
+  deps += [ ":crossbeam-utils-v0_8_21" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":memoffset-v0_6_3" ]
   deps += [ ":scopeguard-v1_2_0" ]
@@ -4213,7 +4213,7 @@ rust_library("crossbeam-queue-v0_3_1") {
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":crossbeam-utils-v0_8_14" ]
+  deps += [ ":crossbeam-utils-v0_8_21" ]
 
   rustenv = []
 
@@ -4231,38 +4231,37 @@ rust_library("crossbeam-queue-v0_3_1") {
   applicable_licenses = [ ":crossbeam-queue-v0_3_1.license" ]
 }
 
-license("crossbeam-utils-v0_8_14.license") {
+license("crossbeam-utils-v0_8_21.license") {
   public_package_name = "crossbeam_utils"
   license_files = [
-    "//third_party/rust_crates/vendor/crossbeam-utils-0.8.14/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/crossbeam-utils-0.8.14/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/crossbeam-utils-0.8.21/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/crossbeam-utils-0.8.21/LICENSE-MIT",
   ]
 }
 
-rust_library("crossbeam-utils-v0_8_14") {
+rust_library("crossbeam-utils-v0_8_21") {
   crate_name = "crossbeam_utils"
   crate_root =
-      "//third_party/rust_crates/vendor/crossbeam-utils-0.8.14/src/lib.rs"
-  output_name = "crossbeam_utils-d51f793976478e1e"
+      "//third_party/rust_crates/vendor/crossbeam-utils-0.8.21/src/lib.rs"
+  output_name = "crossbeam_utils-259cf836410df467"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":cfg-if-v1_0_0" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=d51f793976478e1e",
-    "-Cextra-filename=-d51f793976478e1e",
+    "--edition=2021",
+    "-Cmetadata=259cf836410df467",
+    "-Cextra-filename=-259cf836410df467",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":crossbeam-utils-v0_8_14.license" ]
+  applicable_licenses = [ ":crossbeam-utils-v0_8_21.license" ]
 }
 
 license("crossterm-v0_19_0.license") {
@@ -13082,7 +13081,7 @@ rust_library("rayon-core-v1_12_1") {
 
   deps = []
   deps += [ ":crossbeam-deque-v0_8_1" ]
-  deps += [ ":crossbeam-utils-v0_8_14" ]
+  deps += [ ":crossbeam-utils-v0_8_21" ]
 
   rustenv = []
 
@@ -13584,7 +13583,7 @@ rust_library("ringbuf-v0_4_4") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":crossbeam-utils-v0_8_14" ]
+  deps += [ ":crossbeam-utils-v0_8_21" ]
 
   rustenv = []
 

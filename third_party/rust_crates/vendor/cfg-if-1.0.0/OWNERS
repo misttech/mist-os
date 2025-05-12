@@ -17,7 +17,6 @@ include /third_party/rust_crates/vendor/crossbeam-channel-0.5.1/OWNERS
 include /third_party/rust_crates/vendor/crossbeam-deque-0.8.1/OWNERS
 include /third_party/rust_crates/vendor/crossbeam-epoch-0.9.4/OWNERS
 include /third_party/rust_crates/vendor/crossbeam-queue-0.3.1/OWNERS
-include /third_party/rust_crates/vendor/crossbeam-utils-0.8.14/OWNERS
 include /third_party/rust_crates/vendor/filetime-0.2.14/OWNERS
 include /third_party/rust_crates/vendor/getrandom-0.2.10/OWNERS
 include /third_party/rust_crates/vendor/half-2.4.1/OWNERS

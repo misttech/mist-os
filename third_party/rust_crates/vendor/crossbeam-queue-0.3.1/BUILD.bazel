@@ -77,6 +77,6 @@ rust_library(
     version = "0.3.1",
     deps = [
         "//third_party/rust_crates/vendor/cfg-if-1.0.0:cfg_if",
-        "//third_party/rust_crates/vendor/crossbeam-utils-0.8.14:crossbeam_utils",
+        "//third_party/rust_crates/vendor/crossbeam-utils-0.8.21:crossbeam_utils",
     ],
 )

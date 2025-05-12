@@ -84,7 +84,7 @@ crc = "1.8.1"
 criterion = { version = "0.2", default-features = false }
 crossbeam = "0.8.0"
 crossbeam-channel = "0.5.1"
-crossbeam-utils = "0.8.14"
+crossbeam-utils = "0.8.21"
 crypto-common = "0.1.6"
 csv = "1.3.1"
 darling = "0.20.11"
@@ -562,7 +562,7 @@ env_vars = ["OUT_DIR=../../../compat/crc"]
 [gn.package.crc32fast."1.2.0"]
 rustflags = ["--cfg=crc32fast_stdarchx86"]
 
-[gn.package.crossbeam-utils."0.8.14"]
+[gn.package.crossbeam-utils."0.8.21"]
 rustflags = []
 
 [gn.package.crunchy."0.2.3"]
