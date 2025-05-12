@@ -160,7 +160,6 @@ template("sdk_source_set") {
                              "category",
                              "sdk_area",
                              "include_base",
-                             "metadata",
                              "non_sdk_deps",
                              "non_sdk_public_deps",
                              "non_sdk_local_deps",
@@ -204,12 +203,6 @@ template("sdk_source_set") {
     }
 
     configs += [ "//build/config:sdk_extra_warnings" ]
-
-    metadata = {
-      if (defined(invoker.metadata)) {
-        forward_variables_from(invoker.metadata, "*")
-      }
-    }
   }
 
   # Walk over dependencies (deps and public_deps) and collect their names (dep_names), labels (all_deps), labels of corresponding

@@ -230,10 +230,8 @@ template("sdk_shared_library") {
       configs += [ "//build/config/fuchsia:no_cpp_standard_library" ]
     }
 
+    assert(!defined(metadata))
     metadata = {
-      if (defined(invoker.metadata)) {
-        forward_variables_from(invoker.metadata, "*")
-      }
       if (is_fuchsia) {
         # Used by sdk_verify_runtime_deps() template.
         sdk_runtime_deps = [

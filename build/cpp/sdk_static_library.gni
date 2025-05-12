@@ -183,12 +183,6 @@ template("sdk_static_library") {
       configs += [ "//build/config/fuchsia:no_cpp_standard_library" ]
     }
 
-    metadata = {
-      if (defined(invoker.metadata)) {
-        forward_variables_from(invoker.metadata, "*")
-      }
-    }
-
     # Ensure that 'sdk_static_library()' targets are included in the allowlist.
     # The allowlist target's `visibility` list ensures that the target using
     # this template is in the allowlist.
