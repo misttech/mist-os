@@ -35,7 +35,7 @@ import("//build/sdk/sdk_atom.gni")
 #     If not specified, the path will be "<sdk_name>.api".
 #     Not allowed when `stable` is false.
 #
-#   sdk_name (required for non-internal libraries)
+#   sdk_name (required)
 #     Name of the library in the SDK.
 #
 #   source_dir (optional)
@@ -84,6 +84,8 @@ import("//build/sdk/sdk_atom.gni")
 #
 template("sdk_source_set") {
   assert(defined(invoker.category), "Must define an SDK category")
+  assert(defined(invoker.sdk_name),
+         "Must specify a name that is meaningful in the IDK context.")
 
   valid_categories = [
     # "internal" is deprecated; only specific legacy cases below are allowed.
@@ -109,26 +111,8 @@ template("sdk_source_set") {
           valid_categories || make_internal_atom,
       "'${target_name}' has unsupported SDK category '${invoker.category}'. Must be one of ${valid_categories}.")
 
-  # Internal source sets may also specify an sdk_name.
-  assert(
-      defined(invoker.sdk_name) || make_internal_atom,
-      "Source sets in the IDK must specify a name that is meaningful in that context.")
-
-  if (defined(invoker.sdk_name)) {
-    sdk_name = invoker.sdk_name
-    sdk_root_path = "pkg/${sdk_name}"
-  } else {
-    # if not defined by the invoker, the sdk_name is the fully qualified target name with some tweaks. For example:
-    #    //src/lib/fxl:fxl            sdk_name = //src/lib/fxl_fxl          sdk_root_path= src/lib/fxl_fxl
-    #    //src/lib/fxl:functional     sdk_name = //src/lib/fxl_functional   sdk_root_path= src/lib/fxl_functional
-    #    //src/lib/fxl/files:files    sdk_name = //src/lib/fxl/files_files  sdk_root_path= src/lib/fxl/files_files
-    full_label = get_label_info(":${invoker.target_name}", "label_no_toolchain")
-    path = get_label_info(full_label, "dir")
-    path = "${path}_${invoker.target_name}"
-
-    sdk_name = path
-    sdk_root_path = string_replace(path, "//", "")
-  }
+  sdk_name = invoker.sdk_name
+  sdk_root_path = "pkg/${sdk_name}"
 
   sdk_id = "sdk://${sdk_root_path}"
 
