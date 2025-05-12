@@ -5,7 +5,6 @@
   </imports>
   <projects>
     <project name="third_party/dart-pkg"
-             gitsubmoduleof="fuchsia"
              path="third_party/dart-pkg/pub"
              remote="https://fuchsia.googlesource.com/third_party/dart-pkg"
              gerrithost="https://fuchsia-review.googlesource.com"

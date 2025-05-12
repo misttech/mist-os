@@ -132,7 +132,6 @@ for archive in "${sorted_archives[@]}"; do
   cat >>"${configfile}" <<-EOF
     <!-- ${pkg}-${version} -->
     <project name="third_party/pylibs/${pkg}"
-        gitsubmoduleof="fuchsia"
         path="third_party/pylibs/${pkg}/src"
         remote="https://fuchsia.googlesource.com/${path}"
         revision="$(echo "$matching_tag" | awk '{print $1}')"

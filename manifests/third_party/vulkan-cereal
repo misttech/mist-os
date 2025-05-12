@@ -2,7 +2,6 @@
 <manifest>
   <projects>
     <project name="third_party/android/device/generic/vulkan-cereal"
-             gitsubmoduleof="fuchsia"
              path="third_party/android/device/generic/vulkan-cereal"
              remote="https://fuchsia.googlesource.com/third_party/android/device/generic/vulkan-cereal"
              revision="bcf5b509ef92357aefa83acb134cc031427fe456"/>
