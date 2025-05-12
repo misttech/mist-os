@@ -154,12 +154,3 @@ open protocol Manager {
         count uint32;
     }) error zx.Status;
 };
-
-/// Interface for watching when bootup is complete, in which there are no more bind and driver start
-/// activity.
-@available(added=20, removed=21)
-@discoverable
-open protocol BootupWatcher {
-    // Waits for bootup to complete.
-    strict WaitForBootup() -> ();
-};
