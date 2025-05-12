@@ -205,77 +205,107 @@ mod tests {
     use storage_device::fake_device::FakeDevice;
 
     const BLOCK_SIZE: u32 = 4096;
+    const IMAGE_PATH: &str = "/pkg/data/simple_super.img.zstd";
 
     fn open_image(path: &Path) -> FakeDevice {
+        // If image changes at the file path, need to update the `verify_*` functions below that
+        // verifies the parser.
         let image = zstd::Decoder::new(std::fs::File::open(path).expect("open file failed"))
             .expect("decompress image failed");
         FakeDevice::from_image(image, BLOCK_SIZE).expect("create fake block device failed")
     }
 
-    #[fuchsia::test]
-    async fn test_parsing_metadata() {
-        let golden = std::path::Path::new("/pkg/data/simple_super.img.zstd");
-        let device = open_image(golden);
-
-        let super_partition = Metadata::load_from_device(device).await.expect("open device failed");
-
-        // Check geometry.
-        let max_size = super_partition.geometry.metadata_max_size;
-        let metadata_slot_count = super_partition.geometry.metadata_slot_count;
+    // Verify metadata geometry against the image at `IMAGE_PATH`.
+    fn verify_geometry(metadata: &Metadata) -> Result<(), Error> {
+        let geometry = metadata.geometry;
+        let max_size = geometry.metadata_max_size;
+        let metadata_slot_count = geometry.metadata_slot_count;
         assert_eq!(max_size, 65536);
         assert_eq!(metadata_slot_count, 1);
+        Ok(())
+    }
 
-        // Check header.
-        let num_partition_entries = super_partition.header.partitions.num_entries;
-        let num_extent_entries = super_partition.header.extents.num_entries;
+    // Verify metadata header against the image at `IMAGE_PATH`.
+    fn verify_header(metadata: &Metadata) -> Result<(), Error> {
+        let header = metadata.header;
+        let num_partition_entries = header.partitions.num_entries;
+        let num_extent_entries = header.extents.num_entries;
         assert_eq!(num_partition_entries, 2);
         assert_eq!(num_extent_entries, 1);
+        Ok(())
+    }
 
-        // Check partitions.
-        let partitions = super_partition.partitions;
+    // Verify metadata partitions table against the image at `IMAGE_PATH`.
+    fn verify_partitions_table(metadata: &Metadata) -> Result<(), Error> {
+        let partitions = &metadata.partitions;
+        // The first entry in the partitions table is "system".
         let expected_name = "system".to_string();
         let partition_name = String::from_utf8(partitions[0].name.to_vec())
             .expect("failed to convert partition entry name to string");
         assert_eq!(partition_name[..expected_name.len()], expected_name);
         let partition_attributes = partitions[0].attributes;
         assert_eq!(partition_attributes, PartitionAttributes::READONLY);
+        let system_partition_extent_index = partitions[0].first_extent_index;
+        let system_partition_num_extents = partitions[0].num_extents;
+        assert_eq!(system_partition_extent_index, 0);
+        assert_eq!(system_partition_num_extents, 1);
 
+        // The next entry in the partitions table is "system_ext".
         let expected_name = "system_ext".to_string();
         let partition_name = String::from_utf8(partitions[1].name.to_vec())
             .expect("failed to convert partition entry name to string");
         assert_eq!(partition_name[..expected_name.len()], expected_name);
         let partition_attributes = partitions[1].attributes;
         assert_eq!(partition_attributes, PartitionAttributes::READONLY);
+        Ok(())
+    }
 
-        // "System" partition owns one extent starting at the 0-th extent index.
-        let system_partition_extent_index = partitions[0].first_extent_index;
-        let system_partition_num_extents = partitions[0].num_extents;
-        assert_eq!(system_partition_extent_index, 0);
-        assert_eq!(system_partition_num_extents, 1);
-
-        // Check extents - the simple super image has a "system" partition of size 4096 bytes.
-        let num_sectors = super_partition.extents[0].num_sectors;
+    // Verify metadata extents table against the image at `IMAGE_PATH`.
+    fn verify_extents_table(metadata: &Metadata) -> Result<(), Error> {
+        // The simple super image has a "system" partition of size 4096 bytes. This extent entry
+        // refers to the extent used by that partition.
+        let num_sectors = metadata.extents[0].num_sectors;
         assert_eq!(num_sectors * SECTOR_SIZE as u64, 4096);
+        Ok(())
+    }
 
-        // Expect to see one group "default" of unlimited maximum size.
-        assert_eq!(super_partition.partition_groups.len(), 1);
-        let group = super_partition.partition_groups[0];
-        let expected_group_name = "default".to_string();
-        let group_name = String::from_utf8(group.name.to_vec())
+    // Verify metadata partition groups table against the image at `IMAGE_PATH`.
+    fn verify_partition_groups_table(metadata: &Metadata) -> Result<(), Error> {
+        // Expect to see one group, "default", of unlimited maximum size.
+        assert_eq!(metadata.partition_groups.len(), 1);
+        let group = metadata.partition_groups[0];
+        let expected_name = "default".to_string();
+        let name = String::from_utf8(group.name.to_vec())
             .expect("failed to convert partition group name to string");
-        assert_eq!(group_name[..expected_group_name.len()], expected_group_name);
+        assert_eq!(name[..expected_name.len()], expected_name);
         let maximum_size = group.maximum_size;
         assert_eq!(maximum_size, 0);
+        Ok(())
+    }
 
-        let expected_partition_name = "super".to_string();
-        let block_device_partition_name =
-            String::from_utf8(super_partition.block_devices[0].partition_name.to_vec())
-                .expect("failed to convert partition entry name to string");
-        assert_eq!(
-            block_device_partition_name[..expected_partition_name.len()],
-            expected_partition_name
-        );
-        let device_size = super_partition.block_devices[0].size;
+    // Verify metadata block devices table against the image at `IMAGE_PATH`.
+    fn verify_block_devices_table(metadata: &Metadata) -> Result<(), Error> {
+        let block_devices = &metadata.block_devices;
+        let expected_name = "super".to_string();
+        let partition_name = String::from_utf8(block_devices[0].partition_name.to_vec())
+            .expect("failed to convert partition entry name to string");
+        assert_eq!(partition_name[..expected_name.len()], expected_name);
+        let device_size = block_devices[0].size;
         assert_eq!(device_size, 1073741824);
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_parsing_metadata() {
+        let device = open_image(std::path::Path::new(IMAGE_PATH));
+
+        let super_partition = Metadata::load_from_device(device).await.expect("open device failed");
+
+        verify_geometry(&super_partition).expect("incorrect geometry");
+        verify_header(&super_partition).expect("incorrect header");
+        verify_partitions_table(&super_partition).expect("incorrect partitions table");
+        verify_extents_table(&super_partition).expect("incorrect extents table");
+        verify_partition_groups_table(&super_partition).expect("incorrect partition groups table");
+        verify_block_devices_table(&super_partition).expect("incorrect block devices table");
     }
 }
