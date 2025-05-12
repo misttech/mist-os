@@ -245,14 +245,7 @@ template("sdk_static_library") {
   if (defined(invoker.include_base)) {
     include_base = invoker.include_base
   } else {
-    if (is_internal) {
-      # by default, we want internal SDK elements to have their include path similar when used through
-      # an SDK (eg Bazel SDk) or directly (GN/Ninja), so that source code doesn't need to be changed
-      # when switching from one to the other.
-      include_base = "//"
-    } else {
-      include_base = "include"
-    }
+    include_base = "include"
   }
 
   include_dest = "${sdk_root_path}/include"

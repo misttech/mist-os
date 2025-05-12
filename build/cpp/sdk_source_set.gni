@@ -79,7 +79,7 @@ import("//build/sdk/sdk_atom.gni")
 #     Whether this source library is stabilized.
 #     When true, an .api file is generated. When false, the atom is marked as
 #     unstable in the final IDK.
-#     Must be specified when `sdk_category` is defined and not "internal";
+#     Must be specified when `category` is defined and not "internal";
 #     otherwise, must not be specified.
 #
 template("sdk_source_set") {
@@ -247,17 +247,8 @@ template("sdk_source_set") {
   if (defined(invoker.include_base)) {
     include_base = invoker.include_base
   } else {
-    if (is_internal) {
-      # by default, we want internal SDK elements to have their include path similar when used through
-      # an SDK (eg Bazel SDk) or directly (GN/Ninja), so that source code doesn't need to be changed
-      # when switching from one to the other.
-      include_base = "//"
-    } else {
-      include_base = "include"
-    }
+    include_base = "include"
   }
-  assert(include_base != "")  # Work around for unused variable warning when
-                              # all_headers is empty
 
   include_dest = "${sdk_root_path}/include"
 
