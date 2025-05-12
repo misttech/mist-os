@@ -427,6 +427,13 @@
             to: "#session-manager",
         },
         {
+            protocol: "fuchsia.time.alarms.Wake",
+            from: "#timekeeper",
+            to: "#session-manager",
+            source_availability: "unknown",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.space.Manager",
                 "fuchsia.sys2.RealmExplorer.root",
