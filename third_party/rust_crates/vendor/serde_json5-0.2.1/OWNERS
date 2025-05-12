@@ -3,6 +3,7 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /build/OWNERS
+include /src/connectivity/network/tests/integration/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/developer/ffx/plugins/scrutiny/OWNERS
 include /src/diagnostics/OWNERS
@@ -11,8 +12,11 @@ include /src/diagnostics/tools/OWNERS
 include /src/fonts/OWNERS
 include /src/lib/assembly/OWNERS
 include /src/lib/assembly/component_manager_config/OWNERS
+include /src/lib/testing/expectation/OWNERS
 include /src/power/OWNERS
 include /src/security/lib/scrutiny/OWNERS
+include /src/starnix/OWNERS
+include /src/starnix/lib/selinux/OWNERS
 include /src/sys/lib/component_id_index/OWNERS
 include /tools/cmc/OWNERS
 include /tools/configc/OWNERS

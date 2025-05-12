@@ -23,10 +23,11 @@ include /src/lib/utf8_path/OWNERS
 include /src/media/audio/OWNERS
 include /src/security/lib/scrutiny/OWNERS
 include /src/starnix/tools/OWNERS
+include /src/sys/component_manager/OWNERS
 include /src/sys/lib/cm_config/OWNERS
 include /src/sys/lib/component_id_index/OWNERS
+include /src/sys/lib/routing/OWNERS
 include /src/sys/pkg/OWNERS
-include /src/sysmem/OWNERS
 include /third_party/rust_crates/vendor/cargo_metadata-0.18.1/OWNERS
 include /third_party/rust_crates/vendor/pathdiff-0.2.1/OWNERS
 include /tools/OWNERS

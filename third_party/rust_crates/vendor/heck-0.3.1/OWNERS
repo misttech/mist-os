@@ -2,6 +2,8 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
+include /src/connectivity/network/tests/fidl/OWNERS
+include /src/connectivity/network/tests/integration/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/devices/lib/OWNERS
 include /src/devices/tools/fidlgen_banjo/OWNERS

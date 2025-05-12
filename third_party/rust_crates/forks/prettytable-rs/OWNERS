@@ -11,4 +11,5 @@ include /src/developer/ffx/plugins/profile/memory/OWNERS
 include /src/developer/ffx/plugins/repository/OWNERS
 include /src/developer/ffx/plugins/target/repository/OWNERS
 include /src/developer/ffx/tools/bluetooth/OWNERS
+include /src/storage/OWNERS
 include /src/sys/lib/component_debug/OWNERS

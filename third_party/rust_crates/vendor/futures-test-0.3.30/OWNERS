@@ -2,3 +2,6 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
+include /src/lib/async-utils/OWNERS
+include /src/lib/fidl/OWNERS
+include /src/lib/fuchsia-async/OWNERS
