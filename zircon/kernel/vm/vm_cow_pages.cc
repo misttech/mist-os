@@ -7461,6 +7461,14 @@ VmCowPages::DeferredOps::~DeferredOps() {
     LockedPtr self(self_, VmLockAcquireMode::First);
     VmCowPages::RangeChangeUpdateCowChildren(ktl::move(self), range_op_->range, range_op_->op);
   }
+  if (page_source_lock_.has_value()) {
+    // When dropping the page_source_lock as we could be holding the last references to the object
+    // the mutex must be released first, prior to potentially destroying the object by releasing the
+    // refptr.
+    page_source_lock_->first.Release();
+    page_source_lock_->second.reset();
+    page_source_lock_.reset();
+  }
   // The pages must be freed *after* any range update is performed.
   freed_list_.FreePages(self_);
 }
