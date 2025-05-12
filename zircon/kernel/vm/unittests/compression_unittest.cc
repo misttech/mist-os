@@ -6,8 +6,11 @@
 
 #include <lib/fit/defer.h>
 
+#include <cstddef>
+
 #include <ktl/variant.h>
 #include <vm/lz4_compressor.h>
+#include <vm/slot_page_storage.h>
 #include <vm/tri_page_storage.h>
 
 #include "test_helper.h"
@@ -96,14 +99,24 @@ void write_pattern(vm_page_t* page, size_t len, uint64_t offset) {
 
 bool validate_pattern(const void* data, size_t len, uint64_t offset) {
   for (size_t i = 0; i < len; i++) {
-    if (static_cast<const uint8_t*>(data)[i] != static_cast<uint8_t>((i + offset % 256))) {
+    if (static_cast<const uint8_t*>(data)[i] != static_cast<uint8_t>((i + offset) % 256)) {
       return false;
     }
   }
   return true;
 }
 
-VmCompressedStorage::CompressedRef store(VmTriPageStorage& storage, vm_page_t* page, size_t len) {
+bool validate_pattern_ref(VmCompressedStorage& storage, VmCompressedStorage::CompressedRef ref,
+                          size_t expected_len, uint64_t offset) {
+  auto [data, metadata, size] = storage.CompressedData(ref);
+  if (size != expected_len) {
+    return false;
+  }
+  return validate_pattern(data, size, offset);
+}
+
+VmCompressedStorage::CompressedRef store(VmCompressedStorage& storage, vm_page_t* page,
+                                         size_t len) {
   auto [maybe_ref, return_page] = storage.Store(page, len);
   if (return_page) {
     pmm_free_page(return_page);
@@ -112,7 +125,7 @@ VmCompressedStorage::CompressedRef store(VmTriPageStorage& storage, vm_page_t* p
   return *maybe_ref;
 }
 
-VmCompressedStorage::CompressedRef store_pattern(VmTriPageStorage& storage, size_t len,
+VmCompressedStorage::CompressedRef store_pattern(VmCompressedStorage& storage, size_t len,
                                                  uint64_t offset) {
   vm_page_t* page = nullptr;
 
@@ -409,6 +422,36 @@ bool tri_page_storage_small_storage() {
   END_TEST;
 }
 
+bool slot_page_storage_size_rounding() {
+  BEGIN_TEST;
+
+  VmSlotPageStorage storage;
+
+  constexpr size_t kNumItems = 5;
+  constexpr size_t items[kNumItems] = {64, 128, 63, 1, 65};
+
+  // Store items that are a perfectly multiple of the slot size, as well as +/- 1 byte, to ensure
+  // that the correct number of slots is used and the remainder is calculated correctly.
+  VmCompressedStorage::CompressedRef refs[kNumItems] = {
+      store_pattern(storage, items[0], 0), store_pattern(storage, items[1], 1),
+      store_pattern(storage, items[2], 2), store_pattern(storage, items[3], 3),
+      store_pattern(storage, items[4], 4)};
+
+  // So far should have used 7 slots to store our 5 items. Using the remaining 57 slots should not
+  // cause us to need a second storage page.
+  VmCompressedStorage::CompressedRef padding = store_pattern(storage, 57ul * 64, 5);
+  EXPECT_EQ(storage.GetInternalMemoryUsage().data_bytes, static_cast<size_t>(PAGE_SIZE));
+
+  for (size_t i = 0; i < kNumItems; i++) {
+    EXPECT_TRUE(validate_pattern_ref(storage, refs[i], items[i], i));
+  }
+
+  ktl::ranges::for_each(refs, [&storage](auto& r) { storage.Free(r); });
+  storage.Free(padding);
+
+  END_TEST;
+}
+
 // Test that the high-level compression-deconmpression flow preserves page data and metadata.
 bool compression_smoke_test() {
   BEGIN_TEST;
@@ -648,6 +691,7 @@ VM_UNITTEST(tri_page_storage_optimal_bucket)
 VM_UNITTEST(tri_page_storage_capacity)
 VM_UNITTEST(tri_page_storage_maxmize_free_space)
 VM_UNITTEST(tri_page_storage_small_storage)
+VM_UNITTEST(slot_page_storage_size_rounding)
 VM_UNITTEST(compression_smoke_test)
 VM_UNITTEST(compression_zero_test)
 VM_UNITTEST(compression_fail_test)

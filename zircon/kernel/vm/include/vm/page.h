@@ -104,15 +104,24 @@ struct vm_page {
     } __PACKED object;  // attached to a vm object
     struct {
       // Tracks user-provided metadata for the item in each of the possible buckets.
-      uint32_t left_metadata;
-      uint32_t mid_metadata;
-      uint32_t right_metadata;
+      union {
+        struct {
+          uint32_t left_metadata;
+          uint32_t mid_metadata;
+          uint32_t right_metadata;
 
-      // Used by the VmTriPageStorage allocator to record the size of the item in each of the
-      // possible buckets. See it for more details.
-      uint16_t left_compress_size;
-      uint16_t mid_compress_size;
-      uint16_t right_compress_size;
+          // Used by the VmTriPageStorage allocator to record the size of the item in each of the
+          // possible buckets. See it for more details.
+          uint16_t left_compress_size;
+          uint16_t mid_compress_size;
+          uint16_t right_compress_size;
+        } __PACKED;
+        struct {
+          // Used by the VmSlotPageStorage allocator to record free block information in the page.
+          // See it for more details.
+          uint64_t free_block_mask;
+        } __PACKED;
+      } __PACKED;
     } __PACKED zram;
     struct {
       // Optionally used by mmu code to count the number of valid mappings in this page if it is a

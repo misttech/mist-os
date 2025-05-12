@@ -98,7 +98,8 @@ template <>
 inline constexpr auto Enum<CompressionStorageStrategy> = [](auto&& Switch) {
   return Switch  //
       .Case("none", CompressionStorageStrategy::kNone)
-      .Case("tri_page", CompressionStorageStrategy::kTriPage);
+      .Case("tri_page", CompressionStorageStrategy::kTriPage)
+      .Case("slot", CompressionStorageStrategy::kSlot);
 };
 
 template <>

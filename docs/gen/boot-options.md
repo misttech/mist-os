@@ -824,13 +824,14 @@ This option selects the desired compression strategy to be used when a page need
 If `none` is set then `kernel.compression.storage-strategy` must also be `none`. Selecting `none`
 effectively disables compression.
 
-### kernel.compression.storage-strategy=\[none | tri_page\]
+### kernel.compression.storage-strategy=\[none | tri_page | slot\]
 
 **Default:** `none`
 
 Supported compression storage strategies are:
 - `none`
 - `tri_page`
+- `slot`
 
 This option selects the desired storage strategy to be used for storing data that has been
 compressed. If `none` is set then `kernel.compression.strategy` must also be `none`.

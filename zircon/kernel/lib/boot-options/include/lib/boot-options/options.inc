@@ -715,6 +715,7 @@ DEFINE_OPTION("kernel.compression.storage-strategy", CompressionStorageStrategy,
 Supported compression storage strategies are:
 - `none`
 - `tri_page`
+- `slot`
 
 This option selects the desired storage strategy to be used for storing data that has been
 compressed. If `none` is set then `kernel.compression.strategy` must also be `none`.
