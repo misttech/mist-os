@@ -288,14 +288,14 @@ if (!is_host) {
     idk_export_dir = "$root_build_dir/sdk/exported/fuchsia_idk_head_only"
   }
 
+  import("//sdk/generate_idk_targets.gni")
   import("//sdk/idk_contents.gni")
-  import("//sdk/idk_rules.gni")
 
   # Instantiate the target rules for the complete external IDK and the in-tree
   # IDK used by the in-tree Bazel SDK.
 
   # The Fuchsia IDK that is distributed to out-of-tree developers.
-  idk_rules("fuchsia") {
+  generate_idk_targets("fuchsia") {
     visibility = []
     visibility = [
       ":exported_collection_for_tool_goldens",
@@ -313,7 +313,7 @@ if (!is_host) {
 
   # The in-tree subset of the IDK that contains only those atoms needed for the
   # in-tree build and SDK.
-  idk_rules("in_tree") {
+  generate_idk_targets("in_tree") {
     visibility = []
     visibility = [
       ":bazel_in_tree_idk",

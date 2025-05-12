@@ -11,7 +11,7 @@ import("//build/sdk/sdk_collection.gni")
 # Template defining the targets used to build the  IDK.
 # When the target name is "fuchsia", all atoms will be built. Otherwise,
 # the subset needed for in-tree uses of the IDK will be built.
-template("idk_rules") {
+template("generate_idk_targets") {
   assert(defined(invoker.atoms_independent_of_api_level_and_cpu_arch))
   assert(defined(invoker.atoms_to_include_in_deprecated_arch_directory))
   assert(defined(invoker.dart_library))
