@@ -760,29 +760,33 @@ void KTraceImpl<BufferMode::kPerCpu>::ReportMetadata() {
   // Emit the FXT metadata records. These must be emitted on the boot CPU to ensure that they
   // are read at the very beginning of the trace.
   auto emit_starting_records = [](void* arg) {
+    // Emit the magic and initialization records.
     KTraceImpl<BufferMode::kPerCpu>* ktrace = static_cast<KTraceImpl<BufferMode::kPerCpu>*>(arg);
     zx_status_t status = fxt::WriteMagicNumberRecord(ktrace);
     DEBUG_ASSERT(status == ZX_OK);
     status = fxt::WriteInitializationRecord(ktrace, ticks_per_second());
     DEBUG_ASSERT(status == ZX_OK);
+
+    // Emit strings needed to improve readability, such as syscall names, to the trace buffer.
+    fxt::InternedString::RegisterStrings();
+
+    // Emit the KOIDs of each CPU to the trace buffer.
+    const uint32_t max_cpus = arch_max_num_cpus();
+    char name[32];
+    for (uint32_t i = 0; i < max_cpus; i++) {
+      snprintf(name, sizeof(name), "cpu-%u", i);
+      fxt::WriteKernelObjectRecord(ktrace, fxt::Koid(ktrace->cpu_context_map_.GetCpuKoid(i)),
+                                   ZX_OBJ_TYPE_THREAD, fxt::StringRef{name},
+                                   fxt::Argument{"process"_intern, kNoProcess});
+    }
   };
   const cpu_mask_t target_mask = cpu_num_to_mask(BOOT_CPU_ID);
   mp_sync_exec(MP_IPI_TARGET_MASK, target_mask, emit_starting_records, &GetInstance());
 
-  // Emit strings needed to improve readability, such as syscall names, to the trace buffer.
-  fxt::InternedString::RegisterStrings();
-
-  // Emit the KOIDs of each CPU to the trace buffer.
-  const uint32_t max_cpus = arch_max_num_cpus();
-  char name[32];
-  for (uint32_t i = 0; i < max_cpus; i++) {
-    snprintf(name, sizeof(name), "cpu-%u", i);
-    fxt::WriteKernelObjectRecord(&GetInstance(), fxt::Koid(cpu_context_map_.GetCpuKoid(i)),
-                                 ZX_OBJ_TYPE_THREAD, fxt::StringRef{name},
-                                 fxt::Argument{"process"_intern, kNoProcess});
-  }
-
-  // Emit the names of all live processes and threads to the trace buffer.
+  // Emit the names of all live processes and threads to the trace buffer. Note that these records
+  // will be inserted into the buffer associated with the CPU we're running on, which may not be
+  // the boot CPU. Fortunately for us, these process and thread names, unlike the other metadata
+  // records, do not need to exist before any records that reference them are emitted.
   ktrace_report_live_processes();
   ktrace_report_live_threads();
 }
