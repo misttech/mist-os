@@ -4,7 +4,10 @@
 
 use crate::util::cobalt_logger::log_cobalt_batch;
 use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
-use {fuchsia_async as fasync, wlan_legacy_metrics_registry as metrics};
+use {
+    fidl_fuchsia_power_battery as fidl_battery, fuchsia_async as fasync,
+    wlan_legacy_metrics_registry as metrics,
+};
 
 #[derive(Debug, PartialEq)]
 pub enum ScanResult {
@@ -16,20 +19,28 @@ pub enum ScanResult {
 pub struct ScanLogger {
     cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     scan_started_at: Option<fasync::BootInstant>,
+    on_battery: bool,
 }
 
 impl ScanLogger {
     pub fn new(cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy) -> Self {
-        Self { cobalt_proxy, scan_started_at: None }
+        Self { cobalt_proxy, scan_started_at: None, on_battery: false }
     }
 
     pub async fn handle_scan_start(&mut self) {
         self.scan_started_at = Some(fasync::BootInstant::now());
-        let metric_events = vec![MetricEvent {
+        let mut metric_events = vec![MetricEvent {
             metric_id: metrics::SCAN_OCCURRENCE_METRIC_ID,
             event_codes: vec![],
             payload: MetricEventPayload::Count(1),
         }];
+        if self.on_battery {
+            metric_events.push(MetricEvent {
+                metric_id: metrics::SCAN_OCCURRENCE_ON_BATTERY_METRIC_ID,
+                event_codes: vec![],
+                payload: MetricEventPayload::Count(1),
+            });
+        }
         log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_scan_start");
     }
 
@@ -75,6 +86,13 @@ impl ScanLogger {
             log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_scan_result");
         }
     }
+
+    pub async fn handle_battery_charge_status(
+        &mut self,
+        charge_status: fidl_battery::ChargeStatus,
+    ) {
+        self.on_battery = matches!(charge_status, fidl_battery::ChargeStatus::Discharging);
+    }
 }
 
 #[cfg(test)]
@@ -105,6 +123,18 @@ mod tests {
         );
     }
 
+    fn run_handle_battery_charge_status(
+        test_helper: &mut TestHelper,
+        scan_logger: &mut ScanLogger,
+        charge_status: fidl_battery::ChargeStatus,
+    ) {
+        let mut test_fut = pin!(scan_logger.handle_battery_charge_status(charge_status));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+    }
+
     #[fuchsia::test]
     fn test_handle_scan_start() {
         let mut test_helper = setup_test();
@@ -115,6 +145,43 @@ mod tests {
         let metrics = test_helper.get_logged_metrics(metrics::SCAN_OCCURRENCE_METRIC_ID);
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].payload, MetricEventPayload::Count(1));
+
+        let metrics = test_helper.get_logged_metrics(metrics::SCAN_OCCURRENCE_ON_BATTERY_METRIC_ID);
+        assert!(metrics.is_empty());
+    }
+
+    #[fuchsia::test]
+    fn test_handle_scan_start_on_battery() {
+        let mut test_helper = setup_test();
+        let mut scan_logger = ScanLogger::new(test_helper.cobalt_proxy.clone());
+
+        run_handle_battery_charge_status(
+            &mut test_helper,
+            &mut scan_logger,
+            fidl_battery::ChargeStatus::Discharging,
+        );
+        run_handle_scan_start(&mut test_helper, &mut scan_logger);
+
+        let metrics = test_helper.get_logged_metrics(metrics::SCAN_OCCURRENCE_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::Count(1));
+
+        let metrics = test_helper.get_logged_metrics(metrics::SCAN_OCCURRENCE_ON_BATTERY_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::Count(1));
+
+        // Set charge status to Charging and verify that scan_onccurrence_on_battery is not
+        // logged. This verifies that we do change back to off battery.
+        test_helper.clear_cobalt_events();
+        run_handle_battery_charge_status(
+            &mut test_helper,
+            &mut scan_logger,
+            fidl_battery::ChargeStatus::Charging,
+        );
+        run_handle_scan_start(&mut test_helper, &mut scan_logger);
+
+        let metrics = test_helper.get_logged_metrics(metrics::SCAN_OCCURRENCE_ON_BATTERY_METRIC_ID);
+        assert!(metrics.is_empty());
     }
 
     #[fuchsia::test]

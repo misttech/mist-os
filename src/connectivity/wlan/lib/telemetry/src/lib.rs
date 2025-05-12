@@ -10,8 +10,9 @@ use std::boxed::Box;
 use windowed_stats::experimental::serve::serve_time_matrix_inspection;
 use wlan_common::bss::BssDescription;
 use {
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync,
-    fuchsia_inspect_auto_persist as auto_persist, wlan_legacy_metrics_registry as metrics,
+    fidl_fuchsia_power_battery as fidl_battery, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fuchsia_async as fasync, fuchsia_inspect_auto_persist as auto_persist,
+    wlan_legacy_metrics_registry as metrics,
 };
 
 mod processors;
@@ -56,6 +57,7 @@ pub enum TelemetryEvent {
     SuspendImminent,
     /// Unclear power level requested by policy layer
     UnclearPowerDemand(UnclearPowerDemand),
+    BatteryChargeStatus(fidl_battery::ChargeStatus),
 }
 
 /// Attempts to connect to the Cobalt service.
@@ -185,7 +187,7 @@ pub fn serve_telemetry(
                             power_logger.handle_iface_disconnect(info.iface_id).await;
                         }
                         ClientConnectionsToggle { event } => {
-                            toggle_logger.log_toggle_event(event).await;
+                            toggle_logger.handle_toggle_event(event).await;
                         }
                         ClientIfaceCreated { iface_id } => {
                             client_iface_counters_logger.handle_iface_created(iface_id).await;
@@ -212,7 +214,10 @@ pub fn serve_telemetry(
                         UnclearPowerDemand(demand) => {
                             power_logger.handle_unclear_power_demand(demand).await;
                         }
-
+                        BatteryChargeStatus(charge_status) => {
+                            scan_logger.handle_battery_charge_status(charge_status).await;
+                            toggle_logger.handle_battery_charge_status(charge_status).await;
+                        }
                     }
                 }
                 _ = telemetry_interval.next() => {

@@ -7,7 +7,11 @@ use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
 use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
-use {fuchsia_async as fasync, wlan_legacy_metrics_registry as metrics, zx};
+use std::cmp::max;
+use {
+    fidl_fuchsia_power_battery as fidl_battery, fuchsia_async as fasync,
+    wlan_legacy_metrics_registry as metrics, zx,
+};
 
 pub const INSPECT_TOGGLE_EVENTS_LIMIT: usize = 20;
 const TIME_QUICK_TOGGLE_WIFI: zx::BootDuration = zx::BootDuration::from_seconds(5);
@@ -29,6 +33,9 @@ pub struct ToggleLogger {
     /// The last time wlan was toggled off, or None if it hasn't been. Used to determine if WLAN
     /// was turned on right after being turned off.
     time_stopped: Option<fasync::BootInstant>,
+    /// When the device was last on battery. This is not populated on init and when the device is
+    /// on charger.
+    on_battery_since: Option<fasync::BootInstant>,
 }
 
 impl ToggleLogger {
@@ -42,11 +49,19 @@ impl ToggleLogger {
         let current_state = None;
         let time_started = None;
         let time_stopped = None;
+        let on_battery_since = None;
 
-        Self { toggle_inspect_node, cobalt_proxy, current_state, time_started, time_stopped }
+        Self {
+            toggle_inspect_node,
+            cobalt_proxy,
+            current_state,
+            time_started,
+            time_stopped,
+            on_battery_since,
+        }
     }
 
-    pub async fn log_toggle_event(&mut self, event_type: ClientConnectionsToggleEvent) {
+    pub async fn handle_toggle_event(&mut self, event_type: ClientConnectionsToggleEvent) {
         // This inspect macro logs the time as well
         inspect_log!(self.toggle_inspect_node, {
             event_type: std::format!("{:?}", event_type)
@@ -93,6 +108,25 @@ impl ToggleLogger {
                             event_codes: vec![],
                             payload: MetricEventPayload::IntegerValue(duration.into_millis()),
                         });
+
+                        // If `on_battery_since` is `Some`, it indicates that we have been
+                        // on battery, as otherwise this Option would be cleared out in
+                        // `handle_battery_charge_status`
+                        //
+                        // Here we only handle the transition from connection-enabled +
+                        // on-battery state -> connection disabled. The other case
+                        // where we transition to on charger is handled in
+                        // `handle_battery_charge_status`
+                        if let Some(on_battery_since) = self.on_battery_since {
+                            // Get the max of `time_started` and `on_battery_since` as it was
+                            // when connection is enabled *and* device is on battery
+                            let duration = now - max(time_started, on_battery_since);
+                            metric_events.push(MetricEvent {
+                                metric_id: metrics::CLIENT_CONNECTION_ENABLED_DURATION_ON_BATTERY_METRIC_ID,
+                                event_codes: vec![],
+                                payload: MetricEventPayload::IntegerValue(duration.into_millis()),
+                            });
+                        }
                     }
                 }
             }
@@ -100,7 +134,45 @@ impl ToggleLogger {
         self.current_state = Some(event_type);
 
         if !metric_events.is_empty() {
-            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "log_toggle_events");
+            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_toggle_events");
+        }
+    }
+
+    pub async fn handle_battery_charge_status(
+        &mut self,
+        charge_status: fidl_battery::ChargeStatus,
+    ) {
+        let mut metric_events = vec![];
+        let now = fasync::BootInstant::now();
+        let on_battery_now = matches!(charge_status, fidl_battery::ChargeStatus::Discharging);
+
+        match (self.on_battery_since, on_battery_now) {
+            (None, true) => self.on_battery_since = Some(now),
+            (Some(on_battery_since), false) => {
+                let _on_battery_since = self.on_battery_since.take();
+                // Here we only handle the transition from connection-enabled *and*
+                // on-battery state -> on-charger state. The other case
+                // where we transition to connection disabled is handled in
+                // `handle_toggle_event`
+                if let Some(ClientConnectionsToggleEvent::Enabled) = self.current_state {
+                    if let Some(time_started) = self.time_started {
+                        // Get the max of `time_started` and `on_battery_since` as it was
+                        // when connection is enabled *and* device is on battery
+                        let duration = now - max(time_started, on_battery_since);
+                        metric_events.push(MetricEvent {
+                            metric_id:
+                                metrics::CLIENT_CONNECTION_ENABLED_DURATION_ON_BATTERY_METRIC_ID,
+                            event_codes: vec![],
+                            payload: MetricEventPayload::IntegerValue(duration.into_millis()),
+                        });
+                    }
+                }
+            }
+            _ => (),
+        }
+
+        if !metric_events.is_empty() {
+            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_battery_charge_status");
         }
     }
 }
@@ -121,13 +193,13 @@ mod tests {
         let mut toggle_logger = ToggleLogger::new(test_helper.cobalt_proxy.clone(), &node);
 
         let event = ClientConnectionsToggleEvent::Enabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         let event = ClientConnectionsToggleEvent::Disabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         let event = ClientConnectionsToggleEvent::Enabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         assert_data_tree!(test_helper.inspector, root: contains {
             wlan_mock_node: {
@@ -149,14 +221,26 @@ mod tests {
         });
     }
 
-    // Uses the test helper to run toggle_logger.log_toggle_event so that any cobalt metrics sent
-    // will be acked and not block anything. It expects no response from the log_toggle_event.
-    fn run_log_toggle_event(
+    // Uses the test helper to run toggle_logger.handle_toggle_event so that any cobalt metrics sent
+    // will be acked and not block anything. It expects no response from the handle_toggle_event.
+    fn run_handle_toggle_event(
         test_helper: &mut TestHelper,
         toggle_logger: &mut ToggleLogger,
         event: ClientConnectionsToggleEvent,
     ) {
-        let mut test_fut = pin!(toggle_logger.log_toggle_event(event));
+        let mut test_fut = pin!(toggle_logger.handle_toggle_event(event));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+    }
+
+    fn run_handle_battery_charge_status(
+        test_helper: &mut TestHelper,
+        toggle_logger: &mut ToggleLogger,
+        charge_status: fidl_battery::ChargeStatus,
+    ) {
+        let mut test_fut = pin!(toggle_logger.handle_battery_charge_status(charge_status));
         assert_eq!(
             test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
             Poll::Ready(())
@@ -172,18 +256,18 @@ mod tests {
         // Start with client connections enabled.
         let mut test_time = fasync::MonotonicInstant::from_nanos(123);
         let event = ClientConnectionsToggleEvent::Enabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         // Stop client connections and quickly start them again.
         test_time += fasync::MonotonicDuration::from_minutes(40);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Disabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         test_time += fasync::MonotonicDuration::from_seconds(1);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Enabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         // Check that a metric is logged for the quick stop and start.
         let logged_metrics =
@@ -207,18 +291,18 @@ mod tests {
         // Start with client connections enabled.
         let mut test_time = fasync::MonotonicInstant::from_nanos(123);
         let event = ClientConnectionsToggleEvent::Enabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         // Stop client connections and a while later start them again.
         test_time += fasync::MonotonicDuration::from_minutes(20);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Disabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         test_time += fasync::MonotonicDuration::from_minutes(30);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Enabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         // Check that no metric is logged for quick toggles since there was a while between the
         // stop and start.
@@ -238,24 +322,24 @@ mod tests {
         // Start with client connections enabled.
         let mut test_time = fasync::MonotonicInstant::from_nanos(123);
         let event = ClientConnectionsToggleEvent::Enabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         // Stop client connections and a while later stop them again.
         test_time += fasync::MonotonicDuration::from_minutes(40);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Disabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         test_time += fasync::MonotonicDuration::from_minutes(30);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Disabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         // Start client connections right after the last disable message.
         test_time += fasync::MonotonicDuration::from_seconds(1);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Enabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         // Check that no metric is logged since the enable message came a while after the first
         // disable message.
@@ -273,7 +357,7 @@ mod tests {
         // Start with client connections enabled.
         test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000));
         let event = ClientConnectionsToggleEvent::Enabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         let metrics =
             test_helper.get_logged_metrics(metrics::CLIENT_CONNECTION_ENABLED_OCCURRENCE_METRIC_ID);
@@ -285,7 +369,7 @@ mod tests {
         test_helper.clear_cobalt_events();
         test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(50_000_000));
         let event = ClientConnectionsToggleEvent::Enabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         let metrics =
             test_helper.get_logged_metrics(metrics::CLIENT_CONNECTION_ENABLED_OCCURRENCE_METRIC_ID);
@@ -296,11 +380,100 @@ mod tests {
         test_helper.clear_cobalt_events();
         test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(100_000_000));
         let event = ClientConnectionsToggleEvent::Disabled;
-        run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         let metrics =
             test_helper.get_logged_metrics(metrics::CLIENT_CONNECTION_ENABLED_DURATION_METRIC_ID);
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(90));
+        let metrics = test_helper
+            .get_logged_metrics(metrics::CLIENT_CONNECTION_ENABLED_DURATION_ON_BATTERY_METRIC_ID);
+        assert!(metrics.is_empty());
+    }
+
+    #[fuchsia::test]
+    fn test_log_client_connection_enabled_duration_on_battery_with_reenable() {
+        let mut test_helper = setup_test();
+        let inspect_node = test_helper.create_inspect_node("test_stats");
+        let mut toggle_logger = ToggleLogger::new(test_helper.cobalt_proxy.clone(), &inspect_node);
+
+        // Start with client connections enabled.
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000));
+        let event = ClientConnectionsToggleEvent::Enabled;
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
+
+        // Set on battery
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(30_000_000));
+        let charge_status = fidl_battery::ChargeStatus::Discharging;
+        run_handle_battery_charge_status(&mut test_helper, &mut toggle_logger, charge_status);
+
+        // Send disabled event. This should log the duration between now and when the client
+        // connections enabled AND device is on battery
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(100_000_000));
+        let event = ClientConnectionsToggleEvent::Disabled;
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
+
+        let metrics = test_helper
+            .get_logged_metrics(metrics::CLIENT_CONNECTION_ENABLED_DURATION_ON_BATTERY_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(70));
+
+        test_helper.clear_cobalt_events();
+        // Send client connections enabled and disabled events again.
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(110_000_000));
+        let event = ClientConnectionsToggleEvent::Enabled;
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(150_000_000));
+        let event = ClientConnectionsToggleEvent::Disabled;
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
+
+        // Verify that only the duration since the second enabled event is logged.
+        let metrics = test_helper
+            .get_logged_metrics(metrics::CLIENT_CONNECTION_ENABLED_DURATION_ON_BATTERY_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(40));
+    }
+
+    #[fuchsia::test]
+    fn test_log_client_connection_enabled_duration_on_battery_with_repeated_battery_change() {
+        let mut test_helper = setup_test();
+        let inspect_node = test_helper.create_inspect_node("test_stats");
+        let mut toggle_logger = ToggleLogger::new(test_helper.cobalt_proxy.clone(), &inspect_node);
+
+        // Start with client connections enabled.
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000));
+        let event = ClientConnectionsToggleEvent::Enabled;
+        run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
+
+        // Set on battery
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(30_000_000));
+        let charge_status = fidl_battery::ChargeStatus::Discharging;
+        run_handle_battery_charge_status(&mut test_helper, &mut toggle_logger, charge_status);
+
+        // Set on charger. This should log the duration between now and when the client
+        // connection is enabled *and* device is on battery
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(100_000_000));
+        let charge_status = fidl_battery::ChargeStatus::Charging;
+        run_handle_battery_charge_status(&mut test_helper, &mut toggle_logger, charge_status);
+
+        let metrics = test_helper
+            .get_logged_metrics(metrics::CLIENT_CONNECTION_ENABLED_DURATION_ON_BATTERY_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(70));
+
+        test_helper.clear_cobalt_events();
+        // Set on battery and then on charger again.
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(110_000_000));
+        let charge_status = fidl_battery::ChargeStatus::Discharging;
+        run_handle_battery_charge_status(&mut test_helper, &mut toggle_logger, charge_status);
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(150_000_000));
+        let charge_status = fidl_battery::ChargeStatus::Charging;
+        run_handle_battery_charge_status(&mut test_helper, &mut toggle_logger, charge_status);
+
+        // Verify that only the duration since the second enabled event is logged.
+        let metrics = test_helper
+            .get_logged_metrics(metrics::CLIENT_CONNECTION_ENABLED_DURATION_ON_BATTERY_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(40));
     }
 }

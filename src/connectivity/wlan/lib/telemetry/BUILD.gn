@@ -15,6 +15,7 @@ rustc_library("wlan-telemetry") {
   deps = [
     ":wlan_legacy_metrics_registry",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
+    "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_rust",
     "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_rust",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
