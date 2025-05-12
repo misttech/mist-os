@@ -113,6 +113,7 @@
             service: [
                 "fuchsia.gpu.magma.TestService",
                 "fuchsia.hardware.google.nanohub.Service",
+                "fuchsia.hardware.haptics.Service",
                 "fuchsia.hardware.overnet.Service",
                 "fuchsia.hardware.qcom.hvdcpopti.Service",
                 "fuchsia.hardware.sockettunnel.Service",

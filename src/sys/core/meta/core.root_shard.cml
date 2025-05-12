@@ -275,6 +275,7 @@
             service: [
                 "fuchsia.hardware.gnss.Service",
                 "fuchsia.hardware.google.nanohub.Service",
+                "fuchsia.hardware.haptics.Service",
                 "fuchsia.hardware.nfc.Service",
                 "fuchsia.hardware.overnet.Service",
                 "fuchsia.hardware.power.suspend.SuspendService",

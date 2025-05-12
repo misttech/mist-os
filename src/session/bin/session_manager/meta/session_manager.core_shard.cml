@@ -259,6 +259,7 @@
                 "fuchsia.gpu.magma.Service", // replaces /dev/class/gpu
                 "fuchsia.hardware.backlight.Service", // replaces /dev/class/backlight
                 "fuchsia.hardware.bluetooth.Service", // replaces /dev/class/bt-hci
+                "fuchsia.hardware.haptics.Service",
                 "fuchsia.hardware.hrtimer.Service", // replaces /dev/class/hrtimer
                 "fuchsia.hardware.light.LightService", // replaces /dev/class/light
                 "fuchsia.hardware.power.sensor.Service", // replaces /dev/class/power-sensor
