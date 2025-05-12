@@ -224,6 +224,7 @@ fidl_library://fidl/fuchsia.hardware.hrtimer (unstable)
 fidl_library://fidl/fuchsia.hardware.i2c
 fidl_library://fidl/fuchsia.hardware.i2c.businfo (unstable)
 fidl_library://fidl/fuchsia.hardware.i2cimpl (unstable)
+fidl_library://fidl/fuchsia.hardware.interconnect (unstable)
 fidl_library://fidl/fuchsia.hardware.light
 fidl_library://fidl/fuchsia.hardware.mailbox (unstable)
 fidl_library://fidl/fuchsia.hardware.network
