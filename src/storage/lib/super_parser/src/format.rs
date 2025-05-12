@@ -53,6 +53,40 @@ impl MetadataGeometry {
         sha2::Sha256::digest(temp_metadata_geometry.as_bytes()).into()
     }
 
+    // Returns an error if there is an overflow.
+    pub fn get_total_metadata_size(&self) -> Result<u64, Error> {
+        // Metadata region looks like:
+        //     +-----------------------------------+
+        //     | Reserved bytes                    |
+        //     +-----------------------------------+
+        //     | Geometry                          |
+        //     +-----------------------------------+
+        //     | Geometry Backup                   |
+        //     +-----------------------------------+
+        //     | Metadata                          |
+        //     |                                   |
+        //     |  * contains `metadata_slot_count` |
+        //     |  * copies of the metadata         |
+        //     |                                   |
+        //     +-----------------------------------+
+        //     | Backup Metadata                   |
+        //     | ...                               |
+        //     +-----------------------------------+
+        //
+        let total_metadata_size = (self.metadata_max_size as u64)
+            .checked_mul(self.metadata_slot_count as u64)
+            .ok_or_else(|| anyhow!("arithmetic overflow"))?;
+        let geometry_and_metadata_size = total_metadata_size
+            .checked_add(METADATA_GEOMETRY_RESERVED_SIZE as u64)
+            .ok_or_else(|| anyhow!("arithmetic overflow"))?;
+        let total_geometry_and_metadata_size = geometry_and_metadata_size
+            .checked_mul(2)
+            .ok_or_else(|| anyhow!("arithmetic overflow"))?;
+        total_geometry_and_metadata_size
+            .checked_add(PARTITION_RESERVED_BYTES as u64)
+            .ok_or_else(|| anyhow!("arithmetic overflow"))
+    }
+
     pub fn validate(&self) -> Result<(), Error> {
         ensure!(self.magic == METADATA_GEOMETRY_MAGIC, "Invalid metadata geometry magic.");
         ensure!(
@@ -69,6 +103,9 @@ impl MetadataGeometry {
             self.logical_block_size % SECTOR_SIZE == 0,
             "Invalid logical block size. Must be sector-aligned."
         );
+
+        // Check for potential arithmetic overflow.
+        ensure!(self.get_total_metadata_size().is_ok(), "Invalid metadata region size.");
         Ok(())
     }
 }
@@ -175,7 +212,10 @@ impl MetadataHeader {
             self.groups.entry_size == std::mem::size_of::<MetadataPartitionGroup>() as u32,
             "Invalid partition group table entry size."
         );
-        // TODO(https://fxbug.dev/404952286): Validate entry size for block device.
+        ensure!(
+            self.block_devices.entry_size == std::mem::size_of::<MetadataBlockDevice>() as u32,
+            "Invalid block device table entry size."
+        );
 
         Ok(())
     }
@@ -328,6 +368,7 @@ bitflags! {
         const SLOT_SUFFIXED = 1 << 0;
     }
 }
+
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable)]
 pub struct MetadataPartitionGroup {
@@ -342,6 +383,66 @@ impl ValidateTable for MetadataPartitionGroup {
     fn validate(&self, _header: &MetadataHeader) -> Result<(), Error> {
         // Nothing to validate
         Ok(())
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Immutable, FromBytes, IntoBytes)]
+pub struct BlockDeviceFlags(u32);
+bitflags! {
+    impl BlockDeviceFlags: u32 {
+        /// Similar to the other `*_Flags::SLOT_SUFFIXED` flag. If this is set, then the
+        /// `partition_name` in block device needs the slot suffix applied. The slot suffix is
+        /// determined by the metadata slot number (e.g. 0 => "_a" and 1 => "_b").
+        // TODO(https://fxbug.dev/404952286): Adjust partition_name to have suffix applied if set.
+        const SLOT_SUFFIXED = 1 << 0;
+    }
+}
+
+/// Defines an entry in the `block_device` table. There must be at least one device and the first
+/// device must represent the partition holding the super metadata.
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable)]
+pub struct MetadataBlockDevice {
+    /// First usable sector for allocating logical partitions. This is the first sector after the
+    /// metadata region (consists of the the geometry blocks, and space consumed by the metadata
+    /// and the metadata backup).
+    pub first_logical_sector: u64,
+    /// Alignment for defining partitions or partition extents. For example, an alignment of 1MiB
+    /// will require that all partitions have a size evenly divisible by 1MiB, and that the smallest
+    /// unit the partition can grow by is 1MiB.
+    ///
+    /// Alignment is normally determined at runtime when growing or adding partitions. If for some
+    /// reason the alignment cannot be determined, then this predefined alignment in the geometry is
+    /// used instead. By default it is set to 1MiB.
+    pub alignment: u32,
+    /// Alignment offset for "stacked" devices. For example, if the "super" partition is not aligned
+    /// within the parent block device's partition table, then this is used in deciding where to
+    /// place `first_logical_sector`.
+    ///
+    /// Similar to `alignment`, this will be derived from the operating system. If it cannot be
+    /// determined, it is assumed to be zero.
+    pub alignment_offset: u32,
+    /// Block device size in bytes, as specified when the metadata was created. This can be used to
+    /// verify the geometry against a target device.
+    pub size: u64,
+    /// Partition name in the GPT. Unused characters must be zero.
+    pub partition_name: [u8; 36],
+    pub flags: BlockDeviceFlags,
+}
+
+impl ValidateTable for MetadataBlockDevice {
+    fn validate(&self, _header: &MetadataHeader) -> Result<(), Error> {
+        ensure!(self.get_first_logical_sector_in_bytes().is_ok(), "Invalid first_logical_sector.");
+        Ok(())
+    }
+}
+
+impl MetadataBlockDevice {
+    /// Returns offset of the first logical sector in bytes.
+    pub fn get_first_logical_sector_in_bytes(&self) -> Result<u64, Error> {
+        self.first_logical_sector
+            .checked_mul(SECTOR_SIZE.into())
+            .ok_or_else(|| anyhow!("arithmetic overflow"))
     }
 }
 
@@ -643,5 +744,34 @@ mod tests {
         group
             .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
             .expect("metadata partition group failed validation");
+    }
+
+    const VALID_METADATA_BLOCK_DEVICE: MetadataBlockDevice = MetadataBlockDevice {
+        first_logical_sector: 2048,
+        alignment: 1048576,
+        alignment_offset: 0,
+        size: 1073741824,
+        partition_name: [
+            115, 117, 112, 101, 114, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ],
+        flags: BlockDeviceFlags(0),
+    };
+
+    #[fuchsia::test]
+    async fn test_valid_block_device() {
+        let metadata_block_device = VALID_METADATA_BLOCK_DEVICE;
+        metadata_block_device
+            .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+            .expect("metadata block device failed validation");
+    }
+
+    #[fuchsia::test]
+    async fn test_invalid_block_device() {
+        let mut invalid_metadata_block_device = VALID_METADATA_BLOCK_DEVICE;
+        invalid_metadata_block_device.first_logical_sector = u64::MAX;
+        invalid_metadata_block_device
+            .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+            .expect_err("metadata block device passed validation unexpectedly");
     }
 }

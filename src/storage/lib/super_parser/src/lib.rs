@@ -9,7 +9,10 @@ use crate::format::{
     PARTITION_RESERVED_BYTES,
 };
 use anyhow::{anyhow, ensure, Error};
-use format::{MetadataPartition, MetadataPartitionGroup, MetadataTableDescriptor, ValidateTable};
+use format::{
+    MetadataBlockDevice, MetadataPartition, MetadataPartitionGroup, MetadataTableDescriptor,
+    ValidateTable,
+};
 use sha2::Digest;
 use storage_device::fake_device::FakeDevice;
 use storage_device::Device;
@@ -22,6 +25,8 @@ fn round_up_to_alignment(x: u32, alignment: u32) -> Result<u32, Error> {
         .ok_or(anyhow!("overflow occurred when rounding up to nearest alignment"))
 }
 
+// TODO(https://fxbug.dev/404952286): Add checks for potential arithmetic overflows from data read
+// from the device and test for this.
 // TODO(https://fxbug.dev/404952286): Add fuzzer to check for arithmetic overflows.
 
 pub struct SuperParser {
@@ -30,7 +35,7 @@ pub struct SuperParser {
     partitions: Vec<MetadataPartition>,
     extents: Vec<MetadataExtent>,
     partition_groups: Vec<MetadataPartitionGroup>,
-    // TODO(https://fxbug.dev/404952286): parse block devices.
+    block_devices: Vec<MetadataBlockDevice>,
 }
 
 impl SuperParser {
@@ -106,7 +111,40 @@ impl SuperParser {
         .await
         .unwrap();
 
-        Ok(Self { metadata_geometry, metadata_header, partitions, extents, partition_groups })
+        // Parse block device table entries.
+        let tables_offset = tables_offset
+            .checked_add(metadata_header.groups.num_entries * metadata_header.groups.entry_size)
+            .ok_or_else(|| anyhow!("Adding offset + num_entries * entry_size overflowed."))?;
+        let block_devices = Self::parse_table::<MetadataBlockDevice>(
+            tables_bytes,
+            tables_offset,
+            &metadata_header,
+            &metadata_header.block_devices,
+        )
+        .await
+        .unwrap();
+
+        // Expect there to be at least be one block device: "super".
+        ensure!(block_devices.len() > 0, "Metadata did not specify a super device.");
+        let super_device = block_devices[0];
+        // The block device would have passed validation before. We don't expect this to return an
+        // error.
+        let logical_partition_offset = super_device.get_first_logical_sector_in_bytes()?;
+        // `metadata_geometry` passed validation before. We don't expect this to return an error.
+        let metadata_region = metadata_geometry.get_total_metadata_size()?;
+        ensure!(
+            metadata_region <= logical_partition_offset,
+            "Logical partition metadata overlaps with logical partition contents."
+        );
+
+        Ok(Self {
+            metadata_geometry,
+            metadata_header,
+            partitions,
+            extents,
+            partition_groups,
+            block_devices,
+        })
     }
 
     async fn parse_metadata_geometry(device: &FakeDevice) -> Result<MetadataGeometry, Error> {
@@ -240,5 +278,16 @@ mod tests {
         assert_eq!(group_name[..expected_group_name.len()], expected_group_name);
         let maximum_size = group.maximum_size;
         assert_eq!(maximum_size, 0);
+
+        let expected_partition_name = "super".to_string();
+        let block_device_partition_name =
+            String::from_utf8(super_partition.block_devices[0].partition_name.to_vec())
+                .expect("failed to convert partition entry name to string");
+        assert_eq!(
+            block_device_partition_name[..expected_partition_name.len()],
+            expected_partition_name
+        );
+        let device_size = super_partition.block_devices[0].size;
+        assert_eq!(device_size, 1073741824);
     }
 }
