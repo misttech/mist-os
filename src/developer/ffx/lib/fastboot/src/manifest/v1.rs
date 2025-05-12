@@ -163,7 +163,7 @@ impl Boot for FlashManifest {
 mod test {
     use super::*;
     use crate::common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR};
-    use crate::test::TestResolver;
+    use crate::file_resolver::test::TestResolver;
     use ffx_fastboot_interface::test::setup;
     use serde_json::{from_str, json};
     use std::path::PathBuf;

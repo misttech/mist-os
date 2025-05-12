@@ -11,3 +11,26 @@ pub mod resolvers;
 pub trait FileResolver {
     async fn get_file(&mut self, file: &str) -> Result<String>;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// tests
+pub mod test {
+    use super::*;
+    use anyhow::Result;
+    use async_trait::async_trait;
+
+    pub struct TestResolver {}
+
+    impl TestResolver {
+        pub fn new() -> Self {
+            Self {}
+        }
+    }
+
+    #[async_trait(?Send)]
+    impl FileResolver for TestResolver {
+        async fn get_file(&mut self, file: &str) -> Result<String> {
+            Ok(file.to_owned())
+        }
+    }
+}
