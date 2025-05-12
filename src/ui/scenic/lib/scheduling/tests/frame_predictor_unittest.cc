@@ -379,5 +379,17 @@ TEST(ConstantFramePredictor, OffsetsGreaterThanVsyncIntervalAreRespected) {
   EXPECT_EQ(ms_to_time(48), prediction.presentation_time);
 }
 
+TEST(FramePredictor, ComputeNextSyncTime) {
+  const zx::time base_vsync_time(123456789);
+  zx::duration vsync_interval = zx::msec(16);
+
+  for (size_t i = 0; i < 10; ++i) {
+    EXPECT_EQ((base_vsync_time + (vsync_interval * i)).get(),
+              FramePredictor::ComputeNextVsyncTime(base_vsync_time, vsync_interval,
+                                                   base_vsync_time + (vsync_interval * i))
+                  .get());
+  }
+}
+
 }  // namespace test
 }  // namespace scheduling

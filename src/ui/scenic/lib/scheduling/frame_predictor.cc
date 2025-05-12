@@ -22,7 +22,11 @@ zx::time FramePredictor::ComputeNextVsyncTime(zx::time base_vsync_time, zx::dura
     return base_vsync_time;
   }
 
-  const int64_t num_intervals = (min_vsync_time - base_vsync_time) / vsync_interval;
+  // The "-1" is so that `ComputeNextVsyncTime(5, 10, 15)` returns 15 instead of 25.
+  // The latter would be surprising, because the if-statement above causes
+  // `ComputeNextVsyncTime(5, 10, 5)` to return 5.
+  const int64_t num_intervals =
+      (min_vsync_time.get() - base_vsync_time.get() - 1) / vsync_interval.get();
   return base_vsync_time + (vsync_interval * (num_intervals + 1));
 }
 
