@@ -123,6 +123,12 @@ struct vm_page {
       // Loaned pages maintain an optional backlink while in the alloc state to their holder object.
       FreeLoanedPagesHolder* owner;
     } __PACKED alloc;
+    struct {
+      uint32_t id;
+      uint32_t free_slot;
+      uint32_t peak_allocated;
+      uint32_t allocated;
+    } __PACKED slab;
   };
   using object_t = decltype(object);
 

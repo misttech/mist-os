@@ -132,6 +132,7 @@ source_set("tests") {
     "unittests/compression_unittest.cc",
     "unittests/evictor_unittest.cc",
     "unittests/pmm_unittest.cc",
+    "unittests/slab_unittest.cc",
     "unittests/test_helper.cc",
     "unittests/vmo_lock_unittest.cc",
     "unittests/vmo_unittest.cc",
