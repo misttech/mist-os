@@ -6517,8 +6517,8 @@ pub type socklen_t = u32;
 )]
 pub struct ucred {
     pub pid: __kernel_pid_t,
-    pub uid: __kernel_uid_t,
-    pub gid: __kernel_gid_t,
+    pub uid: __kernel_uid32_t,
+    pub gid: __kernel_gid32_t,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]

@@ -17,8 +17,8 @@ typedef uint32_t socklen_t;
 
 struct ucred {
   __kernel_pid_t pid;
-  __kernel_uid_t uid;
-  __kernel_gid_t gid;
+  __kernel_uid32_t uid;
+  __kernel_gid32_t gid;
 };
 
 struct msghdr {
