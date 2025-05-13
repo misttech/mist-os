@@ -20,7 +20,7 @@
     offer: [
         // Needed to start fuzzers within the Test runner Framework.
         {
-            protocol: [ "fuchsia.test.manager.RunBuilder" ],
+            protocol: [ "fuchsia.test.manager.SuiteRunner" ],
             from: "#test_manager",
             to: "#fuzz-manager",
         },

@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 use crate::diagnostics::{ArtifactBridge, ArtifactHandler};
-use crate::events::{handle_run_events, handle_suite_events};
+use crate::events::handle_suite_events;
 use anyhow::{Context as _, Result};
 use futures::channel::{mpsc, oneshot};
 use futures::{pin_mut, select, FutureExt, SinkExt};
 use log::warn;
 use std::cell::RefCell;
 use std::rc::Rc;
-use test_manager::{Artifact, LaunchError, RunControllerProxy, SuiteControllerProxy};
+use test_manager::{Artifact, LaunchError, SuiteControllerProxy};
 use {
     fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager, fuchsia_async as fasync,
 };
@@ -66,11 +66,7 @@ impl Fuzzer {
     /// `LogBridge`s and establish the connections between them to forward stdout, stderr, and
     /// syslog from the fuzzer to the appropriate sockets provided by `ffx fuzz` via a call to
     /// `Fuzzer::get_output`.
-    pub async fn start(
-        &mut self,
-        run_proxy: RunControllerProxy,
-        suite_proxy: SuiteControllerProxy,
-    ) {
+    pub async fn start(&mut self, suite_proxy: SuiteControllerProxy) {
         self.set_state(FuzzerState::Starting);
 
         let (artifact_sender, artifact_receiver) = mpsc::unbounded::<Artifact>();
@@ -87,21 +83,17 @@ impl Fuzzer {
         let syslog = artifact_handler.create_syslog_bridge(syslog_rx);
 
         let task = || async move {
-            let run_fut =
-                handle_run_events(run_proxy, artifact_sender.clone(), kill_receiver).fuse();
-            let suite_fut = handle_suite_events(suite_proxy, artifact_sender, start_sender).fuse();
+            let suite_fut =
+                handle_suite_events(suite_proxy, artifact_sender, start_sender, kill_receiver)
+                    .fuse();
             let artifact_fut = artifact_handler.run().fuse();
             let stdout_fut = stdout.forward().fuse();
             let stderr_fut = stderr.forward().fuse();
             let syslog_fut = syslog.forward().fuse();
-            pin_mut!(run_fut, suite_fut, artifact_fut, stdout_fut, stderr_fut, syslog_fut);
-            let mut event_futs = 2;
+            pin_mut!(suite_fut, artifact_fut, stdout_fut, stderr_fut, syslog_fut);
+            let mut event_futs = 1;
             while event_futs > 0 {
                 let result = select! {
-                    result = run_fut => {
-                        event_futs -= 1;
-                        result
-                    }
                     result = suite_fut => {
                         event_futs -= 1;
                         result

@@ -86,12 +86,6 @@ impl TestRealm {
         Ok(())
     }
 
-    pub fn send_run_stopped(&self, url: &str) -> Result<()> {
-        self.fuzzers
-            .send_run_stopped(url)
-            .context(format!("failed to send 'run stopped' to {}", url))
-    }
-
     pub fn send_suite_stopped(&self, url: &str) -> Result<()> {
         self.fuzzers
             .send_suite_stopped(url)
@@ -212,20 +206,20 @@ async fn serve_registry(
 }
 
 // The |FakeTestManager| simulates the behavior of test_manager and provides a way to
-// |serve_run_builder| streams by connecting them via |FakeRunBuilderEndpoint|s.
+// |serve_run_builder| streams by connecting them via |FakeSuiteRunnerEndpoint|s.
 struct FakeTestManager {
-    sender: mpsc::UnboundedSender<ServerEnd<RunBuilderMarker>>,
-    receiver: RefCell<Option<mpsc::UnboundedReceiver<ServerEnd<RunBuilderMarker>>>>,
+    sender: mpsc::UnboundedSender<ServerEnd<SuiteRunnerMarker>>,
+    receiver: RefCell<Option<mpsc::UnboundedReceiver<ServerEnd<SuiteRunnerMarker>>>>,
 }
 
 impl FakeTestManager {
     fn new() -> Self {
-        let (sender, receiver) = mpsc::unbounded::<ServerEnd<RunBuilderMarker>>();
+        let (sender, receiver) = mpsc::unbounded::<ServerEnd<SuiteRunnerMarker>>();
         Self { sender: sender, receiver: RefCell::new(Some(receiver)) }
     }
 
-    fn create_run_builder(&self) -> FakeRunBuilderEndpoint {
-        FakeRunBuilderEndpoint::new(self.sender.clone())
+    fn create_run_builder(&self) -> FakeSuiteRunnerEndpoint {
+        FakeSuiteRunnerEndpoint::new(self.sender.clone())
     }
 
     async fn serve(&self, test_realm: Rc<RefCell<TestRealm>>) {
@@ -242,54 +236,46 @@ impl FakeTestManager {
     }
 }
 
-// The |FakeRunBuilderEndpoint| provides a way to connect a proxy to a stream served by
+// The |FakeSuiteRunnerEndpoint| provides a way to connect a proxy to a stream served by
 // |serve_run_builder|.
-struct FakeRunBuilderEndpoint {
-    sender: mpsc::UnboundedSender<ServerEnd<RunBuilderMarker>>,
+struct FakeSuiteRunnerEndpoint {
+    sender: mpsc::UnboundedSender<ServerEnd<SuiteRunnerMarker>>,
 }
 
-impl FakeRunBuilderEndpoint {
-    fn new(sender: mpsc::UnboundedSender<ServerEnd<RunBuilderMarker>>) -> Self {
+impl FakeSuiteRunnerEndpoint {
+    fn new(sender: mpsc::UnboundedSender<ServerEnd<SuiteRunnerMarker>>) -> Self {
         Self { sender }
     }
 }
 
-impl FidlEndpoint<RunBuilderMarker> for FakeRunBuilderEndpoint {
-    fn create_proxy(&self) -> Result<RunBuilderProxy> {
-        let (proxy, server_end) = create_proxy::<RunBuilderMarker>();
+impl FidlEndpoint<SuiteRunnerMarker> for FakeSuiteRunnerEndpoint {
+    fn create_proxy(&self) -> Result<SuiteRunnerProxy> {
+        let (proxy, server_end) = create_proxy::<SuiteRunnerMarker>();
         self.sender.unbounded_send(server_end)?;
         Ok(proxy)
     }
 }
 
-// Serves |fuchsia.test_manager.RunBuilder| while allowing test realms to configure various errors
+// Serves |fuchsia.test_manager.SuiteRunner| while allowing test realms to configure various errors
 // and/or events retrieved by the |Suite-| and |RunController|s.
 async fn serve_run_builder(
-    mut stream: RunBuilderRequestStream,
+    mut stream: SuiteRunnerRequestStream,
     test_realm: Rc<RefCell<TestRealm>>,
 ) -> Result<()> {
     let (fuzzers, launch_error) = {
         let mut test_realm = test_realm.borrow_mut();
         (Rc::clone(&test_realm.fuzzers), test_realm.launch_error.take())
     };
-    // |RunBuilder| requests will always follow a specific order: |AddSuite|, then |Build|.
+    // |SuiteRunner| requests will always follow a specific order: |AddSuite|, then |Build|.
     let (url, suite_stream) = match stream.next().await {
-        Some(Ok(RunBuilderRequest::AddSuite {
-            test_url,
+        Some(Ok(SuiteRunnerRequest::Run {
+            test_suite_url,
             options: _,
             controller,
             control_handle: _,
         })) => {
             let suite_stream = controller.into_stream();
-            (test_url, suite_stream)
-        }
-        _ => unreachable!(),
-    };
-
-    let run_stream = match stream.next().await {
-        Some(Ok(RunBuilderRequest::Build { controller, control_handle: _ })) => {
-            let run_stream = controller.into_stream();
-            run_stream
+            (test_suite_url, suite_stream)
         }
         _ => unreachable!(),
     };
@@ -305,8 +291,6 @@ async fn serve_run_builder(
             (Some(batch_client), Some(batch_stream), Some(syslog_sender), Some(syslog_receiver))
         }
     };
-    let run_receiver = send_default_run_events(Rc::clone(&fuzzers), &url)
-        .context("failed to send default run events")?;
     let suite_receiver =
         send_default_suite_events(Rc::clone(&fuzzers), &url, batch_client, syslog_sender)
             .context("failed to send default suite events")?;
@@ -318,11 +302,6 @@ async fn serve_run_builder(
                 .context("failed to serve suite controller")
         },
         async {
-            serve_run_controller(run_stream, run_receiver)
-                .await
-                .context("failed to serve run controller")
-        },
-        async {
             serve_batch_iterator(batch_stream, syslog_receiver)
                 .await
                 .context("failed to serve batch iterator")
@@ -331,43 +310,19 @@ async fn serve_run_builder(
     Ok(())
 }
 
-fn send_default_run_events(
-    fuzzers: Rc<FakeFuzzerMap>,
-    url: &str,
-) -> Result<mpsc::UnboundedReceiver<RunEventPayload>> {
-    let (sender, receiver) = mpsc::unbounded::<RunEventPayload>();
-    fuzzers.put_run_sender(url, sender);
-    fuzzers
-        .send_run_event(url, RunEventPayload::RunStarted(RunStarted {}))
-        .context("failed to send RunStarted run event")?;
-
-    let (out_rx, out_tx) = zx::Socket::create_stream();
-    let stdout = fasync::Socket::from_socket(out_tx);
-    fuzzers.put_stdout(&url, stdout);
-    fuzzers
-        .send_run_event(url, RunEventPayload::Artifact(Artifact::Stdout(out_rx)))
-        .context("failed to send Stdout run event")?;
-
-    let (err_rx, err_tx) = zx::Socket::create_stream();
-    let stderr = fasync::Socket::from_socket(err_tx);
-    fuzzers.put_stderr(&url, stderr);
-    fuzzers
-        .send_run_event(url, RunEventPayload::Artifact(Artifact::Stderr(err_rx)))
-        .context("failed to send Stderr run event")?;
-
-    Ok(receiver)
-}
-
 fn send_default_suite_events(
     fuzzers: Rc<FakeFuzzerMap>,
     url: &str,
     client_end: Option<ClientEnd<fdiagnostics::BatchIteratorMarker>>,
     syslog_sender: Option<mpsc::UnboundedSender<String>>,
-) -> Result<mpsc::UnboundedReceiver<SuiteEventPayload>> {
-    let (sender, receiver) = mpsc::unbounded::<SuiteEventPayload>();
+) -> Result<mpsc::UnboundedReceiver<EventDetails>> {
+    let (sender, receiver) = mpsc::unbounded::<EventDetails>();
     fuzzers.put_suite_sender(url, sender);
     fuzzers
-        .send_suite_event(url, SuiteEventPayload::SuiteStarted(SuiteStarted {}))
+        .send_suite_event(
+            url,
+            EventDetails::SuiteStarted(SuiteStartedEventDetails { ..Default::default() }),
+        )
         .context("failed to send SuiteStarted suite event")?;
 
     if let Some(syslog_sender) = syslog_sender {
@@ -377,8 +332,9 @@ fn send_default_suite_events(
         fuzzers
             .send_suite_event(
                 url,
-                SuiteEventPayload::SuiteArtifact(SuiteArtifact {
-                    artifact: Artifact::Log(Syslog::Batch(client_end)),
+                EventDetails::SuiteArtifactGenerated(SuiteArtifactGeneratedEventDetails {
+                    artifact: Some(Artifact::Log(Syslog::Batch(client_end))),
+                    ..Default::default()
                 }),
             )
             .context("failed to send Syslog suite event")?;
@@ -388,15 +344,48 @@ fn send_default_suite_events(
     fuzzers
         .send_suite_event(
             url,
-            SuiteEventPayload::CaseFound(CaseFound {
-                test_case_name: "test-case".to_string(),
-                identifier: id,
+            EventDetails::TestCaseFound(TestCaseFoundEventDetails {
+                test_case_name: Some("test-case".to_string()),
+                test_case_id: Some(id),
+                ..Default::default()
             }),
         )
         .context("failed to send CaseFound suite event")?;
     fuzzers
-        .send_suite_event(url, SuiteEventPayload::CaseStarted(CaseStarted { identifier: id }))
+        .send_suite_event(
+            url,
+            EventDetails::TestCaseStarted(TestCaseStartedEventDetails {
+                test_case_id: Some(id),
+                ..Default::default()
+            }),
+        )
         .context("failed to send CaseStarted suite event")?;
+
+    let (out_rx, out_tx) = zx::Socket::create_stream();
+    let stdout = fasync::Socket::from_socket(out_tx);
+    fuzzers.put_stdout(&url, stdout);
+    fuzzers
+        .send_suite_event(
+            url,
+            EventDetails::SuiteArtifactGenerated(SuiteArtifactGeneratedEventDetails {
+                artifact: Some(Artifact::Stdout(out_rx)),
+                ..Default::default()
+            }),
+        )
+        .context("failed to send Stdout run event")?;
+
+    let (err_rx, err_tx) = zx::Socket::create_stream();
+    let stderr = fasync::Socket::from_socket(err_tx);
+    fuzzers.put_stderr(&url, stderr);
+    fuzzers
+        .send_suite_event(
+            url,
+            EventDetails::SuiteArtifactGenerated(SuiteArtifactGeneratedEventDetails {
+                artifact: Some(Artifact::Stderr(err_rx)),
+                ..Default::default()
+            }),
+        )
+        .context("failed to send Stderr run event")?;
 
     Ok(receiver)
 }
@@ -404,32 +393,32 @@ fn send_default_suite_events(
 async fn serve_suite_controller(
     stream: SuiteControllerRequestStream,
     launch_error: Option<LaunchError>,
-    payload_receiver: mpsc::UnboundedReceiver<SuiteEventPayload>,
+    event_details_receiver: mpsc::UnboundedReceiver<EventDetails>,
 ) -> Result<()> {
-    let payload_receiver_rc = RefCell::new(payload_receiver);
+    let event_details_receiver_rc = RefCell::new(event_details_receiver);
     stream
         .map(|result| result.context("failed request"))
         .try_for_each(|request| async {
             match request {
-                SuiteControllerRequest::GetEvents { responder } => {
-                    let mut payload_receiver = payload_receiver_rc.borrow_mut();
+                SuiteControllerRequest::WatchEvents { responder } => {
+                    let mut event_details_receiver = event_details_receiver_rc.borrow_mut();
                     let response = match launch_error {
                         Some(e) => Err(e),
                         None => {
-                            let mut payloads = Vec::new();
-                            while let Ok(Some(payload)) = payload_receiver.try_next() {
-                                payloads.push(payload);
+                            let mut details = Vec::new();
+                            while let Ok(Some(detail)) = event_details_receiver.try_next() {
+                                details.push(detail);
                             }
-                            if payloads.is_empty() {
-                                if let Some(payload) = payload_receiver.next().await {
-                                    payloads.push(payload);
+                            if details.is_empty() {
+                                if let Some(detail) = event_details_receiver.next().await {
+                                    details.push(detail);
                                 }
                             }
-                            let suite_events = payloads
+                            let suite_events = details
                                 .drain(..)
-                                .map(|payload| SuiteEvent {
+                                .map(|details| Event {
                                     timestamp: Some(zx::MonotonicInstant::get().into_nanos()),
-                                    payload: Some(payload),
+                                    details: Some(details),
                                     ..Default::default()
                                 })
                                 .collect();
@@ -438,47 +427,7 @@ async fn serve_suite_controller(
                     };
                     responder.send(response)
                 }
-                _ => unreachable!(),
-            }
-            .map_err(Error::msg)
-            .context("failed response")
-        })
-        .await
-        .context("failed to serve fake SuiteController")?;
-    Ok(())
-}
-
-async fn serve_run_controller(
-    stream: RunControllerRequestStream,
-    payload_receiver: mpsc::UnboundedReceiver<RunEventPayload>,
-) -> Result<()> {
-    let payload_receiver_rc = RefCell::new(payload_receiver);
-    stream
-        .map(|request| request.context("failed request"))
-        .try_for_each(|request| async {
-            match request {
-                RunControllerRequest::GetEvents { responder } => {
-                    let mut payload_receiver = payload_receiver_rc.borrow_mut();
-                    let mut payloads = Vec::new();
-                    while let Ok(Some(payload)) = payload_receiver.try_next() {
-                        payloads.push(payload);
-                    }
-                    if payloads.is_empty() {
-                        if let Some(payload) = payload_receiver.next().await {
-                            payloads.push(payload);
-                        }
-                    }
-                    let run_events: Vec<RunEvent> = payloads
-                        .into_iter()
-                        .map(|payload| RunEvent {
-                            timestamp: Some(zx::MonotonicInstant::get().into_nanos()),
-                            payload: Some(payload),
-                            ..Default::default()
-                        })
-                        .collect();
-                    responder.send(run_events)
-                }
-                RunControllerRequest::Kill { control_handle } => {
+                SuiteControllerRequest::Kill { control_handle } => {
                     control_handle.shutdown();
                     Ok(())
                 }
@@ -488,7 +437,7 @@ async fn serve_run_controller(
             .context("failed response")
         })
         .await
-        .context("failed to serve fake RunController")?;
+        .context("failed to serve fake SuiteController")?;
     Ok(())
 }
 
@@ -563,44 +512,21 @@ struct FakeFuzzer {
     stdout: Option<fasync::Socket>,
     stderr: Option<fasync::Socket>,
     syslog: Option<mpsc::UnboundedSender<String>>,
-    run_sender: Option<mpsc::UnboundedSender<RunEventPayload>>,
-    suite_sender: Option<mpsc::UnboundedSender<SuiteEventPayload>>,
+    suite_sender: Option<mpsc::UnboundedSender<EventDetails>>,
 }
 
 impl FakeFuzzer {
-    fn send_run_event(&mut self, payload: RunEventPayload) -> Result<()> {
-        // let stop = match payload {
-        //     RunEventPayload::RunStopped(_) => true,
-        //     _ => false,
-        // };
-        if let Some(sender) = self.run_sender.as_ref() {
-            sender.unbounded_send(payload).context("failed to send RunEventPayload")?;
-            // if !stop {
-            //     self.run_sender = Some(sender);
-            // }
-        }
-        Ok(())
-    }
-
-    fn send_run_stopped(&mut self) -> Result<()> {
-        self.send_run_event(RunEventPayload::RunStopped(RunStopped {}))
-            .context("failed to send RunStopped")?;
-        self.run_sender = None;
-        self.stdout = None;
-        self.stderr = None;
-        Ok(())
-    }
-
-    fn send_suite_event(&mut self, payload: SuiteEventPayload) -> Result<()> {
+    fn send_suite_event(&mut self, details: EventDetails) -> Result<()> {
         if let Some(sender) = self.suite_sender.as_ref() {
-            sender.unbounded_send(payload).context("failed to send SuiteEventPayload")?;
+            sender.unbounded_send(details).context("failed to send EventDetails")?;
         }
         Ok(())
     }
 
     fn send_suite_stopped(&mut self) -> Result<()> {
-        self.send_suite_event(SuiteEventPayload::SuiteStopped(SuiteStopped {
-            status: SuiteStatus::Passed,
+        self.send_suite_event(EventDetails::SuiteStopped(SuiteStoppedEventDetails {
+            result: Some(SuiteResult::Finished),
+            ..Default::default()
         }))
         .context("failed to send SuiteStopped event")?;
         self.suite_sender = None;
@@ -636,7 +562,6 @@ impl FakeFuzzerMap {
                 stdout: None,
                 stderr: None,
                 syslog: None,
-                run_sender: None,
                 suite_sender: None,
             },
         );
@@ -651,40 +576,17 @@ impl FakeFuzzerMap {
         self.fuzzers.borrow_mut().get_mut(url).unwrap()._controller = Some(controller);
     }
 
-    fn put_run_sender(&self, url: &str, run_sender: mpsc::UnboundedSender<RunEventPayload>) {
-        let mut fuzzers = self.fuzzers.borrow_mut();
-        if let Some(fuzzer) = fuzzers.get_mut(url) {
-            fuzzer.run_sender = Some(run_sender);
-        }
-    }
-
-    fn send_run_event(&self, url: &str, payload: RunEventPayload) -> Result<()> {
-        let mut fuzzers = self.fuzzers.borrow_mut();
-        if let Some(fuzzer) = fuzzers.get_mut(url) {
-            fuzzer.send_run_event(payload).context("failed to send run event")?;
-        }
-        Ok(())
-    }
-
-    fn send_run_stopped(&self, url: &str) -> Result<()> {
-        let mut fuzzers = self.fuzzers.borrow_mut();
-        if let Some(fuzzer) = fuzzers.get_mut(url) {
-            fuzzer.send_run_stopped().context("failed to send 'run stopped'")?;
-        }
-        Ok(())
-    }
-
-    fn put_suite_sender(&self, url: &str, suite_sender: mpsc::UnboundedSender<SuiteEventPayload>) {
+    fn put_suite_sender(&self, url: &str, suite_sender: mpsc::UnboundedSender<EventDetails>) {
         let mut fuzzers = self.fuzzers.borrow_mut();
         if let Some(fuzzer) = fuzzers.get_mut(url) {
             fuzzer.suite_sender = Some(suite_sender);
         }
     }
 
-    fn send_suite_event(&self, url: &str, payload: SuiteEventPayload) -> Result<()> {
+    fn send_suite_event(&self, url: &str, details: EventDetails) -> Result<()> {
         let mut fuzzers = self.fuzzers.borrow_mut();
         if let Some(fuzzer) = fuzzers.get_mut(url) {
-            fuzzer.send_suite_event(payload).context("failed to send suite event")?;
+            fuzzer.send_suite_event(details).context("failed to send suite event")?;
         }
         Ok(())
     }
@@ -735,7 +637,6 @@ impl FakeFuzzerMap {
         match fuzzers.remove(url) {
             Some(mut fuzzer) => {
                 let _ = fuzzer.send_suite_stopped();
-                let _ = fuzzer.send_run_stopped();
                 zx::Status::OK
             }
             None => zx::Status::NOT_FOUND,

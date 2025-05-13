@@ -109,7 +109,7 @@ type Artifact = resource table {
 ///
 /// In addition to an `Artifact`, long-running workflows may also produce the
 /// standard output, standard error, and system logs. These fuzzer output
-/// streams are provided by `fuchsia.test_manager/RunBuilder` and have no
+/// streams are provided by `fuchsia.test_manager/SuiteRunner` and have no
 /// guaranteed order with respect to FIDL responses. As a result, the streams
 /// need to include an "in-band" signal that indicates when they are complete
 /// for a particular workflow. Clients processing the fuzzer output may use this
