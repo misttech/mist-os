@@ -66,6 +66,7 @@ timekeeper_deps = [
   "//src/sys/time/timekeeper/adjust:time_adjust",
   "//src/sys/time/timekeeper/alarms",
   "//src/sys/time/timekeeper/persistence:lib",
+  "//src/sys/time/timekeeper/pretty:time_pretty",
   "//third_party/cobalt/src/lib/client/rust:cobalt-client",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:async-trait",

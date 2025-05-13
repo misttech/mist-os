@@ -21,6 +21,7 @@ use lazy_static::lazy_static;
 use log::warn;
 use std::collections::HashMap;
 use std::sync::Arc;
+use time_pretty::format_duration;
 
 const ONE_MILLION: i32 = 1_000_000;
 /// The value stored in place of any time that could not be generated.
@@ -202,7 +203,9 @@ struct UserAdjustUtcNode {
     /// The count of failed user adjustment UTC attempts.
     failure_count: UintProperty,
     /// The value of the offset resulting from the last successful proposal.
-    last_allowed_offset_nanos: IntProperty,
+    last_allowed_offset_nanos: StringProperty,
+    /// The value of the offset resulting from the last unsuccessful proposal.
+    last_disallowed_offset_nanos: StringProperty,
     /// Was last update was a failure?
     last_update_result: StringProperty,
     /// The boot timestamp at which the last UTC adjustment was applied.
@@ -216,7 +219,10 @@ impl UserAdjustUtcNode {
         Self {
             success_count: node.create_uint("success_count", 0),
             failure_count: node.create_uint("failure_count", 0),
-            last_allowed_offset_nanos: node.create_int("last_proposed_offset_nanos", 0),
+            last_allowed_offset_nanos: node
+                .create_string("last_allowed_offset_nanos", "(unspecified)"),
+            last_disallowed_offset_nanos: node
+                .create_string("last_disallowed_offset_nanos", "(unspecified)"),
             last_update_result: node.create_string(
                 "last_update_result",
                 &format!("{:?}", UserAdjustResult::Unspecified),
@@ -234,11 +240,12 @@ impl UserAdjustUtcNode {
             UserAdjustUtcOutcome::Succeeded => {
                 self.success_count.add(1);
                 self.last_update_result.set(&format!("{:?}", UserAdjustResult::Success));
-                self.last_allowed_offset_nanos.set(offset.into_nanos());
+                self.last_allowed_offset_nanos.set(&format_duration(offset));
             }
             UserAdjustUtcOutcome::Failed => {
                 self.failure_count.add(1);
                 self.last_update_result.set(&format!("{:?}", UserAdjustResult::Failure));
+                self.last_disallowed_offset_nanos.set(&format_duration(offset));
             }
         }
     }
