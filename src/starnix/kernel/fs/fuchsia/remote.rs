@@ -277,7 +277,7 @@ impl RemoteFs {
         let (remote_node, node_id) =
             match Zxio::create_with_on_representation(client_end.into(), Some(&mut attrs)) {
                 Err(status) => return Err(from_status_like_fdio!(status)),
-                Ok(zxio) => (RemoteNode { zxio: Arc::new(zxio), rights }, attrs.id),
+                Ok(zxio) => (RemoteNode { zxio, rights }, attrs.id),
             };
 
         if !rights.contains(fio::PERM_WRITABLE) {
@@ -305,7 +305,7 @@ pub struct RemoteNode {
     /// We delegate to the zxio library for actually doing I/O with remote
     /// objects, including fuchsia.io.Directory and fuchsia.io.File objects.
     /// This structure lets us share code with FDIO and other Fuchsia clients.
-    zxio: Arc<syncio::Zxio>,
+    zxio: syncio::Zxio,
 
     /// The fuchsia.io rights for the dir handle. Subdirs will be opened with
     /// the same rights.
@@ -313,7 +313,7 @@ pub struct RemoteNode {
 }
 
 impl RemoteNode {
-    pub fn new(zxio: Arc<syncio::Zxio>, rights: fio::Flags) -> Self {
+    pub fn new(zxio: syncio::Zxio, rights: fio::Flags) -> Self {
         Self { zxio, rights }
     }
 }
@@ -429,7 +429,7 @@ pub fn create_fuchsia_pipe(
 }
 
 fn fetch_and_refresh_info_impl<'a>(
-    zxio: &Arc<syncio::Zxio>,
+    zxio: &syncio::Zxio,
     info: &'a RwLock<FsNodeInfo>,
 ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
     let attrs = zxio
@@ -570,9 +570,10 @@ impl FsNodeOps for RemoteNode {
                         return error!(ENOKEY);
                     }
                 }
-                // For directories we need to clone the connection because we rely on the seek offset.
+                // For directories we need to deep-clone the connection because we rely on the seek
+                // offset.
                 return Ok(Box::new(RemoteDirectoryObject::new(
-                    (*self.zxio).clone().map_err(|status| from_status_like_fdio!(status))?,
+                    self.zxio.deep_clone().map_err(|status| from_status_like_fdio!(status))?,
                 )));
             }
         }
@@ -585,7 +586,7 @@ impl FsNodeOps for RemoteNode {
             node.fsverity.lock().check_writable()?;
         }
 
-        // For files we can clone the `Arc<Zxio>` because we don't rely on any per-connection state
+        // For files we can clone the `Zxio` because we don't rely on any per-connection state
         // (i.e. the file offset).
         Ok(Box::new(RemoteFileObject::new(self.zxio.clone())))
     }
@@ -615,37 +616,36 @@ impl FsNodeOps for RemoteNode {
             has: zxio_node_attr_has_t { id: true, ..Default::default() },
             ..Default::default()
         };
-        zxio = Arc::new(
-            self.zxio
-                .open(
-                    name,
-                    fio::Flags::FLAG_MUST_CREATE
-                        | fio::Flags::PROTOCOL_FILE
-                        | fio::Flags::PERM_READ_BYTES
-                        | fio::Flags::PERM_WRITE_BYTES
-                        | fio::Flags::PERM_GET_ATTRIBUTES
-                        | fio::Flags::PERM_UPDATE_ATTRIBUTES
-                        | fio::Flags::PERM_MODIFY_DIRECTORY,
-                    ZxioOpenOptions::new(
-                        Some(&mut attrs),
-                        Some(zxio_node_attributes_t {
-                            mode: mode.bits(),
-                            uid: owner.uid,
-                            gid: owner.gid,
-                            rdev: dev.bits(),
-                            has: zxio_node_attr_has_t {
-                                mode: true,
-                                uid: true,
-                                gid: true,
-                                rdev: true,
-                                ..Default::default()
-                            },
+        zxio = self
+            .zxio
+            .open(
+                name,
+                fio::Flags::FLAG_MUST_CREATE
+                    | fio::Flags::PROTOCOL_FILE
+                    | fio::Flags::PERM_READ_BYTES
+                    | fio::Flags::PERM_WRITE_BYTES
+                    | fio::Flags::PERM_GET_ATTRIBUTES
+                    | fio::Flags::PERM_UPDATE_ATTRIBUTES
+                    | fio::Flags::PERM_MODIFY_DIRECTORY,
+                ZxioOpenOptions::new(
+                    Some(&mut attrs),
+                    Some(zxio_node_attributes_t {
+                        mode: mode.bits(),
+                        uid: owner.uid,
+                        gid: owner.gid,
+                        rdev: dev.bits(),
+                        has: zxio_node_attr_has_t {
+                            mode: true,
+                            uid: true,
+                            gid: true,
+                            rdev: true,
                             ..Default::default()
-                        }),
-                    ),
-                )
-                .map_err(|status| from_status_like_fdio!(status, name))?,
-        );
+                        },
+                        ..Default::default()
+                    }),
+                ),
+            )
+            .map_err(|status| from_status_like_fdio!(status, name))?;
         node_id = attrs.id;
 
         let ops = if mode.is_reg() {
@@ -687,32 +687,31 @@ impl FsNodeOps for RemoteNode {
             has: zxio_node_attr_has_t { id: true, ..Default::default() },
             ..Default::default()
         };
-        zxio = Arc::new(
-            self.zxio
-                .open(
-                    name,
-                    fio::Flags::FLAG_MUST_CREATE
-                        | fio::Flags::PROTOCOL_DIRECTORY
-                        | fio::PERM_READABLE
-                        | fio::PERM_WRITABLE,
-                    ZxioOpenOptions::new(
-                        Some(&mut attrs),
-                        Some(zxio_node_attributes_t {
-                            mode: mode.bits(),
-                            uid: owner.uid,
-                            gid: owner.gid,
-                            has: zxio_node_attr_has_t {
-                                mode: true,
-                                uid: true,
-                                gid: true,
-                                ..Default::default()
-                            },
+        zxio = self
+            .zxio
+            .open(
+                name,
+                fio::Flags::FLAG_MUST_CREATE
+                    | fio::Flags::PROTOCOL_DIRECTORY
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE,
+                ZxioOpenOptions::new(
+                    Some(&mut attrs),
+                    Some(zxio_node_attributes_t {
+                        mode: mode.bits(),
+                        uid: owner.uid,
+                        gid: owner.gid,
+                        has: zxio_node_attr_has_t {
+                            mode: true,
+                            uid: true,
+                            gid: true,
                             ..Default::default()
-                        }),
-                    ),
-                )
-                .map_err(|status| from_status_like_fdio!(status, name))?,
-        );
+                        },
+                        ..Default::default()
+                    }),
+                ),
+            )
+            .map_err(|status| from_status_like_fdio!(status, name))?;
         node_id = attrs.id;
 
         let ops = RemoteNode { zxio, rights: self.rights };
@@ -775,11 +774,10 @@ impl FsNodeOps for RemoteNode {
         if let Some(buffer) = &mut cached_context {
             options = options.with_selinux_context_read(buffer).unwrap();
         }
-        zxio = Arc::new(
-            self.zxio
-                .open(name, self.rights, options)
-                .map_err(|status| from_status_like_fdio!(status, name))?,
-        );
+        zxio = self
+            .zxio
+            .open(name, self.rights, options)
+            .map_err(|status| from_status_like_fdio!(status, name))?;
         let symlink_zxio = zxio.clone();
         mode = get_mode(&attrs);
         node_id = attrs.id;
@@ -949,11 +947,10 @@ impl FsNodeOps for RemoteNode {
         node.fail_if_locked(current_task)?;
 
         let name = get_name_str(name)?;
-        let zxio = Arc::new(
-            self.zxio
-                .create_symlink(name, target)
-                .map_err(|status| from_status_like_fdio!(status))?,
-        );
+        let zxio = self
+            .zxio
+            .create_symlink(name, target)
+            .map_err(|status| from_status_like_fdio!(status))?;
 
         let fs = node.fs();
         let fs_ops = RemoteFs::from_fs(&fs);
@@ -1007,31 +1004,30 @@ impl FsNodeOps for RemoteNode {
         // there exist fuchsia flags `fio::FLAG_TEMPORARY_AS_NOT_LINKABLE`, the starnix vfs already
         // handles this case and makes sure that the created file is not linkable. There is also no
         // current way of passing the open flags to this function.
-        zxio = Arc::new(
-            self.zxio
-                .open(
-                    ".",
-                    fio::Flags::PROTOCOL_FILE
-                        | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
-                        | self.rights,
-                    ZxioOpenOptions::new(
-                        Some(&mut attrs),
-                        Some(zxio_node_attributes_t {
-                            mode: mode.bits(),
-                            uid: owner.uid,
-                            gid: owner.gid,
-                            has: zxio_node_attr_has_t {
-                                mode: true,
-                                uid: true,
-                                gid: true,
-                                ..Default::default()
-                            },
+        zxio = self
+            .zxio
+            .open(
+                ".",
+                fio::Flags::PROTOCOL_FILE
+                    | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                    | self.rights,
+                ZxioOpenOptions::new(
+                    Some(&mut attrs),
+                    Some(zxio_node_attributes_t {
+                        mode: mode.bits(),
+                        uid: owner.uid,
+                        gid: owner.gid,
+                        has: zxio_node_attr_has_t {
+                            mode: true,
+                            uid: true,
+                            gid: true,
                             ..Default::default()
-                        }),
-                    ),
-                )
-                .map_err(|status| from_status_like_fdio!(status))?,
-        );
+                        },
+                        ..Default::default()
+                    }),
+                ),
+            )
+            .map_err(|status| from_status_like_fdio!(status))?;
         node_id = attrs.id;
 
         let ops = Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>;
@@ -1085,11 +1081,9 @@ impl FsNodeOps for RemoteNode {
     ) -> Result<(), Errno> {
         // Before forgetting this node, update atime if we need to.
         if info.pending_time_access_update {
-            // Expect `Arc::try_unwrap` to succeed as we shouldn't be forgetting a node if there are
-            // other references around.
-            let zxio = Arc::try_unwrap(self.zxio)
-                .expect("should not forget remotefs nodes that have multiple references");
-            zxio.close_and_update_access_time().map_err(|status| from_status_like_fdio!(status))?;
+            self.zxio
+                .close_and_update_access_time()
+                .map_err(|status| from_status_like_fdio!(status))?;
         }
         Ok(())
     }
@@ -1135,7 +1129,7 @@ impl FsNodeOps for RemoteNode {
 }
 
 struct RemoteSpecialNode {
-    zxio: Arc<syncio::Zxio>,
+    zxio: syncio::Zxio,
 }
 
 impl FsNodeOps for RemoteSpecialNode {
@@ -1460,7 +1454,7 @@ impl FileOps for RemoteDirectoryObject {
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         self.zxio
-            .clone()
+            .deep_clone()
             .and_then(Zxio::release)
             .map(Some)
             .map_err(|status| from_status_like_fdio!(status))
@@ -1470,7 +1464,7 @@ impl FileOps for RemoteDirectoryObject {
 pub struct RemoteFileObject {
     /// The underlying Zircon I/O object.  This is shared, so we must take care not to use any
     /// stateful methods on the underlying object (reading and writing is fine).
-    zxio: Arc<Zxio>,
+    zxio: Zxio,
 
     /// Cached read-only VMO handle.
     read_only_memory: OnceCell<Arc<MemoryObject>>,
@@ -1480,9 +1474,9 @@ pub struct RemoteFileObject {
 }
 
 impl RemoteFileObject {
-    fn new(zxio: impl Into<Arc<Zxio>>) -> RemoteFileObject {
+    fn new(zxio: Zxio) -> RemoteFileObject {
         RemoteFileObject {
-            zxio: zxio.into(),
+            zxio,
             read_only_memory: Default::default(),
             read_exec_memory: Default::default(),
         }
@@ -1555,8 +1549,7 @@ impl FileOps for RemoteFileObject {
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         self.zxio
-            .as_ref()
-            .clone()
+            .deep_clone()
             .and_then(Zxio::release)
             .map(Some)
             .map_err(|status| from_status_like_fdio!(status))
@@ -1588,11 +1581,11 @@ impl FileOps for RemoteFileObject {
 }
 
 struct RemoteSymlink {
-    zxio: Mutex<Arc<syncio::Zxio>>,
+    zxio: Mutex<syncio::Zxio>,
 }
 
 impl RemoteSymlink {
-    fn zxio(&self) -> Arc<syncio::Zxio> {
+    fn zxio(&self) -> syncio::Zxio {
         self.zxio.lock().clone()
     }
 }
@@ -1630,11 +1623,9 @@ impl FsNodeOps for RemoteSymlink {
     ) -> Result<(), Errno> {
         // Before forgetting this node, update atime if we need to.
         if info.pending_time_access_update {
-            // Expect `Arc::try_unwrap` to succeed as we shouldn't be forgetting a node if there are
-            // other references around.
-            let zxio = Arc::try_unwrap(self.zxio.into_inner())
-                .expect("should not forget remotefs nodes that have multiple references");
-            zxio.close_and_update_access_time().map_err(|status| from_status_like_fdio!(status))?;
+            self.zxio()
+                .close_and_update_access_time()
+                .map_err(|status| from_status_like_fdio!(status))?;
         }
         Ok(())
     }

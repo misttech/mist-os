@@ -19,7 +19,7 @@ use starnix_uapi::vfs::FdEvents;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Weak};
 use syncio::zxio::zxio_signals_t;
-use syncio::{Zxio, ZxioSignals};
+use syncio::{ZxioSignals, ZxioWeak};
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum ReadyItemKey {
@@ -109,7 +109,7 @@ impl EventHandler {
 }
 
 pub struct ZxioSignalHandler {
-    pub zxio: Arc<Zxio>,
+    pub zxio: ZxioWeak,
     pub get_events_from_zxio_signals: fn(zxio_signals_t) -> FdEvents,
 }
 
@@ -141,7 +141,11 @@ impl SignalHandler {
         let events = match inner {
             SignalHandlerInner::None => None,
             SignalHandlerInner::Zxio(ZxioSignalHandler { zxio, get_events_from_zxio_signals }) => {
-                Some(get_events_from_zxio_signals(zxio.wait_end(signals)))
+                if let Some(zxio) = zxio.upgrade() {
+                    Some(get_events_from_zxio_signals(zxio.wait_end(signals)))
+                } else {
+                    None
+                }
             }
             SignalHandlerInner::ZxHandle(get_events_from_zx_signals) => {
                 Some(get_events_from_zx_signals(signals))
@@ -180,7 +184,7 @@ struct WaitCancelerQueue {
 }
 
 struct WaitCancelerZxio {
-    zxio: Weak<Zxio>,
+    zxio: ZxioWeak,
     inner: HandleWaitCanceler,
 }
 
@@ -246,7 +250,7 @@ impl WaitCanceler {
         Self { cancellers: Default::default() }
     }
 
-    pub fn new_zxio(zxio: Weak<Zxio>, inner: HandleWaitCanceler) -> Self {
+    pub fn new_zxio(zxio: ZxioWeak, inner: HandleWaitCanceler) -> Self {
         Self::new_inner(WaitCancelerInner::Zxio(WaitCancelerZxio { zxio, inner }))
     }
 

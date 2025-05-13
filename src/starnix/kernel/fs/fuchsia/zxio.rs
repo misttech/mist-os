@@ -9,7 +9,6 @@ use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::vfs::FdEvents;
 
-use std::sync::Arc;
 use syncio::{zxio, Zxio, ZxioSignals};
 
 fn get_zxio_signals_from_events(events: FdEvents) -> zxio::zxio_signals_t {
@@ -65,7 +64,7 @@ fn get_events_from_zxio_signals(signals: zxio::zxio_signals_t) -> FdEvents {
 }
 
 pub fn zxio_wait_async(
-    zxio: &Arc<Zxio>,
+    zxio: &Zxio,
     waiter: &Waiter,
     events: FdEvents,
     event_handler: EventHandler,
@@ -80,7 +79,7 @@ pub fn zxio_wait_async(
 
     let signal_handler = SignalHandler {
         inner: SignalHandlerInner::Zxio(ZxioSignalHandler {
-            zxio: zxio.clone(),
+            zxio: zxio.downgrade(),
             get_events_from_zxio_signals,
         }),
         event_handler,
@@ -89,12 +88,12 @@ pub fn zxio_wait_async(
 
     // unwrap OK here as errors are only generated from misuse
     WaitCanceler::new_zxio(
-        Arc::downgrade(zxio),
+        zxio.downgrade(),
         waiter.wake_on_zircon_signals(&handle, signals, signal_handler).unwrap(),
     )
 }
 
-pub fn zxio_query_events(zxio: &Arc<Zxio>) -> Result<FdEvents, Errno> {
+pub fn zxio_query_events(zxio: &Zxio) -> Result<FdEvents, Errno> {
     let (handle, signals) = zxio.wait_begin(ZxioSignals::all().bits());
     let observed_signals = if handle.is_invalid() {
         zx::Signals::empty()

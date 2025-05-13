@@ -29,7 +29,7 @@ use ebpf_api::SOCKET_FILTER_CBPF_CONFIG;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 use syncio::zxio::{
     zxio_socket_mark, IP_RECVERR, SOL_IP, SOL_SOCKET, SO_DOMAIN, SO_FUCHSIA_MARK, SO_MARK,
     SO_PROTOCOL, SO_TYPE, ZXIO_SOCKET_MARK_DOMAIN_1, ZXIO_SOCKET_MARK_DOMAIN_2,
@@ -87,7 +87,7 @@ impl ServiceConnector for SocketProviderServiceConnector {
 /// A socket backed by an underlying Zircon I/O object.
 pub struct ZxioBackedSocket {
     /// The underlying Zircon I/O object.
-    zxio: Arc<syncio::Zxio>,
+    zxio: syncio::Zxio,
 }
 
 impl ZxioBackedSocket {
@@ -115,7 +115,7 @@ impl ZxioBackedSocket {
     }
 
     pub fn new_with_zxio(zxio: syncio::Zxio) -> ZxioBackedSocket {
-        ZxioBackedSocket { zxio: Arc::new(zxio) }
+        ZxioBackedSocket { zxio }
     }
 
     pub fn sendmsg(
@@ -376,7 +376,7 @@ impl SocketOps for ZxioBackedSocket {
             .map_err(|out_code| errno_from_zxio_code!(out_code))?;
 
         Ok(Socket::new_with_ops_and_info(
-            Box::new(ZxioBackedSocket { zxio: Arc::new(zxio) }),
+            Box::new(ZxioBackedSocket { zxio }),
             socket.domain,
             socket.socket_type,
             socket.protocol,
@@ -620,8 +620,7 @@ impl SocketOps for ZxioBackedSocket {
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         self.zxio
-            .as_ref()
-            .clone()
+            .deep_clone()
             .and_then(Zxio::release)
             .map(Some)
             .map_err(|status| from_status_like_fdio!(status))

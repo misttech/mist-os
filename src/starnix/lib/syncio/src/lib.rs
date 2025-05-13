@@ -11,6 +11,7 @@ use bstr::BString;
 use fidl::encoding::const_assert_eq;
 use fidl::endpoints::SynchronousProxy;
 use fidl_fuchsia_io as fio;
+use pin_weak::sync::PinWeak;
 use std::cell::OnceCell;
 use std::ffi::CStr;
 use std::marker::PhantomData;
@@ -18,6 +19,7 @@ use std::mem::{size_of, size_of_val, MaybeUninit};
 use std::num::TryFromIntError;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::pin::Pin;
+use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, TryFromBytes};
 use zx::{self as zx, AsHandleRef as _, HandleBased as _};
 use zxio::{
@@ -524,18 +526,26 @@ struct ZxioStorage {
 /// Note: the underlying storage backing the object is pinned on the heap
 /// because it can contain self referential data.
 pub struct Zxio {
-    inner: Pin<Box<ZxioStorage>>,
+    inner: Pin<Arc<ZxioStorage>>,
 }
 
 impl Default for Zxio {
     fn default() -> Self {
-        Self { inner: Box::pin(ZxioStorage::default()) }
+        Self { inner: Arc::pin(ZxioStorage::default()) }
     }
 }
 
 impl std::fmt::Debug for Zxio {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Zxio").finish()
+    }
+}
+
+pub struct ZxioWeak(PinWeak<ZxioStorage>);
+
+impl ZxioWeak {
+    pub fn upgrade(&self) -> Option<Zxio> {
+        Some(Zxio { inner: self.0.upgrade()? })
     }
 }
 
@@ -843,7 +853,7 @@ impl Zxio {
         Ok(actual)
     }
 
-    pub fn clone(&self) -> Result<Zxio, zx::Status> {
+    pub fn deep_clone(&self) -> Result<Zxio, zx::Status> {
         Zxio::create(self.clone_handle()?)
     }
 
@@ -852,6 +862,10 @@ impl Zxio {
         let status = unsafe { zxio::zxio_clone(self.as_ptr(), &mut handle) };
         zx::ok(status)?;
         unsafe { Ok(zx::Handle::from_raw(handle)) }
+    }
+
+    pub fn downgrade(&self) -> ZxioWeak {
+        ZxioWeak(PinWeak::downgrade(self.inner.clone()))
     }
 
     pub fn read_at(&self, offset: u64, data: &mut [u8]) -> Result<usize, zx::Status> {
@@ -1528,11 +1542,22 @@ impl Zxio {
     }
 }
 
-impl Drop for Zxio {
+impl Drop for ZxioStorage {
     fn drop(&mut self) {
+        // `zxio_destroy` should be called once only when `ZxioStorage` is dropped, just before the
+        // `zxio_storage_t` memory is deallocated. Operations on an upgraded `ZxioWeak`,
+        // like WaitCanceler, will then always operate on a non-poisoned `zxio_t as long as the
+        // `ZxioStorage` is alive.
+        let zxio_ptr: *mut zxio::zxio_t = &mut self.storage.io;
         unsafe {
-            zxio::zxio_destroy(self.as_ptr());
+            zxio::zxio_destroy(zxio_ptr);
         };
+    }
+}
+
+impl Clone for Zxio {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone() }
     }
 }
 
