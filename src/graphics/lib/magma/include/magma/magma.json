@@ -421,7 +421,7 @@
                 "name": "magma_connection_execute_immediate_commands",
                 "type": "magma_status_t",
                 "description": "Submits a series of commands for execution on the hardware without using a command buffer.",
-                "attributes": "MAGMA_DEPRECATED_SINCE(1, NEXT, \"use magma_connection_execute_inline_commands\")",
+                "attributes": "MAGMA_DEPRECATED_SINCE(1, 27, \"use magma_connection_execute_inline_commands\")",
                 "arguments": [
                     {
                         "name": "connection",
@@ -450,7 +450,7 @@
                 "name": "magma_connection_execute_inline_commands",
                 "type": "magma_status_t",
                 "description": "Submits a series of commands for execution on the hardware without using a command buffer.",
-                "attributes": "MAGMA_AVAILABLE_SINCE(NEXT)",
+                "attributes": "MAGMA_AVAILABLE_SINCE(27)",
                 "arguments": [
                     {
                         "name": "connection",

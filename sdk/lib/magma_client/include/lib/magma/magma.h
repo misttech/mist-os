@@ -262,7 +262,7 @@ MAGMA_EXPORT magma_status_t magma_connection_execute_immediate_commands(
     uint32_t context_id,
     uint64_t command_count,
     magma_inline_command_buffer_t* command_buffers)
-MAGMA_DEPRECATED_SINCE(1, NEXT, "use magma_connection_execute_inline_commands");
+MAGMA_DEPRECATED_SINCE(1, 27, "use magma_connection_execute_inline_commands");
 
 ///
 /// \brief Submits a series of commands for execution on the hardware without using a command
@@ -277,7 +277,7 @@ MAGMA_EXPORT magma_status_t magma_connection_execute_inline_commands(
     uint32_t context_id,
     uint64_t command_count,
     magma_inline_command_buffer_t* command_buffers)
-MAGMA_AVAILABLE_SINCE(NEXT);
+MAGMA_AVAILABLE_SINCE(27);
 
 ///
 /// \brief Incurs a round-trip to the system driver, used to ensure all previous messages have been
