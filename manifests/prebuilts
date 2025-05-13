@@ -538,7 +538,7 @@
     <!-- Packages in /fuchsia/infra -->
     <package name="fuchsia/infra/artifacts/${platform}"
              path="prebuilt/tools/artifacts"
-             version="git_revision:ea65604aeedbd31f3fdcd1ef979882c07bacc2aa"
+             version="git_revision:44d44ad8f72ddef1148012b7cf48c980b8581097"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"/>
     <package name="fuchsia/infra/lkg/${platform}"
              path="prebuilt/tools/lkg"
