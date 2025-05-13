@@ -284,7 +284,7 @@ pub enum TelemetryEvent {
     Disconnected {
         /// Indicates whether subsequent period should be used to increment the downtime counters.
         track_subsequent_downtime: bool,
-        info: DisconnectInfo,
+        info: Option<DisconnectInfo>,
     },
     OnSignalReport {
         ind: fidl_internal::SignalReportIndication,
@@ -611,7 +611,7 @@ struct ConnectedState {
 #[derive(Debug)]
 pub struct DisconnectedState {
     disconnected_since: fasync::MonotonicInstant,
-    disconnect_info: DisconnectInfo,
+    disconnect_info: Option<DisconnectInfo>,
     connect_start_time: Option<fasync::MonotonicInstant>,
     /// The latest time when the device's no saved neighbor duration was accounted.
     /// If this has a value, then conceptually we say that "no saved neighbor" flag
@@ -1251,13 +1251,18 @@ impl Telemetry {
                             total_downtime - state.accounted_no_saved_neighbor_duration,
                             zx::MonotonicDuration::from_seconds(0),
                         );
-                        self.stats_logger
-                            .log_downtime_cobalt_metrics(adjusted_downtime, &state.disconnect_info)
-                            .await;
-                        let disconnect_source = state.disconnect_info.disconnect_source;
-                        self.stats_logger
-                            .log_reconnect_cobalt_metrics(total_downtime, disconnect_source)
-                            .await;
+
+                        if let Some(disconnect_info) = state.disconnect_info.as_ref() {
+                            self.stats_logger
+                                .log_downtime_cobalt_metrics(adjusted_downtime, disconnect_info)
+                                .await;
+                            self.stats_logger
+                                .log_reconnect_cobalt_metrics(
+                                    total_downtime,
+                                    disconnect_info.disconnect_source,
+                                )
+                                .await;
+                        }
                     }
 
                     // Log successful post-recovery connection attempt if relevant.
@@ -1394,38 +1399,40 @@ impl Telemetry {
                 }
             }
             TelemetryEvent::Disconnected { track_subsequent_downtime, info } => {
-                // Any completed SME operation tells us the SME is operational.
-                self.report_sme_timeout_resolved().await;
+                let mut connect_start_time = None;
 
-                self.log_disconnect_event_inspect(&info);
-                self.stats_logger
-                    .log_stat(StatOp::AddDisconnectCount(info.disconnect_source))
-                    .await;
-                self.stats_logger
-                    .log_pre_disconnect_score_deltas_by_signal(
-                        info.connected_duration,
-                        info.signals.clone(),
-                    )
-                    .await;
-                self.stats_logger
-                    .log_pre_disconnect_rssi_deltas(info.connected_duration, info.signals.clone())
-                    .await;
-                let duration = now - self.last_checked_connection_state;
-                match &self.connection_state {
-                    ConnectionState::Connected(state) => {
+                // Disconnect info is expected to be None when something unexpectedly fails beneath
+                // the SME. This case is very rare, so we're ok with missing metrics in this case.
+                if let Some(info) = info.as_ref() {
+                    // Any completed SME operation tells us the SME is operational.
+                    // A caveat here is that empty disconnect info indicates that something beneath
+                    // SME has failed.
+                    self.report_sme_timeout_resolved().await;
+
+                    self.log_disconnect_event_inspect(info);
+                    self.stats_logger
+                        .log_stat(StatOp::AddDisconnectCount(info.disconnect_source))
+                        .await;
+                    self.stats_logger
+                        .log_pre_disconnect_score_deltas_by_signal(
+                            info.connected_duration,
+                            info.signals.clone(),
+                        )
+                        .await;
+                    self.stats_logger
+                        .log_pre_disconnect_rssi_deltas(
+                            info.connected_duration,
+                            info.signals.clone(),
+                        )
+                        .await;
+
+                    // If we are in the connected state, log the disconnect and short connection
+                    // metric if applicable.
+                    if let ConnectionState::Connected(state) = &self.connection_state {
                         self.stats_logger
-                            .log_disconnect_cobalt_metrics(&info, state.multiple_bss_candidates)
+                            .log_disconnect_cobalt_metrics(info, state.multiple_bss_candidates)
                             .await;
-                        self.stats_logger.queue_stat_op(StatOp::AddConnectedDuration(duration));
-                        // Log device connected to AP metrics right now in case we have not logged it
-                        // to Cobalt yet today.
-                        self.stats_logger
-                            .log_device_connected_cobalt_metrics(
-                                state.multiple_bss_candidates,
-                                &state.ap_state,
-                                state.network_is_likely_hidden,
-                            )
-                            .await;
+
                         // Log metrics if connection had a short duration.
                         if info.connected_duration < METRICS_SHORT_CONNECT_DURATION {
                             self.stats_logger
@@ -1437,22 +1444,36 @@ impl Telemetry {
                                 .await;
                         }
                     }
+
+                    // If `is_sme_reconnecting` is true, we already know that the process of
+                    // establishing connection is already started at the moment of disconnect,
+                    // so set the connect_start_time to now.
+                    if info.is_sme_reconnecting {
+                        connect_start_time = Some(now);
+                    } else if let ConnectionState::Connected(state) = &self.connection_state {
+                        connect_start_time = state.new_connect_start_time
+                    }
+                }
+
+                let duration = now - self.last_checked_connection_state;
+                match &self.connection_state {
+                    ConnectionState::Connected(state) => {
+                        self.stats_logger.queue_stat_op(StatOp::AddConnectedDuration(duration));
+                        // Log device connected to AP metrics right now in case we have not logged it
+                        // to Cobalt yet today.
+                        self.stats_logger
+                            .log_device_connected_cobalt_metrics(
+                                state.multiple_bss_candidates,
+                                &state.ap_state,
+                                state.network_is_likely_hidden,
+                            )
+                            .await;
+                    }
                     _ => {
                         warn!("Received disconnect event while not connected. Metric may not be logged");
                     }
                 }
 
-                let connect_start_time = if info.is_sme_reconnecting {
-                    // If `is_sme_reconnecting` is true, we already know that the process of
-                    // establishing connection is already started at the moment of disconnect,
-                    // so set the connect_start_time to now.
-                    Some(now)
-                } else {
-                    match &self.connection_state {
-                        ConnectionState::Connected(state) => state.new_connect_start_time,
-                        _ => None,
-                    }
-                };
                 self.connection_state = if track_subsequent_downtime {
                     ConnectionState::Disconnected(DisconnectedState {
                         disconnected_since: now,
@@ -5019,7 +5040,7 @@ mod tests {
 
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
             track_subsequent_downtime: false,
-            info: fake_disconnect_info(),
+            info: Some(fake_disconnect_info()),
         });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
@@ -5059,6 +5080,86 @@ mod tests {
                 }
             }
         });
+    }
+
+    #[fuchsia::test]
+    fn test_log_disconnect_on_recovery() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Boilerplate for creating a Telemetry struct
+        let (sender, _receiver) = mpsc::channel::<TelemetryEvent>(TELEMETRY_EVENT_BUFFER_SIZE);
+        let (monitor_svc_proxy, _monitor_svc_stream) =
+            create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>();
+        let (cobalt_1dot1_proxy, mut cobalt_1dot1_stream) =
+            create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
+        let inspector = Inspector::default();
+        let inspect_node = inspector.root().create_child("stats");
+        let external_inspect_node = inspector.root().create_child("external");
+        let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
+
+        // Create a telemetry struct and initialize it to be in the connected state.
+        let mut telemetry = Telemetry::new(
+            TelemetrySender::new(sender),
+            monitor_svc_proxy,
+            cobalt_1dot1_proxy.clone(),
+            inspect_node,
+            external_inspect_node,
+            persistence_req_sender,
+            defect_sender,
+        );
+
+        telemetry.connection_state = ConnectionState::Connected(ConnectedState {
+            iface_id: 0,
+            new_connect_start_time: None,
+            prev_connection_stats: None,
+            multiple_bss_candidates: false,
+            ap_state: generate_random_ap_state(),
+            network_is_likely_hidden: false,
+            last_signal_report: fasync::MonotonicInstant::now(),
+            num_consecutive_get_counter_stats_failures: InspectableU64::new(
+                0,
+                &telemetry.inspect_node,
+                "num_consecutive_get_counter_stats_failures",
+            ),
+            is_driver_unresponsive: InspectableBool::new(
+                false,
+                &telemetry.inspect_node,
+                "is_driver_unresponsive",
+            ),
+            telemetry_proxy: None,
+        });
+
+        {
+            // Send a disconnect event with empty disconnect info.
+            let fut = telemetry.handle_telemetry_event(TelemetryEvent::Disconnected {
+                track_subsequent_downtime: false,
+                info: None,
+            });
+            let mut fut = pin!(fut);
+
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+            // There should be a single batch logging event.
+            assert_variant!(
+                exec.run_until_stalled(&mut cobalt_1dot1_stream.next()),
+                Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogMetricEvents {
+                    events: _,
+                    responder
+                }))) => {
+                    responder.send(Ok(())).expect("failed to send response");
+                }
+            );
+
+            // And then the future should run to completion.
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        }
+
+        // Verify that the telemetry state has transitioned to idle.
+        assert_variant!(
+            telemetry.connection_state,
+            ConnectionState::Idle(IdleState { connect_start_time: None })
+        );
     }
 
     #[fuchsia::test]
@@ -5116,9 +5217,10 @@ mod tests {
 
         // Disconnect now
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_hours(8), test_fut.as_mut());
@@ -5328,9 +5430,10 @@ mod tests {
 
         // Disconnect but not track downtime. Downtime counter should not increase.
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(10), test_fut.as_mut());
@@ -5352,9 +5455,10 @@ mod tests {
 
         // Disconnect and track downtime. Downtime counter should now increase
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(15), test_fut.as_mut());
@@ -5385,9 +5489,10 @@ mod tests {
 
         // Disconnect but not track downtime. Downtime counter should not increase.
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // The 5 seconds connected duration is not accounted for yet.
@@ -5433,9 +5538,10 @@ mod tests {
 
         // Disconnect and track downtime.
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_seconds(5), test_fut.as_mut());
@@ -5523,9 +5629,10 @@ mod tests {
 
         // Disconnect but don't track downtime
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
 
         // Indicate that there's no saved neighbor in vicinity
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
@@ -5655,9 +5762,10 @@ mod tests {
             }),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
@@ -5681,9 +5789,10 @@ mod tests {
             ),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
@@ -5709,9 +5818,10 @@ mod tests {
             ),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
@@ -5748,9 +5858,10 @@ mod tests {
             }),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         let time_series = test_helper.get_time_series(&mut test_fut);
@@ -6216,9 +6327,10 @@ mod tests {
         test_helper.advance_by(zx::MonotonicDuration::from_hours(12), test_fut.as_mut());
 
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_hours(6), test_fut.as_mut());
@@ -6252,9 +6364,10 @@ mod tests {
         test_helper.advance_by(zx::MonotonicDuration::from_hours(6), test_fut.as_mut());
 
         let info = DisconnectInfo { disconnect_source, ..fake_disconnect_info() };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
         test_helper.drain_cobalt_events(&mut test_fut);
     }
@@ -6384,9 +6497,10 @@ mod tests {
             ),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
         test_helper.advance_by(zx::MonotonicDuration::from_hours(12), test_fut.as_mut());
 
@@ -6412,9 +6526,10 @@ mod tests {
 
         test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_hours(23), test_fut.as_mut());
@@ -6593,9 +6708,10 @@ mod tests {
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(30), test_fut.as_mut());
 
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(15), test_fut.as_mut());
@@ -6919,7 +7035,7 @@ mod tests {
         };
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
             track_subsequent_downtime: true,
-            info: info.clone(),
+            info: Some(info.clone()),
         });
 
         test_helper.send_connected_event(random_bss_description!(Wpa2));
@@ -6934,7 +7050,7 @@ mod tests {
         };
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
             track_subsequent_downtime: true,
-            info: info.clone(),
+            info: Some(info.clone()),
         });
 
         test_helper.send_connected_event(random_bss_description!(Wpa2));
@@ -6948,7 +7064,7 @@ mod tests {
         };
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
             track_subsequent_downtime: true,
-            info: info.clone(),
+            info: Some(info.clone()),
         });
 
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -6995,9 +7111,10 @@ mod tests {
             ap_state,
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         let policy_disconnection_reasons =
@@ -7131,9 +7248,10 @@ mod tests {
             ),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         // Check that a count was logged for a disconnect from a user requested network change.
@@ -7689,9 +7807,10 @@ mod tests {
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: true });
         test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         test_helper.advance_by(zx::MonotonicDuration::from_seconds(4), test_fut.as_mut());
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -7720,9 +7839,10 @@ mod tests {
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: true });
         test_helper.telemetry_sender.send(TelemetryEvent::ClearEstablishConnectionStartTime);
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         test_helper
             .telemetry_sender
@@ -7749,9 +7869,10 @@ mod tests {
         test_helper.cobalt_events.clear();
 
         let info = DisconnectInfo { is_sme_reconnecting: true, ..fake_disconnect_info() };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -7778,9 +7899,10 @@ mod tests {
             }),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(42), test_fut.as_mut());
@@ -7832,9 +7954,10 @@ mod tests {
             }),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_seconds(3), test_fut.as_mut());
@@ -7872,9 +7995,10 @@ mod tests {
             ),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
         let downtime = 5_000_000;
         test_helper.advance_by(zx::MonotonicDuration::from_micros(downtime), test_fut.as_mut());
@@ -8087,9 +8211,10 @@ mod tests {
         test_helper.cobalt_events.clear();
 
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         // Verify that on disconnect, device connected metric is also logged.
@@ -9420,11 +9545,11 @@ mod tests {
         },
         TelemetryEvent::Disconnected {
             track_subsequent_downtime: false,
-            info: fake_disconnect_info(),
+            info: Some(fake_disconnect_info()),
         },
         TelemetryEvent::Disconnected {
             track_subsequent_downtime: false,
-            info: fake_disconnect_info(),
+            info: Some(fake_disconnect_info()),
         },
         metrics::TIMEOUT_RECOVERY_OUTCOME_METRIC_ID,
         vec![RecoveryOutcome::Success as u32, TimeoutRecoveryMechanism::PhyReset as u32] ;
@@ -9685,7 +9810,7 @@ mod tests {
         };
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
             track_subsequent_downtime: false,
-            info: disconnect_info,
+            info: Some(disconnect_info),
         });
 
         // Catch logged score delta metrics
@@ -9763,7 +9888,7 @@ mod tests {
         };
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
             track_subsequent_downtime: false,
-            info: disconnect_info,
+            info: Some(disconnect_info),
         });
         test_helper.drain_cobalt_events(&mut test_fut);
 
