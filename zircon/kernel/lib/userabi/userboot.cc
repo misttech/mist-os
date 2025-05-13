@@ -486,7 +486,7 @@ void userboot_init(HandoffEnd handoff_end) {
 
   // Send the bootstrap message.
   status = bootstrap_channel.Send(ktl::move(msg));
-  ASSERT(status == ZX_OK);
+  ASSERT_MSG(status == ZX_OK, "status=%d", status);
 
   kill_userboot.cancel();
 
