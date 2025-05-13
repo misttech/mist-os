@@ -2,8 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
+import("//src/lib/testing/sharding/fuchsia_sharded_test_package.gni")
 
 rustc_test("netlink_integration_test") {
   edition = "2021"
@@ -41,12 +41,19 @@ rustc_test("netlink_integration_test") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_unittest_component("netlink-integration-test") {
-  deps = [ ":netlink_integration_test" ]
-}
+fuchsia_sharded_test_package("netlink-integration-tests") {
+  test_components = [
+    {
+      name = "netlink-integration-test"
+      manifest = "meta/netlink-integration-test.cml"
+      deps = [ ":netlink_integration_test" ]
+      num_shards = 5
 
-fuchsia_test_package("netlink-integration-tests") {
-  test_components = [ ":netlink-integration-test" ]
+      # Matches the first `::`-delimited section of the test case name,
+      # or the whole name if there are no `::` delimiters.
+      shard_part_regex = "([^::]+)(?:::.*)?"
+    },
+  ]
   deps = [
     # netemul-sandbox is used to create hermetic test realms.
     "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
