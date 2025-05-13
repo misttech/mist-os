@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::cmd::{ManifestParams, OemFile};
 use crate::common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR};
 use crate::file_resolver::FileResolver;
 use crate::manifest::{from_in_tree, from_local_product_bundle, from_path, from_sdk};
@@ -12,6 +11,7 @@ use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use errors::ffx_bail;
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, RebootEvent, UploadProgress};
+use ffx_flash_manifest::{ManifestParams, OemFile};
 use futures::prelude::*;
 use futures::try_join;
 use pbms::is_local_product_bundle;
@@ -27,7 +27,6 @@ pub const MISSING_CREDENTIALS: &str =
     "The flash manifest is missing the credential files to unlock this device.\n\
      Please unlock the target and try again.";
 
-pub mod cmd;
 pub mod crypto;
 pub mod vars;
 

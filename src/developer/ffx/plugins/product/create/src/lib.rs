@@ -16,7 +16,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use epoch::EpochFile;
 use ffx_config::sdk::{in_tree_sdk_version, SdkVersion};
 use ffx_config::EnvironmentContext;
-use ffx_fastboot::manifest::FlashManifestVersion;
+use ffx_flash_manifest::FlashManifestVersion;
 use ffx_product_create_args::CreateCommand;
 use ffx_writer::SimpleWriter;
 use fho::{return_bug, FfxMain, FfxTool};

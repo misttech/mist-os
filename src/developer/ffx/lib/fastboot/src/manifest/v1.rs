@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::boot::boot;
-use crate::common::cmd::{ManifestParams, OemFile};
 use crate::common::{
     flash_and_reboot, is_locked, Boot, Flash, Partition as PartitionTrait, Product as ProductTrait,
     Unlock, MISSING_PRODUCT, UNLOCK_ERR,
@@ -14,19 +13,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
+use ffx_flash_manifest::v1::{FlashManifest, Partition, Product};
+use ffx_flash_manifest::{ManifestParams, OemFile};
 use futures::try_join;
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{self, Sender};
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Product {
-    pub name: String,
-    pub bootloader_partitions: Vec<Partition>,
-    pub partitions: Vec<Partition>,
-    pub oem_files: Vec<OemFile>,
-    #[serde(default)]
-    pub requires_unlock: bool,
-}
 
 impl ProductTrait<Partition> for Product {
     fn bootloader_partitions(&self) -> &Vec<Partition> {
@@ -42,45 +32,23 @@ impl ProductTrait<Partition> for Product {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Partition(
-    String,
-    String,
-    #[serde(default)] Option<String>,
-    #[serde(default)] Option<String>,
-);
-
-impl Partition {
-    pub fn new(
-        name: String,
-        file: String,
-        variable: Option<String>,
-        variable_value: Option<String>,
-    ) -> Self {
-        Self(name, file, variable, variable_value)
-    }
-}
-
 impl PartitionTrait for Partition {
     fn name(&self) -> &str {
-        self.0.as_str()
+        self.name()
     }
 
     fn file(&self) -> &str {
-        self.1.as_str()
+        self.file()
     }
 
     fn variable(&self) -> Option<&str> {
-        self.2.as_ref().map(|s| s.as_str())
+        self.variable()
     }
 
     fn variable_value(&self) -> Option<&str> {
-        self.3.as_ref().map(|s| s.as_str())
+        self.variable_value()
     }
 }
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct FlashManifest(pub Vec<Product>);
 
 #[async_trait(?Send)]
 impl Flash for FlashManifest {

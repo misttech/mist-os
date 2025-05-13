@@ -13,7 +13,6 @@ use discovery::{
 use errors::ffx_bail;
 use fastboot_file_discovery::FASTBOOT_FILE_PATH;
 use ffx_config::EnvironmentContext;
-use ffx_fastboot::common::cmd::OemFile;
 use ffx_fastboot::common::from_manifest;
 use ffx_fastboot::util::{Event, UnlockEvent};
 use ffx_fastboot_connection_factory::{
@@ -21,6 +20,7 @@ use ffx_fastboot_connection_factory::{
 };
 use ffx_fastboot_interface::fastboot_interface::UploadProgress;
 use ffx_flash_args::FlashCommand;
+use ffx_flash_manifest::OemFile;
 use ffx_ssh::SshKeyFiles;
 use ffx_writer::VerifiedMachineWriter;
 use fho::{deferred, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool};
