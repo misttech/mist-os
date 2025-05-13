@@ -71,7 +71,7 @@ async fn test_no_errors_reboot_normal() {
     let realm_instance = build_test_realm(&reboot).await;
     let cmdline = read_starnix_file("/fs_root/proc/cmdline", &realm_instance).await;
     assert!(
-        cmdline.contains("android.bootreason=reboot,userrequested"),
+        cmdline.contains("androidboot.bootreason=reboot,userrequested"),
         "cmdline ({cmdline}) has wrong bootreason"
     );
 }
@@ -88,7 +88,7 @@ async fn test_kernel_panic() {
     let cmdline = read_starnix_file("/fs_root/proc/cmdline", &realm_instance).await;
 
     assert!(
-        cmdline.contains("android.bootreason=kernel_panic"),
+        cmdline.contains("androidboot.bootreason=kernel_panic"),
         "cmdline ({cmdline}) has wrong bootreason"
     );
 }

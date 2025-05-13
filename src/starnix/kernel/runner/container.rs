@@ -521,7 +521,7 @@ async fn create_container(
         }
     }
     if features.android_bootreason {
-        kernel_cmdline.extend(b" android.bootreason=");
+        kernel_cmdline.extend(b" androidboot.bootreason=");
         match get_android_bootreason() {
             Ok(reason) => {
                 kernel_cmdline.extend(reason.bytes());
