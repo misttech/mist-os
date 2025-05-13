@@ -15,9 +15,6 @@
     <hook name="install-environment"
           project="fuchsia"
           action="scripts/devshell/lib/add_symlink_to_bin.sh"/>
-    <hook name="gen-ssh-keys"
-          project="fuchsia"
-          action="tools/ssh-keys/gen-ssh-keys.sh"/>
     <hook name="create-ctf-releases-gni"
           project="fuchsia"
           action="sdk/ctf/build/internal/create_ctf_releases_gni.sh"/>
