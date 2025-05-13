@@ -245,7 +245,7 @@ def _simplify_process(process: JSON) -> dict[str, JSON]:
 def _simplify_processes(processes: JSON) -> list[JSON]:
     """Prepares `ffx profile memory` JSON data for BigQuery.
 
-    Turns a list of processes and a list of simplified processes.
+    Turns a list of processes into a list of simplified processes.
     """
     if not isinstance(processes, list):
         raise ValueError
@@ -257,6 +257,23 @@ def _with_vmos_removed(metrics_dict: JSON) -> dict[str, JSON]:
     if not isinstance(metrics_dict, dict):
         raise ValueError
     return {k: v for k, v in metrics_dict.items() if k != "vmos"}
+
+
+def _simplify_principal(principal: JSON) -> dict[str, JSON]:
+    """Prepares `ffx profile memory component` JSON data for BigQuery."""
+    if not isinstance(principal, dict):
+        raise ValueError
+    return principal | {"vmos": _simplify_name_to_vmo_memory(principal["vmos"])}
+
+
+def _simplify_principals(principals: JSON) -> list[JSON]:
+    """Prepares `ffx profile memory` JSON data for BigQuery.
+
+    Turns a list of principals into a list of simplified processes.
+    """
+    if not isinstance(principals, list):
+        raise ValueError
+    return [_simplify_principal(b) for b in principals]
 
 
 def _simplify_digest(process_profile: JSON, component_profile: JSON) -> JSON:
@@ -273,6 +290,6 @@ def _simplify_digest(process_profile: JSON, component_profile: JSON) -> JSON:
         digest = component_profile["ComponentDigest"]
         if not isinstance(digest, dict):
             raise ValueError
-        result["principals"] = digest["principals"]
+        result["principals"] = _simplify_principals(digest["principals"])
 
     return result

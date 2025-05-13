@@ -277,8 +277,9 @@ class ProfileTest(unittest.TestCase):
                             "populated_total": 1436753920,
                             "attributor": "root",
                             "processes": ["fxfs.cm (13934)"],
-                            "vmos": {
-                                "[blobs]": {
+                            "vmos": [
+                                {
+                                    "name": "[blobs]",
                                     "count": 1827,
                                     "committed_private": 0,
                                     "committed_scaled": 411303842.98151606,
@@ -287,7 +288,7 @@ class ProfileTest(unittest.TestCase):
                                     "populated_scaled": 411303842.98151606,
                                     "populated_total": 1385910272,
                                 }
-                            },
+                            ],
                         }
                     ],
                 },
@@ -339,8 +340,9 @@ class ProfileTest(unittest.TestCase):
                             "populated_total": 1436753920,
                             "attributor": "root",
                             "processes": ["fxfs.cm (13934)"],
-                            "vmos": {
-                                "[blobs]": {
+                            "vmos": [
+                                {
+                                    "name": "[blobs]",
                                     "count": 1827,
                                     "committed_private": 0,
                                     "committed_scaled": 411303842.98151606,
@@ -349,7 +351,7 @@ class ProfileTest(unittest.TestCase):
                                     "populated_scaled": 411303842.98151606,
                                     "populated_total": 1385910272,
                                 }
-                            },
+                            ],
                         }
                     ]
                 },
