@@ -12,11 +12,6 @@ sync with toplevel.MODULE.bazel whenever possible!!
 workspace(name = "main")
 # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
 
-local_repository(
-    name = "platforms",
-    path = "third_party/bazel_platforms",
-)
-
 # Note that this is a fake repository that only contains the minimum
 # amount of declarations required by Bazel to run. The Fuchsia platform
 # build does not support Java, and will likely never will, and using
@@ -32,11 +27,6 @@ load(
 )
 
 setup_pigweed_repository_dependencies()
-
-local_repository(
-    name = "bazel_skylib",
-    path = "third_party/bazel_skylib",
-)
 
 # NOTE this must appear before bazel_skylib_workspace() call.
 local_repository(
@@ -145,14 +135,6 @@ fuchsia_icu_config_repository(
     content_hash_file = "fuchsia_build_generated/fuchsia_icu_config.hash",
     # LINT.ThenChange(scripts/workspace_utils.py)
 )
-
-# buildifier: disable=load-on-top
-load(
-    "@bazel_skylib//:workspace.bzl",
-    "bazel_skylib_workspace",
-)
-
-bazel_skylib_workspace()
 
 # buildifier: disable=load-on-top
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies")

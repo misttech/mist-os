@@ -17,3 +17,6 @@ module(
     version = "1",
 )
 # LINT.ThenChange(//build/bazel/scripts/bazel_action.py, //build/bazel/bazel_workspace.gni)
+
+bazel_dep(name = "platforms", version = "0.0.11")
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
