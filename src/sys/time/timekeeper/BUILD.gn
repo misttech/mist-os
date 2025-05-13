@@ -13,6 +13,7 @@ group("timekeeper") {
     "adjust",
     "alarms",
     "persistence",
+    "pretty",
   ]
 }
 
@@ -23,6 +24,7 @@ group("tests") {
     "adjust:tests",
     "alarms:tests",
     "persistence:tests",
+    "pretty:tests",
   ]
 }
 
