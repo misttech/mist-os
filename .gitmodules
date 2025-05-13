@@ -748,3 +748,8 @@
 	url = https://fuchsia.googlesource.com/third_party/half
 	name = third_party/half
 	ignore = all
+[submodule "third_party/volk/src"]
+	path = third_party/volk/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/zeux/volk
+	name = third_party/volk
+	ignore = all
