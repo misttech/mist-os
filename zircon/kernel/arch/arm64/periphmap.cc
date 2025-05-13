@@ -81,12 +81,12 @@ using Phys2Virt = PeriphUtil<Phys2VirtTrait>;
 using Virt2Phys = PeriphUtil<Virt2PhysTrait>;
 
 template <typename T>
-uint32_t rd_reg(vaddr_t addr) {
-  return static_cast<uint32_t>(reinterpret_cast<volatile T*>(addr)[0]);
+uint64_t rd_reg(vaddr_t addr) {
+  return static_cast<uint64_t>(reinterpret_cast<volatile T*>(addr)[0]);
 }
 
 template <typename T>
-void wr_reg(vaddr_t addr, uint32_t val) {
+void wr_reg(vaddr_t addr, uint64_t val) {
   reinterpret_cast<volatile T*>(addr)[0] = static_cast<T>(val);
 }
 
@@ -96,34 +96,42 @@ enum class AccessWidth {
   Byte = 0,
   Halfword = 1,
   Word = 2,
+  Doubleword = 3,
 };
 constexpr struct {
   const char* tag;
-  void (*print)(uint32_t);
-  uint32_t (*rd)(vaddr_t);
-  void (*wr)(vaddr_t, uint32_t);
+  void (*print)(uint64_t);
+  uint64_t (*rd)(vaddr_t);
+  void (*wr)(vaddr_t, uint64_t);
   uint32_t byte_width;
 } kDumpModOptions[] = {
     {
         .tag = "byte",
-        .print = [](uint32_t val) { printf(" %02x", val); },
+        .print = [](uint64_t val) { printf(" %02" PRIx64, val); },
         .rd = rd_reg<uint8_t>,
         .wr = wr_reg<uint8_t>,
         .byte_width = 1,
     },
     {
         .tag = "halfword",
-        .print = [](uint32_t val) { printf(" %04x", val); },
+        .print = [](uint64_t val) { printf(" %04" PRIx64, val); },
         .rd = rd_reg<uint16_t>,
         .wr = wr_reg<uint16_t>,
         .byte_width = 2,
     },
     {
         .tag = "word",
-        .print = [](uint32_t val) { printf(" %08x", val); },
+        .print = [](uint64_t val) { printf(" %08" PRIx64, val); },
         .rd = rd_reg<uint32_t>,
         .wr = wr_reg<uint32_t>,
         .byte_width = 4,
+    },
+    {
+        .tag = "doubleword",
+        .print = [](uint64_t val) { printf(" %016" PRIx64, val); },
+        .rd = rd_reg<uint64_t>,
+        .wr = wr_reg<uint64_t>,
+        .byte_width = 8,
     },
 };
 
@@ -175,7 +183,7 @@ zx_status_t dump_periph(paddr_t phys, uint64_t count, AccessWidth width) {
   return ZX_OK;
 }
 
-zx_status_t mod_periph(paddr_t phys, uint32_t val, AccessWidth width) {
+zx_status_t mod_periph(paddr_t phys, uint64_t val, AccessWidth width) {
   const auto& opt = kDumpModOptions[static_cast<uint32_t>(width)];
 
   // Sanity check alignment.
@@ -210,12 +218,12 @@ int cmd_peripheral_map(int argc, const cmd_args* argv, uint32_t flags) {
     printf("%s phys2virt <addr>\n", cmd);
     printf("%s virt2phys <addr>\n", cmd);
     printf(
-        "%s dw|dh|db <phys_addr> [<count>] :: Dump <count> (word|half|byte) from <phys_addr> "
-        "(count default = 1)\n",
+        "%s dd|dw|dh|db <phys_addr> [<count>] :: Dump <count> (double|word|half|byte) from "
+        "<phys_addr> (count default = 1)\n",
         cmd);
     printf(
-        "%s mw|mh|mb <phys_addr> <value> :: Write the contents of <value> to the (word|half|byte) "
-        "at <phys_addr>\n",
+        "%s md|mw|mh|mb <phys_addr> <value> :: Write the contents of <value> to the "
+        "(double|word|half|byte) at <phys_addr>\n",
         cmd);
 
     return ZX_ERR_INTERNAL;
@@ -259,6 +267,9 @@ int cmd_peripheral_map(int argc, const cmd_args* argv, uint32_t flags) {
     // Parse the next letter to figure out the width of the operation.
     AccessWidth width;
     switch (argv[1].str[1]) {
+      case 'd':
+        width = AccessWidth::Doubleword;
+        break;
       case 'w':
         width = AccessWidth::Word;
         break;
@@ -278,8 +289,7 @@ int cmd_peripheral_map(int argc, const cmd_args* argv, uint32_t flags) {
       return dump_periph(phys_addr, (argc < 4) ? 1 : argv[3].u, width);
     } else {
       // Modify commands are required to have a value.
-      return (argc < 4) ? usage(true)
-                        : mod_periph(phys_addr, static_cast<uint32_t>(argv[3].u), width);
+      return (argc < 4) ? usage(true) : mod_periph(phys_addr, argv[3].u, width);
     }
 
   } else {
