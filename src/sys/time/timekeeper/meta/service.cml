@@ -93,6 +93,14 @@
             service: "fuchsia.hardware.hrtimer.Service",
             availability: "optional",
         },
+        {
+            // Uses connectivity monitoring to know whether to issue outbound
+            // HTTPS requests for talking to external time sources.
+            // Requires assembly config setting:
+            // `platform.timekeeper.use_connectivity = true`.
+            protocol: "fuchsia.net.reachability.Monitor",
+            availability: "optional",
+        },
     ],
     offer: [
         {

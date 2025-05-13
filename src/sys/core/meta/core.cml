@@ -182,6 +182,16 @@
             ],
         },
         {
+            // Uses connectivity monitoring to know whether to issue outbound
+            // HTTPS requests for talking to external time sources.
+            // Requires assembly config setting:
+            // `platform.timekeeper.use_connectivity = true`.
+            protocol: [ "fuchsia.net.reachability.Monitor" ],
+            from: "#network",
+            to: [ "#timekeeper" ],
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",
