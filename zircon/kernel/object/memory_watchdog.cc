@@ -280,10 +280,12 @@ void MemoryWatchdog::WorkerThread() {
         // Otherwise if eviction was not outstanding, trigger the eviction for slightly in the
         // future. Half the hysteresis time here is a balance between giving user space time to
         // release memory and the eviction running before the end of the hysteresis period.
-        eviction_trigger_.SetOneshot(
-            (eviction_was_outstanding ? time_now
-                                      : zx_time_add_duration(time_now, eviction_delay_ms_)),
-            EvictionTriggerCallback, this);
+        if (eviction_was_outstanding || eviction_delay_ms_ == 0) {
+          EvictionTrigger();
+        } else {
+          eviction_trigger_.SetOneshot(zx_time_add_duration(time_now, eviction_delay_ms_),
+                                       EvictionTriggerCallback, this);
+        }
       } else if (eviction_strategy_ == EvictionStrategy::Continuous &&
                  mem_event_idx_ > max_eviction_level_) {
         // If we're out of the max configured eviction-eligible memory pressure level, disable
