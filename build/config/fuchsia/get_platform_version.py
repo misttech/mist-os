@@ -101,8 +101,6 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         "runtime_supported_api_levels": runtime_supported_api_levels,
         # API levels whose contents should not change anymore.
         "frozen_api_levels": sunset_api_levels + supported_api_levels,
-        # TODO(https://fxbug.dev/324653879): Remove once vendor repos have migrated.
-        "idk_buildable_api_levels": idk_buildable_api_levels,
     }
 
 
