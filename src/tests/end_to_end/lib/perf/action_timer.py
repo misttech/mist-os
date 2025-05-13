@@ -12,14 +12,15 @@ P = TypeVar("P")
 R = TypeVar("R")
 
 
-class FuchsiaPerfResults(ABC, Generic[P, R]):
-    """Utility class for timing the execution of actions and record to a file.
+class ActionTimer(ABC, Generic[P, R]):
+    """Base class that times an action and records the time to a file.
 
-    This utility class allows to record the duration of executing action and
-    recording the times (since the action could be executed multiple times) to a
+    This utility class allows a subclass to execute an action 1 or more times,
+    capture the wallclock time taken for each iteration, and record them to a
     file.
 
-    Duration measurements will be recorded to a fuchsiaperf.json file.
+    Duration measurements will be recorded to a Fuchsia freeform metrics file,
+    with the suffix `freeform.json`.
     """
 
     def execute(
@@ -33,9 +34,9 @@ class FuchsiaPerfResults(ABC, Generic[P, R]):
 
         Args:
             test_suite: the name of the test suite for the output
-                fuchsiaperf.json.
+                freeform.json.
             label: the label for the test within the test suite.
-            results_path: the path where the fuchsiaperf.json file will be
+            results_path: the path where the freeform.json file will be
                 written.
             repetitions: the number of times to execute an action.
         """

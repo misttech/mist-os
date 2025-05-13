@@ -4,11 +4,11 @@
 
 import("//build/python/python_library.gni")
 
-python_library("perf_utils") {
+python_library("perf") {
   testonly = true
-  library_name = "perf_utils"
+  library_name = "perf"
   sources = [
     "__init__.py",
-    "utils.py",
+    "action_timer.py",
   ]
 }

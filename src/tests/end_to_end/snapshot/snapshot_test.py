@@ -22,8 +22,8 @@ from fuchsia_base_test import fuchsia_base_test
 from honeydew.fuchsia_device.fuchsia_device import FuchsiaDevice
 from memory import profile
 from mobly import asserts, test_runner
+from perf import action_timer
 from perf_publish import publish
-from perf_utils.utils import FuchsiaPerfResults
 from trace_processing import trace_importing, trace_metrics, trace_model
 from trace_processing.metrics import cpu
 
@@ -32,7 +32,7 @@ _SNAPSHOT_ZIP = "snapshot_test.zip"
 _TEST_SUITE = "fuchsia.test.diagnostics"
 
 
-class SnapshotPerfResults(FuchsiaPerfResults[None, None]):
+class SnapshotPerfResults(action_timer.ActionTimer[None, None]):
     def __init__(self, device: FuchsiaDevice, test_case_path: str):
         self._device = device
         self.test_case_path = test_case_path

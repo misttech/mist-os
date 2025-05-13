@@ -14,13 +14,13 @@ from typing import Any, Dict, List
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.transports.ffx.ffx import FFX
 from mobly import asserts, test_runner
-from perf_utils.utils import FuchsiaPerfResults
+from perf import action_timer
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 _TEST_SUITE = "fuchsia.test.diagnostics"
 
 
-class LogPerfResults(FuchsiaPerfResults[None, str]):
+class LogPerfResults(action_timer.ActionTimer[None, str]):
     def __init__(self, ffx: FFX):
         self._ffx = ffx
 
@@ -37,7 +37,7 @@ class LogPerfResults(FuchsiaPerfResults[None, str]):
         asserts.assert_greater(len(step_output), 0)
 
 
-class InspectPerfResults(FuchsiaPerfResults[None, str]):
+class InspectPerfResults(action_timer.ActionTimer[None, str]):
     def __init__(self, ffx: FFX):
         self._ffx = ffx
 
