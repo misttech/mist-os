@@ -75,7 +75,7 @@ async fn main() -> Result<(), Error> {
         .context("Failed to connect to the kernel stats provider")?;
 
     let stall_provider = Arc::new(stalls::StallProviderImpl::new(
-        MonotonicDuration::from_minutes(5),
+        MonotonicDuration::from_hours(1),
         Arc::new(connect_to_protocol::<fkernel::StallResourceMarker>()?.get().await?),
     )?);
 
@@ -95,7 +95,7 @@ async fn main() -> Result<(), Error> {
     let _inspect_nodes_service = inspect_nodes::start_service(
         attribution_data_provider.clone(),
         kernel_stats.clone(),
-        stall_provider,
+        stall_provider.clone(),
         Config::take_from_startup_handle(),
         connect_to_protocol::<fpressure::ProviderMarker>()
             .context("Failed to connect to the memory pressure provider")?,

@@ -47,10 +47,11 @@ pub fn start_service(
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
             .ok_or_else(|| anyhow!("Failed to serve server handling `fuchsia.inspect.Tree`"))?;
 
-    build_inspect_tree(kernel_stats_proxy.clone(), stall_provider, inspector);
+    build_inspect_tree(kernel_stats_proxy.clone(), stall_provider.clone(), inspector);
     let digest_service = digest_service(
         memory_monitor2_config,
         attribution_data_service,
+        stall_provider,
         kernel_stats_proxy,
         memorypressure_proxy,
         bucket_definitions,
@@ -178,18 +179,10 @@ fn build_inspect_tree(
     {
         inspector.root().record_lazy_child("stalls", move || {
             let stall_info = stall_provider.get_stall_info().unwrap();
-            let stall_rate_opt = stall_provider.get_stall_rate();
             async move {
                 let inspector = Inspector::default();
-                inspector.root().record_int("current_some", stall_info.stall_time_some);
-                inspector.root().record_int("current_full", stall_info.stall_time_full);
-                if let Some(stall_rate) = stall_rate_opt {
-                    inspector
-                        .root()
-                        .record_int("rate_interval_s", stall_rate.interval.into_seconds());
-                    inspector.root().record_int("rate_some", stall_rate.rate_some);
-                    inspector.root().record_int("rate_full", stall_rate.rate_full);
-                }
+                inspector.root().record_int("some", stall_info.stall_time_some);
+                inspector.root().record_int("full", stall_info.stall_time_full);
                 Ok(inspector)
             }
             .boxed()
@@ -200,6 +193,7 @@ fn build_inspect_tree(
 fn digest_service(
     memory_monitor2_config: Config,
     attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
+    stall_provider: Arc<impl StallProvider>,
     kernel_stats_proxy: fkernel::StatsProxy,
     memorypressure_proxy: fpressure::ProviderProxy,
     bucket_definitions: Vec<BucketDefinition>,
@@ -286,6 +280,8 @@ fn digest_service(
                 buckets_names
             });
 
+            let stall_values = stall_provider.get_stall_info()?;
+
             // Add an entry for the current aggregation.
             buckets_list_node.add_entry(|n| {
                 n.record_int("timestamp", timestamp.into_nanos());
@@ -294,6 +290,10 @@ fn digest_service(
                     ia.set(i, b.size as u64);
                 }
                 n.record(ia);
+                n.record_child("stalls", |child| {
+                    child.record_int("some", stall_values.stall_time_some);
+                    child.record_int("full", stall_values.stall_time_full);
+                });
             });
         }
     }))
@@ -413,6 +413,21 @@ mod tests {
         Ok(())
     }
 
+    struct FakeStallProvider {}
+    impl StallProvider for FakeStallProvider {
+        fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
+            Ok(zx::MemoryStall { stall_time_some: 10, stall_time_full: 20 })
+        }
+
+        fn get_stall_rate(&self) -> Option<stalls::MemoryStallRate> {
+            Some(stalls::MemoryStallRate {
+                interval: fasync::MonotonicDuration::from_seconds(60),
+                rate_some: 1,
+                rate_full: 2,
+            })
+        }
+    }
+
     #[test]
     fn test_build_inspect_tree() {
         let mut exec = fasync::TestExecutor::new();
@@ -425,21 +440,6 @@ mod tests {
         .detach();
 
         let inspector = fuchsia_inspect::Inspector::default();
-
-        struct FakeStallProvider {}
-        impl StallProvider for FakeStallProvider {
-            fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
-                Ok(zx::MemoryStall { stall_time_some: 10, stall_time_full: 20 })
-            }
-
-            fn get_stall_rate(&self) -> Option<stalls::MemoryStallRate> {
-                Some(stalls::MemoryStallRate {
-                    interval: fasync::MonotonicDuration::from_seconds(60),
-                    rate_some: 1,
-                    rate_full: 2,
-                })
-            }
-        }
 
         build_inspect_tree(stats_provider, Arc::new(FakeStallProvider {}), &inspector);
 
@@ -488,11 +488,8 @@ mod tests {
                 ]
             },
             stalls: {
-                current_some: 10i64,
-                current_full: 20i64,
-                rate_some: 1i64,
-                rate_full: 2i64,
-                rate_interval_s: 60i64
+                some: 10i64,
+                full: 20i64,
             }
         });
     }
@@ -520,6 +517,7 @@ mod tests {
                 normal_capture_delay_s: 10,
             },
             get_attribution_data_provider(),
+            Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
             vec![],
@@ -604,6 +602,10 @@ mod tests {
                             19u64,   // [Addl]DiscardableUnlocked
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
+                        stalls: {
+                            some: 10i64,
+                            full: 20i64,
+                        },
                     },
                     // Corresponds to the capture after the passage of time
                     "1": {
@@ -620,6 +622,10 @@ mod tests {
                             19u64,   // [Addl]DiscardableUnlocked
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
+                        stalls: {
+                            some: 10i64,
+                            full: 20i64,
+                        },
                     },
                 },
             },
@@ -649,6 +655,7 @@ mod tests {
                 normal_capture_delay_s: 10,
             },
             get_attribution_data_provider(),
+            Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
             vec![],
@@ -728,8 +735,12 @@ mod tests {
                             19u64,   // [Addl]DiscardableUnlocked
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
+                        stalls: {
+                            some: 10i64,
+                            full: 20i64,
+                        },
                     },
-                },
+            },
             },
         });
         Ok(())
@@ -767,6 +778,7 @@ mod tests {
                 normal_capture_delay_s: 10,
             },
             get_attribution_data_provider(),
+            Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
             vec![],
@@ -820,6 +832,7 @@ mod tests {
                 normal_capture_delay_s: 10,
             },
             get_attribution_data_provider(),
+            Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
             vec![],
@@ -862,6 +875,10 @@ mod tests {
                             19u64,   // [Addl]DiscardableUnlocked
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
+                        stalls: {
+                            some: 10i64,
+                            full: 20i64,
+                        },
                     },
                 },
             },
