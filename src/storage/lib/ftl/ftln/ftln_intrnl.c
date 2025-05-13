@@ -4,7 +4,6 @@
 
 #include <errno.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -17,6 +16,7 @@
 #ifndef FTLN_DEBUG_RECYCLES
 #define FTLN_DEBUG_RECYCLES FALSE
 #endif
+#define SHOW_LAG_HIST FALSE
 
 // Type Definitions
 typedef struct {
@@ -32,7 +32,7 @@ void FtlNumFree(uint num_free_blks);
 #endif
 #if FTLN_DEBUG_RECYCLES
 static int recycle_possible(CFTLN ftl, ui32 b);
-static uint64_t block_selector(FTLN ftl, ui32 b, int should_boost_low_wear);
+static ui32 block_selector(FTLN ftl, ui32 b);
 
 // Local Function Definitions
 
@@ -50,7 +50,7 @@ static int show_blk(FTLN ftl, ui32 b) {
       n += printf("erased");
     else
       n += printf("free  ");
-    n += printf(" w=%06d ", ftl->blk_wc[b]);
+    n += printf(" wl=%03d ", ftl->blk_wc_lag[b]);
     return n;
   } else if (IS_MAP_BLK(ftl->bdata[b])) {
     putchar('m');
@@ -60,11 +60,11 @@ static int show_blk(FTLN ftl, ui32 b) {
     ++n;
   }
   n += printf(" u=%-2d", NUM_USED(ftl->bdata[b]));
-  n += printf(" w=%06d ", ftl->blk_wc[b]);
+  n += printf(" wl=%03d ", ftl->blk_wc_lag[b]);
   if (!recycle_possible(ftl, b))
     n += printf("np");
   else
-    n += printf("s=%lu", block_selector(ftl, b, 0));
+    n += printf("s=%d", block_selector(ftl, b));
   if (ftl->free_vpn / ftl->pgs_per_blk == b)
     n += printf(" FV");
   else if (ftl->free_mpn / ftl->pgs_per_blk == b)
@@ -99,21 +99,43 @@ static void show_blks(FTLN ftl) {
   }
 }
 
-// check_low_wear: Verify the low wear calculation.
+// check_lag_sum: Verify the wear lag sum and max lag calculations.
 //
 //       Input: ftl = pointer to FTL control block
 //
-static void check_low_wear(FTLN ftl) {
-  uint min_wc = (ui32)-1;
+static void check_lag_sum(FTLN ftl) {
+  ui32 b, wc_lag, wc_lag_sum = 0, wc_lag_max = 0;
 
-  for (uint b = 0; b < ftl->num_blks; ++b) {
-    if (min_wc > ftl->blk_wc[b]) {
-      min_wc = ftl->blk_wc[b];
-    }
+  for (b = 0; b < ftl->num_blks; ++b) {
+    wc_lag = ftl->blk_wc_lag[b];
+    if (wc_lag_max < wc_lag)
+      wc_lag_max = wc_lag;
+    wc_lag_sum += wc_lag;
   }
-  PfAssert(ftl->low_wc == min_wc);
+  PfAssert(ftl->wear_data.cur_max_lag == wc_lag_max);
+  PfAssert(ftl->wc_lag_sum == wc_lag_sum);
+  PfAssert(ftl->wear_data.avg_wc_lag == wc_lag_sum / ftl->num_blks);
 }
 #endif  // FTLN_DEBUG_RECYCLES
+
+#if SHOW_LAG_HIST
+// show_lag_hist: Print running histogram of block wear lag.
+//
+//       Input: ftl = pointer to FTL control block
+//
+static void show_lag_hist(FTLN ftl) {
+  uint i, j = ftl->wear_data.cur_max_lag / 2;
+  uint avg_lag_scaled = ftl->wear_data.avg_wc_lag / 2;
+
+  for (i = 0; i < j; ++i) {
+    if (i <= avg_lag_scaled)
+      putchar('+');
+    else
+      putchar('-');
+  }
+  printf(" %u\n", ftl->wear_data.cur_max_lag);
+}
+#endif
 
 // next_free_vpg: Get next free volume page
 //
@@ -249,7 +271,7 @@ static ui32 next_free_mpg(FTLN ftl) {
 //     Returns: 0 on success, -1 on error
 //
 static int wr_vol_page(FTLN ftl, ui32 vpn, void* buf, ui32 old_ppn) {
-  ui32 ppn, b;
+  ui32 ppn, b, wc;
   int rc;
 
 #if INC_ELIST
@@ -271,12 +293,13 @@ static int wr_vol_page(FTLN ftl, ui32 vpn, void* buf, ui32 old_ppn) {
 
   // Calculate the block's erase wear count.
   b = ppn / ftl->pgs_per_blk;
-  PfAssert(ftl->blk_wc[b] > 0);
+  wc = ftl->high_wc - ftl->blk_wc_lag[b];
+  PfAssert((int)wc > 0);
 
   // Initialize spare area, including VPN and block wear count.
   memset(ftl->spare_buf, 0xFF, ftl->eb_size);
   SET_SA_VPN(vpn, ftl->spare_buf);
-  SET_SA_WC(ftl->blk_wc[b], ftl->spare_buf);
+  SET_SA_WC(wc, ftl->spare_buf);
 
   // If page data in buffer, write it. Returns 0 or -2.
   if (buf) {
@@ -431,9 +454,8 @@ static int recycle_possible(CFTLN ftl, ui32 b) {
 //
 //     Returns: Selector used to determine whether block is recycled
 //
-static uint64_t block_selector(FTLN ftl, ui32 b, int should_boost_low_wear) {
-  uint64_t pages_gained;
-  uint64_t priority;
+static ui32 block_selector(FTLN ftl, ui32 b, int should_boost_low_wear) {
+  ui32 pages_gained, priority;
 
   // Get number of free pages gained. Only half of MLC map block pages
   // are available.
@@ -444,23 +466,18 @@ static uint64_t block_selector(FTLN ftl, ui32 b, int should_boost_low_wear) {
 #endif
   pages_gained -= NUM_USED(ftl->bdata[b]);
 
-  // Priority sorting bits:
-  // 00-31: Wear lag.
-  // 32-47: Pages available. Up to 65535 pages per block without overflow.
-  // 48-48: Boost low wear
-  // 49-49: Over read limit.
-  ui32 wear_lag = ftl->high_wc - ftl->blk_wc[b];
-  priority = (pages_gained << 32) + wear_lag;
+  priority = pages_gained * 256 + ftl->blk_wc_lag[b];
 
   // Boost a block's priority if requested and considered low wear.
-  if (should_boost_low_wear && wear_lag + FTL_LOW_WEAR_BOOST_LAG > ftl->high_wc - ftl->low_wc) {
-    priority += 1ul << 48;
+  if (should_boost_low_wear &&
+      (ftl->blk_wc_lag[b] + FTL_LOW_WEAR_BOOST_LAG > ftl->wear_data.cur_max_lag)) {
+    priority += 0x100000;
   }
 
   // If block's read count is too high, there is danger of losing its
   // data, so add a priority boost that overwhelms the other facters.
   if (GET_RC(ftl->bdata[b]) >= ftl->max_rc)
-    priority += 1ul << 49;
+    priority += 0x200000;
 
   // Return priority value (higher value is better to recycle).
   return priority;
@@ -474,9 +491,7 @@ static uint64_t block_selector(FTLN ftl, ui32 b, int should_boost_low_wear) {
 //     Returns: Chosen recycle block, (ui32)-1 on error
 //
 static ui32 next_recycle_blk(FTLN ftl, int should_boost_low_wear) {
-  ui32 b, rec_b = 0;
-  uint64_t selector;
-  uint64_t best_selector = 0;
+  ui32 b, rec_b, selector, best_selector = 0;
 
   // Initially set flag as if no block is at the max read-count limit.
   ftl->max_rc_blk = (ui32)-1;
@@ -669,8 +684,8 @@ static int recycle(FTLN ftl, int should_boost_low_wear) {
     show_blks(ftl);
   }
 
-  // Verify the low wear calculations.
-  check_low_wear(ftl);
+  // Verify the wear lag sum and max lag calculations.
+  check_lag_sum(ftl);
 #endif
 
   // Select next block to recycle. Return error if unable.
@@ -813,7 +828,7 @@ int FtlnWrPages(const void* buf, ui32 vpn, int count, void* vol) {
     // Copy page's VPN and block's BC/WC to the spare area.
     memset(spare, 0xFF, ftl->eb_size);
     SET_SA_VPN(vpn, spare);
-    wc = ftl->blk_wc[ppn / ftl->pgs_per_blk];
+    wc = ftl->high_wc - ftl->blk_wc_lag[ppn / ftl->pgs_per_blk];
     PfAssert((int)wc > 0);
     SET_SA_WC(wc, spare);
     spare += ftl->eb_size;
@@ -1124,11 +1139,17 @@ int FtlnRecCheck(FTLN ftl, int wr_cnt) {
       if (recycle(ftl, /*should_boost_low_wear=*/count & 1) != 0)
         return -1;
 
+#if SHOW_LAG_HIST
+      // Print running histogram of block wear lag.
+      show_lag_hist(ftl);
+#endif
+
       // Record the highest number of consecutive recycles.
       if (ftl->wear_data.max_consec_rec < count) {
         ftl->wear_data.max_consec_rec = count;
         if (ftln_debug() > 2) {
-          printf("max_consec_rec=%u\n", ftl->wear_data.max_consec_rec);
+          printf("max_consec_rec=%u, avg_wc_lag=%u\n", ftl->wear_data.max_consec_rec,
+                 ftl->wear_data.avg_wc_lag);
         }
       }
 
@@ -1304,7 +1325,7 @@ int FtlnVclean(FTLN ftl) {
 //
 int FtlnMapWr(void* vol, ui32 mpn, void* buf) {
   FTLN ftl = vol;
-  ui32 pn, b, old_pn = ftl->mpns[mpn];
+  ui32 pn, b, wc, old_pn = ftl->mpns[mpn];
   int status;
 
   // Return -1 if fatal I/O error occurred.
@@ -1324,13 +1345,16 @@ int FtlnMapWr(void* vol, ui32 mpn, void* buf) {
   if (pn == (ui32)-1)
     return -1;
 
-  // Initialize spare area, including VPN, block count, and wear count.
+  // Determine the block's erase wear count.
   b = pn / ftl->pgs_per_blk;
+  wc = ftl->high_wc - ftl->blk_wc_lag[b];
+  PfAssert((int)wc > 0);
+
+  // Initialize spare area, including VPN, block count, and wear count.
   memset(ftl->spare_buf, 0xFF, ftl->eb_size);
   SET_SA_VPN(mpn, ftl->spare_buf);
   SET_SA_BC(ftl->high_bc, ftl->spare_buf);
-  PfAssert(ftl->blk_wc[b] > 0);
-  SET_SA_WC(ftl->blk_wc[b], ftl->spare_buf);
+  SET_SA_WC(wc, ftl->spare_buf);
 
   // If page data in buffer, invoke write_page().
   if (buf) {
@@ -1420,11 +1444,7 @@ int FtlnGetWearHistogram(CFTLN ftl, int count, ui32* histogram) {
   memset(histogram, 0, sizeof(ui32) * kNumBuckets);
 
   for (block = 0; block < ftl->num_blks; ++block) {
-    ui32 value = ftl->high_wc - ftl->blk_wc[block];
-    if (value > 255) {
-      value = 255;
-    }
-    value = 255 - value;
+    ui8 value = 255 - ftl->blk_wc_lag[block];
     histogram[value * kNumBuckets / 256]++;
   }
 
