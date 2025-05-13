@@ -152,10 +152,6 @@ template("sdk_source_set") {
                              "stable",
                            ])
 
-    if (defined(visibility)) {
-      visibility += [ ":${sdk_target_name}" ]
-    }
-
     if (defined(invoker.non_sdk_deps)) {
       deps += invoker.non_sdk_deps
       public_deps += invoker.non_sdk_deps

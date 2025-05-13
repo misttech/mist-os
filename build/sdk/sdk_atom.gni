@@ -100,7 +100,7 @@ _valid_data_atom_types = [
 #     This is very roughly approximated by checking whether the files themselves
 #     have changed at all.
 #     See the "File scopes" section for how to describe files.
-#     Only relevant when `api` is set.
+#     Required when when `api` is set.
 #
 #   deps (optional)
 #     List of GN labels for other SDK elements this element depends on at build
@@ -520,9 +520,7 @@ template("sdk_atom") {
       ]
       warn_on_changes = warn_on_sdk_changes
 
-      if (defined(invoker.api_contents)) {
-        deps = [ ":$generate_api_target_name" ]
-      }
+      deps = [ ":$generate_api_target_name" ]
     }
   }
 
