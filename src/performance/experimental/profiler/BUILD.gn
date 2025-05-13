@@ -41,9 +41,6 @@ source_set("lib") {
     "//zircon/system/ulib/trace-reader",
     "//zircon/system/ulib/zircon-internal",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 executable("bin") {

@@ -144,9 +144,9 @@ zx::result<std::vector<zx_koid_t>> GetChildrenTids(const zx::process& process) {
     return zx::ok(std::vector<zx_koid_t>{});
   }
 
-  zx_koid_t threads[num_threads];
+  auto threads = std::make_unique<zx_koid_t[]>(num_threads);
   size_t records_read;
-  status = process.get_info(ZX_INFO_PROCESS_THREADS, threads, num_threads * sizeof(threads[0]),
+  status = process.get_info(ZX_INFO_PROCESS_THREADS, threads.get(), num_threads * sizeof(zx_koid_t),
                             &records_read, nullptr);
 
   if (status != ZX_OK) {
@@ -159,7 +159,7 @@ zx::result<std::vector<zx_koid_t>> GetChildrenTids(const zx::process& process) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  std::vector<zx_koid_t> children{threads, threads + num_threads};
+  std::vector<zx_koid_t> children{threads.get(), threads.get() + num_threads};
   return zx::ok(children);
 }
 
@@ -244,15 +244,16 @@ zx::result<profiler::JobTarget> profiler::TargetTree::MakeJobTarget(
   // children.
   std::unordered_map<zx_koid_t, profiler::JobTarget> child_job_targets;
   if (num_child_jobs > 0) {
-    zx_koid_t child_jobs[num_child_jobs];
-    if (zx_status_t status =
-            job.get_info(ZX_INFO_JOB_CHILDREN, child_jobs, sizeof(child_jobs), nullptr, nullptr);
+    auto child_jobs = std::make_unique<zx_koid_t[]>(num_child_jobs);
+    if (zx_status_t status = job.get_info(ZX_INFO_JOB_CHILDREN, child_jobs.get(),
+                                          num_child_jobs * sizeof(zx_koid_t), nullptr, nullptr);
         status != ZX_OK) {
       FX_PLOGS(WARNING, status) << "failed to get job children";
       return zx::error(status);
     }
 
-    for (zx_koid_t child_koid : child_jobs) {
+    for (size_t i = 0; i < num_child_jobs; i++) {
+      zx_koid_t child_koid = child_jobs[i];
       zx::job child_job;
       if (zx_status_t status = job.get_child(child_koid, ZX_DEFAULT_JOB_RIGHTS, &child_job);
           status != ZX_OK) {
@@ -278,15 +279,16 @@ zx::result<profiler::JobTarget> profiler::TargetTree::MakeJobTarget(
   }
   std::unordered_map<zx_koid_t, profiler::ProcessTarget> process_targets;
   if (num_processes > 0) {
-    zx_koid_t processes[num_processes];
-    if (zx_status_t status =
-            job.get_info(ZX_INFO_JOB_PROCESSES, processes, sizeof(processes), nullptr, nullptr);
+    auto processes = std::make_unique<zx_koid_t[]>(num_processes);
+    if (zx_status_t status = job.get_info(ZX_INFO_JOB_PROCESSES, processes.get(),
+                                          num_processes * sizeof(zx_koid_t), nullptr, nullptr);
         status != ZX_OK) {
       FX_PLOGS(WARNING, status) << "failed to get job processes";
       return zx::error(status);
     }
 
-    for (zx_koid_t process_koid : processes) {
+    for (size_t i = 0; i < num_processes; i++) {
+      zx_koid_t process_koid = processes[i];
       zx::process process;
       if (zx_status_t status = job.get_child(process_koid, ZX_DEFAULT_PROCESS_RIGHTS, &process);
           status != ZX_OK) {
