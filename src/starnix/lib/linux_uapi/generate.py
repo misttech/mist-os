@@ -303,7 +303,7 @@ REPLACEMENTS_PTR = [
     # Use uaddr/uref in place of pointers for compat with zerocopy traits. Because
     # the target of the pointer is in userspace anyway, treating it as an opaque
     # pointer is harmless.
-    (r"\*mut crate::types::c_void", "uaddr"),
+    (r"\*(const|mut) crate::types::c_void", "uaddr"),
     (
         r'::std::option::Option<unsafe extern "C" fn\([a-zA-Z_0-9: ]*\)>',
         "uaddr",
@@ -317,7 +317,7 @@ ARCH32_REPLACEMENTS_PTR = [
     # pointer is harmless.
     # For arch32, we only use 64-bit width when dealing with AsBytes union
     # padding.
-    (r"\*mut crate::types::arch32::c_void", "crate::uaddr32"),
+    (r"\*(const|mut) crate::types::arch32::c_void", "crate::uaddr32"),
     (
         r'::std::option::Option<\s*unsafe extern "C" fn\([*a-zA-Z_0-9,:\s]*\),?\s*>',
         "crate::uaddr32",

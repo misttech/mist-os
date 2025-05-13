@@ -102,6 +102,8 @@
 #include <linux/bpf.h>
 #include <linux/bpf_perf_event.h>
 
+#endif  // #ifndef __arm__
+
 #ifndef __KERNEL__
 #define __KERNEL__ 1
 #define __HAS_KERNEL__ 0
@@ -114,8 +116,6 @@
 #undef __KERNEL__
 #endif
 #undef __HAS_KERNEL__
-
-#endif  // #ifndef __arm__
 
 // Android kgsl header
 #include "src/starnix/lib/linux_uapi/stub/kgsl/msm_kgsl.h"

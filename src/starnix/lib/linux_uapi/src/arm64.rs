@@ -21553,8 +21553,8 @@ pub struct fuse_mount {
 pub struct fuse_bpf_in_arg {
     pub size: u32,
     pub __bindgen_padding_0: [u8; 4usize],
-    pub value: uref<crate::types::c_void>,
-    pub end_offset: uref<crate::types::c_void>,
+    pub value: uaddr,
+    pub end_offset: uaddr,
 }
 impl Default for fuse_bpf_in_arg {
     fn default() -> Self {
