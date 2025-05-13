@@ -5,7 +5,6 @@
 use crate::arch::registers::RegisterState;
 use crate::arch::task::{decode_page_fault_exception_report, get_signal_for_general_exception};
 use crate::execution::{create_zircon_process, TaskInfo};
-use crate::fs::proc::pid_directory::TaskDirectory;
 use crate::loader::{load_executable, resolve_executable, ResolvedElf};
 use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, TaskMemoryAccessor};
 use crate::security;
@@ -278,8 +277,16 @@ impl CurrentTask {
         *self.temp_task().persistent_info.lock().creds_mut() = creds;
         // The /proc/pid directory's ownership is updated when the task's euid
         // or egid changes. See proc(5).
-        let mut state = self.proc_pid_directory_cache.lock();
-        TaskDirectory::maybe_force_chown(&mut state, &self.creds());
+        let maybe_node = self.proc_pid_directory_cache.lock();
+        if let Some(node) = &*maybe_node {
+            let creds = self.creds().euid_as_fscred();
+            // SAFETY: The /proc/pid directory held by `proc_pid_directory_cache` represents the
+            // current task. It's owner and group are supposed to track the current task's euid and
+            // egid.
+            unsafe {
+                node.force_chown(creds);
+            }
+        }
     }
 
     #[inline(always)]

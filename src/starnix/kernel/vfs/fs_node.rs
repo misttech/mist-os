@@ -2224,6 +2224,22 @@ impl FsNode {
         })
     }
 
+    /// Forcefully change the owner and group of this node.
+    ///
+    /// # Safety
+    ///
+    /// This function skips all the security checks and just updates the owner and group. Also, does
+    /// not check if the filesystem is read-only and does not update the attribute change time.
+    ///
+    /// This function is used to set the owner and group of /proc/pid to the credentials of the
+    /// current task. Please consider carefully whether you want to use this function for another
+    /// purpose.
+    pub unsafe fn force_chown(&self, creds: FsCred) {
+        self.update_info(|info| {
+            info.chown(Some(creds.uid), Some(creds.gid));
+        });
+    }
+
     /// Whether this node is a regular file.
     pub fn is_reg(&self) -> bool {
         self.info().mode.is_reg()

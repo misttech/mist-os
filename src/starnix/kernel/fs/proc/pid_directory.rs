@@ -22,18 +22,18 @@ use crate::vfs::{
 use itertools::Itertools;
 use regex::Regex;
 use starnix_logging::{bug_ref, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::ownership::{OwnedRef, TempRef, WeakRef};
 use starnix_types::time::duration_to_scheduler_clock;
-use starnix_uapi::auth::{Credentials, FsCred, CAP_SYS_NICE, CAP_SYS_RESOURCE};
+use starnix_uapi::auth::{CAP_SYS_NICE, CAP_SYS_RESOURCE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    errno, error, gid_t, ino_t, off_t, pid_t, uapi, uid_t, OOM_ADJUST_MIN, OOM_DISABLE,
-    OOM_SCORE_ADJ_MIN, RLIM_INFINITY,
+    errno, error, ino_t, off_t, pid_t, uapi, OOM_ADJUST_MIN, OOM_DISABLE, OOM_SCORE_ADJ_MIN,
+    RLIM_INFINITY,
 };
 use std::borrow::Cow;
 use std::ffi::CString;
@@ -98,7 +98,6 @@ pub enum TaskEntryScope {
 /// The `creds` stored within is applied to the directory node itself and child entries.
 pub struct TaskDirectory {
     task_weak: WeakRef<Task>,
-    creds: Mutex<FsCred>,
     scope: TaskEntryScope,
     inode_range: Range<ino_t>,
 }
@@ -109,39 +108,18 @@ impl TaskDirectory {
         fs: &FileSystemHandle,
         task: &TempRef<'_, Task>,
         scope: TaskEntryScope,
-        creds: FsCred,
     ) -> FsNodeHandle {
+        let creds = task.creds().euid_as_fscred();
         let task_weak = WeakRef::from(task);
         fs.create_node(
             current_task,
             Arc::new(TaskDirectory {
                 task_weak,
-                creds: Mutex::new(creds),
                 scope,
                 inode_range: fs.allocate_node_id(task_entries(scope).len()),
             }),
             FsNodeInfo::new_factory(mode!(IFDIR, 0o777), creds),
         )
-    }
-
-    pub fn maybe_force_chown(state: &mut Option<FsNodeHandle>, creds: &Credentials) {
-        let Some(ref mut pd) = &mut *state else {
-            return;
-        };
-        let Some(pd_ops) = pd.downcast_ops::<Arc<crate::fs::proc::pid_directory::TaskDirectory>>()
-        else {
-            return;
-        };
-        pd_ops.force_chown(&pd, creds.euid, creds.egid);
-    }
-
-    fn force_chown(&self, node: &FsNodeHandle, uid: uid_t, gid: gid_t) {
-        node.update_info(|info| {
-            info.chown(Some(uid), Some(gid));
-        });
-        let mut creds = self.creds.lock();
-        creds.uid = uid;
-        creds.gid = gid;
     }
 }
 
@@ -166,7 +144,7 @@ impl FsNodeOps for Arc<TaskDirectory> {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let task_weak = self.task_weak.clone();
-        let creds = *self.creds.lock();
+        let creds = node.info().cred();
         let fs = node.fs();
         let (mode, inode) = task_entries(self.scope)
             .into_iter()
@@ -266,7 +244,6 @@ impl FsNodeOps for Arc<TaskDirectory> {
                 let task = self.task_weak.upgrade().ok_or_else(|| errno!(ESRCH))?;
                 Box::new(TaskListDirectory {
                     thread_group: OwnedRef::downgrade(&task.thread_group()),
-                    creds,
                 })
             }
             name => unreachable!(
@@ -331,8 +308,7 @@ pub fn pid_directory(
 ) -> FsNodeHandle {
     // proc(5): "The files inside each /proc/pid directory are normally
     // owned by the effective user and effective group ID of the process."
-    let creds = task.creds().euid_as_fscred();
-    let fs_node = TaskDirectory::new(current_task, fs, task, TaskEntryScope::ThreadGroup, creds);
+    let fs_node = TaskDirectory::new(current_task, fs, task, TaskEntryScope::ThreadGroup);
 
     security::task_to_fs_node(current_task, task, &fs_node);
     fs_node
@@ -343,9 +319,8 @@ fn tid_directory(
     current_task: &CurrentTask,
     fs: &FileSystemHandle,
     task: &TempRef<'_, Task>,
-    creds: FsCred,
 ) -> FsNodeHandle {
-    TaskDirectory::new(current_task, fs, task, TaskEntryScope::Task, creds)
+    TaskDirectory::new(current_task, fs, task, TaskEntryScope::Task)
 }
 
 /// `FdDirectory` implements the directory listing operations for a `proc/<pid>/fd` directory.
@@ -629,7 +604,6 @@ fn fds_to_directory_entries(fds: Vec<FdNumber>) -> Vec<VecDirectoryEntry> {
 /// Directory that lists the task IDs (tid) in a process. Located at `/proc/<pid>/task/`.
 struct TaskListDirectory {
     thread_group: WeakRef<ThreadGroup>,
-    creds: FsCred,
 }
 
 impl TaskListDirectory {
@@ -683,7 +657,7 @@ impl FsNodeOps for TaskListDirectory {
         let task = weak_task.upgrade().ok_or_else(|| errno!(ENOENT))?;
         std::mem::drop(pid_state);
 
-        Ok(tid_directory(current_task, &node.fs(), &task, self.creds))
+        Ok(tid_directory(current_task, &node.fs(), &task))
     }
 }
 
