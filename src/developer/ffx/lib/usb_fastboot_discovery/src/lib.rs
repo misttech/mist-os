@@ -5,7 +5,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use fastboot::command::{ClientVariable, Command};
 use fastboot::reply::Reply;
-use fastboot::send;
+use fastboot::{send, FastbootContext};
 use fuchsia_async::{Task, Timer};
 use std::collections::BTreeSet;
 use std::time::Duration;
@@ -210,7 +210,9 @@ pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
     let mut interface =
         open_interface(|info: &InterfaceInfo| -> bool { info_matches_serial(info, serial) })
             .with_context(|| format!("opening interface with serial number: {}", serial))?;
-    match send(Command::GetVar(ClientVariable::Version), &mut interface).await {
+    match send(FastbootContext::new(), Command::GetVar(ClientVariable::Version), &mut interface)
+        .await
+    {
         Ok(Reply::Okay(version)) => {
             log::debug!("USB serial {serial}: fastboot version: {version}");
             Ok(interface)

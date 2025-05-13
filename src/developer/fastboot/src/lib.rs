@@ -11,8 +11,8 @@ use fuchsia_async::TimeoutExt;
 use futures::io::{AsyncRead, AsyncWrite};
 use futures::lock::Mutex;
 use futures::{AsyncReadExt, AsyncWriteExt};
-use lazy_static::lazy_static;
 use std::io::Read;
+use std::sync::Arc;
 use thiserror::Error;
 
 pub mod command;
@@ -23,9 +23,16 @@ const MAX_PACKET_SIZE: usize = 64;
 const DEFAULT_READ_TIMEOUT_SECS: i64 = 30;
 const BUFFER_SIZE: usize = 50 * 1024 * 1024; // 50 MB
 
-lazy_static! {
-    static ref SEND_LOCK: Mutex<()> = Mutex::new(());
-    static ref TRANSFER_LOCK: Mutex<()> = Mutex::new(());
+#[derive(Debug, Clone)]
+pub struct FastbootContext {
+    send_lock: Arc<Mutex<()>>,
+    transfer_lock: Arc<Mutex<()>>,
+}
+
+impl FastbootContext {
+    pub fn new() -> Self {
+        Self { send_lock: Arc::new(Mutex::new(())), transfer_lock: Arc::new(Mutex::new(())) }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -166,11 +173,12 @@ async fn read_with_timeout<T: AsyncRead + Unpin>(
 }
 
 pub async fn send_with_listener<T: AsyncRead + AsyncWrite + Unpin>(
+    ctx: FastbootContext,
     cmd: Command,
     interface: &mut T,
     listener: &(impl InfoListener + Sync),
 ) -> Result<Reply> {
-    let _lock = SEND_LOCK.lock().await;
+    let _lock = ctx.send_lock.lock().await;
     let bytes = Vec::<u8>::try_from(&cmd)?;
     log::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
     interface.write_all(&bytes).await?;
@@ -178,10 +186,11 @@ pub async fn send_with_listener<T: AsyncRead + AsyncWrite + Unpin>(
 }
 
 pub async fn send<T: AsyncRead + AsyncWrite + Unpin>(
+    ctx: FastbootContext,
     cmd: Command,
     interface: &mut T,
 ) -> Result<Reply> {
-    let _lock = SEND_LOCK.lock().await;
+    let _lock = ctx.send_lock.lock().await;
     let bytes = Vec::<u8>::try_from(&cmd)?;
     log::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
     interface.write_all(&bytes).await?;
@@ -189,11 +198,12 @@ pub async fn send<T: AsyncRead + AsyncWrite + Unpin>(
 }
 
 pub async fn send_with_timeout<T: AsyncRead + AsyncWrite + Unpin>(
+    ctx: FastbootContext,
     cmd: Command,
     interface: &mut T,
     timeout: Duration,
 ) -> Result<Reply> {
-    let _lock = SEND_LOCK.lock().await;
+    let _lock = ctx.send_lock.lock().await;
     let bytes = Vec::<u8>::try_from(&cmd)?;
     log::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
     interface.write_all(&bytes).await?;
@@ -201,12 +211,14 @@ pub async fn send_with_timeout<T: AsyncRead + AsyncWrite + Unpin>(
 }
 
 pub async fn upload<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
+    ctx: FastbootContext,
     size: u32,
     buf: &mut R,
     interface: &mut T,
     listener: &impl UploadProgressListener,
 ) -> Result<Reply> {
     upload_with_read_timeout(
+        ctx,
         size,
         buf,
         interface,
@@ -217,16 +229,17 @@ pub async fn upload<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
 }
 
 pub async fn upload_with_read_timeout<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
+    ctx: FastbootContext,
     size: u32,
     buf: &mut R,
     interface: &mut T,
     listener: &impl UploadProgressListener,
     timeout: Duration,
 ) -> Result<Reply> {
-    let _lock = TRANSFER_LOCK.lock().await;
+    let _lock = ctx.transfer_lock.lock().await;
     // We are sending "Download" in our "upload" function because we are the
     // host -- from the device's point of view, it is a download
-    let reply = send(Command::Download(size), interface).await?;
+    let reply = send(ctx.clone(), Command::Download(size), interface).await?;
     match reply {
         Reply::Data(s) => {
             if s != size {
@@ -286,13 +299,14 @@ pub async fn upload_with_read_timeout<T: AsyncRead + AsyncWrite + Unpin, R: Read
 }
 
 pub async fn download<T: AsyncRead + AsyncWrite + Unpin>(
+    ctx: FastbootContext,
     path: &String,
     interface: &mut T,
 ) -> Result<Reply> {
-    let _lock = TRANSFER_LOCK.lock().await;
+    let _lock = ctx.transfer_lock.lock().await;
     // We are sending "Upload" in our "download" function because we are the
     // host -- from the device's point of view, it is an upload
-    let reply = send(Command::Upload, interface).await?;
+    let reply = send(ctx.clone(), Command::Upload, interface).await?;
     log::debug!("got reply from upload command: {:?}", reply);
     match reply {
         Reply::Data(s) => {
@@ -374,15 +388,17 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_send_does_not_return_info_replies() {
         let mut test_transport = TestTransport::new();
+        let ctx = FastbootContext::new();
         test_transport.push(Reply::Okay("0.4".to_string()));
-        let response = send(Command::GetVar(ClientVariable::Version), &mut test_transport).await;
+        let response =
+            send(ctx.clone(), Command::GetVar(ClientVariable::Version), &mut test_transport).await;
         assert!(!response.is_err());
         assert_eq!(response.unwrap(), Reply::Okay("0.4".to_string()));
 
         test_transport.push(Reply::Okay("0.4".to_string()));
         test_transport.push(Reply::Info("Test".to_string()));
         let response_with_info =
-            send(Command::GetVar(ClientVariable::Version), &mut test_transport).await;
+            send(ctx.clone(), Command::GetVar(ClientVariable::Version), &mut test_transport).await;
         assert!(!response_with_info.is_err());
         assert_eq!(response_with_info.unwrap(), Reply::Okay("0.4".to_string()));
 
@@ -391,7 +407,7 @@ mod test {
             test_transport.push(Reply::Info(format!("Test {}", i).to_string()));
         }
         let response_with_info =
-            send(Command::GetVar(ClientVariable::Version), &mut test_transport).await;
+            send(ctx.clone(), Command::GetVar(ClientVariable::Version), &mut test_transport).await;
         assert!(!response_with_info.is_err());
         assert_eq!(response_with_info.unwrap(), Reply::Okay("0.4".to_string()));
     }
@@ -408,8 +424,9 @@ mod test {
         let listener = PushEventsUploadProgressListener { event_queue: events.clone() };
 
         let data_len = u32::try_from(data.len()).unwrap();
+        let ctx = FastbootContext::new();
         let response =
-            upload(data_len, &mut Cursor::new(data), &mut test_transport, &listener).await;
+            upload(ctx, data_len, &mut Cursor::new(data), &mut test_transport, &listener).await;
         assert!(!response.is_err());
         assert_eq!(response.unwrap(), Reply::Okay("Done Writing".to_string()));
 
@@ -429,12 +446,13 @@ mod test {
         let data: [u8; 1024] = [0; 1024];
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Info("Writing".to_string()));
+        let ctx = FastbootContext::new();
 
         let events = Arc::new(Mutex::new(Vec::<UploadEvent>::new()));
         let listener = PushEventsUploadProgressListener { event_queue: events.clone() };
         let data_len = u32::try_from(data.len()).unwrap();
         let response =
-            upload(data_len, &mut Cursor::new(data), &mut test_transport, &listener).await;
+            upload(ctx, data_len, &mut Cursor::new(data), &mut test_transport, &listener).await;
         assert!(response.is_err());
         let queue = events.lock().await;
         assert_eq!(*queue, vec![]);
@@ -445,12 +463,13 @@ mod test {
         let data: [u8; 1024] = [0; 1024];
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Data(1000));
+        let ctx = FastbootContext::new();
 
         let events = Arc::new(Mutex::new(Vec::<UploadEvent>::new()));
         let listener = PushEventsUploadProgressListener { event_queue: events.clone() };
         let data_len = u32::try_from(data.len()).unwrap();
         let response =
-            upload(data_len, &mut Cursor::new(data), &mut test_transport, &listener).await;
+            upload(ctx, data_len, &mut Cursor::new(data), &mut test_transport, &listener).await;
         assert!(response.is_err());
         let queue = events.lock().await;
         assert_eq!(
