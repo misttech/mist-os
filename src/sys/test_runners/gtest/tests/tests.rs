@@ -11,14 +11,10 @@ use maplit::hashset;
 use pretty_assertions::assert_eq;
 use test_manager_test_lib::{GroupRunEventByTestCase, RunEvent};
 
-fn default_options() -> ftest_manager::RunOptions {
-    ftest_manager::RunOptions {
+fn default_options() -> ftest_manager::RunSuiteOptions {
+    ftest_manager::RunSuiteOptions {
         run_disabled_tests: Some(false),
-        parallel: Some(10),
-        arguments: None,
-        timeout: None,
-        case_filters_to_run: None,
-        log_iterator: None,
+        max_concurrent_test_case_runs: Some(10),
         ..Default::default()
     }
 }
@@ -76,7 +72,7 @@ async fn launch_and_run_test_with_environ() {
 async fn launch_and_run_sample_test_no_concurrent() {
     let test_url = "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/sample_tests.cm";
     let mut run_options = default_options();
-    run_options.parallel = None;
+    run_options.max_concurrent_test_case_runs = None;
     let (events, _logs) = run_test(test_url, run_options).await.unwrap();
     let events = events.into_iter().group_by_test_case_unordered();
 
@@ -176,7 +172,7 @@ async fn launch_and_test_echo_test() {
 async fn test_parallel_execution() {
     let test_url = "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/concurrency-test.cm";
     let mut run_options = default_options();
-    run_options.parallel = Some(5);
+    run_options.max_concurrent_test_case_runs = Some(5);
     let (events, _logs) = run_test(test_url, run_options).await.unwrap();
     let events = events.into_iter().group_by_test_case_unordered();
 
@@ -200,7 +196,7 @@ async fn test_parallel_execution() {
 async fn launch_and_test_zxtest_success() {
     let test_url = "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/zxtest_success.cm";
     let mut run_options = default_options();
-    run_options.parallel = Some(1);
+    run_options.max_concurrent_test_case_runs = Some(1);
     let (events, _logs) = run_test(test_url, run_options).await.unwrap();
 
     let grouped = events.into_iter().group_by_test_case_ordered();
@@ -238,7 +234,7 @@ async fn launch_and_test_zxtest_success() {
 async fn launch_and_test_zxtest_failure() {
     let test_url = "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/zxtest_failure.cm";
     let mut run_options = default_options();
-    run_options.parallel = Some(1);
+    run_options.max_concurrent_test_case_runs = Some(1);
     let (events, _logs) = run_test(test_url, run_options).await.unwrap();
 
     let expected_events = vec![
@@ -269,7 +265,7 @@ async fn launch_and_test_gtest_setup_failure() {
     let test_url =
         "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/gtest_setup_failure.cm";
     let mut run_options = default_options();
-    run_options.parallel = Some(1);
+    run_options.max_concurrent_test_case_runs = Some(1);
     let (events, _logs) = run_test(test_url, run_options).await.unwrap();
 
     let expected_events = vec![
@@ -300,7 +296,7 @@ async fn launch_and_test_zxtest_setup_failure() {
     let test_url =
         "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/zxtest_setup_failure.cm";
     let mut run_options = default_options();
-    run_options.parallel = Some(1);
+    run_options.max_concurrent_test_case_runs = Some(1);
     let (events, _logs) = run_test(test_url, run_options).await.unwrap();
 
     let event_groups = events.into_iter().group_by_test_case_unordered();
@@ -334,7 +330,7 @@ async fn launch_and_test_zxtest_env_setup_failure() {
     let test_url =
         "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/zxtest_env_setup_failure.cm";
     let mut run_options = default_options();
-    run_options.parallel = Some(1);
+    run_options.max_concurrent_test_case_runs = Some(1);
     let (events, _logs) = run_test(test_url, run_options).await.unwrap();
 
     let event_groups = events.into_iter().group_by_test_case_unordered();
