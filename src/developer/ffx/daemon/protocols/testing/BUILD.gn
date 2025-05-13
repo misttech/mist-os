@@ -17,7 +17,7 @@ rustc_library("ffx_daemon_protocol_testing") {
     "//src/developer/ffx/lib/protocols:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/lib.rs" ]

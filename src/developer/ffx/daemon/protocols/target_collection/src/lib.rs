@@ -81,7 +81,7 @@ impl Default for TargetCollectionProtocol {
 }
 
 async fn target_is_fastboot_tcp(addr: SocketAddr) -> bool {
-    tracing::info!("Checking if target at addr: {addr:?} in fastboot over tcp");
+    log::info!("Checking if target at addr: {addr:?} in fastboot over tcp");
     let tclone = Target::new_with_fastboot_addrs(
         Option::<String>::None,
         Option::<String>::None,
@@ -91,17 +91,17 @@ async fn target_is_fastboot_tcp(addr: SocketAddr) -> bool {
 
     match tclone.is_fastboot_tcp().await {
         Ok(true) => {
-            tracing::info!("Target is running TCP fastboot");
+            log::info!("Target is running TCP fastboot");
             true
         }
         Ok(false) => {
-            tracing::info!("Target not running TCP fastboot");
+            log::info!("Target not running TCP fastboot");
             false
         }
         Err(e) => {
             // Since we don't know if this target supports fastboot, this should
             // be an info message, not an error
-            tracing::info!("Got error connecting to target over TCP: {:?}", e);
+            log::info!("Got error connecting to target over TCP: {:?}", e);
             false
         }
     }
@@ -113,13 +113,13 @@ async fn add_manual_target(
     addr: SocketAddr,
     overnet_node: &Arc<overnet_core::Router>,
 ) -> Rc<Target> {
-    tracing::debug!("Adding manual targets, addr: {addr:?}");
+    log::debug!("Adding manual targets, addr: {addr:?}");
 
     // When adding a manual target we need to test if the target behind the
     // address is running in fastboot over tcp or not
     let is_fastboot_tcp = target_is_fastboot_tcp(addr).await;
 
-    tracing::debug!("Is manual target in Fastboot over TCP: {}", is_fastboot_tcp);
+    log::debug!("Is manual target in Fastboot over TCP: {}", is_fastboot_tcp);
 
     let mut update = TargetUpdateBuilder::new()
         .manual_target()
@@ -143,7 +143,7 @@ async fn add_manual_target(
     );
 
     let _ = manual_targets.add(format!("{}", addr)).await.map_err(|e| {
-        tracing::error!("Unable to persist manual target: {:?}", e);
+        log::error!("Unable to persist manual target: {:?}", e);
     });
 
     let target = tc
@@ -152,7 +152,7 @@ async fn add_manual_target(
         .expect("Could not find inserted manual target");
 
     if !is_fastboot_tcp {
-        tracing::debug!("Running host pipe since target is not fastboot");
+        log::debug!("Running host pipe since target is not fastboot");
         target.run_host_pipe(overnet_node);
     }
     target
@@ -176,9 +176,9 @@ async fn remove_manual_target(
             let mut sockaddr: SocketAddr = sockaddr.into();
             ssh_port.map(|p| sockaddr.set_port(p));
             let _ = manual_targets.remove(format!("{}", sockaddr)).await.map_err(|e| {
-                tracing::error!("Unable to persist target removal: {}", e);
+                log::error!("Unable to persist target removal: {}", e);
             });
-            tracing::debug!("Removed {:#?} from manual target collection", sockaddr)
+            log::debug!("Removed {:#?} from manual target collection", sockaddr)
         }
     }
     tc.remove_target(target_id)
@@ -196,7 +196,7 @@ impl TargetCollectionProtocol {
             let (addr, scope, port) = match netext::parse_address_parts(unparsed_addr.as_str()) {
                 Ok(res) => res,
                 Err(e) => {
-                    tracing::error!("Skipping load of manual target address due to parsing error '{unparsed_addr}': {e}");
+                    log::error!("Skipping load of manual target address due to parsing error '{unparsed_addr}': {e}");
                     continue;
                 }
             };
@@ -204,7 +204,7 @@ impl TargetCollectionProtocol {
                 match netext::get_verified_scope_id(scope) {
                     Ok(res) => res,
                     Err(e) => {
-                        tracing::error!("Scope load of manual address '{unparsed_addr}', which had a scope ID of '{scope}', which was not verifiable: {e}");
+                        log::error!("Scope load of manual address '{unparsed_addr}', which had a scope ID of '{scope}', which was not verifiable: {e}");
                         continue;
                     }
                 }
@@ -219,7 +219,7 @@ impl TargetCollectionProtocol {
 
             let tc = cx.get_target_collection().await?;
             let overnet_node = cx.overnet_node()?;
-            tracing::info!("Adding manual target with address: {:?}", sa);
+            log::info!("Adding manual target with address: {:?}", sa);
             add_manual_target(manual_targets.clone(), &tc, sa, &overnet_node).await;
         }
         Ok(())
@@ -281,7 +281,7 @@ impl TargetCollectionProtocol {
             .map_err(|_| ffx::OpenTargetError::QueryAmbiguous)
             .and_then(|target| match target {
                 None => {
-                    tracing::error!("Couldn't find target we just created");
+                    log::error!("Couldn't find target we just created");
                     Err(ffx::OpenTargetError::TargetNotFound)
                 }
                 Some(t) => Ok(t),
@@ -295,7 +295,7 @@ impl FidlProtocol for TargetCollectionProtocol {
     type StreamHandler = FidlStreamHandler<Self>;
 
     async fn handle(&self, cx: &Context, req: ffx::TargetCollectionRequest) -> Result<()> {
-        tracing::debug!("handling request {req:?}");
+        log::debug!("handling request {req:?}");
         let target_collection = cx.get_target_collection().await?;
         match req {
             ffx::TargetCollectionRequest::ListTargets { reader, query, .. } => {
@@ -325,10 +325,10 @@ impl FidlProtocol for TargetCollectionProtocol {
                 Ok(())
             }
             ffx::TargetCollectionRequest::OpenTarget { query, responder, target_handle } => {
-                tracing::trace!("Open Target {query:?}");
+                log::trace!("Open Target {query:?}");
 
                 let query = TargetInfoQuery::from(query.string_matcher.clone());
-                tracing::debug!("Open Target parsed query: {query:?}");
+                log::debug!("Open Target parsed query: {query:?}");
 
                 let node = cx.overnet_node()?;
                 // Get a previously used target first, otherwise fall back to discovery + use.
@@ -360,7 +360,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                                             target_collection.use_target(t, "OpenTarget request")
                                         })
                                 } else {
-                                    tracing::warn!("OpenTarget(query:?): daemon discovery is turned off, so client should only be sending already-resolved addresses (Addr or Serial)");
+                                    log::warn!("OpenTarget(query:?): daemon discovery is turned off, so client should only be sending already-resolved addresses (Addr or Serial)");
                                     Err(ffx::OpenTargetError::TargetNotFound)
                                 }
                             }
@@ -372,12 +372,12 @@ impl FidlProtocol for TargetCollectionProtocol {
                 let target = match result {
                     Ok(target) => target,
                     Err(e) => {
-                        tracing::debug!("OpenTarget: got err {e:?}");
+                        log::debug!("OpenTarget: got err {e:?}");
                         return responder.send(Err(e)).map_err(Into::into);
                     }
                 };
 
-                tracing::trace!("Found target: {target:?}");
+                log::trace!("Found target: {target:?}");
                 self.tasks.spawn(TargetHandle::new(
                     target,
                     cx.clone(),
@@ -443,12 +443,12 @@ impl FidlProtocol for TargetCollectionProtocol {
                 // If the target is in fastboot then skip rcs
                 match target.get_connection_state() {
                     TargetConnectionState::Fastboot(_) => {
-                        tracing::info!("skipping rcs verfication as the target is in fastboot ");
+                        log::info!("skipping rcs verfication as the target is in fastboot ");
                         let _ = drop_guard.0.take();
                         return add_target_responder.success().map_err(Into::into);
                     }
                     _ => {
-                        tracing::error!(
+                        log::error!(
                             "target connection state was: {:?}",
                             target.get_connection_state()
                         );
@@ -542,18 +542,18 @@ impl FidlProtocol for TargetCollectionProtocol {
             None
         };
         self.tasks.spawn(async move {
-            tracing::debug!("Loading previously configured manual targets");
+            log::debug!("Loading previously configured manual targets");
             if let Err(e) = TargetCollectionProtocol::load_manual_targets(
                 &load_manual_cx,
                 manual_targets_collection,
             )
             .await
             {
-                tracing::warn!("Got error loading manual targets: {}", e);
+                log::warn!("Got error loading manual targets: {}", e);
             }
             #[cfg(test)]
             if let Some(s) = signal {
-                tracing::debug!("Sending signal that manual target loading is complete");
+                log::debug!("Sending signal that manual target loading is complete");
                 let _ = s.send(());
             }
         });
@@ -594,7 +594,7 @@ impl FidlProtocol for TargetCollectionProtocol {
             {
                 Ok(dir) => dir,
                 Err(e) => {
-                    tracing::error!("Could not read emulator instance root configuration: {e:?}");
+                    log::error!("Could not read emulator instance root configuration: {e:?}");
                     return;
                 }
             };
@@ -602,7 +602,7 @@ impl FidlProtocol for TargetCollectionProtocol {
             let mut watcher = match emulator_targets::start_emulator_watching(instance_root) {
                 Ok(w) => w,
                 Err(e) => {
-                    tracing::error!("Could not create emulator watcher: {e:?}");
+                    log::error!("Could not create emulator watcher: {e:?}");
                     return;
                 }
             };
@@ -610,8 +610,8 @@ impl FidlProtocol for TargetCollectionProtocol {
             let _ = watcher
                 .check_all_instances()
                 .await
-                .map_err(|e| tracing::error!("Error checking emulator instances: {e:?}"));
-            tracing::trace!("Starting processing emulator instance events");
+                .map_err(|e| log::error!("Error checking emulator instances: {e:?}"));
+            log::trace!("Starting processing emulator instance events");
             loop {
                 if let Some(emu_target_action) = watcher.emulator_target_detected().await {
                     match emu_target_action {
@@ -622,15 +622,12 @@ impl FidlProtocol for TargetCollectionProtocol {
                         EmulatorTargetAction::Remove(emu_target) => {
                             if let Some(id) = emu_target.nodename {
                                 if tc2.remove_target(id.clone()) {
-                                    tracing::info!(
+                                    log::info!(
                                         "Successfully removed emulator instance ['{}']",
                                         &id
                                     );
                                 } else {
-                                    tracing::error!(
-                                        "Unable to remove emulator instance ['{}']",
-                                        &id
-                                    );
+                                    log::error!("Unable to remove emulator instance ['{}']", &id);
                                 };
                             }
                         }
@@ -647,7 +644,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                     match event {
                         UsbVsockHostEvent::AddedCid(cid) => {
                             if let Err(error) = handle_usb_target(cid, &tc, &node).await {
-                                tracing::warn!(cid, ?error, "Could not connect to USB target");
+                                log::warn!(cid, error:?; "Could not connect to USB target");
                             }
                         }
                         UsbVsockHostEvent::RemovedCid(cid) => {
@@ -656,7 +653,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                     }
                 }
 
-                tracing::error!("USB Discovery shut down");
+                log::error!("USB Discovery shut down");
             });
         }
 
@@ -739,7 +736,7 @@ async fn handle_usb_target_impl(
 // USB fastboot
 fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget) {
     if let Some(serial) = target.serial {
-        tracing::debug!("Found new target via fastboot: {}", serial);
+        log::debug!("Found new target via fastboot: {}", serial);
 
         let update = TargetUpdateBuilder::new()
             .discovered(TargetProtocol::Fastboot, TargetTransport::Usb)
@@ -747,7 +744,7 @@ fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget
             .build();
         tc.update_target(&[TargetUpdateFilter::Serial(&serial)], update, true);
     } else if let Some(addrs) = target.addresses {
-        tracing::debug!("Found a new fastboot over network target {:?}.", addrs);
+        log::debug!("Found a new fastboot over network target {:?}.", addrs);
 
         let mut nadders = vec![];
         for addr in addrs {
@@ -759,7 +756,7 @@ fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget
             .build();
         tc.update_target(&[TargetUpdateFilter::NetAddrs(&nadders)], update, true);
     } else {
-        tracing::warn!("Got a fastboot target without serial or addresses: {:?}", target);
+        log::warn!("Got a fastboot target without serial or addresses: {:?}", target);
     }
 }
 
@@ -770,16 +767,16 @@ fn handle_discovered_target(
     overnet_node: &Arc<overnet_core::Router>,
     autoconnect: bool,
 ) {
-    tracing::debug!("Discovered target {t:?}");
+    log::debug!("Discovered target {t:?}");
 
     if t.fastboot_interface.is_some() {
-        tracing::debug!(
+        log::debug!(
             "Found new fastboot target via mdns: {}. Address: {:?}",
             t.nodename.as_deref().unwrap_or(ffx_target::UNKNOWN_TARGET_NAME),
             t.addresses
         );
     } else {
-        tracing::debug!(
+        log::debug!(
             "Found new target via mdns or file watcher: {}",
             t.nodename.as_deref().unwrap_or(ffx_target::UNKNOWN_TARGET_NAME),
         );

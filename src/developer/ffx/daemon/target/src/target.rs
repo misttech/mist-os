@@ -381,7 +381,7 @@ impl Target {
                 .replace(UsbVsockHost::new(Vec::<std::path::PathBuf>::new(), true, sender))
                 .is_some()
             {
-                tracing::warn!("Re-initializing USB VSock host");
+                log::warn!("Re-initializing USB VSock host");
             }
             Some(receiver)
         } else {
@@ -811,7 +811,7 @@ impl Target {
         let current_status = self.get_compatibility_status();
         let new_status = match current_status {
             Some(_) => {
-                tracing::debug!(
+                log::debug!(
                     "ignoring status change from id:{} {:?} to {:?}",
                     self.id(),
                     current_status,
@@ -822,12 +822,12 @@ impl Target {
             None if status.is_some() => {
                 // Make compatibility status change more obvious to the user in the info logs.
                 // Leave the detailed status struct in the debug logs in case it is needed.
-                tracing::info!(
+                log::info!(
                     "Compatibility status changed to ['{:#?}'] for target: [{}]",
                     status.as_ref().unwrap().status,
                     self.id()
                 );
-                tracing::debug!("{:#?}", status);
+                log::debug!("{:#?}", status);
                 status.clone()
             }
             _ => None,
@@ -846,7 +846,7 @@ impl Target {
         // enforce state transition control, such as ensuring that
         // manual targets do not enter the disconnected state. It must
         // only be used in tests.
-        tracing::debug!(
+        log::debug!(
             "Setting state directly for {name}@{id} from {old:?} to {new:?}",
             name = self.nodename_str(),
             id = self.id(),
@@ -926,7 +926,7 @@ impl Target {
         }
 
         if former_state == new_state {
-            tracing::trace!(
+            log::trace!(
                 "State unchanged for {}@{} from {:?}",
                 self.nodename_str(),
                 self.id(),
@@ -935,7 +935,7 @@ impl Target {
             return;
         }
 
-        tracing::debug!(
+        log::debug!(
             "Updating state for {}@{} from {:?} to {:?}",
             self.nodename_str(),
             self.id(),
@@ -952,25 +952,23 @@ impl Target {
             // If the target is going from the disconnected state to discovered, clear the transient
             // flag.
             if self.transient.get() {
-                tracing::debug!("Cleared transient flag for target connection state transition");
+                log::debug!("Cleared transient flag for target connection state transition");
                 self.transient.set(false);
             }
         } else if expired && self.transient.get() && self.is_enabled() {
-            tracing::debug!("Enabled transient target expired, closing...");
+            log::debug!("Enabled transient target expired, closing...");
             self.disable();
         }
 
         if self.get_connection_state().is_rcs() {
             self.events.push(TargetEvent::RcsActivated).unwrap_or_else(|err| {
-                tracing::warn!("unable to enqueue RCS activation event: {:#}", err)
+                log::warn!("unable to enqueue RCS activation event: {:#}", err)
             });
         }
 
         self.events
             .push(TargetEvent::ConnectionStateChanged(former_state, self.state.borrow().clone()))
-            .unwrap_or_else(|e| {
-                tracing::error!("Failed to push state change for {:?}: {:?}", self, e)
-            });
+            .unwrap_or_else(|e| log::error!("Failed to push state change for {:?}: {:?}", self, e));
     }
 
     pub fn from_manual_to_tcp_fastboot(&self) {
@@ -1080,7 +1078,7 @@ impl Target {
 
     pub fn set_ssh_port(&self, port: Option<u16>) {
         if *self.ssh_port.borrow() != port {
-            tracing::debug!(
+            log::debug!(
                 "Setting ssh port for {} from {:?} to {:?}",
                 self.nodename_str(),
                 self.ssh_port.borrow(),
@@ -1207,7 +1205,7 @@ impl Target {
             // -- we don't want to return Ok(None), that would imply that the
             // connection _did_ get made, but didn't provide an id.)
             drop(task);
-            tracing::debug!("Reconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
+            log::debug!("Reconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
             self.run_host_pipe_with_sender(&overnet_node, roid_sender);
         }
     }
@@ -1230,7 +1228,7 @@ impl Target {
                 Ok(addr) => {
                     target.ssh_host_address.replace(Some(addr.into()));
                 }
-                Err(error) => tracing::debug!(error = ?error, "Error fetching ssh host address"),
+                Err(error) => log::debug!(error:? = error; "Error fetching ssh host address"),
             }
         })
         .detach();
@@ -1272,7 +1270,7 @@ impl Target {
             if let Some(sender) = roid_sender {
                 let _ = sender.send(None);
             }
-            tracing::error!("Cannot run host pipe for device not in use");
+            log::error!("Cannot run host pipe for device not in use");
             return;
         }
 
@@ -1283,14 +1281,14 @@ impl Target {
                 match &mut hp.remote_overnet_id {
                     RemoteOvernetIdState::Pending(ref mut waiters) => waiters.push(sender),
                     RemoteOvernetIdState::Ready(roid) => {
-                        tracing::debug!(
+                        log::debug!(
                         "Got request for host pipe overnet id for an already-running host-pipe -- sending back {roid:?}",
                     );
                         let _ = sender.send(*roid);
                     }
                 }
             }
-            // tracing::debug!("Host pipe is already set for {}@{}.", self.nodename_str(), self.id());
+            // log::debug!("Host pipe is already set for {}@{}.", self.nodename_str(), self.id());
             return;
         }
 
@@ -1379,7 +1377,7 @@ impl Target {
                 }
 
                 weak_target.upgrade().and_then(|target| {
-                    tracing::debug!(
+                    log::debug!(
                         "Exiting run_host_pipe for {target_name_str} ({conn_type} connection)"
                     );
                     target.host_pipe.borrow_mut().take()
@@ -1401,7 +1399,7 @@ impl Target {
 
             match nr {
                 Ok(mut hp) => {
-                    tracing::debug!("host pipe spawn returned OK for {target_name_str}");
+                    log::debug!("host pipe spawn returned OK for {target_name_str}");
                     eprintln!("host pipe spawn returned OK for {target_name_str}");
                     let compatibility_status = hp.get_compatibility_status();
 
@@ -1417,7 +1415,7 @@ impl Target {
                         if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
                             host_pipe.ssh_addr = Some(hp.get_address());
                             let overnet_id = hp.overnet_id();
-                            tracing::debug!(
+                            log::debug!(
                                 "Got host pipe overnet id {:?} -- sending to waiters",
                                 overnet_id
                             );
@@ -1440,10 +1438,10 @@ impl Target {
                         Ok(r) => {
                             // This was an info. Moved to debug as this is not informational or
                             // actionable to end users.
-                            tracing::debug!("HostPipeConnection returned: {:?}", r);
+                            log::debug!("HostPipeConnection returned: {:?}", r);
                         }
                         Err(r) => {
-                            tracing::warn!(
+                            log::warn!(
                                 "The host pipe connection to ['{target_name_str}'] returned: {:?}",
                                 r
                             );
@@ -1453,7 +1451,7 @@ impl Target {
                 Err(e) => {
                     // Change this to a debug message (from warn). We will get any error from
                     // SSH client in the logs so this is redundant.
-                    tracing::debug!("Host pipe spawn {:?}", e);
+                    log::debug!("Host pipe spawn {:?}", e);
                     let compatibility_status = Some(CompatibilityInfo {
                         status: CompatibilityState::Error,
                         platform_abi: 0,
@@ -1469,7 +1467,7 @@ impl Target {
             }
 
             weak_target.upgrade().and_then(|target| {
-                tracing::debug!("Exiting run_host_pipe for {target_name_str}");
+                log::debug!("Exiting run_host_pipe for {target_name_str}");
                 target.host_pipe.borrow_mut().take()
             });
         };
@@ -1498,7 +1496,7 @@ impl Target {
         match self.events.wait_for(None, |e| e == TargetEvent::RcsActivated).await {
             Ok(()) => (),
             Err(e) => {
-                tracing::warn!("{}", e);
+                log::warn!("{}", e);
                 bail!("RCS connection issue")
             }
         }
@@ -1549,12 +1547,12 @@ impl Target {
             };
 
             if new_state.is_some() && self.is_transient() && self.has_keep_alive() {
-                tracing::debug!("Not expiring state for transient target with keep alive");
+                log::debug!("Not expiring state for transient target with keep alive");
                 return current_state;
             }
 
             if let Some(ref new_state) = new_state {
-                tracing::debug!(
+                log::debug!(
                     "Target {:?} state {:?} => {:?} due to expired state after {:?}.",
                     self,
                     &current_state,
@@ -1622,7 +1620,7 @@ impl Target {
 
     pub fn disconnect(&self) {
         drop(self.host_pipe.take());
-        tracing::debug!("Disconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
+        log::debug!("Disconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
         self.update_connection_state(|_| TargetConnectionState::Disconnected);
     }
 }
@@ -1646,7 +1644,7 @@ impl From<&Target> for ffx::TargetInfo {
                 .num_milliseconds()
             {
                 dur if dur < 0 => {
-                    tracing::trace!(
+                    log::trace!(
                         "negative duration encountered on target '{}': {}",
                         target.nodename_str(),
                         dur

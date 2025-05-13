@@ -248,7 +248,6 @@ tracing_visibility = [
 
   # At this time we are not enforcing restrictions on ffx and related libraries.
   "//src/developer/ffx/config/*",
-  "//src/developer/ffx/daemon/*",
   "//src/developer/ffx/lib/logging/*",
   "//src/developer/ffx/lib/usb_vsock_host/*",
   "//src/connectivity/overnet/lib/ascendd:*",

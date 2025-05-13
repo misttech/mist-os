@@ -25,12 +25,12 @@ impl FidlProtocol for Echo {
     }
 
     async fn start(&mut self, _cx: &Context) -> Result<()> {
-        tracing::debug!("started echo protocol");
+        log::debug!("started echo protocol");
         Ok(())
     }
 
     async fn stop(&mut self, _cx: &Context) -> Result<()> {
-        tracing::debug!("stopped echo protocol");
+        log::debug!("stopped echo protocol");
         Ok(())
     }
 }

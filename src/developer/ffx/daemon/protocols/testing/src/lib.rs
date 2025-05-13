@@ -24,7 +24,7 @@ impl FidlProtocol for Testing {
             // again periodically on timers, depending on implementation
             // details of the underlying reactor.
             ffx::TestingRequest::Hang { .. } => {
-                tracing::info!("instructed to hang by client invocation");
+                log::info!("instructed to hang by client invocation");
                 std::thread::park();
                 Ok(())
             }

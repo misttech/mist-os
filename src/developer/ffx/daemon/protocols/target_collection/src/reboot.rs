@@ -153,7 +153,7 @@ impl RebootController {
                     match fastboot_interface.reboot().await {
                         Ok(_) => responder.send(Ok(())).map_err(Into::into),
                         Err(e) => {
-                            tracing::error!("Fastboot communication error: {:?}", e);
+                            log::error!("Fastboot communication error: {:?}", e);
                             responder
                                 .send(Err(TargetRebootError::FastbootCommunication))
                                 .map_err(Into::into)
@@ -207,7 +207,7 @@ impl RebootController {
                     match fastboot_interface.reboot_bootloader(reboot_client).await {
                         Ok(_) => responder.send(Ok(())).map_err(Into::into),
                         Err(e) => {
-                            tracing::error!("Fastboot communication error: {:?}", e);
+                            log::error!("Fastboot communication error: {:?}", e);
                             responder
                                 .send(Err(TargetRebootError::FastbootCommunication))
                                 .map_err(Into::into)
@@ -222,18 +222,18 @@ impl RebootController {
                 let response = if let Some(addr) = self.target.netsvc_address() {
                     match state {
                         TargetRebootState::Product => reboot(addr).await.map(|_| ()).map_err(|e| {
-                            tracing::error!("zedboot reboot failed {:?}", e);
+                            log::error!("zedboot reboot failed {:?}", e);
                             TargetRebootError::NetsvcCommunication
                         }),
                         TargetRebootState::Bootloader => {
                             reboot_to_bootloader(addr).await.map(|_| ()).map_err(|e| {
-                                tracing::error!("zedboot reboot to bootloader failed {:?}", e);
+                                log::error!("zedboot reboot to bootloader failed {:?}", e);
                                 TargetRebootError::NetsvcCommunication
                             })
                         }
                         TargetRebootState::Recovery => {
                             reboot_to_recovery(addr).await.map(|_| ()).map_err(|e| {
-                                tracing::error!("zedboot reboot to recovery failed {:?}", e);
+                                log::error!("zedboot reboot to recovery failed {:?}", e);
                                 TargetRebootError::NetsvcCommunication
                             })
                         }
@@ -254,7 +254,7 @@ impl RebootController {
                     match res {
                         Ok(_) => responder.send(Ok(())).map_err(Into::into),
                         Err(e) => {
-                            tracing::error!("Target communication error when rebooting: {:?}", e);
+                            log::error!("Target communication error when rebooting: {:?}", e);
                             responder
                                 .send(Err(TargetRebootError::TargetCommunication))
                                 .map_err(Into::into)
@@ -264,11 +264,11 @@ impl RebootController {
                     let admin_proxy = match self
                         .get_admin_proxy()
                         .map_err(|e| {
-                            tracing::warn!("error getting admin proxy: {}", e);
+                            log::warn!("error getting admin proxy: {}", e);
                             TargetRebootError::TargetCommunication
                         })
                         .on_timeout(Duration::from_secs(5), || {
-                            tracing::warn!("timed out getting admin proxy");
+                            log::warn!("timed out getting admin proxy");
                             Err(TargetRebootError::TargetCommunication)
                         })
                         .await
@@ -324,15 +324,15 @@ pub(crate) fn handle_fidl_connection_err(e: Error, responder: TargetRebootRespon
             // Check the 'protocol_name' and if it is 'fuchsia.hardware.power.statecontrol.Admin'
             // then we can be more confident that target reboot/shutdown has succeeded.
             if protocol_name == "fuchsia.hardware.power.statecontrol.Admin" {
-                tracing::info!("Target reboot succeeded.");
+                log::info!("Target reboot succeeded.");
             } else {
-                tracing::info!("Assuming target reboot succeeded. Client received a PEER_CLOSED from '{protocol_name}'");
+                log::info!("Assuming target reboot succeeded. Client received a PEER_CLOSED from '{protocol_name}'");
             }
-            tracing::debug!("{:?}", e);
+            log::debug!("{:?}", e);
             responder.send(Ok(()))?;
         }
         _ => {
-            tracing::error!("Target communication error: {:?}", e);
+            log::error!("Target communication error: {:?}", e);
             responder.send(Err(TargetRebootError::TargetCommunication))?;
         }
     }
@@ -344,7 +344,7 @@ async fn run_ssh_command(target: Weak<Target>, state: TargetRebootState) -> Resu
         target.upgrade().ok_or_else(|| anyhow!("Could not upgrade Target to build ssh command"))?;
     let addr = t.ssh_address().ok_or_else(|| anyhow!("Could not get ssh address for target"))?;
     let mut cmd = build_ssh_command_local(addr.into(), state).await?;
-    tracing::debug!("About to run command on target to reboot: {:?}", cmd);
+    log::debug!("About to run command on target to reboot: {:?}", cmd);
     let ssh = cmd.spawn()?;
     let output = ssh.wait_with_output()?;
     match output.status.success() {
@@ -356,7 +356,7 @@ async fn run_ssh_command(target: Weak<Target>, state: TargetRebootState) -> Resu
                 Ok(())
             } else {
                 let stdout = output.stdout;
-                tracing::error!(
+                log::error!(
                     "Error rebooting. Error code: {:?}. Output from ssh command: {:?}",
                     output.status.code(),
                     stdout

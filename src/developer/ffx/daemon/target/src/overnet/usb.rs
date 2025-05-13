@@ -12,21 +12,21 @@ use super::vsock::OVERNET_VSOCK_PORT;
 
 /// Host-pipe-like task for communicating via vsock.
 pub async fn spawn_usb(host: Arc<UsbVsockHost>, cid: u32, node: Arc<overnet_core::Router>) {
-    tracing::debug!(cid, "Spawning USB VSOCK host pipe");
+    log::debug!(cid; "Spawning USB VSOCK host pipe");
 
     let Ok(cid) = cid.try_into() else {
-        tracing::warn!("Tried to connect to USB CID 0");
+        log::warn!("Tried to connect to USB CID 0");
         return;
     };
 
     let (socket, other_end) = fasync::emulated_handle::Socket::create_stream();
     let other_end = fasync::Socket::from_socket(other_end);
     if let Err(error) = host.connect(cid, OVERNET_VSOCK_PORT, other_end).await {
-        tracing::warn!(cid, ?error, "Could not connect to USB VSOCK");
+        log::warn!(cid, error:?; "Could not connect to USB VSOCK");
         return;
     }
 
-    tracing::debug!(cid, "USB VSOCK connection established");
+    log::debug!(cid; "USB VSOCK connection established");
 
     let (error_sender, mut error_receiver) = unbounded();
 
@@ -44,14 +44,14 @@ pub async fn spawn_usb(host: Arc<UsbVsockHost>, cid: u32, node: Arc<overnet_core
 
     let conn = async move {
         if let Err(error) = conn.await {
-            tracing::warn!(cid, ?error, "USB VSOCK Connection failed");
+            log::warn!(cid, error:?; "USB VSOCK Connection failed");
         }
     };
 
     let error_logger = {
         async move {
             while let Some(error) = error_receiver.next().await {
-                tracing::debug!(vsock_cid = cid, ?error, "Stream encountered an error");
+                log::debug!(vsock_cid = cid, error:?; "Stream encountered an error");
             }
         }
     };

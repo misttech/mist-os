@@ -130,12 +130,12 @@ impl Injection {
         router_interval: Option<Duration>,
         daemon_check: DaemonVersionCheck,
     ) -> ffx_command_error::Result<Injection> {
-        tracing::debug!("Initializing Overnet");
+        log::debug!("Initializing Overnet");
         let node = overnet_core::Router::new(router_interval)
             .bug_context("Failed to initialize overnet")?;
-        tracing::debug!("Getting target");
+        log::debug!("Getting target");
         let target_spec = ffx_target::get_target_specifier(&env_context).await?;
-        tracing::debug!("Building Injection");
+        log::debug!("Building Injection");
         Ok(Injection::new(env_context, daemon_check, node, target_spec))
     }
 
@@ -224,7 +224,7 @@ impl Injection {
                         &fidl_fuchsia_io::Options::default(),
                         server.into(),
                     ) {
-                        tracing::debug!(?error, "Could not open svc folder in toolbox namespace");
+                        log::debug!(error:?; "Could not open svc folder in toolbox namespace");
                     };
                     Ok(client)
                 });
@@ -285,7 +285,7 @@ impl Injector for Injection {
         // We pin this in order to avoid the compiler reporting "error: large
         // future with a size of 16600 bytes".
         Box::pin(timeout(proxy_timeout, self.target_factory_inner())).await.map_err(|_| {
-            tracing::warn!("Timed out getting Target proxy for: {:?}", self.target_spec);
+            log::warn!("Timed out getting Target proxy for: {:?}", self.target_spec);
             timeout_error
         })?
     }
@@ -306,7 +306,7 @@ impl Injector for Injection {
         }))
         .await
         .map_err(|_| {
-            tracing::warn!("Timed out getting remote control proxy for: {:?}", self.target_spec);
+            log::warn!("Timed out getting remote control proxy for: {:?}", self.target_spec);
             match target_info.lock().unwrap().take() {
                 Some(TargetInfo { nodename: Some(name), .. }) => {
                     FfxTargetError::DaemonError { err: DaemonError::Timeout, target: Some(name) }
@@ -368,7 +368,7 @@ async fn init_daemon_proxy(
         ffx_daemon::spawn_daemon(&context).await?;
     }
 
-    tracing::debug!("Daemon available, establishing Overnet link");
+    log::debug!("Daemon available, establishing Overnet link");
     let (nodeid, proxy, link) =
         get_daemon_proxy_single_link(&node, ascendd_path.clone(), None).await?;
 
@@ -387,8 +387,8 @@ async fn init_daemon_proxy(
         .context("Getting hash from daemon")?;
 
     // Check the version against the given comparison scheme.
-    tracing::debug!("Checking daemon version: {version_check:?}");
-    tracing::debug!("Daemon version info: {daemon_version_info:?}");
+    log::debug!("Checking daemon version: {version_check:?}");
+    log::debug!("Daemon version info: {daemon_version_info:?}");
     let matched_proxy = match (first_connection, version_check, daemon_version_info) {
         (false, _, _) => true,
         (_, DaemonVersionCheck::SameBuildId(ours), VersionInfo { build_id: Some(daemon), .. })
@@ -418,12 +418,12 @@ async fn init_daemon_proxy(
     };
 
     if matched_proxy {
-        tracing::debug!("Found matching daemon version, using it.");
+        log::debug!("Found matching daemon version, using it.");
         link_task.detach();
         return Ok(proxy);
     }
 
-    tracing::info!("Daemon is a different version, attempting to restart");
+    log::info!("Daemon is a different version, attempting to restart");
 
     // Tell the daemon to quit, and wait for the link task to finish.
     // TODO(raggi): add a timeout on this, if the daemon quit fails for some
@@ -485,7 +485,7 @@ mod test {
                     backoff = backoff0;
                 }
                 Err(e) => {
-                    tracing::warn!("Operation failed: {:?} -- retrying in {:?}", e, backoff);
+                    log::warn!("Operation failed: {:?} -- retrying in {:?}", e, backoff);
                     fuchsia_async::Timer::new(backoff).await;
                     backoff = std::cmp::min(backoff * 2, max_backoff);
                 }

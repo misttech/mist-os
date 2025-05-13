@@ -125,11 +125,11 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
                                     }
                                 },
                                 e @ _ => {
-                                    tracing::debug!("We only support Fastboot events in this module... skipping non fastboot event: {:?}", e);
+                                    log::debug!("We only support Fastboot events in this module... skipping non fastboot event: {:?}", e);
                                 }
                             },
                             TargetEvent::Removed(_) => {
-                                tracing::debug!("Skipping removed event");
+                                log::debug!("Skipping removed event");
                             }
                         }
                     }

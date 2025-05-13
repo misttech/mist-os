@@ -59,7 +59,7 @@ struct TargetHandleInner {
 
 impl TargetHandleInner {
     async fn handle(&self, cx: &Context, req: ffx::TargetRequest) -> Result<()> {
-        tracing::debug!("handling request {req:?}");
+        log::debug!("handling request {req:?}");
         match req {
             ffx::TargetRequest::GetSshLogs { responder } => {
                 let logs = self.target.borrow().host_pipe_log_buffer().lines();
@@ -160,7 +160,7 @@ impl TargetHandleInner {
             if prev_target.id() != self.target.borrow().id() {
                 {
                     let my_target = self.target.borrow();
-                    tracing::info!("connection to {:?} reached same target as {:?}. Redirecting further requests", my_target.addrs(), prev_target.addrs());
+                    log::info!("connection to {:?} reached same target as {:?}. Redirecting further requests", my_target.addrs(), prev_target.addrs());
                     prev_target.extend_addrs_from_other(my_target.clone());
                     self.target_collection.remove_target_from_list(my_target.id());
                 }
@@ -185,12 +185,12 @@ pub(crate) async fn wait_for_rcs(
         if let Some(rcs) = t.rcs() {
             break Ok(rcs);
         } else if let Some(err) = seen_event.borrow_mut().take() {
-            tracing::debug!("host pipe connection failed: {err:?}. Restarting connection.");
+            log::debug!("host pipe connection failed: {err:?}. Restarting connection.");
             t.disconnect();
             t.run_host_pipe(match &cx.overnet_node() {
                 Ok(n) => n,
                 Err(e) => {
-                    tracing::debug!("unable to get overnet node, forcing connection to exit with last seen SSH error: {err:?}. Overnet node error was {e:?}");
+                    log::debug!("unable to get overnet node, forcing connection to exit with last seen SSH error: {err:?}. Overnet node error was {e:?}");
                     t.host_pipe_log_buffer().push_line(err.to_string());
                     break Err(host_pipe_err_to_fidl(err));
                 }
@@ -198,7 +198,7 @@ pub(crate) async fn wait_for_rcs(
             t.host_pipe_log_buffer().push_line(err.to_string());
             break Err(host_pipe_err_to_fidl(err));
         } else {
-            tracing::trace!("RCS dropped after event fired. Waiting again.");
+            log::trace!("RCS dropped after event fired. Waiting again.");
         }
 
         let se_clone = seen_event.clone();
@@ -220,7 +220,7 @@ pub(crate) async fn wait_for_rcs(
 fn host_pipe_err_to_fidl(ssh_err: SshError) -> ffx::TargetConnectionError {
     match ssh_err {
         SshError::Unknown(s) => {
-            tracing::warn!("Unknown host-pipe error received: '{}'", s);
+            log::warn!("Unknown host-pipe error received: '{}'", s);
             ffx::TargetConnectionError::UnknownError
         }
         SshError::NetworkUnreachable => ffx::TargetConnectionError::NetworkUnreachable,
