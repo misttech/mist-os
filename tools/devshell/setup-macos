@@ -69,6 +69,9 @@ function allow_tools {
 }
 
 function main {
+  fx-warn "This tool is deprecated per go/fuchsia-on-mac and will be removed on [2025/07/01]: b/417476651"
+  echo ""
+
   echo "  clearing firewall rules.."
   clear_tools
   echo "  adding firewall rules.."
