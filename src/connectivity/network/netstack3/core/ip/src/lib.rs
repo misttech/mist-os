@@ -80,11 +80,11 @@ pub mod device {
         del_ip_addr_inner, get_ipv4_addr_subnet, get_ipv6_hop_limit, is_ip_device_enabled,
         is_ip_multicast_forwarding_enabled, is_ip_unicast_forwarding_enabled, join_ip_multicast,
         join_ip_multicast_with_config, leave_ip_multicast, leave_ip_multicast_with_config,
-        receive_igmp_packet, AddressRemovedReason, DelIpAddr, IpAddressState,
+        on_arp_packet, receive_igmp_packet, AddressRemovedReason, DelIpAddr, IpAddressState,
         IpDeviceAddressContext, IpDeviceBindingsContext, IpDeviceConfigurationContext,
-        IpDeviceEvent, IpDeviceIpExt, IpDeviceSendContext, IpDeviceStateContext, IpDeviceTimerId,
-        Ipv4DeviceTimerId, Ipv6DeviceConfigurationContext, Ipv6DeviceContext, Ipv6DeviceHandler,
-        Ipv6DeviceTimerId, Ipv6LinkLayerAddr, WithIpDeviceConfigurationMutInner,
+        IpDeviceEvent, IpDeviceHandler, IpDeviceIpExt, IpDeviceSendContext, IpDeviceStateContext,
+        IpDeviceTimerId, Ipv4DeviceTimerId, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
+        Ipv6DeviceHandler, Ipv6DeviceTimerId, Ipv6LinkLayerAddr, WithIpDeviceConfigurationMutInner,
         WithIpv6DeviceConfigurationMutInner,
     };
 

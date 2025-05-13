@@ -35,12 +35,12 @@ pub trait DadIpExt: Ip {
 
     /// Data that accompanies a sent DAD probe.
     type SentProbeData: Debug;
-    /// Data that accompanies a received DAD probe.
-    type ReceivedProbeData<'a>;
+    /// Data that accompanies a received DAD packet.
+    type ReceivedPacketData<'a>;
     /// State held for tentative addresses.
     type TentativeState: Debug + Default + Send + Sync;
-    /// Metadata associated with the result of handling and incoming DAD probe.
-    type IncomingProbeResultMeta;
+    /// Metadata associated with the result of handling and incoming DAD packet.
+    type IncomingPacketResultMeta;
     /// Data used to determine the interval to wait between DAD probes.
     type RetransmitTimerData;
 
@@ -56,9 +56,15 @@ pub trait DadIpExt: Ip {
         data: &Self::RetransmitTimerData,
         bindings_ctx: &mut BC,
     ) -> NonZeroDuration;
+
+    /// Handles an incoming DAD packet while in the tentative state.
+    fn handle_incoming_packet_while_tentative<'a>(
+        data: Self::ReceivedPacketData<'a>,
+        state: &mut Self::TentativeState,
+        dad_transmits_remaining: &mut Option<NonZeroU16>,
+    ) -> Self::IncomingPacketResultMeta;
 }
 
-// TODO(https://fxbug.dev/42077260): Actually support DAD for IPv4.
 impl DadIpExt for Ipv4 {
     /// In the context of IPv4 addresses, DAD refers to Address Conflict Detection
     /// (ACD) as specified in RFC 5227.
@@ -77,9 +83,9 @@ impl DadIpExt for Ipv4 {
     const DEFAULT_DAD_ENABLED: bool = false;
 
     type SentProbeData = Ipv4DadSentProbeData;
-    type ReceivedProbeData<'a> = ();
+    type ReceivedPacketData<'a> = ();
     type TentativeState = ();
-    type IncomingProbeResultMeta = ();
+    type IncomingPacketResultMeta = ();
     type RetransmitTimerData = ();
 
     fn generate_sent_probe_data<BC: RngContext>(
@@ -96,6 +102,16 @@ impl DadIpExt for Ipv4 {
     ) -> NonZeroDuration {
         ipv4_dad_probe_interval(bindings_ctx)
     }
+
+    fn handle_incoming_packet_while_tentative<'a>(
+        _data: (),
+        _state: &mut (),
+        _dad_transmits_remaining: &mut Option<NonZeroU16>,
+    ) -> () {
+        // TODO(https://fxbug.dev/416523141): Once we support ratelimiting, this
+        // would be an appropriate place to acknowledge that a conflict has
+        // occurred.
+    }
 }
 
 impl DadIpExt for Ipv6 {
@@ -107,9 +123,9 @@ impl DadIpExt for Ipv6 {
     const DEFAULT_DAD_ENABLED: bool = true;
 
     type SentProbeData = Ipv6DadSentProbeData;
-    type ReceivedProbeData<'a> = Option<NdpNonce<&'a [u8]>>;
+    type ReceivedPacketData<'a> = Option<NdpNonce<&'a [u8]>>;
     type TentativeState = Ipv6TentativeDadState;
-    type IncomingProbeResultMeta = Ipv6ProbeResultMetadata;
+    type IncomingPacketResultMeta = Ipv6PacketResultMetadata;
     type RetransmitTimerData = NonZeroDuration;
 
     fn generate_sent_probe_data<BC: RngContext>(
@@ -133,6 +149,28 @@ impl DadIpExt for Ipv6 {
         _bindings_ctx: &mut BC,
     ) -> NonZeroDuration {
         *data
+    }
+
+    fn handle_incoming_packet_while_tentative<'a>(
+        data: Option<NdpNonce<&'a [u8]>>,
+        state: &mut Ipv6TentativeDadState,
+        dad_transmits_remaining: &mut Option<NonZeroU16>,
+    ) -> Ipv6PacketResultMetadata {
+        // Check if the incoming nonce matches stored nonces.
+        let Ipv6TentativeDadState { nonces, added_extra_transmits_after_detecting_looped_back_ns } =
+            state;
+        let matched_nonce = data.is_some_and(|nonce| nonces.contains(nonce.bytes()));
+        if matched_nonce
+            && !core::mem::replace(added_extra_transmits_after_detecting_looped_back_ns, true)
+        {
+            // Detected a looped-back DAD neighbor solicitation.
+            // Per RFC 7527, we should send MAX_MULTICAST_SOLICIT more DAD probes.
+            *dad_transmits_remaining = Some(
+                DEFAULT_MAX_MULTICAST_SOLICIT
+                    .saturating_add(dad_transmits_remaining.map(NonZero::get).unwrap_or(0)),
+            );
+        }
+        Ipv6PacketResultMetadata { matched_nonce }
     }
 }
 
@@ -382,20 +420,20 @@ impl<E, BC> DadBindingsContext<E> for BC where
 
 /// The result of handling an incoming DAD probe.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DadIncomingProbeResult<I: DadIpExt> {
+pub enum DadIncomingPacketResult<I: DadIpExt> {
     /// The probe's address is not assigned to ourself.
     Uninitialized,
     /// The probe's address is tentatively assigned to ourself.
     ///
     /// Includes IP specific `meta` related to handling this probe.
-    Tentative { meta: I::IncomingProbeResultMeta },
+    Tentative { meta: I::IncomingPacketResultMeta },
     /// The probe's address is assigned to ourself.
     Assigned,
 }
 
-/// IPv6 specific metadata held by [`DadIncomingProbeResult`].
+/// IPv6 specific metadata held by [`DadIncomingPacketResult`].
 #[derive(Debug, PartialEq)]
-pub struct Ipv6ProbeResultMetadata {
+pub struct Ipv6PacketResultMetadata {
     /// True if the incoming Neighbor Solicitation contained a nonce that
     /// matched a nonce previously sent by ourself. This indicates that the
     /// network looped back a Neighbor Solicitation from ourself.
@@ -437,19 +475,19 @@ pub trait DadHandler<I: IpDeviceIpExt, BC>:
         addr: &Self::AddressId,
     );
 
-    /// Handles an incoming duplicate address detection probe.
+    /// Handles an incoming duplicate address detection packet.
     ///
-    /// This probe is indicative of the sender (possibly ourselves, if the
-    /// probe was looped back) performing duplicate address detection.
+    /// This packet is indicative of the sender (possibly ourselves, if the
+    /// packet was looped back) performing duplicate address detection.
     ///
     /// The returned state indicates the address' state on ourself.
-    fn handle_incoming_probe(
+    fn handle_incoming_packet(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         addr: &Self::AddressId,
-        data: I::ReceivedProbeData<'_>,
-    ) -> DadIncomingProbeResult<I>;
+        data: I::ReceivedPacketData<'_>,
+    ) -> DadIncomingPacketResult<I>;
 }
 
 /// Indicates whether DAD is needed for a given address on a given device.
@@ -673,6 +711,41 @@ fn stop_duplicate_address_detection<
     )
 }
 
+// Handles an incoming packet for the given addr received on the given device.
+fn handle_incoming_packet<
+    'a,
+    I: IpDeviceIpExt,
+    BC: DadBindingsContext<CC::OuterEvent>,
+    CC: DadContext<I, BC>,
+>(
+    core_ctx: &mut CC,
+    _bindings_ctx: &mut BC,
+    device_id: &'a CC::DeviceId,
+    addr: &'a CC::AddressId,
+    data: I::ReceivedPacketData<'a>,
+) -> DadIncomingPacketResult<I> {
+    core_ctx.with_dad_state(
+        device_id,
+        addr,
+        |DadStateRef { state, retrans_timer_data: _, max_dad_transmits: _ }| {
+            let DadAddressStateRef { dad_state, core_ctx: _ } = state;
+            match dad_state {
+                DadState::Uninitialized => DadIncomingPacketResult::Uninitialized,
+                DadState::Assigned => DadIncomingPacketResult::Assigned,
+                DadState::Tentative { dad_transmits_remaining, timer: _, ip_specific_state } => {
+                    DadIncomingPacketResult::Tentative {
+                        meta: I::handle_incoming_packet_while_tentative(
+                            data,
+                            ip_specific_state,
+                            dad_transmits_remaining,
+                        ),
+                    }
+                }
+            }
+        },
+    )
+}
+
 // TODO(https://fxbug.dev/42077260): Actually support DAD for IPv4.
 impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<Ipv4, BC>> DadHandler<Ipv4, BC> for CC {
     fn initialize_duplicate_address_detection<'a>(
@@ -699,14 +772,15 @@ impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<Ipv4, BC>> DadHandle
     ) {
     }
 
-    fn handle_incoming_probe(
+    /// Handles an incoming ARP packet.
+    fn handle_incoming_packet(
         &mut self,
-        _bindings_ctx: &mut BC,
-        _device_id: &Self::DeviceId,
-        _addr: &Self::AddressId,
-        _data: (),
-    ) -> DadIncomingProbeResult<Ipv4> {
-        unimplemented!()
+        bindings_ctx: &mut BC,
+        device_id: &Self::DeviceId,
+        addr: &Self::AddressId,
+        data: (),
+    ) -> DadIncomingPacketResult<Ipv4> {
+        handle_incoming_packet(self, bindings_ctx, device_id, addr, data)
     }
 }
 
@@ -787,56 +861,15 @@ where
         )
     }
 
-    /// Handles an incoming Neighbor Solicitation.
-    ///
-    /// Checks if the incoming nonce matches stored nonces in DAD state.
-    fn handle_incoming_probe(
+    /// Handles an incoming Neighbor Solicitation / Neighbor Advertisement.
+    fn handle_incoming_packet(
         &mut self,
-        _bindings_ctx: &mut BC,
+        bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         addr: &Self::AddressId,
         data: Option<NdpNonce<&[u8]>>,
-    ) -> DadIncomingProbeResult<Ipv6> {
-        self.with_dad_state(
-            device_id,
-            addr,
-            |DadStateRef { state, retrans_timer_data: _, max_dad_transmits: _ }| {
-                let DadAddressStateRef { dad_state, core_ctx: _ } = state;
-                match dad_state {
-                    DadState::Assigned => DadIncomingProbeResult::Assigned,
-                    DadState::Tentative {
-                        dad_transmits_remaining,
-                        timer: _,
-                        ip_specific_state:
-                            Ipv6TentativeDadState {
-                                nonces,
-                                added_extra_transmits_after_detecting_looped_back_ns,
-                            },
-                    } => {
-                        let matched_nonce =
-                            data.is_some_and(|nonce| nonces.contains(nonce.bytes()));
-                        if matched_nonce
-                            && !core::mem::replace(
-                                added_extra_transmits_after_detecting_looped_back_ns,
-                                true,
-                            )
-                        {
-                            // Detected a looped-back DAD neighbor solicitation.
-                            // Per RFC 7527, we should send MAX_MULTICAST_SOLICIT more DAD probes.
-                            *dad_transmits_remaining =
-                                Some(DEFAULT_MAX_MULTICAST_SOLICIT.saturating_add(
-                                    dad_transmits_remaining.map(NonZero::get).unwrap_or(0),
-                                ));
-                        }
-                        DadIncomingProbeResult::Tentative {
-                            meta: Ipv6ProbeResultMetadata { matched_nonce },
-                        }
-                    }
-
-                    DadState::Uninitialized => DadIncomingProbeResult::Uninitialized,
-                }
-            },
-        )
+    ) -> DadIncomingPacketResult<Ipv6> {
+        handle_incoming_packet(self, bindings_ctx, device_id, addr, data)
     }
 }
 
@@ -1305,13 +1338,13 @@ mod tests {
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
 
         let want_lookup_result = if assigned {
-            DadIncomingProbeResult::Assigned
+            DadIncomingPacketResult::Assigned
         } else {
-            DadIncomingProbeResult::Uninitialized
+            DadIncomingPacketResult::Uninitialized
         };
 
         assert_eq!(
-            DadHandler::<Ipv6, _>::handle_incoming_probe(
+            DadHandler::<Ipv6, _>::handle_incoming_packet(
                 core_ctx,
                 bindings_ctx,
                 &FakeDeviceId,
@@ -1370,15 +1403,15 @@ mod tests {
             NdpNonce::from(if looped_back { &sent_nonce } else { &alternative_nonce });
 
         let matched_nonce = assert_matches!(
-            DadHandler::<Ipv6, _>::handle_incoming_probe(
+            DadHandler::<Ipv6, _>::handle_incoming_packet(
                 core_ctx,
                 bindings_ctx,
                 &FakeDeviceId,
                 &addr,
                 Some(incoming_nonce),
             ),
-            DadIncomingProbeResult::Tentative {
-                meta: Ipv6ProbeResultMetadata {matched_nonce}
+            DadIncomingPacketResult::Tentative {
+                meta: Ipv6PacketResultMetadata {matched_nonce}
             } => matched_nonce
         );
 

@@ -1336,11 +1336,11 @@ fn receive_ndp_packet<
                     //       which this message is sent or (if Duplicate Address
                     //       Detection is in progress [ADDRCONF]) the
                     //       unspecified address.
-                    match Ipv6DeviceHandler::handle_received_dad_neighbor_solicitation(
+                    match IpDeviceHandler::handle_received_dad_packet(
                         core_ctx,
                         bindings_ctx,
                         &device_id,
-                        target_address,
+                        target_address.into_specified(),
                         p.body().iter().find_map(|option| option.nonce()),
                     ) {
                         IpAddressState::Assigned => {
@@ -1437,11 +1437,16 @@ fn receive_ndp_packet<
 
             core_ctx.counters().rx.neighbor_advertisement.increment();
 
-            match Ipv6DeviceHandler::handle_received_neighbor_advertisement(
+            // Note: Neighbor Advertisements don't carry a nonce value. Handle
+            // a NA in the same way that we would handle an NS that omitted the
+            // nonce (i.e. conclude it's not-looped-back).
+            let nonce = None;
+            match IpDeviceHandler::handle_received_dad_packet(
                 core_ctx,
                 bindings_ctx,
                 &device_id,
-                target_address,
+                target_address.into_specified(),
+                nonce,
             ) {
                 IpAddressState::Assigned => {
                     // A neighbor is advertising that it owns an address
@@ -3628,6 +3633,16 @@ mod tests {
         fn set_default_hop_limit(&mut self, _device_id: &Self::DeviceId, _hop_limit: NonZeroU8) {
             unreachable!()
         }
+
+        fn handle_received_dad_packet(
+            &mut self,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
+            _device_id: &Self::DeviceId,
+            _addr: SpecifiedAddr<Ipv6Addr>,
+            _probe_data: Option<NdpNonce<&'_ [u8]>>,
+        ) -> IpAddressState {
+            unimplemented!()
+        }
     }
 
     impl IpDeviceEgressStateContext<Ipv6> for FakeIcmpCoreCtx<Ipv6> {
@@ -3671,25 +3686,6 @@ mod tests {
             _device_id: &Self::DeviceId,
             _retrans_timer: NonZeroDuration,
         ) {
-            unimplemented!()
-        }
-
-        fn handle_received_dad_neighbor_solicitation(
-            &mut self,
-            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
-            _device_id: &Self::DeviceId,
-            _addr: UnicastAddr<Ipv6Addr>,
-            _nonce: Option<NdpNonce<&'_ [u8]>>,
-        ) -> IpAddressState {
-            unimplemented!()
-        }
-
-        fn handle_received_neighbor_advertisement(
-            &mut self,
-            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
-            _device_id: &Self::DeviceId,
-            _addr: UnicastAddr<Ipv6Addr>,
-        ) -> IpAddressState {
             unimplemented!()
         }
 

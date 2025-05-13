@@ -15,6 +15,7 @@ use netstack3_base::{
     InstantBindingsTypes, LinkDevice, SendFrameContext, SendFrameError, TimerContext,
     TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
+use netstack3_ip::device::IpAddressState;
 use netstack3_ip::nud::{
     self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext, NudBindingsTypes,
     NudConfigContext, NudContext, NudHandler, NudSenderContext, NudState, NudTimerId,
@@ -159,11 +160,6 @@ pub trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
     /// returned.
     fn get_protocol_addr(&mut self, device_id: &Self::DeviceId) -> Option<Ipv4Addr>;
 
-    /// Check if `addr` is assigned to this interface.
-    ///
-    /// If `device_id` does not have any addresses, return `false`.
-    fn addr_on_interface(&mut self, device_id: &Self::DeviceId, addr: Ipv4Addr) -> bool;
-
     /// Get the hardware address of this interface.
     fn get_hardware_addr(
         &mut self,
@@ -185,6 +181,24 @@ pub trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
+}
+
+/// An execution context for ARP providing functionality from the IP layer.
+pub trait ArpIpLayerContext<D: ArpDevice, BC>: DeviceIdContext<D> {
+    /// Dispatches a received ARP Request or Reply to the IP layer.
+    ///
+    /// The IP layer may use this packet to update internal state, such as
+    /// facilitating Address Conflict Detection (RFC 5227).
+    ///
+    /// Returns the `IpAddressState` of the `target_addr` on `device`. This is
+    /// used by ARP to send responses to the packet (if applicable).
+    fn on_arp_packet(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device: &Self::DeviceId,
+        sender_addr: Ipv4Addr,
+        target_addr: Ipv4Addr,
+    ) -> IpAddressState;
 }
 
 /// An execution context for the ARP protocol that allows accessing
@@ -335,10 +349,7 @@ pub(crate) trait ArpPacketHandler<D: ArpDevice, BC>: DeviceIdContext<D> {
 impl<
         D: ArpDevice,
         BC: ArpBindingsContext<D, CC::DeviceId>,
-        CC: ArpContext<D, BC>
-            + SendFrameContext<BC, ArpFrameMetadata<D, Self::DeviceId>>
-            + NudHandler<Ipv4, D, BC>
-            + CounterContext<ArpCounters>,
+        CC: ArpContext<D, BC> + ArpIpLayerContext<D, BC> + NudHandler<Ipv4, D, BC>,
     > ArpPacketHandler<D, BC> for CC
 {
     /// Handles an inbound ARP packet.
@@ -357,10 +368,7 @@ fn handle_packet<
     D: ArpDevice,
     BC: ArpBindingsContext<D, CC::DeviceId>,
     B: BufferMut + Debug,
-    CC: ArpContext<D, BC>
-        + SendFrameContext<BC, ArpFrameMetadata<D, CC::DeviceId>>
-        + NudHandler<Ipv4, D, BC>
-        + CounterContext<ArpCounters>,
+    CC: ArpContext<D, BC> + ArpIpLayerContext<D, BC> + NudHandler<Ipv4, D, BC>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -420,6 +428,15 @@ fn handle_packet<
         return;
     }
 
+    // As Per RFC 5227, section 2.1.1 dispatch any received ARP packet
+    // (Request *or* Reply) to the DAD engine.
+    let target_addr_state = core_ctx.on_arp_packet(
+        bindings_ctx,
+        &device_id,
+        packet.sender_protocol_address(),
+        packet.target_protocol_address(),
+    );
+
     enum PacketKind {
         Gratuitous,
         AddressedToMe,
@@ -469,7 +486,10 @@ fn handle_packet<
     let target_addr = packet.target_protocol_address();
 
     let garp = sender_addr == target_addr;
-    let targets_interface = core_ctx.addr_on_interface(&device_id, target_addr);
+    let targets_interface = match target_addr_state {
+        IpAddressState::Assigned => true,
+        IpAddressState::Tentative | IpAddressState::Unavailable => false,
+    };
     let (source, kind) = match (garp, targets_interface) {
         (true, false) => {
             // Treat all GARP messages as neighbor probes as GARPs are not
@@ -711,6 +731,9 @@ mod tests {
         config: FakeArpConfigCtx,
         counters: ArpCounters,
         nud_counters: NudCounters<Ipv4>,
+        // Stores received ARP packets that were dispatched to the IP Layer.
+        // Holds a tuple of (sender_addr, target_addr).
+        dispatched_arp_packets: Vec<(Ipv4Addr, Ipv4Addr)>,
     }
 
     /// A fake `ArpSenderContext` that sends IP packets.
@@ -732,6 +755,7 @@ mod tests {
                 config: FakeArpConfigCtx,
                 counters: Default::default(),
                 nud_counters: Default::default(),
+                dispatched_arp_packets: Default::default(),
             }
         }
     }
@@ -828,10 +852,6 @@ mod tests {
             cb(&self.state.arp_state)
         }
 
-        fn addr_on_interface(&mut self, _device_id: &FakeLinkDeviceId, addr: Ipv4Addr) -> bool {
-            self.state.proto_addrs.iter().any(|&a| a == addr)
-        }
-
         fn get_protocol_addr(&mut self, _device_id: &FakeLinkDeviceId) -> Option<Ipv4Addr> {
             self.state.proto_addrs.first().copied()
         }
@@ -857,6 +877,24 @@ mod tests {
         ) -> O {
             let FakeArpCtx { arp_state, config, .. } = &mut self.state;
             cb(arp_state, config)
+        }
+    }
+
+    impl ArpIpLayerContext<EthernetLinkDevice, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
+        fn on_arp_packet(
+            &mut self,
+            _bindings_ctx: &mut FakeBindingsCtxImpl,
+            _device_id: &FakeLinkDeviceId,
+            sender_addr: Ipv4Addr,
+            target_addr: Ipv4Addr,
+        ) -> IpAddressState {
+            self.state.dispatched_arp_packets.push((sender_addr, target_addr));
+
+            if self.state.proto_addrs.iter().any(|&a| a == target_addr) {
+                IpAddressState::Assigned
+            } else {
+                IpAddressState::Unavailable
+            }
         }
     }
 
@@ -1424,5 +1462,35 @@ mod tests {
             TEST_LOCAL_MAC,
             Mac::UNSPECIFIED,
         );
+    }
+
+    // Test receiving an ARP packet and dispatching it to the IP Layer.
+    #[test_case(ArpOp::Request, TEST_REMOTE_IPV4, TEST_LOCAL_IPV4, true; "dispatch_request")]
+    #[test_case(ArpOp::Response, TEST_REMOTE_IPV4, TEST_LOCAL_IPV4, true; "dispatch_reply")]
+    #[test_case(ArpOp::Other(99), TEST_REMOTE_IPV4, TEST_LOCAL_IPV4, false; "ignore_other")]
+    fn test_receive_arp_packet(
+        op: ArpOp,
+        sender_addr: Ipv4Addr,
+        target_addr: Ipv4Addr,
+        expect_dispatch: bool,
+    ) {
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
+
+        send_arp_packet(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            op,
+            sender_addr,
+            target_addr,
+            TEST_REMOTE_MAC,
+            TEST_LOCAL_MAC,
+            FrameDestination::Broadcast,
+        );
+
+        if expect_dispatch {
+            assert_eq!(&core_ctx.state.dispatched_arp_packets[..], [(sender_addr, target_addr)]);
+        } else {
+            assert_eq!(&core_ctx.state.dispatched_arp_packets[..], []);
+        }
     }
 }
