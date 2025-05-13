@@ -249,6 +249,7 @@ impl EpollFileObject {
                     wait_canceler.cancel();
                 }
                 wait_object.events = epoll_event.events() | FdEvents::POLLHUP | FdEvents::POLLERR;
+                wait_object.data = epoll_event.data();
                 // If the new epoll event doesn't include EPOLLWAKEUP, we need to take down the
                 // wake lease. This ensures that the system doesn't stay awake unnecessarily when
                 // the event no longer requires it to be awake.
