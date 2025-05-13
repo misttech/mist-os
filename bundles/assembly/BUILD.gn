@@ -5094,3 +5094,21 @@ assembly_input_bundle("session_manager_disable_pkg_cache") {
     },
   ]
 }
+
+# Includes GNSS functionality.
+assembly_input_bundle("gnss") {
+  base_packages = [ "//src/connectivity/location/gnss:gnss_service" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/connectivity/location/gnss/meta/gnss-service.core-shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}

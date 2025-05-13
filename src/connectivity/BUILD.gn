@@ -30,7 +30,6 @@ group("tests_no_e2e") {
   deps = [
     "bluetooth:tests",
     "ethernet:tests",
-    "gnss:tests",
     "lib:tests",
     "location:tests",
     "lowpan:tests",

@@ -380,6 +380,11 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             builder.platform_bundle("realtek_8211f_driver");
         }
 
+        // Include GNSS service through a platform AIB.
+        if context.board_info.provides_feature("fuchsia::gnss") {
+            builder.platform_bundle("gnss");
+        }
+
         Ok(())
     }
 }
