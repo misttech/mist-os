@@ -247,7 +247,7 @@ tracing_visibility = [
   "//src/tests/diagnostics:*",
 
   # At this time we are not enforcing restrictions on ffx and related libraries.
-  "//src/developer/ffx/config/*",
+  "//src/developer/ffx/config:*",
   "//src/developer/ffx/lib/logging/*",
   "//src/developer/lib/credentials:*",
   "//src/lib/fuchsia-lockfile:*",

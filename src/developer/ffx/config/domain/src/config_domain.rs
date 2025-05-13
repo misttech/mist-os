@@ -239,16 +239,16 @@ impl ConfigDomain {
 
         // check that the SDK exists at the given path.
         if sdk_root.manifest_path().is_none() {
-            tracing::warn!("SDK manifest didn't exist for {sdk_root:?}");
+            log::warn!("SDK manifest didn't exist for {sdk_root:?}");
             return Some(update_cmd);
         } else {
-            tracing::debug!("SDK manifest existed for {sdk_root:?}");
+            log::debug!("SDK manifest existed for {sdk_root:?}");
         }
 
-        tracing::trace!("checking files: {files:?}");
+        log::trace!("checking files: {files:?}");
         match FileStates::check_paths(self.root.to_owned(), files) {
             Ok(new_states) => {
-                tracing::trace!("comparing file state: {known_states:?} == {new_states:?}");
+                log::trace!("comparing file state: {known_states:?} == {new_states:?}");
                 if let Err(changed) = known_states.changed_files(&new_states) {
                     update_cmd.env("FUCHSIA_VERSION_CHECK_FILES_DIRTY", join_paths(changed.iter()));
                     *known_states = new_states;
@@ -258,7 +258,7 @@ impl ConfigDomain {
                 }
             }
             Err(err) => {
-                tracing::warn!("Error reading SDK state file: {err}");
+                log::warn!("Error reading SDK state file: {err}");
                 Some(update_cmd)
             }
         }

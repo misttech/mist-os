@@ -6,6 +6,7 @@ use crate::storage::Config;
 use crate::{ConfigLevel, ConfigMap};
 use anyhow::{bail, Context, Result};
 use fuchsia_lockfile::{Lockfile, LockfileCreateError};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -14,7 +15,6 @@ use std::io::{BufReader, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use tracing::info;
 
 mod context;
 mod kind;
@@ -284,27 +284,27 @@ impl Environment {
     pub async fn populate_defaults(&mut self, level: &ConfigLevel) -> Result<()> {
         match level {
             ConfigLevel::User => {
-                tracing::debug!("Populating user defaults");
+                log::debug!("Populating user defaults");
                 if let None = self.files.user {
-                    tracing::debug!("Getting user default file");
+                    log::debug!("Getting user default file");
                     let default_path = self.context.get_default_user_file_path()?;
 
-                    tracing::debug!("Creating new user default file");
+                    log::debug!("Creating new user default file");
                     match create_new_file(&default_path) {
                         Ok(mut file) => {
-                            tracing::debug!("Doing write_all");
+                            log::debug!("Doing write_all");
                             file.write_all(b"{}")
                                 .context("writing default user configuration file")?;
-                            tracing::debug!("Syncing block cache with underlying storage");
+                            log::debug!("Syncing block cache with underlying storage");
                             if !self.context().env_kind().is_isolated() {
                                 file.sync_all().context(
                                     "syncing default user configuration file to filesystem",
                                 )?;
                             }
-                            tracing::debug!("Done syncing");
+                            log::debug!("Done syncing");
                         }
                         Err(e) if e.kind() == ErrorKind::AlreadyExists => {
-                            tracing::debug!("File already exists");
+                            log::debug!("File already exists");
                         }
                         other => {
                             other.context("creating default user configuration file").map(|_| ())?
@@ -314,7 +314,7 @@ impl Environment {
                 }
             }
             ConfigLevel::Global => {
-                tracing::debug!("Populating global defaults");
+                log::debug!("Populating global defaults");
                 if let None = self.files.global {
                     bail!(
                         "Global configuration not set. Use 'ffx config env set' command \
@@ -324,7 +324,7 @@ impl Environment {
             }
             ConfigLevel::Build => match self.build_dir().map(Path::to_owned) {
                 Some(b_dir) => {
-                    tracing::debug!("Populating build defaults");
+                    log::debug!("Populating build defaults");
                     let build_dirs = match &mut self.files.build {
                         Some(build_dirs) => build_dirs,
                         None => self.files.build.get_or_insert_with(Default::default),
@@ -334,15 +334,15 @@ impl Environment {
                         reason = "mass allow for https://fxbug.dev/381896734"
                     )]
                     if !build_dirs.contains_key(&b_dir) {
-                        tracing::debug!("Getting build dir config path");
+                        log::debug!("Getting build dir config path");
                         let config = self.context.get_default_build_dir_config_path(&b_dir)?;
                         if !config.is_file() {
                             info!("Build configuration file for '{b_dir}' does not exist yet, will create it by default at '{config}' if a value is set", b_dir=b_dir.display(), config=config.display());
                         }
-                        tracing::debug!("Saving build dir config path");
+                        log::debug!("Saving build dir config path");
                         build_dirs.insert(b_dir, config);
                     }
-                    tracing::debug!("Build defaults populated");
+                    log::debug!("Build defaults populated");
                 }
                 None => bail!("Cannot set a build configuration without a build directory."),
             },

@@ -90,12 +90,12 @@ impl<'a> ConfigQuery<'a> {
             }
             _ => {
                 let err_string = format!("Invalid query: {self}");
-                tracing::debug!("{err_string}");
+                log::debug!("{err_string}");
                 bail!("{err_string}");
             }
         }
         .into();
-        tracing::debug!("`{self}` => `{result:?}`");
+        log::debug!("`{self}` => `{result:?}`");
         Ok(result)
     }
 
@@ -260,20 +260,20 @@ impl<'a> ConfigQuery<'a> {
 
     /// Set the queried location to the given Value.
     pub async fn set(&self, value: Value) -> Result<()> {
-        tracing::debug!("Setting config value");
+        log::debug!("Setting config value");
         let (key, level) = self.validate_write_query()?;
         let mut env = self.get_env().await?;
-        tracing::debug!("Config set got environment");
+        log::debug!("Config set got environment");
         env.populate_defaults(&level).await?;
-        tracing::debug!("Config set defaults populated");
+        log::debug!("Config set defaults populated");
         let config = env.config_from_cache()?;
-        tracing::debug!("Config set got value from cache");
+        log::debug!("Config set got value from cache");
         let mut write_guard = config.write().map_err(|_| anyhow!("config write guard"))?;
-        tracing::debug!("Config set got write guard");
+        log::debug!("Config set got write guard");
         write_guard.set(key, level, value)?;
-        tracing::debug!("Config set performed");
+        log::debug!("Config set performed");
         write_guard.save().await?;
-        tracing::debug!("Config set saved");
+        log::debug!("Config set saved");
         Ok(())
     }
 

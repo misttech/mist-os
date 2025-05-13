@@ -399,10 +399,7 @@ pub fn init(
 
     configure_subscribers(ctx, destinations, level).init();
 
-    tracing::info!(
-        "ffx logging initialized. ffx version info: {:?}",
-        ffx_build_version::build_info()
-    );
+    log::info!("ffx logging initialized. ffx version info: {:?}", ffx_build_version::build_info());
 
     Ok(())
 }

@@ -26,13 +26,13 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/sdk:lib",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:sha2",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:toml",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [

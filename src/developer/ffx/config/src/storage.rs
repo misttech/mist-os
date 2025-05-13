@@ -13,13 +13,13 @@ use config_macros::include_default;
 use fuchsia_lockfile::Lockfile;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use log::error;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 use std::fmt;
 use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
-use tracing::error;
 
 fn format_env_variables_error(preamble: &Option<String>, values: &Vec<ConfigValue>) -> String {
     let error_list_string = values
@@ -217,12 +217,12 @@ impl<T: Write> Write for MaybeFlushWriter<T> {
 
     fn flush(&mut self) -> std::io::Result<()> {
         if self.flush {
-            tracing::debug!("Flushing writer");
+            log::debug!("Flushing writer");
             let ret = self.writer.flush();
-            tracing::debug!("Flushed writer");
+            log::debug!("Flushed writer");
             ret
         } else {
-            tracing::debug!("Skipped flushing writer (isolate detected)");
+            log::debug!("Skipped flushing writer (isolate detected)");
             Ok(())
         }
     }
@@ -243,17 +243,17 @@ where
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
         let tmp = tempfile::NamedTempFile::new_in(parent)?;
         let mut writer = MaybeFlushWriter { flush, writer: tmp };
-        tracing::debug!("Calling writer callback");
+        log::debug!("Calling writer callback");
         f(Some(BufWriter::new(&mut writer)))?;
-        tracing::debug!("Calling persist");
+        log::debug!("Calling persist");
         writer.writer.persist(path)?;
-        tracing::debug!("Persisted");
+        log::debug!("Persisted");
 
         Ok(())
     } else {
-        tracing::debug!("Calling writer callback with no persist");
+        log::debug!("Calling writer callback with no persist");
         let ret = f(None);
-        tracing::debug!("Called writer callback");
+        log::debug!("Called writer callback");
         ret
     }
 }
@@ -323,7 +323,7 @@ impl ConfigFile {
     }
 
     async fn save(&mut self) -> Result<()> {
-        tracing::debug!("Saving path {:?}", self.path);
+        log::debug!("Saving path {:?}", self.path);
 
         // FIXME(81502): There is a race between the ffx CLI and the daemon service
         // in updating the config. We can lose changes if both try to change the
@@ -340,7 +340,7 @@ impl ConfigFile {
         } else {
             Ok(())
         };
-        tracing::debug!("Saved path {:?}", self.path);
+        log::debug!("Saved path {:?}", self.path);
         ret
     }
 }
@@ -381,7 +381,7 @@ impl Config {
         let global_conf: Option<PathBuf> = env.get_global();
         let is_isolated = env.context().env_kind().is_isolated();
         if !is_isolated {
-            tracing::debug!("Non isolated context {:?}", env.context().env_kind());
+            log::debug!("Non isolated context {:?}", env.context().env_kind());
         }
         let from_file =
             if is_isolated { ConfigFile::from_nonflushing_file } else { ConfigFile::from_file };
