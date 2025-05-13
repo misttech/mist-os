@@ -26,6 +26,22 @@ impl StubBytesFile {
     }
 
     #[track_caller]
+    pub fn new_node_with_data(
+        message: &'static str,
+        bug: starnix_logging::BugRef,
+        initial_data: impl Into<Vec<u8>>,
+    ) -> impl FsNodeOps {
+        let location = std::panic::Location::caller();
+        let file = BytesFile::new(StubBytesFile {
+            data: Mutex::new(initial_data.into()),
+        });
+        SimpleFileNode::new(move || {
+            starnix_logging::__track_stub_inner(bug, message, None, location);
+            Ok(file.clone())
+        })
+    }
+
+    #[track_caller]
     pub fn new_node_with_capabilities(
         message: &'static str,
         bug: starnix_logging::BugRef,

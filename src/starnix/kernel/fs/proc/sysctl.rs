@@ -107,9 +107,10 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         dir.entry(
             current_task,
             "domainname",
-            StubBytesFile::new_node(
+            StubBytesFile::new_node_with_data(
                 "/proc/sys/kernel/domainname",
                 bug_ref!("https://fxbug.dev/322873722"),
+                "(none)"
             ),
             mode,
         );
