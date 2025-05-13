@@ -13,18 +13,23 @@ use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::time::duration_from_timeval;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    error, uapi, ABS_CNT, ABS_MT_POSITION_X, ABS_MT_POSITION_Y, ABS_MT_SLOT, ABS_MT_TRACKING_ID,
-    BTN_MISC, BTN_TOUCH, FF_CNT, INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEY_CNT, KEY_POWER, LED_CNT,
-    MSC_CNT, REL_CNT, REL_WHEEL, SW_CNT,
+    errno, error, uapi, ABS_CNT, ABS_MT_POSITION_X, ABS_MT_POSITION_Y, ABS_MT_SLOT,
+    ABS_MT_TRACKING_ID, BTN_MISC, BTN_TOUCH, FF_CNT, INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEY_CNT,
+    KEY_POWER, LED_CNT, MSC_CNT, REL_CNT, REL_WHEEL, SW_CNT,
 };
 use std::collections::VecDeque;
 use std::sync::Arc;
 use zerocopy::IntoBytes as _; // for `as_bytes()`
 
-const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
+uapi::check_arch_independent_layout! {
+    input_id {}
+    input_absinfo {}
+}
+
+type InputEventPtr = MultiArchUserRef<uapi::input_event, uapi::arch32::input_event>;
 
 pub struct InputFileStatus {
     /// The number of FIDL events received by this file from Fuchsia input system.
@@ -503,7 +508,7 @@ impl FileOps for InputFile {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
@@ -517,11 +522,13 @@ impl FileOps for InputFile {
             return error!(EAGAIN);
         }
 
+        let input_event_size = InputEventPtr::size_of_object_for(current_task);
+
         // The limit of the buffer is determined by taking the available bytes
         // and using integer division on the size of uapi::input_event in bytes.
         // This is how many events we can write at a time, up to the amount of
         // events queued to be written.
-        let limit = std::cmp::min(data.available() / INPUT_EVENT_SIZE, num_events);
+        let limit = std::cmp::min(data.available() / input_event_size, num_events);
         if num_events > limit {
             log_info!(
                 "There was only space in the given buffer to read {} of the {} queued events. Sending a notification to prompt another read.",
@@ -546,8 +553,15 @@ impl FileOps for InputFile {
             }
         }
 
-        let events: Vec<uapi::input_event> = events.iter().map(|e| e.event).collect();
-        data.write_all(events.as_bytes())
+        if current_task.is_arch32() {
+            let events: Result<Vec<uapi::arch32::input_event>, _> =
+                events.iter().map(|e| uapi::arch32::input_event::try_from(e.event)).collect();
+            let events = events.map_err(|_| errno!(EINVAL))?;
+            data.write_all(events.as_bytes())
+        } else {
+            let events: Vec<uapi::input_event> = events.iter().map(|e| e.event).collect();
+            data.write_all(events.as_bytes())
+        }
     }
 
     fn write(

@@ -101,6 +101,13 @@ arch_translate_data! {
         iov_base,
         iov_len,
     }
+
+    BidiFrom<input_event> {
+        time,
+        type_,
+        code,
+        value,
+    }
 }
 
 translate_data! {
