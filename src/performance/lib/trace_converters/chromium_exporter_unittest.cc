@@ -129,7 +129,9 @@ TEST(ChromiumExporterTest, EmptyTrace) {
   // cleanup routines are called by the destructor before the
   // output stream is read. This way, we can obtain the full
   // output rather than a truncated version.
-  { tracing::ChromiumExporter exporter(out_stream); }
+  {
+    tracing::ChromiumExporter exporter(out_stream);
+  }
 
   EXPECT_EQ(out_stream.str(),
             "{\"displayTimeUnit\":\"ns\",\"traceEvents\":["
@@ -138,8 +140,8 @@ TEST(ChromiumExporterTest, EmptyTrace) {
 
 TEST(ChromiumExporterTest, LastBranchRecords) {
   const unsigned num_branches = 4;
-  char blob[perfmon::LastBranchRecordBlobSize(num_branches)];
-  auto lbr = reinterpret_cast<perfmon::LastBranchRecordBlob*>(blob);
+  std::vector<uint8_t> blob(perfmon::LastBranchRecordBlobSize(num_branches));
+  auto lbr = reinterpret_cast<perfmon::LastBranchRecordBlob*>(blob.data());
   lbr->cpu = 1;
   lbr->num_branches = num_branches;
   lbr->reserved = 0;
@@ -151,10 +153,10 @@ TEST(ChromiumExporterTest, LastBranchRecords) {
     lbr->branches[i].info = 69 * i;
   }
   trace::Record record(trace::Record::Blob{
-      TRACE_BLOB_TYPE_LAST_BRANCH,
-      fbl::String("cpu1"),
-      blob,
-      sizeof(blob),
+      .type = TRACE_BLOB_TYPE_LAST_BRANCH,
+      .name = fbl::String("cpu1"),
+      .blob = blob.data(),
+      .blob_size = blob.size(),
   });
 
   std::ostringstream out_stream;
