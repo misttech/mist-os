@@ -19,11 +19,12 @@ use futures::{FutureExt, TryFutureExt};
 use log::debug;
 use std::fmt::Debug;
 use std::sync::Arc;
+use time_pretty::{format_common, format_duration, format_timer};
 
 const TIMESOURCE_COLLECTION_NAME: &str = "timesource";
 
 /// A time sample received from a source of time.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy)]
 pub struct Sample {
     /// The UTC time.
     pub utc: UtcInstant,
@@ -31,6 +32,16 @@ pub struct Sample {
     pub reference: zx::BootInstant,
     /// The standard deviation of the UTC error.
     pub std_dev: zx::BootDuration,
+}
+
+impl Debug for Sample {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Sample")
+            .field("utc", &format_common(self.utc.into_nanos()))
+            .field("reference", &format_timer(self.reference))
+            .field("std_dev", &format_duration(self.std_dev))
+            .finish()
+    }
 }
 
 impl TryFrom<TimeSample> for Sample {

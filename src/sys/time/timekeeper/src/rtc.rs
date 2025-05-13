@@ -22,6 +22,7 @@ use time_persistence::State;
 use {fidl_fuchsia_hardware_rtc as frtc, fidl_fuchsia_io as fio};
 #[cfg(test)]
 use {fuchsia_sync::Mutex, std::sync::Arc};
+use time_pretty::format_duration;
 
 static RTC_PATH: &str = "/dev/class/rtc";
 
@@ -115,15 +116,15 @@ where
     async fn get(&self) -> Result<UtcInstant> {
         let boot_now = (self.clock_fn)();
         let (boot_reference, utc_reference) = self.state.borrow().get_rtc_reference();
-        let diff_nanos = boot_now.into_nanos() - boot_reference.into_nanos();
-        if diff_nanos < 0 {
+        let diff = boot_now - boot_reference;
+        if diff < zx::BootDuration::ZERO {
             // ReadOnlyRtc relies on the boot clock for RTC updates. This allows us to have
             // correct time estimates during suspend.  However, on reboot, we typically
             // restart the boot clock, leading to a negative offset adjustment, which is wrong.
             // To avoid incorrect UTC adjustments, we disallow negative offsets.
-            Err(anyhow!("negative offset adjustment for RTC is not allowed: {}", diff_nanos))
+            Err(anyhow!("negative offset adjustment for RTC is not allowed: {}", format_duration(diff)))
         } else {
-            let utc_now = utc_reference + UtcDuration::from_nanos(diff_nanos);
+            let utc_now = utc_reference + UtcDuration::from_nanos(diff.into_nanos());
             Ok(utc_now)
         }
     }

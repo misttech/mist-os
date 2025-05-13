@@ -24,6 +24,7 @@ use std::fmt::{self, Debug};
 use std::rc::Rc;
 use std::sync::Arc;
 use time_adjust::Command;
+use time_pretty::format_duration;
 use zx::AsHandleRef;
 use {fidl_fuchsia_time as fft, fuchsia_async as fasync};
 
@@ -286,7 +287,7 @@ impl Debug for Slew {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Slew")
             .field("rate_ppm", &self.slew_rate_adjust)
-            .field("duration_ms", &self.duration.into_millis())
+            .field("duration", &format_duration(self.duration))
             .finish()
     }
 }
@@ -583,12 +584,18 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         if let Some(first_deadline) = first_deadline {
             if *first_deadline > now {
                 // This should be an uncommon setting, so log it.
-                info!("first time source sample, delaying by: {:?}", *first_deadline - now);
+                info!(
+                    "first time source sample, delaying by: {}",
+                    format_duration(*first_deadline - now)
+                );
                 _ = fasync::Timer::new(*first_deadline).await;
                 debug!("first time source sample, delay done");
             }
         } else {
-            info!("source sample pause, delaying by: {:?}", *back_off_deadline - now);
+            info!(
+                "source sample pause, delaying by: {}",
+                format_duration(*back_off_deadline - now)
+            );
             _ = fasync::Timer::new(*back_off_deadline).await;
         }
         debug!("manage_clock: asking for a time sample");
