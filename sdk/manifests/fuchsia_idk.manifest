@@ -138,7 +138,6 @@ companion_host_tool://tools/x64/aemu_internal
 companion_host_tool://tools/x64/crosvm_internal
 companion_host_tool://tools/x64/qemu_internal
 dart_library://dart/sl4f
-data://data/config/symbol_index
 data://pkg/driver_component/driver_component.json
 data://pkg/heapdump_instrumentation/heapdump_instrumentation_shard.json
 data://pkg/inspect/inspect_sdk.json
