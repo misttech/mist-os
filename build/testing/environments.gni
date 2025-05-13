@@ -82,6 +82,15 @@ bt_lacewing_vim3_env = {
   }
 }
 
+bt_lacewing_sorrel_env = {
+  dimensions = {
+    device_type = "Sorrel"
+    pool = "fuchsia.tests.bluetooth"
+    sorrels = "2"
+    testbed = "lacewing_bt_sorrel"
+  }
+}
+
 wlan_astro_ap_env = {
   dimensions = {
     access_points = "1"
@@ -425,6 +434,7 @@ guest_vulkan_envs = guest_envs - [
 lacewing_bluetooth_envs = [
   bt_lacewing_sherlock_env,
   bt_lacewing_vim3_env,
+  bt_lacewing_sorrel_env,
 ]
 
 # Set of environments for Honeydew WLAN testing with AP present.
