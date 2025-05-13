@@ -18,7 +18,7 @@
 #define FTLN_DEBUG_RECYCLES FALSE
 #endif
 
-#define FTLN_MIGRATE_COLD_DATA_PER_RECYCLE 1
+#define FTLN_MIGRATE_COLD_DATA_PER_RECYCLE 0
 
 // Type Definitions
 typedef struct {
@@ -1059,7 +1059,10 @@ int FtlnGetNewWearLeveling(CFTLN ftl) {
 //
 //                  Inputs: ftl = pointer to FTL control block
 //                          state = 1 to turn on. 0 to turn off.
-void FtlnSetNewWearLeveling(FTLN ftl, int state) { ftl->new_wear_leveling = (ui8)state; }
+void FtlnSetNewWearLeveling(FTLN ftl, int state) {
+  ftl->logger.warn(__FILE__, __LINE__, "Setting new wear leveling is not honoured at this time.");
+  ftl->new_wear_leveling = (ui8)state;
+}
 
 //  FtlnMetaWr: Write FTL meta information page
 //
@@ -1197,13 +1200,12 @@ int FtlnRecCheck(FTLN ftl, int wr_cnt) {
           ftl->free_vpn, free_vol_list_pgs(ftl), ftl->free_mpn, free_map_list_pgs(ftl),
           ftl->num_free_blks);
     }
-    int use_cold_migration = FtlnGetNewWearLeveling(ftl);
-    int cold_migration_limit = use_cold_migration ? FTLN_MIGRATE_COLD_DATA_PER_RECYCLE : 0;
+    int cold_migration_limit = FTLN_MIGRATE_COLD_DATA_PER_RECYCLE;
 
     // Loop until enough pages are free.
     for (count = 1;; ++count) {
       // Don't look for low wear blocks to boost when migrating cold data.
-      int should_boost_low_wear = (count & 1) && !use_cold_migration;
+      int should_boost_low_wear = (count & 1) && !FTLN_MIGRATE_COLD_DATA_PER_RECYCLE;
       // Perform one recycle operation. Return -1 if error.
       if (recycle(ftl, should_boost_low_wear) != 0)
         return -1;
