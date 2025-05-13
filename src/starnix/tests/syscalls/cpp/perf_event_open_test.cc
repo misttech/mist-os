@@ -47,7 +47,7 @@ struct read_format_data_id {
 // but still need to pass them in.
 // TODO(https://fxbug.dev/409621963): implement permissions logic for any pid > 0.
 const int32_t example_pid = 0;
-const int32_t example_cpu = 0;
+const int32_t example_cpu = -1;  // Keep this as -1 for now so that it includes events on ANY CPU.
 // TODO(https://fxbug.dev/409619971): handle cases other than -1.
 const int example_group_fd = -1;
 const long example_flags = 0;
@@ -259,10 +259,7 @@ TEST(PerfEventOpenTest, WhenEnabledEventCountShouldBeOne) {
     read_format_data data;
     std::memcpy(&data, buffer, sizeof(buffer));
 
-    // This fails for the host test because the value is always 0.
-    // TODO(https://fxbug.dev/413134743): figure out what the real value is.
-    unsigned long count = 1;
-    EXPECT_EQ(data.value, count);
+    EXPECT_GT(data.value, (uint64_t)0);
     EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
   }
 }
@@ -299,10 +296,9 @@ TEST(PerfEventOpenTest, WhenResetAndDisabledEventCountShouldBeZero) {
     read_format_data data;
     std::memcpy(&data, buffer, sizeof(buffer));
 
-    // This fails for the host test because the value is always 0.
-    // TODO(https://fxbug.dev/413134743): figure out what the real value is.
+    // Host test will return a real value, which is bigger.
     unsigned long count = 2;
-    EXPECT_EQ(data.value, count);
+    EXPECT_GE(data.value, count);
 
     // Disable and reset. Count value should now be 0 and stay there.
     EXPECT_NE(syscall(__NR_ioctl, file_descriptor, PERF_EVENT_IOC_DISABLE), -1);
@@ -487,9 +483,7 @@ TEST(PerfEventOpenTest, ReadingFirstEightBytesCanReturnCountAsALong) {
     long long count;
     syscall(__NR_read, file_descriptor, &count, sizeof(count));
 
-    // This fails for the host test because the value is always 0.
-    // TODO(https://fxbug.dev/413134743): figure out what the real value is.
-    EXPECT_EQ(count, 1);
+    EXPECT_GE(count, 1);
     EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
   }
 }
