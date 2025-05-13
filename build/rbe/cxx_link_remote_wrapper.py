@@ -106,8 +106,7 @@ class CxxLinkRemoteAction(object):
             return
         self._cxx_action = cxx.CxxAction(command=filtered_command)
 
-        # Determine whether this action can be done remotely.
-        self._local_only = self._main_args.local or self._detect_local_only()
+        self._local_only = self._main_args.local
 
         self._prepare_status: int | None = None
         self._cleanup_files: list[Path] = []
@@ -544,14 +543,6 @@ class CxxLinkRemoteAction(object):
     @property
     def original_link_command(self) -> Sequence[str]:
         return self.cxx_action.command
-
-    def _detect_local_only(self) -> bool:
-        """Detect when to force local fallback."""
-        # Implicit thin-LTO needs a shared writeable cache directory
-        # which does not work well with remote execution.
-        if self.cxx_action.lto == "thin":
-            return True
-        return False
 
     @property
     def check_determinism(self) -> bool:
