@@ -74,6 +74,41 @@ void *setup_sigaltstack(size_t size) {
   return altstack;
 }
 
+TEST(SignalHandling, NestedSigpipe) {
+  // Validate that we can handle a nested signal
+  // (such as SIGPIPE, when inside another signal handler,
+  // and that the mask is preserved correctly).
+  static int pipefd[2];
+
+  static auto signal_test = []() {
+    sigset_t block, old_sigmask;
+    sigemptyset(&block);
+    sigaddset(&block, SIGPIPE);
+    SAFE_SYSCALL(pthread_sigmask(SIG_BLOCK, &block, &old_sigmask));
+    ASSERT_EQ(pipe(pipefd), 0);
+    close(pipefd[0]);
+    struct sigaction sa;
+    sa.sa_handler = [](int signum) {
+      ASSERT_EQ(signum, SIGQUIT);
+      char data;
+      ssize_t bytes_written = write(pipefd[1], &data, 1);
+      ASSERT_EQ(bytes_written, -1);
+      ASSERT_EQ(errno, EPIPE);
+    };
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    ASSERT_EQ(sigaction(SIGQUIT, &sa, nullptr), 0);
+    raise(SIGQUIT);
+    // Return state back to normal
+    sigtimedwait(&block, nullptr, nullptr);
+    signal(SIGPIPE, SIG_DFL);
+    signal(SIGQUIT, SIG_DFL);
+    pthread_sigmask(SIG_UNBLOCK, &block, &old_sigmask);
+    exit(0);
+  };
+  EXPECT_EXIT([]() { signal_test(); }(), testing::ExitedWithCode(0), "");
+}
+
 TEST(SignalHandling, UseSigaltstackSucceeds) {
   constexpr size_t kStackSize = 0x20000;
   void *altstack = setup_sigaltstack(kStackSize);

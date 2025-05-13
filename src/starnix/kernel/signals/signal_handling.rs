@@ -442,7 +442,9 @@ fn dispatch_signal_handler(
     if action.sa_flags & (SA_NODEFER as u64) == 0 {
         mask = mask | siginfo.signal.into();
     }
-    signal_state.set_mask(mask);
+
+    // Preserve the existing mask when handling a nested signal
+    signal_state.set_mask(mask | signal_state.mask());
 
     registers.set_stack_pointer_register(stack_pointer);
     registers.set_arg0_register(siginfo.signal.number() as u64);
