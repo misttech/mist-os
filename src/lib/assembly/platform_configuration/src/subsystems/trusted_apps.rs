@@ -100,8 +100,7 @@ mod tests {
             .get(&PackageSetDestination::Boot(BootfsPackageDestination::TaManagerConfig))
             .unwrap();
         let directory = domain_config.directories.get("config").unwrap();
-        let entries: Vec<FileOrContents> =
-            directory.entries.iter().map(|(_, e)| e.clone()).collect();
+        let entries: Vec<FileOrContents> = directory.entries.values().cloned().collect();
         let expected_configs = [
             TAConfig::binder_rpc("fuchsia-boot:///pkg2#resource2.txt".into()),
             TAConfig::global_platform("fuchsia-boot:///pkg1#resource1.txt".into()),

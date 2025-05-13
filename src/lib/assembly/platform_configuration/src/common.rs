@@ -971,7 +971,7 @@ mod tests {
         let write_temp_file = |name: &str, contents: &str| -> Utf8PathBuf {
             let p = Utf8PathBuf::from_path_buf(temp_dir.path().join(name)).unwrap();
             let mut f = std::fs::File::create(&p).unwrap();
-            write!(&mut f, "{}", contents).unwrap();
+            write!(&mut f, "{contents}").unwrap();
             p
         };
         let one = write_temp_file("config_data1", "one");
@@ -1112,7 +1112,7 @@ mod tests {
         let write_temp_file = |name: &str, contents: &str| -> Utf8PathBuf {
             let p = Utf8PathBuf::from_path_buf(temp_dir.path().join(name)).unwrap();
             let mut f = std::fs::File::create(&p).unwrap();
-            write!(&mut f, "{}", contents).unwrap();
+            write!(&mut f, "{contents}").unwrap();
             p
         };
         let baz = write_temp_file("baz", "baz");

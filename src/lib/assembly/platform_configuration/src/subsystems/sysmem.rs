@@ -388,8 +388,7 @@ mod test {
         let error_message = format!("{:#}", result.unwrap_err());
         assert!(
             error_message.contains("contiguous_memory_size"),
-            "Faulty message `{}`",
-            error_message
+            "Faulty message `{error_message}`"
         );
         assert!(error_message.contains("got 100"));
     }
@@ -415,8 +414,7 @@ mod test {
         let error_message = format!("{:#}", result.unwrap_err());
         assert!(
             error_message.contains("protected_memory_size"),
-            "Faulty message `{}`",
-            error_message
+            "Faulty message `{error_message}`"
         );
         assert!(error_message.contains("got 100"));
     }

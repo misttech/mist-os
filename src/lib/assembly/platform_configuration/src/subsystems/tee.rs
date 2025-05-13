@@ -473,12 +473,12 @@ mod tests {
 
             shard = component.shards[0].clone().into();
         } else {
-            panic!("unexpected compiled package definition: {:#?}", compiled_package);
+            panic!("unexpected compiled package definition: {compiled_package:#?}");
         }
 
         let contents = std::fs::read_to_string(shard.clone()).unwrap();
-        eprintln!("contents: {}", contents);
-        eprintln!("path: {}", shard);
+        eprintln!("contents: {contents}");
+        eprintln!("path: {shard}");
         let contents_json: serde_json::Value =
             serde_json::from_str(&contents).expect("parsing cml");
 
@@ -559,8 +559,7 @@ mod tests {
 
         assert_eq!(
             expected_json, contents_json,
-            "cml mismatch: Expected: \n\n{:#?}\n\nActual:\n\n{:#?}",
-            expected_json, contents_json,
+            "cml mismatch: Expected: \n\n{expected_json:#?}\n\nActual:\n\n{contents_json:#?}"
         );
     }
 
@@ -607,8 +606,7 @@ mod tests {
 
         assert_eq!(
             expected_json, tee_manager_config_json,
-            "config mismatch: Expected: \n\n{:#?}\n\nActual:\n\n{:#?}",
-            expected_json, tee_manager_config_json,
+            "config mismatch: Expected: \n\n{expected_json:#?}\n\nActual:\n\n{tee_manager_config_json:#?}"
         );
 
         assert!(completed_configuration.bundles.contains("tee_manager"));
@@ -637,7 +635,7 @@ mod tests {
 
             shard = component.shards[0].clone().into();
         } else {
-            panic!("unexpected compiled package definition: {:#?}", compiled_package);
+            panic!("unexpected compiled package definition: {compiled_package:#?}");
         }
 
         let contents = std::fs::read_to_string(shard).unwrap();
@@ -668,8 +666,7 @@ mod tests {
 
         assert_eq!(
             expected_json, contents_json,
-            "cml mismatch: Expected: \n\n{:#?}\n\nActual:\n\n{:#?}",
-            expected_json, contents_json,
+            "cml mismatch: Expected: \n\n{expected_json:#?}\n\nActual:\n\n{contents_json:#?}"
         );
     }
 

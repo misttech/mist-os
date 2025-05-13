@@ -263,14 +263,7 @@ impl AssemblyManifest {
     /// Load an AssemblyManifest from a path on disk, handling path
     /// relativization
     pub fn try_load_from(path: impl AsRef<Utf8Path>) -> Result<Self> {
-        // We need to support the old AssemblyManifest format which is simply a Vec<Image>.
-        let value: serde_json::Value = assembly_util::read_config(path.as_ref())?;
-        let deserialized = if value.is_array() {
-            let images: Vec<Image> = serde_json::from_value(value)?;
-            SerializationHelper { images, board_name: "".to_string() }
-        } else {
-            serde_json::from_value(value)?
-        };
+        let deserialized: SerializationHelper = assembly_util::read_config(path.as_ref())?;
         let manifest =
             AssemblyManifest { images: deserialized.images, board_name: deserialized.board_name };
         manifest.derelativize(path.as_ref().parent().context("Invalid path")?)
@@ -856,20 +849,10 @@ mod tests {
                 Image::FVMSparse(path) => ("path/to/fvm.sparse.blk", path),
                 Image::FVMFastboot(path) => ("path/to/fvm.fastboot.blk", path),
                 Image::QemuKernel(path) => ("path/to/qemu/kernel", path),
-                _ => panic!("Unexpected item {:?}", image),
+                _ => panic!("Unexpected item {image:?}"),
             };
             assert_eq!(&Utf8PathBuf::from(expected), actual);
         }
-    }
-
-    #[test]
-    fn deserialize_old() {
-        let (manifest_file, manifest_path) = NamedTempFile::new().unwrap().into_parts();
-        serde_json::to_writer(manifest_file, &generate_old_test_value()).unwrap();
-        let manifest_path = Utf8PathBuf::from_path_buf(manifest_path.to_path_buf()).unwrap();
-        let manifest = AssemblyManifest::try_load_from(manifest_path).unwrap();
-        assert_eq!(manifest.board_name, "".to_string());
-        assert_eq!(manifest.images.len(), 8);
     }
 
     #[test]
@@ -896,7 +879,7 @@ mod tests {
                     ("path/to/fxfs.sparse.blk", path)
                 }
                 Image::QemuKernel(path) => ("path/to/qemu/kernel", path),
-                _ => panic!("Unexpected item {:?}", image),
+                _ => panic!("Unexpected item {image:?}"),
             };
             assert_eq!(&Utf8PathBuf::from(expected), actual);
         }
@@ -1220,59 +1203,6 @@ mod tests {
             ],
             "board_name": "my_board",
         })
-    }
-
-    fn generate_old_test_value() -> Value {
-        json!([
-            {
-                "type": "far",
-                "name": "base-package",
-                "path": "path/to/base.far",
-            },
-            {
-                "type": "zbi",
-                "name": "zircon-a",
-                "path": "path/to/fuchsia.zbi",
-                "signed": true,
-            },
-            {
-                "type": "vbmeta",
-                "name": "zircon-a",
-                "path": "path/to/fuchsia.vbmeta",
-            },
-            {
-                "type": "blk",
-                "name": "blob",
-                "path": "path/to/blob.blk",
-                "contents": {
-                    "packages": {
-                        "base": [],
-                        "cache": [],
-                    },
-                    "maximum_contents_size": None::<u64>
-                },
-            },
-            {
-                "type": "blk",
-                "name": "storage-full",
-                "path": "path/to/fvm.blk",
-            },
-            {
-                "type": "blk",
-                "name": "storage-sparse",
-                "path": "path/to/fvm.sparse.blk",
-            },
-            {
-                "type": "blk",
-                "name": "fvm.fastboot",
-                "path": "path/to/fvm.fastboot.blk",
-            },
-            {
-                "type": "kernel",
-                "name": "qemu-kernel",
-                "path": "path/to/qemu/kernel",
-            },
-        ])
     }
 
     fn generate_test_value_fxfs() -> Value {
