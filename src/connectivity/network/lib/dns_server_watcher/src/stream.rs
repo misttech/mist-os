@@ -18,6 +18,7 @@ pub enum DnsServersUpdateSource {
     Dhcpv4 { interface_id: u64 },
     Dhcpv6 { interface_id: u64 },
     Ndp { interface_id: u64 },
+    SocketProxy,
 }
 
 /// Returns a `Stream` of [`DnsServerWatcherEvent`]s from watching the server configuration

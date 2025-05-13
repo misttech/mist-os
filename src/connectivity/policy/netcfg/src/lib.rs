@@ -1088,6 +1088,9 @@ impl<'a> NetCfg<'a> {
                     }
                 }
             }
+            DnsServersUpdateSource::SocketProxy => {
+                todo!("https://fxbug.dev/416012531: Connect to socketproxy's DnsServerWatcher")
+            }
         }
     }
 

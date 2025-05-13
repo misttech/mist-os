@@ -31,5 +31,12 @@ type DnsServer = table {
             /// The interface index over which this server was discovered.
             1: source_interface uint64;
         };
+        /// The server was discovered through the socketproxy component, which
+        /// communicates DNS information from networks that are provisioned by
+        /// an agent other than Fuchsia.
+        5: socket_proxy @generated_name("SocketProxyDnsServerSource") table {
+            /// The interface index over which this server was discovered.
+            1: source_interface uint64;
+        };
     };
 };

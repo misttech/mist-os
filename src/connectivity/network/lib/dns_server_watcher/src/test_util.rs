@@ -113,4 +113,36 @@ pub(crate) mod constants {
             ..Default::default()
         }
     }
+
+    pub(crate) const SOCKETPROXY_SOURCE_SOCKADDR1: fnet::SocketAddress =
+        fidl_socket_addr!("192.0.2.5:53");
+
+    pub(crate) const SOCKETPROXY_SERVER1_INTERFACE_ID: u64 = 5;
+
+    pub(crate) fn socketproxy_server1() -> fname::DnsServer_ {
+        fname::DnsServer_ {
+            address: Some(SOCKETPROXY_SOURCE_SOCKADDR1),
+            source: Some(fname::DnsServerSource::SocketProxy(fname::SocketProxyDnsServerSource {
+                source_interface: Some(SOCKETPROXY_SERVER1_INTERFACE_ID),
+                ..Default::default()
+            })),
+            ..Default::default()
+        }
+    }
+
+    pub(crate) const SOCKETPROXY_SOURCE_SOCKADDR2: fnet::SocketAddress =
+        fidl_socket_addr!("192.0.2.6:53");
+
+    pub(crate) const SOCKETPROXY_SERVER2_INTERFACE_ID: u64 = 6;
+
+    pub(crate) fn socketproxy_server2() -> fname::DnsServer_ {
+        fname::DnsServer_ {
+            address: Some(SOCKETPROXY_SOURCE_SOCKADDR2),
+            source: Some(fname::DnsServerSource::SocketProxy(fname::SocketProxyDnsServerSource {
+                source_interface: Some(SOCKETPROXY_SERVER2_INTERFACE_ID),
+                ..Default::default()
+            })),
+            ..Default::default()
+        }
+    }
 }
