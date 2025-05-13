@@ -43,10 +43,12 @@ class VirtualAudioComposite
   zx::result<> Init(fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent);
 
  private:
-  static constexpr fuchsia_hardware_audio::TopologyId kTopologyId = 789;
+  static constexpr size_t kNumberOfTopologies = 2;
+  static constexpr fuchsia_hardware_audio_signalprocessing::TopologyId kPlaybackTopologyId = 789;
+  static constexpr fuchsia_hardware_audio_signalprocessing::TopologyId kCaptureTopologyId = 987;
   static constexpr size_t kNumberOfElements = 2;
-  static constexpr fuchsia_hardware_audio::ElementId kRingBufferId = 123;
-  static constexpr fuchsia_hardware_audio::ElementId kDaiId = 456;
+  static constexpr fuchsia_hardware_audio_signalprocessing::ElementId kRingBufferId = 123;
+  static constexpr fuchsia_hardware_audio_signalprocessing::ElementId kDaiId = 456;
 
   // virtualaudio.Device implementation.
   void GetFormat(GetFormatCompleter::Sync& completer) override;
@@ -104,6 +106,8 @@ class VirtualAudioComposite
           metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  void MaybeCompleteWatchTopology();
+
   void Serve(fidl::ServerEnd<fuchsia_hardware_audio::Composite> server);
   void ResetRingBuffer();
   void OnRingBufferClosed(fidl::UnbindInfo info);
@@ -129,12 +133,6 @@ class VirtualAudioComposite
   bool should_reply_to_position_request_ = true;
   std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_info_completer_;
 
-  bool watch_element_state_needs_reply_[kNumberOfElements] = {true, true};
-  std::optional<WatchElementStateCompleter::Async>
-      watch_element_state_completers_[kNumberOfElements];
-  bool watch_topology_needs_reply_ = true;
-  std::optional<WatchTopologyCompleter::Async> watch_topology_completer_;
-
   bool ring_buffer_vmo_fetched_ = false;
   bool ring_buffer_started_ = false;
   std::optional<fuchsia_hardware_audio::Format> ring_buffer_format_;
@@ -146,6 +144,14 @@ class VirtualAudioComposite
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio::RingBuffer>> ring_buffer_;
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
       signal_;
+
+  fuchsia_hardware_audio_signalprocessing::TopologyId current_topology_id_;
+  std::optional<fuchsia_hardware_audio_signalprocessing::TopologyId> last_reported_topology_id_;
+  std::optional<WatchTopologyCompleter::Async> watch_topology_completer_;
+
+  bool watch_element_state_needs_reply_[kNumberOfElements] = {true, true};
+  std::optional<WatchElementStateCompleter::Async>
+      watch_element_state_completers_[kNumberOfElements];
 
   async_dispatcher_t* dispatcher_;
   fidl::ServerBinding<fuchsia_virtualaudio::Device> device_binding_;

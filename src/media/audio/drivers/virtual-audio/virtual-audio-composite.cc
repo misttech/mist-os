@@ -639,7 +639,7 @@ void VirtualAudioComposite::OnSignalProcessingClosed(fidl::UnbindInfo info) {
        watch_element_state_completers_) {
     completer.reset();
   }
-  watch_topology_needs_reply_ = true;
+  last_reported_topology_id_.reset();
   watch_topology_completer_.reset();
 }
 
@@ -740,46 +740,69 @@ void VirtualAudioComposite::SetElementState(SetElementStateRequest& request,
 }
 
 void VirtualAudioComposite::GetTopologies(GetTopologiesCompleter::Sync& completer) {
-  // This driver is limited to a single ring buffer and a single DAI interconnect.
-  // TODO(https://fxbug.dev/42075676): Add support for more topologies allowing their configuration
-  // and observability via the virtual audio FIDL APIs.
-  fuchsia_hardware_audio_signalprocessing::Topology topology;
-  topology.id(kTopologyId);
-  fuchsia_hardware_audio_signalprocessing::EdgePair edge;
-  // For now, our lone ring buffer is an outgoing one.
+  // This driver exposes two elements: one ring buffer and one DAI interconnect.
+  // We expose two topologies: { Rb -> Dai } and { Dai -> Rb }.
+  // TODO(https://fxbug.dev/42075676): Add support for signalprocessing configuration and
+  // observability via the virtual audio FIDL APIs.
+  std::vector<fuchsia_hardware_audio_signalprocessing::Topology> topologies;
+  fuchsia_hardware_audio_signalprocessing::Topology topology1, topology2;
+  fuchsia_hardware_audio_signalprocessing::EdgePair edge1, edge2;
+
+  topology1.id(kPlaybackTopologyId);
+  edge1.processing_element_id_from(kRingBufferId).processing_element_id_to(kDaiId);
+  topology1.processing_elements_edge_pairs(std::vector({std::move(edge1)}));
+  topologies.emplace_back(std::move(topology1));
+
+  topology2.id(kCaptureTopologyId);
+  edge2.processing_element_id_from(kDaiId).processing_element_id_to(kRingBufferId);
+  topology2.processing_elements_edge_pairs(std::vector({std::move(edge2)}));
+  topologies.emplace_back(std::move(topology2));
+
+  // By default (in the topology of kPlaybackTopologyId), our ring buffer will be an outgoing one.
   ring_buffer_is_outgoing_ = true;
-  edge.processing_element_id_from(kRingBufferId).processing_element_id_to(kDaiId);
-  topology.processing_elements_edge_pairs(std::vector({std::move(edge)}));
-
-  completer.Reply(zx::ok(std::vector{std::move(topology)}));
-}
-
-void VirtualAudioComposite::WatchTopology(WatchTopologyCompleter::Sync& completer) {
-  // This driver is limited to a single ring buffer and a single DAI interconnect.
-  // TODO(https://fxbug.dev/42075676): Add support for more topologies allowing their configuration
-  // and observability via the virtual audio FIDL APIs.
-  if (watch_topology_needs_reply_) {
-    watch_topology_needs_reply_ = false;
-    completer.Reply(kTopologyId);
-  } else if (watch_topology_completer_.has_value()) {
-    // The client called WatchTopology when another hanging get was pending.
-    // This is an error condition and hence we unbind the channel.
-    fdf::error("WatchTopology was re-called while the previous call was still pending");
-    completer.Close(ZX_ERR_BAD_STATE);
-  } else {
-    watch_topology_completer_ = completer.ToAsync();
-  }
+  current_topology_id_ = kPlaybackTopologyId;
+  completer.Reply(zx::ok(std::move(topologies)));
 }
 
 void VirtualAudioComposite::SetTopology(SetTopologyRequest& request,
                                         SetTopologyCompleter::Sync& completer) {
-  if (request.topology_id() == kTopologyId) {
-    completer.Reply(zx::ok());
-  } else {
-    // This driver is limited to a single ring buffer and a single DAI interconnect.
-    // TODO(https://fxbug.dev/42075676): Add support for more topologies allowing their
-    // configuration and observability via the virtual audio FIDL APIs.
+  // This driver exposes two elements: one ring buffer and one DAI interconnect.
+  // We expose two topologies: { Rb -> Dai } and { Dai -> Rb }.
+  // TODO(https://fxbug.dev/42075676): Add support for signalprocessing configuration and
+  // observability via the virtual audio FIDL APIs.
+  if (request.topology_id() != kPlaybackTopologyId && request.topology_id() != kCaptureTopologyId) {
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  ring_buffer_is_outgoing_ = (request.topology_id() == kPlaybackTopologyId);
+  current_topology_id_ = request.topology_id();
+  completer.Reply(zx::ok());
+  MaybeCompleteWatchTopology();
+}
+
+void VirtualAudioComposite::WatchTopology(WatchTopologyCompleter::Sync& completer) {
+  // The client should not call WatchTopology when a previous WatchTopology is pending.
+  if (watch_topology_completer_.has_value()) {
+    // This is an error condition, so we unbind the channel.
+    fdf::error("WatchTopology was re-called while the previous call was still pending");
+    completer.Close(ZX_ERR_BAD_STATE);
+    return;
+  }
+
+  watch_topology_completer_ = completer.ToAsync();
+  MaybeCompleteWatchTopology();
+}
+
+// If we should tell the client about the topology, and if there is a pending request, complete it.
+void VirtualAudioComposite::MaybeCompleteWatchTopology() {
+  if (watch_topology_completer_.has_value() &&
+      (!last_reported_topology_id_.has_value() ||
+       *last_reported_topology_id_ != current_topology_id_)) {
+    last_reported_topology_id_ = current_topology_id_;
+    auto completer = std::move(watch_topology_completer_);
+    watch_topology_completer_.reset();
+    completer->Reply(current_topology_id_);
   }
 }
 
@@ -788,13 +811,13 @@ void VirtualAudioComposite::SetTopology(SetTopologyRequest& request,
 void VirtualAudioComposite::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  fdf::error("VirtualAudioComposite::handle_unknown_method (RingBuffer) ordinal %zu",
+  fdf::error("VirtualAudioComposite::handle_unknown_method (RingBuffer) ordinal {}",
              metadata.method_ordinal);
 }
 void VirtualAudioComposite::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  fdf::error("VirtualAudioComposite::handle_unknown_method (SignalProcessing) ordinal %zu",
+  fdf::error("VirtualAudioComposite::handle_unknown_method (SignalProcessing) ordinal {}",
              metadata.method_ordinal);
 }
 
