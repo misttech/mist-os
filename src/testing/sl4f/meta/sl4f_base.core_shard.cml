@@ -224,7 +224,10 @@
             to: "#sl4f",
         },
         {
-            protocol: "fuchsia.test.audio.recording.AudioRecordingControl",
+            protocol: [
+                "fuchsia.test.audio.Capture",
+                "fuchsia.test.audio.Injection",
+            ],
             from: "#audio_recording",
             to: "#sl4f",
         },

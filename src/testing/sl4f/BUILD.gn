@@ -92,7 +92,7 @@ rustc_library("lib") {
     "//src/lib/ui/input-synthesis",
     "//src/sys/lib/component-events",
     "//src/sys/lib/component_debug",
-    "//src/testing/sl4f/fidl:fuchsia.test.audio.recording_rust",
+    "//src/testing/sl4f/fidl:fuchsia.test.audio_rust",
     "//src/testing/sl4f/fidl:fuchsia.testing.proxy_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-channel",
@@ -326,6 +326,7 @@ fuchsia_component("audio_recording_comp") {
   deps = [ "audio_recording:bin" ]
 }
 
+# TODO(https://fxbug.dev/416247323): Include this in a new on-device affordance support AIB.
 fuchsia_package("sl4f") {
   package_name = "sl4f"
   deps = [
