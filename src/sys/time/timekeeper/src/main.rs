@@ -298,6 +298,7 @@ async fn main() -> Result<()> {
     let cmd_send_clone = cmd_send.clone();
     let serve_test_protocols = config.serve_test_protocols();
     let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms();
+    let use_connectivity = config.use_connectivity();
     let ps = persistent_state.clone();
 
     if config.has_always_on_counter() {
@@ -405,19 +406,21 @@ async fn main() -> Result<()> {
         None
     });
 
-    // Start the reachabilitiy monitor loop. The loop may fail, in which case,
-    // we will effectively be disabling reachability and external time sync.
-    if let Ok(proxy) = fuchsia_component::client::connect_to_protocol::<ffnr::MonitorMarker>() {
-        let cmd = cmd_send.clone();
-        let mut monitor = reachability::Monitor::new(cmd);
-        fasync::Task::local(async move {
-            if let Err(result) = monitor.serve(proxy).await {
-                error!("error on fuchsia.net.reachability/Monitor: {:?}", &result);
-            }
-        })
-        .detach();
-    } else {
-        warn!("no connection to fuchsia.net.reachability/Monitor: sampling time sources is turned off.");
+    if use_connectivity {
+        // Start the connectivity monitor loop. The loop may fail, in which case,
+        // we will effectively be disabling reachability and external time sync.
+        if let Ok(proxy) = fuchsia_component::client::connect_to_protocol::<ffnr::MonitorMarker>() {
+            let cmd = cmd_send.clone();
+            let mut monitor = reachability::Monitor::new(cmd);
+            fasync::Task::local(async move {
+                if let Err(result) = monitor.serve(proxy).await {
+                    error!("error on fuchsia.net.reachability/Monitor: {:?}", &result);
+                }
+            })
+            .detach();
+        } else {
+            warn!("no connection to fuchsia.net.reachability/Monitor: sampling time sources is turned off.");
+        }
     }
 
     // fuchsia::main can only return () or Result<()>.
