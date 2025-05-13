@@ -158,11 +158,6 @@ void FileConnection::Describe(DescribeCompleter::Sync& completer) {
   }
 }
 
-void FileConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
-  fidl::Arena arena;
-  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(rights()).Build());
-}
-
 void FileConnection::Sync(SyncCompleter::Sync& completer) {
   vnode()->Sync([completer = completer.ToAsync()](zx_status_t sync_status) mutable {
     if (sync_status != ZX_OK) {

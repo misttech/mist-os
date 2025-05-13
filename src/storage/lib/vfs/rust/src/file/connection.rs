@@ -604,14 +604,6 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 .trace(trace::trace_future_args!(c"storage", c"File::LinkInto"))
                 .await?;
             }
-            fio::FileRequest::GetConnectionInfo { responder } => {
-                trace::duration!(c"storage", c"File::GetConnectionInfo");
-                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
-                responder.send(fio::ConnectionInfo {
-                    rights: Some(self.options.rights),
-                    ..Default::default()
-                })?;
-            }
             fio::FileRequest::Sync { responder } => {
                 async move {
                     responder.send(self.file.sync(SyncMode::Normal).await.map_err(Status::into_raw))

@@ -184,12 +184,6 @@ impl<N: Node> Connection<N> {
                 responder.send(Ok(()))?;
                 return Ok(ConnectionState::Closed);
             }
-            fio::NodeRequest::GetConnectionInfo { responder } => {
-                responder.send(fio::ConnectionInfo {
-                    rights: Some(self.options.rights),
-                    ..Default::default()
-                })?;
-            }
             fio::NodeRequest::Sync { responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }

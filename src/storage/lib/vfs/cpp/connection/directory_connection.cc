@@ -135,11 +135,6 @@ void DirectoryConnection::Query(QueryCompleter::Sync& completer) {
   completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, protocol.size()));
 }
 
-void DirectoryConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
-  fidl::Arena arena;
-  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(rights()).Build());
-}
-
 void DirectoryConnection::Sync(SyncCompleter::Sync& completer) {
   vnode()->Sync([completer = completer.ToAsync()](zx_status_t sync_status) mutable {
     if (sync_status != ZX_OK) {

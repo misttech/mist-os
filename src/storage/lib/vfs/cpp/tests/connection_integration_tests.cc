@@ -135,38 +135,38 @@ class VfsTestSetup : public testing::Test {
 
 using ConnectionTest = VfsTestSetup;
 
-TEST_F(ConnectionTest, NodeGetDeprecatedSetFlagsOnFile) {
+TEST_F(ConnectionTest, GetSetFlagsOnFile) {
   // Create connection to vfs
   auto root = fidl::Endpoints<fio::Directory>::Create();
   ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
 
-  // Connect to File
+  // Open a new file connection
   zx::result fc = fidl::CreateEndpoints<fio::File>();
   ASSERT_EQ(fc.status_value(), ZX_OK);
-  ASSERT_EQ(
-      fdio_open3_at(root.client.channel().get(), "file", static_cast<uint64_t>(fio::kPermReadable),
-                    fc->server.TakeChannel().release()),
-      ZX_OK);
+  ASSERT_EQ(fdio_open3_at(root.client.channel().get(), "file", uint64_t{fio::kPermReadable},
+                          fc->server.TakeChannel().release()),
+            ZX_OK);
 
-  // Use DeprecatedGetFlags to get current flags and rights
-  auto file_get_result = fidl::WireCall(fc->client)->DeprecatedGetFlags();
-  EXPECT_EQ(file_get_result.status(), ZX_OK);
-  EXPECT_EQ(fio::OpenFlags::kRightReadable, file_get_result->flags);
+  // Use GetFlags to get current flags and rights
+  constexpr fio::Flags kExpectedFlags =
+      fio::Flags::kPermReadBytes | fio::Flags::kPermGetAttributes | fio::Flags::kProtocolFile;
+  auto flags = fidl::WireCall(fc->client)->GetFlags();
+  ASSERT_TRUE(flags.ok() && flags->is_ok()) << flags;
+  ASSERT_EQ((*flags)->flags, kExpectedFlags);
   {
-    // Make modifications to flags with DeprecatedSetFlags: Note this only works for
-    // fio::OpenFlags::kAppend based on posix standard
-    auto file_set_result = fidl::WireCall(fc->client)->DeprecatedSetFlags(fio::OpenFlags::kAppend);
-    EXPECT_EQ(file_set_result->s, ZX_OK);
+    // Make modifications to flags with SetFlags
+    auto result = fidl::WireCall(fc->client)->SetFlags(fio::Flags::kFileAppend);
+    ASSERT_TRUE(result.ok() && result->is_ok()) << result;
   }
   {
     // Check that the new flag is saved
-    auto file_get_result = fidl::WireCall(fc->client)->DeprecatedGetFlags();
-    EXPECT_EQ(file_get_result->s, ZX_OK);
-    EXPECT_EQ(fio::OpenFlags::kRightReadable | fio::OpenFlags::kAppend, file_get_result->flags);
+    auto new_flags = fidl::WireCall(fc->client)->GetFlags();
+    ASSERT_TRUE(new_flags.ok() && new_flags->is_ok()) << new_flags;
+    ASSERT_EQ((*new_flags)->flags, kExpectedFlags | fio::Flags::kFileAppend);
   }
 }
 
-TEST_F(ConnectionTest, NodeGetDeprecatedSetFlagsOnDirectory) {
+TEST_F(ConnectionTest, GetSetFlagsOnDirectory) {
   // Create connection to vfs
   auto root = fidl::Endpoints<fio::Directory>::Create();
   ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
@@ -179,88 +179,60 @@ TEST_F(ConnectionTest, NodeGetDeprecatedSetFlagsOnDirectory) {
                           dc->server.TakeChannel().release()),
             ZX_OK);
 
-  // Directories don't have settable flags, only report RIGHT_* flags.
-  auto dir_get_result = fidl::WireCall(dc->client)->DeprecatedGetFlags();
-  EXPECT_EQ(dir_get_result->s, ZX_OK);
-  EXPECT_EQ(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable, dir_get_result->flags);
+  // Use GetFlags to get current flags and rights
+  constexpr fio::Flags kExpectedFlags =
+      fio::kPermReadable | fio::kPermWritable | fio::Flags::kProtocolDirectory;
+  auto flags = fidl::WireCall(dc->client)->GetFlags();
+  ASSERT_TRUE(flags.ok() && flags->is_ok()) << flags;
+  ASSERT_EQ((*flags)->flags, kExpectedFlags);
 
   // Directories do not support setting flags.
-  auto dir_set_result = fidl::WireCall(dc->client)->DeprecatedSetFlags(fio::OpenFlags::kAppend);
-  EXPECT_EQ(dir_set_result->s, ZX_ERR_NOT_SUPPORTED);
+  auto result = fidl::WireCall(dc->client)->SetFlags(fio::Flags::kFileAppend);
+  ASSERT_TRUE(result.ok() && result->is_error()) << result;
+  ASSERT_EQ(result->error_value(), ZX_ERR_NOT_SUPPORTED) << result;
 }
 
-TEST_F(ConnectionTest, InheritPermissionFlagDirectoryRightExpansion) {
+TEST_F(ConnectionTest, InheritPermissionsDirectoryRightExpansion) {
   // Create connection to VFS with all rights.
   auto root = fidl::Endpoints<fio::Directory>::Create();
   ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
 
   // Combinations of permission inherit flags to be tested.
-  const fio::Flags kFlagCombinations[]{
+  constexpr fio::Flags kFlagCombinations[]{
       fio::Flags::kPermInheritWrite, fio::Flags::kPermInheritExecute,
       fio::Flags::kPermInheritWrite | fio::Flags::kPermInheritExecute};
 
-  for (const fio::Flags kOpenFlags : kFlagCombinations) {
+  for (const fio::Flags flags : kFlagCombinations) {
     // Connect to drectory specifying the flag combination we want to test.
     zx::result dc = fidl::CreateEndpoints<fio::Directory>();
     ASSERT_EQ(dc.status_value(), ZX_OK);
     ASSERT_EQ(fdio_open3_at(root.client.channel().get(), "dir",
-                            static_cast<uint64_t>(fio::kPermReadable | kOpenFlags),
+                            static_cast<uint64_t>(fio::kPermReadable | flags),
                             dc->server.TakeChannel().release()),
               ZX_OK);
 
     // Ensure flags match those which we expect.
-    auto dir_get_result = fidl::WireCall(dc->client)->DeprecatedGetFlags();
-    EXPECT_EQ(dir_get_result->s, ZX_OK);
-    auto dir_flags = dir_get_result->flags;
-    EXPECT_TRUE(fio::OpenFlags::kRightReadable & dir_flags);
+    auto dir_flags = fidl::WireCall(dc->client)->GetFlags();
+    ASSERT_TRUE(dir_flags.ok() && dir_flags->is_ok()) << dir_flags;
+    fio::Flags expected_dir_flags = fio::kPermReadable | fio::Flags::kProtocolDirectory;
     // Each permission inherit flag should be expanded to its respective right(s).
-    if (kOpenFlags & fio::Flags::kPermInheritWrite)
-      EXPECT_TRUE(fio::OpenFlags::kRightWritable & dir_flags);
-    if (kOpenFlags & fio::Flags::kPermInheritExecute)
-      EXPECT_TRUE(fio::OpenFlags::kRightExecutable & dir_flags);
+    if (flags & fio::Flags::kPermInheritWrite)
+      expected_dir_flags |= fio::kPermWritable;
+    if (flags & fio::Flags::kPermInheritExecute)
+      expected_dir_flags |= fio::kPermExecutable;
+    ASSERT_EQ((*dir_flags)->flags, expected_dir_flags);
 
     // Repeat test, but for file, which should not have any expanded rights.
     auto fc = fidl::Endpoints<fio::File>::Create();
     ASSERT_EQ(fdio_open3_at(root.client.channel().get(), "file",
-                            static_cast<uint64_t>(fio::kPermReadable | kOpenFlags),
+                            static_cast<uint64_t>(fio::kPermReadable | flags),
                             fc.server.TakeChannel().release()),
               ZX_OK);
-    auto file_get_result = fidl::WireCall(fc.client)->DeprecatedGetFlags();
-    EXPECT_EQ(file_get_result.status(), ZX_OK);
-    EXPECT_EQ(fio::OpenFlags::kRightReadable, file_get_result->flags);
-  }
-}
-
-TEST_F(ConnectionTest, FileGetDeprecatedSetFlagsOnFile) {
-  // Create connection to vfs
-  auto root = fidl::Endpoints<fio::Directory>::Create();
-  ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
-
-  // Connect to File
-  zx::result fc = fidl::CreateEndpoints<fio::File>();
-  ASSERT_EQ(fc.status_value(), ZX_OK);
-  ASSERT_EQ(
-      fdio_open3_at(root.client.channel().get(), "file", static_cast<uint64_t>(fio::kPermReadable),
-                    fc->server.TakeChannel().release()),
-      ZX_OK);
-
-  {
-    // Use DeprecatedGetFlags to get current flags and rights
-    auto file_get_result = fidl::WireCall(fc->client)->DeprecatedGetFlags();
-    EXPECT_EQ(file_get_result.status(), ZX_OK);
-    EXPECT_EQ(fio::OpenFlags::kRightReadable, file_get_result->flags);
-  }
-  {
-    // Make modifications to flags with DeprecatedSetFlags: Note this only works for kOpenFlagAppend
-    // based on posix standard
-    auto file_set_result = fidl::WireCall(fc->client)->DeprecatedSetFlags(fio::OpenFlags::kAppend);
-    EXPECT_EQ(file_set_result->s, ZX_OK);
-  }
-  {
-    // Check that the new flag is saved
-    auto file_get_result = fidl::WireCall(fc->client)->DeprecatedGetFlags();
-    EXPECT_EQ(file_get_result->s, ZX_OK);
-    EXPECT_EQ(fio::OpenFlags::kRightReadable | fio::OpenFlags::kAppend, file_get_result->flags);
+    auto file_flags = fidl::WireCall(fc.client)->GetFlags();
+    ASSERT_TRUE(file_flags.ok() && file_flags->is_ok()) << file_flags;
+    // We should not have any flags that are not in kPermReadable | Flags::kProtocolFile.
+    constexpr fio::Flags kAllowedFileFlags = fio::kPermReadable | fio::Flags::kProtocolFile;
+    ASSERT_EQ((*file_flags)->flags & ~kAllowedFileFlags, fio::Flags{});
   }
 }
 
@@ -452,7 +424,7 @@ TEST_F(ConnectionTest, ValidateRightsReadonly) {
     ASSERT_EQ(fidl::WireCall(root.client)
                   ->Open(fidl::StringView("file_or_dir"),
                          fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolFile |
-                             fio::Flags::kPermWriteBytes,
+                             fio::kPermWritable,
                          {}, fc->server.TakeChannel())
                   .status(),
               ZX_OK);
@@ -467,17 +439,17 @@ TEST_F(ConnectionTest, ValidateRightsReadonly) {
     ASSERT_EQ(fidl::WireCall(root.client)
                   ->Open(fidl::StringView("file_or_dir"),
                          fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolDirectory |
-                             fio::Flags::kPermGetAttributes | fio::Flags::kPermInheritWrite,
+                             fio::kPermReadable | fio::Flags::kPermInheritWrite,
                          {}, fc->server.TakeChannel())
                   .status(),
               ZX_OK);
     zx::result<fio::Representation> dir_info = GetOnRepresentation(fc->client);
     ASSERT_EQ(dir_info.status_value(), ZX_OK);
     ASSERT_EQ(dir_info->Which(), fio::Representation::Tag::kDirectory);
-    auto connection_info = fidl::WireCall(fc->client)->GetConnectionInfo();
-    ASSERT_EQ(connection_info.status(), ZX_OK);
-    ASSERT_TRUE(connection_info->has_rights());
-    ASSERT_EQ(connection_info->rights() & fs::kAllMutableIo2Rights, fio::Rights());
+    auto flags = fidl::WireCall(fc->client)->GetFlags();
+    constexpr fio::Flags kExpectedFlags = fio::kPermReadable | fio::Flags::kProtocolDirectory;
+    ASSERT_TRUE(flags.ok() && flags->is_ok()) << flags;
+    ASSERT_EQ((*flags)->flags, kExpectedFlags);
   }
 }
 

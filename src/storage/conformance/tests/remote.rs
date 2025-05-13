@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use assert_matches::assert_matches;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
 use io_conformance_util::test_harness::TestHarness;
@@ -236,8 +235,7 @@ async fn open_remote_directory_right_escalation_test() {
         .expect("failed to open remote node");
 
     // Ensure the resulting connection expanded write but not execute rights.
-    let connection_info = proxy.get_connection_info().await.unwrap();
-    assert_matches!(connection_info, fio::ConnectionInfo{ rights: Some(rights), .. } => {
-        assert!(!rights.contains(fio::Operations::EXECUTE));
-        assert!(rights.intersects(fio::Operations::READ_BYTES | fio::Operations::WRITE_BYTES))});
+    let flags = proxy.get_flags().await.unwrap().unwrap();
+    assert!(!flags.contains(fio::Flags::PERM_EXECUTE));
+    assert!(flags.contains(fio::PERM_READABLE | fio::PERM_WRITABLE));
 }

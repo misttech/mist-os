@@ -131,12 +131,6 @@ func (*Service) Representation() io.Representation {
 	return io.Representation{}
 }
 
-func (*Service) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
-	var connectionInfo io.ConnectionInfo
-	connectionInfo.SetRights(io.OperationsConnect)
-	return connectionInfo, nil
-}
-
 func (*Service) Sync(fidl.Context) (io.NodeSyncResult, error) {
 	return io.NodeSyncResultWithErr(int32(zx.ErrNotSupported)), nil
 }
@@ -322,13 +316,6 @@ func (*DirectoryWrapper) DescribeDeprecated() io.NodeInfoDeprecated {
 	var nodeInfo io.NodeInfoDeprecated
 	nodeInfo.SetDirectory(io.DirectoryObject{})
 	return nodeInfo
-}
-
-func (*directoryState) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
-	var connectionInfo io.ConnectionInfo
-	rights := io.RStarDir
-	connectionInfo.SetRights(rights)
-	return connectionInfo, nil
 }
 
 func (*directoryState) Sync(fidl.Context) (io.NodeSyncResult, error) {
@@ -734,13 +721,6 @@ func (fState *fileState) Describe(fidl.Context) (io.FileInfo, error) {
 
 func (*fileState) LinkInto(fidl.Context, zx.Event, string) (io.LinkableLinkIntoResult, error) {
 	return io.LinkableLinkIntoResultWithErr(int32(zx.ErrNotSupported)), nil
-}
-
-func (fState *fileState) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
-	var connectionInfo io.ConnectionInfo
-	rights := io.RStarDir
-	connectionInfo.SetRights(rights)
-	return connectionInfo, nil
 }
 
 func (*fileState) Sync(fidl.Context) (io.NodeSyncResult, error) {

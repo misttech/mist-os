@@ -166,14 +166,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/Directory.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.io/Directory.GetFlags",
         "strictness": "strict",
         "ordinal": "6595803110182632097",
@@ -671,14 +663,6 @@
         "request": "fuchsia.io/FileGetBackingMemoryRequest",
         "response": "fuchsia.io/File_GetBackingMemory_Response",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/File.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
     },
     {
         "kind": "protocol/member",
@@ -1392,14 +1376,6 @@
         "request": "fuchsia.io/NodeGetAttributesRequest",
         "response": "fuchsia.io/NodeAttributes2",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Node.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
     },
     {
         "kind": "protocol/member",

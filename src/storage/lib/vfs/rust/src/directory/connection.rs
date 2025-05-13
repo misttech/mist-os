@@ -105,13 +105,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 responder.send(Ok(()))?;
                 return Ok(ConnectionState::Closed);
             }
-            fio::DirectoryRequest::GetConnectionInfo { responder } => {
-                trace::duration!(c"storage", c"Directory::GetConnectionInfo");
-                responder.send(fio::ConnectionInfo {
-                    rights: Some(self.options.rights),
-                    ..Default::default()
-                })?;
-            }
             fio::DirectoryRequest::GetAttr { responder } => {
                 async move {
                     let (status, attrs) = crate::common::io2_to_io1_attrs(

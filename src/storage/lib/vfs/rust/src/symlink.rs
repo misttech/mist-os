@@ -124,12 +124,6 @@ impl<T: Symlink> Connection<T> {
                     self.handle_link_into(dst_parent_token, dst).await.map_err(|s| s.into_raw()),
                 )?;
             }
-            fio::SymlinkRequest::GetConnectionInfo { responder } => {
-                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
-                let rights = fio::Operations::GET_ATTRIBUTES;
-                responder
-                    .send(fio::ConnectionInfo { rights: Some(rights), ..Default::default() })?;
-            }
             fio::SymlinkRequest::Sync { responder } => {
                 responder.send(Ok(()))?;
             }

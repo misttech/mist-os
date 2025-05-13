@@ -587,13 +587,6 @@ open protocol Node {
     //     token Token;
     // }) error zx.Status;
 
-    /// Acquires information about the connection.
-    ///
-    /// This method does not require any rights.
-    // TODO(https://fxbug.dev/376509077): Remove this method and replace all usages with GetFlags2.
-    @selector("fuchsia.io/Node.GetConnectionInfo")
-    strict GetConnectionInfo() -> (ConnectionInfo);
-
     /// Acquires information about the node.
     ///
     /// The attributes of a node should be stable, independent of the

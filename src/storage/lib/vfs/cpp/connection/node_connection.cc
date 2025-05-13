@@ -73,11 +73,6 @@ void NodeConnection::Query(QueryCompleter::Sync& completer) {
   completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, protocol.size()));
 }
 
-void NodeConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
-  fidl::Arena arena;
-  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(rights()).Build());
-}
-
 void NodeConnection::Sync(SyncCompleter::Sync& completer) {
   completer.Reply(zx::make_result(ZX_ERR_BAD_HANDLE));
 }
