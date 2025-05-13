@@ -34,6 +34,7 @@
 #include "symbolization_context.h"
 #include "targets.h"
 
+namespace {
 std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::unowned_process& process,
                                                          const zx::unowned_thread& thread,
                                                          unwinder::FramePointerUnwinder& unwinder) {
@@ -114,6 +115,7 @@ std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::unowned_proce
   zx::ticks duration = zx::ticks::now() - before;
   return {duration, pcs};
 }
+}  // namespace
 
 zx::result<> profiler::Sampler::AddTarget(JobTarget&& target) {
   zx::result<> res = WatchTarget(target);
@@ -247,7 +249,6 @@ zx::result<> profiler::Sampler::Stop() {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   sample_task_.Cancel();
   FX_LOGS(INFO) << "Stopped! Collected " << inspecting_durations_.size() << " samples";
-  sample_task_.Cancel();
   return zx::ok();
 }
 
@@ -288,7 +289,7 @@ zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
       [&contexts, this](cpp20::span<const zx_koid_t>,
                         const ProcessTarget& target) mutable -> zx::result<> {
         zx::result<std::vector<profiler::Module>> modules =
-            targets_.GetProcessModules(target.handle);
+            profiler::GetProcessModules(target.handle, searcher_);
         if (modules.is_ok()) {
           contexts[target.pid] = *modules;
         }
@@ -300,13 +301,14 @@ zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
   if (res.is_error()) {
     return res.take_error();
   }
-  return zx::ok(profiler::SymbolizationContext{contexts});
+  return zx::ok(profiler::SymbolizationContext{std::move(contexts)});
 }
 
 void profiler::Sampler::AddThread(std::vector<zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid,
                                   zx::thread t) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
-  zx::result res = targets_.AddThread(job_path, pid, ThreadTarget{std::move(t), tid});
+  zx::result res =
+      targets_.AddThread(job_path, pid, ThreadTarget{.handle = std::move(t), .tid = tid});
   if (res.is_error()) {
     FX_PLOGS(ERROR, res.status_value()) << "Failed to add thread to session: " << tid;
   }

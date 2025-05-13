@@ -11,6 +11,7 @@
 #include <lib/zx/task.h>
 #include <lib/zx/thread.h>
 #include <zircon/compiler.h>
+#include <zircon/system/ulib/elf-search/include/elf-search.h>
 
 #include "component.h"
 #include "sampler.h"
@@ -43,6 +44,7 @@ class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session
   ProfilingState state_ = ProfilingState::Unconfigured;
 
   TargetTree targets_;
+  elf_search::Searcher searcher_;
   std::vector<fuchsia_cpu_profiler::SamplingConfig> sample_specs_;
   std::unique_ptr<ComponentTarget> component_target_;
 };

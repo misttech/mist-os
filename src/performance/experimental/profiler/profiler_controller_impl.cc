@@ -49,11 +49,13 @@ constexpr bool kSamplerKernelSupport = EXPERIMENTAL_THREAD_SAMPLER_ENABLED;
 #error "EXPERIMENTAL_THREAD_SAMPLER_ENABLED should always be defined"
 #endif
 
-zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&& tasks) {
+namespace {
+zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&& tasks,
+                             elf_search::Searcher& searcher) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   for (auto&& [koid, job] : tasks.jobs) {
     TRACE_DURATION("cpu_profiler", "PopulateTargets/EachJob");
-    zx::result<profiler::JobTarget> job_target = tree.MakeJobTarget(std::move(job));
+    zx::result<profiler::JobTarget> job_target = profiler::MakeJobTarget(std::move(job), searcher);
     if (job_target.is_error()) {
       // A job might exit in the time between us walking the tree and attempting to find its
       // children. Skip it in this case.
@@ -74,7 +76,8 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
       // children. Skip it in this case.
       continue;
     }
-    zx::result<profiler::ProcessTarget> process_target = tree.MakeProcessTarget(std::move(process));
+    zx::result<profiler::ProcessTarget> process_target =
+        profiler::MakeProcessTarget(std::move(process), searcher);
     if (process_target.is_error()) {
       continue;
     }
@@ -111,7 +114,7 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
                                            std::unordered_map<zx_koid_t, profiler::ThreadTarget>{}};
     FX_LOGS(DEBUG) << "Collecting process modules for process " << pid << ".";
     zx::result<std::vector<profiler::Module>> modules =
-        tree.GetProcessModules(process_target.handle);
+        profiler::GetProcessModules(process_target.handle, searcher);
     if (modules.is_error()) {
       return zx::error(modules.error_value());
     }
@@ -129,7 +132,8 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
       }
     }
 
-    if (zx::result res = tree.AddThread(pid, profiler::ThreadTarget{std::move(thread), koid});
+    if (zx::result res =
+            tree.AddThread(pid, profiler::ThreadTarget{.handle = std::move(thread), .tid = koid});
         res.is_error()) {
       FX_PLOGS(ERROR, res.status_value()) << "Failed to add thread target: " << koid;
       return res;
@@ -201,6 +205,7 @@ zx::result<zx_koid_t> MonikerToJobId(const std::string& moniker) {
   }
   return job_id;
 }
+}  // namespace
 
 void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
                                                  ConfigureCompleter::Sync& completer) {
@@ -369,8 +374,6 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
           if (res.is_error()) {
             FX_PLOGS(ERROR, res.error_value())
                 << "Failed to attach to component: " << attach_moniker.value_or("<unspecified>");
-          }
-          if (res.is_error()) {
             completer.Reply(
                 fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
             return;
@@ -409,7 +412,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
     TaskFinder::FoundTasks tasks;
     tasks.jobs.push_back(std::move(*root_job_info));
 
-    if (auto res = PopulateTargets(targets_, std::move(tasks)); res.is_error()) {
+    if (auto res = PopulateTargets(targets_, std::move(tasks), searcher_); res.is_error()) {
       FX_PLOGS(ERROR, res.error_value()) << "Populate Targets failed";
       completer.Reply(
           fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
@@ -430,7 +433,8 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
       return;
     }
 
-    if (auto res = PopulateTargets(targets_, std::move(*handles_result)); res.is_error()) {
+    if (auto res = PopulateTargets(targets_, std::move(*handles_result), searcher_);
+        res.is_error()) {
       FX_PLOGS(ERROR, res.error_value()) << "Populate Targets failed";
       completer.Reply(
           fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
@@ -479,7 +483,8 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
     }
     for (auto& [koid, handle] : handles->jobs) {
       if (koid == job_id) {
-        zx::result<JobTarget> target = targets_.MakeJobTarget(zx::job(handle.release()));
+        zx::result<JobTarget> target =
+            profiler::MakeJobTarget(zx::job(handle.release()), searcher_);
         if (target.is_error()) {
           FX_PLOGS(ERROR, target.status_value()) << "Failed to make target for: " << moniker;
           return;

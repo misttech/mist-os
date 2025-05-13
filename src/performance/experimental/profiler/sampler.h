@@ -40,8 +40,8 @@ struct Sample {
 
 class Sampler {
  public:
-  explicit Sampler(async_dispatcher_t* dispatcher, TargetTree targets,
-                   std::vector<fuchsia_cpu_profiler::SamplingConfig> sample_specs)
+  Sampler(async_dispatcher_t* dispatcher, TargetTree targets,
+          std::vector<fuchsia_cpu_profiler::SamplingConfig> sample_specs)
       : dispatcher_(dispatcher),
         targets_(std::move(targets)),
         sample_specs_(std::move(sample_specs)) {}
@@ -66,8 +66,6 @@ class Sampler {
   void CollectSamples(async_dispatcher_t* dispatcher, async::TaskBase* task, zx_status_t status);
 
   async_dispatcher_t* dispatcher_;
-  async::TaskMethod<profiler::Sampler, &profiler::Sampler::CollectSamples> sample_task_{this};
-
   TargetTree targets_;
   std::vector<fuchsia_cpu_profiler::SamplingConfig> sample_specs_;
   std::vector<zx::ticks> inspecting_durations_;
@@ -76,6 +74,10 @@ class Sampler {
   // Watchers cannot be moved, so we need to box them
   std::unordered_map<zx_koid_t, std::unique_ptr<ProcessWatcher>> process_watchers_;
   std::unordered_map<zx_koid_t, std::unique_ptr<JobWatcher>> job_watchers_;
+
+ private:
+  async::TaskMethod<profiler::Sampler, &profiler::Sampler::CollectSamples> sample_task_{this};
+  elf_search::Searcher searcher_;
 };
 }  // namespace profiler
 #endif  // SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_SAMPLER_H_
