@@ -9,17 +9,17 @@ import "go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/expe
 var ipv6ndpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
 	{1, 1}:   Pass,
 	{2, 1}:   Pass,
-	{2, 2}:   AnvlSkip,
+	{2, 2}:   AnvlSkip, // Router test but this is the host suite.
 	{2, 3}:   Pass,
-	{2, 4}:   AnvlSkip,
-	{3, 1}:   AnvlSkip,
-	{3, 2}:   AnvlSkip,
-	{3, 3}:   AnvlSkip,
-	{3, 4}:   AnvlSkip,
+	{2, 4}:   AnvlSkip, // Router test but this is the host suite.
+	{3, 1}:   AnvlSkip, // Router test but this is the host suite.
+	{3, 2}:   AnvlSkip, // Router test but this is the host suite.
+	{3, 3}:   AnvlSkip, // Router test but this is the host suite.
+	{3, 4}:   AnvlSkip, // Router test but this is the host suite.
 	{3, 5}:   Pass,
 	{3, 6}:   Pass,
 	{3, 7}:   Pass,
-	{3, 8}:   AnvlSkip,
+	{3, 8}:   AnvlSkip, // Router test but this is the host suite.
 	{3, 9}:   Pass,
 	{4, 1}:   Pass,
 	{4, 2}:   Pass,
@@ -36,11 +36,11 @@ var ipv6ndpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{5, 2}:   Pass,
 	{5, 3}:   Pass,
 	{5, 4}:   Pass,
-	{5, 5}:   AnvlSkip,
+	{5, 5}:   AnvlSkip, // Router test but this is the host suite.
 	{5, 6}:   Pass,
 	{5, 7}:   Pass,
 	{5, 8}:   Pass,
-	{5, 9}:   AnvlSkip,
+	{5, 9}:   AnvlSkip, // Router test but this is the host suite.
 	{5, 10}:  Pass,
 	{5, 12}:  Pass,
 	{5, 13}:  Pass,
@@ -48,38 +48,38 @@ var ipv6ndpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{5, 15}:  Pass,
 	{5, 16}:  Pass,
 	{5, 17}:  Pass,
-	{6, 1}:   AnvlSkip,
-	{6, 2}:   AnvlSkip,
-	{6, 3}:   AnvlSkip,
+	{6, 1}:   AnvlSkip, // Router test but this is the host suite.
+	{6, 2}:   AnvlSkip, // Router test but this is the host suite.
+	{6, 3}:   AnvlSkip, // Router test but this is the host suite.
 	{6, 4}:   Pass,
-	{6, 5}:   AnvlSkip,
-	{6, 6}:   AnvlSkip,
-	{6, 7}:   AnvlSkip,
-	{6, 8}:   AnvlSkip,
-	{6, 9}:   AnvlSkip,
-	{7, 1}:   AnvlSkip,
+	{6, 5}:   AnvlSkip, // Router test but this is the host suite.
+	{6, 6}:   AnvlSkip, // Router test but this is the host suite.
+	{6, 7}:   AnvlSkip, // Router test but this is the host suite.
+	{6, 8}:   AnvlSkip, // Router test but this is the host suite.
+	{6, 9}:   AnvlSkip, // Router test but this is the host suite.
+	{7, 1}:   AnvlSkip, // Router test but this is the host suite.
 	{7, 2}:   Flaky,
-	{7, 3}:   AnvlSkip,
-	{7, 4}:   AnvlSkip,
+	{7, 3}:   AnvlSkip, // Router test but this is the host suite.
+	{7, 4}:   AnvlSkip, // Router test but this is the host suite.
 	{7, 5}:   Pass,
-	{7, 6}:   AnvlSkip,
-	{8, 1}:   AnvlSkip,
+	{7, 6}:   AnvlSkip, // Router test but this is the host suite.
+	{8, 1}:   AnvlSkip, // Router test but this is the host suite.
 	{8, 2}:   Inconclusive,
-	{9, 1}:   AnvlSkip,
-	{9, 2}:   AnvlSkip,
+	{9, 1}:   AnvlSkip, // Router test but this is the host suite.
+	{9, 2}:   AnvlSkip, // Router test but this is the host suite.
 	{10, 1}:  Pass,
 	{10, 2}:  Pass,
 	{11, 1}:  Pass,
-	{11, 2}:  AnvlSkip,
-	{11, 3}:  AnvlSkip,
-	{11, 4}:  AnvlSkip,
-	{11, 5}:  AnvlSkip,
-	{11, 6}:  AnvlSkip,
-	{11, 7}:  AnvlSkip,
-	{11, 8}:  AnvlSkip,
-	{11, 9}:  AnvlSkip,
-	{11, 10}: AnvlSkip,
-	{11, 11}: AnvlSkip,
+	{11, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 3}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 4}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 5}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 6}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 7}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 8}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 9}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 10}: AnvlSkip, // Router test but this is the host suite.
+	{11, 11}: AnvlSkip, // Router test but this is the host suite.
 	{11, 12}: Pass,
 	{12, 1}:  Pass,
 	{12, 2}:  Pass,
@@ -89,45 +89,45 @@ var ipv6ndpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{12, 6}:  Pass,
 	{12, 7}:  Pass,
 	{12, 8}:  Pass,
-	{12, 9}:  AnvlSkip,
-	{13, 1}:  AnvlSkip,
-	{13, 2}:  AnvlSkip,
-	{13, 3}:  AnvlSkip,
-	{13, 4}:  AnvlSkip,
-	{13, 5}:  AnvlSkip,
-	{13, 6}:  AnvlSkip,
-	{13, 7}:  AnvlSkip,
-	{13, 8}:  AnvlSkip,
-	{13, 9}:  AnvlSkip,
-	{13, 10}: AnvlSkip,
-	{13, 11}: AnvlSkip,
-	{13, 12}: AnvlSkip,
-	{13, 13}: AnvlSkip,
-	{13, 14}: AnvlSkip,
-	{13, 15}: AnvlSkip,
-	{13, 16}: AnvlSkip,
-	{13, 17}: AnvlSkip,
-	{13, 18}: AnvlSkip,
-	{14, 1}:  AnvlSkip,
-	{14, 2}:  AnvlSkip,
-	{15, 1}:  AnvlSkip,
+	{12, 9}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 1}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 3}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 4}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 5}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 6}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 7}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 8}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 9}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 10}: AnvlSkip, // Router test but this is the host suite.
+	{13, 11}: AnvlSkip, // Router test but this is the host suite.
+	{13, 12}: AnvlSkip, // Router test but this is the host suite.
+	{13, 13}: AnvlSkip, // Router test but this is the host suite.
+	{13, 14}: AnvlSkip, // Router test but this is the host suite.
+	{13, 15}: AnvlSkip, // Router test but this is the host suite.
+	{13, 16}: AnvlSkip, // Router test but this is the host suite.
+	{13, 17}: AnvlSkip, // Router test but this is the host suite.
+	{13, 18}: AnvlSkip, // Router test but this is the host suite.
+	{14, 1}:  AnvlSkip, // Router test but this is the host suite.
+	{14, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{15, 1}:  AnvlSkip, // Router test but this is the host suite.
 	{16, 1}:  Pass,
-	{16, 2}:  AnvlSkip,
-	{16, 3}:  AnvlSkip,
-	{17, 1}:  AnvlSkip,
-	{17, 2}:  AnvlSkip,
-	{17, 3}:  AnvlSkip,
-	{17, 4}:  AnvlSkip,
+	{16, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{16, 3}:  AnvlSkip, // Router test but this is the host suite.
+	{17, 1}:  AnvlSkip, // Router test but this is the host suite.
+	{17, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{17, 3}:  AnvlSkip, // Router test but this is the host suite.
+	{17, 4}:  AnvlSkip, // Router test but this is the host suite.
 	{18, 1}:  Pass,
-	{18, 2}:  AnvlSkip,
-	{18, 3}:  AnvlSkip,
-	{18, 4}:  AnvlSkip,
-	{18, 5}:  AnvlSkip,
-	{18, 6}:  AnvlSkip,
-	{18, 7}:  AnvlSkip,
-	{18, 8}:  AnvlSkip,
-	{18, 9}:  AnvlSkip,
-	{19, 1}:  AnvlSkip,
+	{18, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 3}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 4}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 5}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 6}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 7}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 8}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 9}:  AnvlSkip, // Router test but this is the host suite.
+	{19, 1}:  AnvlSkip, // Router test but this is the host suite.
 	{20, 1}:  Pass,
 	{21, 1}:  Pass,
 	{21, 2}:  Inconclusive,
@@ -177,8 +177,8 @@ var ipv6ndpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{26, 1}:  Pass,
 	{26, 2}:  Pass,
 	{27, 1}:  Pass,
-	{27, 2}:  AnvlSkip,
-	{27, 3}:  AnvlSkip,
+	{27, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{27, 3}:  AnvlSkip, // Router test but this is the host suite.
 	{27, 4}:  Pass,
 	{27, 5}:  Pass,
 	{27, 6}:  Pass,
@@ -187,7 +187,7 @@ var ipv6ndpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{28, 5}:  Fail,
 	{28, 6}:  Pass,
 	{29, 1}:  Pass,
-	{29, 2}:  AnvlSkip,
+	{29, 2}:  AnvlSkip, // Router test but this is the host suite.
 	{29, 3}:  Pass,
 	{29, 4}:  Pass,
 	{29, 5}:  Pass,
@@ -207,7 +207,7 @@ var ipv6ndpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{30, 15}: Pass,
 	{30, 16}: Pass,
 	{30, 17}: Pass,
-	{31, 1}:  AnvlSkip,
+	{31, 1}:  AnvlSkip, // Router test but this is the host suite.
 	{32, 1}:  Pass,
 	{32, 2}:  Pass,
 	{32, 3}:  Pass,
@@ -225,10 +225,10 @@ var ipv6ndpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{33, 11}: Inconclusive,
 	{33, 12}: Inconclusive,
 	{33, 13}: Inconclusive,
-	{33, 14}: AnvlSkip,
-	{33, 15}: AnvlSkip,
-	{34, 1}:  AnvlSkip,
-	{34, 2}:  AnvlSkip,
+	{33, 14}: AnvlSkip, // Router test but this is the host suite.
+	{33, 15}: AnvlSkip, // Router test but this is the host suite.
+	{34, 1}:  AnvlSkip, // Router test but this is the host suite.
+	{34, 2}:  AnvlSkip, // Router test but this is the host suite.
 	{35, 1}:  Pass,
 	{35, 2}:  Pass,
 	{35, 3}:  Pass,
@@ -239,17 +239,17 @@ var ipv6ndpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 var ipv6ndpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
 	{1, 1}:  Pass,
 	{2, 1}:  Pass,
-	{2, 2}:  AnvlSkip,
+	{2, 2}:  AnvlSkip, // Router test but this is the host suite.
 	{2, 3}:  Pass,
-	{2, 4}:  AnvlSkip,
-	{3, 1}:  AnvlSkip,
-	{3, 2}:  AnvlSkip,
-	{3, 3}:  AnvlSkip,
-	{3, 4}:  AnvlSkip,
+	{2, 4}:  AnvlSkip, // Router test but this is the host suite.
+	{3, 1}:  AnvlSkip, // Router test but this is the host suite.
+	{3, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{3, 3}:  AnvlSkip, // Router test but this is the host suite.
+	{3, 4}:  AnvlSkip, // Router test but this is the host suite.
 	{3, 5}:  Pass,
 	{3, 6}:  Pass,
 	{3, 7}:  Pass,
-	{3, 8}:  AnvlSkip,
+	{3, 8}:  AnvlSkip, // Router test but this is the host suite.
 	{3, 9}:  Pass,
 	{4, 1}:  Pass,
 	{4, 2}:  Pass,
@@ -266,11 +266,11 @@ var ipv6ndpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{5, 2}:  Pass,
 	{5, 3}:  Pass,
 	{5, 4}:  Pass,
-	{5, 5}:  AnvlSkip,
+	{5, 5}:  AnvlSkip, // Router test but this is the host suite.
 	{5, 6}:  Pass,
 	{5, 7}:  Pass,
 	{5, 8}:  Fail,
-	{5, 9}:  AnvlSkip,
+	{5, 9}:  AnvlSkip, // Router test but this is the host suite.
 	{5, 10}: Fail,
 	{5, 12}: Pass,
 	{5, 13}: Pass,
@@ -278,40 +278,40 @@ var ipv6ndpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{5, 15}: Pass,
 	{5, 16}: Pass,
 	{5, 17}: Pass,
-	{6, 1}:  AnvlSkip,
-	{6, 2}:  AnvlSkip,
-	{6, 3}:  AnvlSkip,
+	{6, 1}:  AnvlSkip, // Router test but this is the host suite.
+	{6, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{6, 3}:  AnvlSkip, // Router test but this is the host suite.
 	{6, 4}:  Pass,
-	{6, 5}:  AnvlSkip,
-	{6, 6}:  AnvlSkip,
-	{6, 7}:  AnvlSkip,
-	{6, 8}:  AnvlSkip,
-	{6, 9}:  AnvlSkip,
-	{7, 1}:  AnvlSkip,
+	{6, 5}:  AnvlSkip, // Router test but this is the host suite.
+	{6, 6}:  AnvlSkip, // Router test but this is the host suite.
+	{6, 7}:  AnvlSkip, // Router test but this is the host suite.
+	{6, 8}:  AnvlSkip, // Router test but this is the host suite.
+	{6, 9}:  AnvlSkip, // Router test but this is the host suite.
+	{7, 1}:  AnvlSkip, // Router test but this is the host suite.
 	// TODO(https://fxbug.dev/42078196): Test has a script problem this should
 	// be pass once that's resolved.
 	{7, 2}:   Flaky,
-	{7, 3}:   AnvlSkip,
-	{7, 4}:   AnvlSkip,
+	{7, 3}:   AnvlSkip, // Router test but this is the host suite.
+	{7, 4}:   AnvlSkip, // Router test but this is the host suite.
 	{7, 5}:   Pass,
-	{7, 6}:   AnvlSkip,
-	{8, 1}:   AnvlSkip,
+	{7, 6}:   AnvlSkip, // Router test but this is the host suite.
+	{8, 1}:   AnvlSkip, // Router test but this is the host suite.
 	{8, 2}:   Inconclusive,
-	{9, 1}:   AnvlSkip,
-	{9, 2}:   AnvlSkip,
+	{9, 1}:   AnvlSkip, // Router test but this is the host suite.
+	{9, 2}:   AnvlSkip, // Router test but this is the host suite.
 	{10, 1}:  Pass,
 	{10, 2}:  Pass,
 	{11, 1}:  Pass,
-	{11, 2}:  AnvlSkip,
-	{11, 3}:  AnvlSkip,
-	{11, 4}:  AnvlSkip,
-	{11, 5}:  AnvlSkip,
-	{11, 6}:  AnvlSkip,
-	{11, 7}:  AnvlSkip,
-	{11, 8}:  AnvlSkip,
-	{11, 9}:  AnvlSkip,
-	{11, 10}: AnvlSkip,
-	{11, 11}: AnvlSkip,
+	{11, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 3}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 4}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 5}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 6}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 7}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 8}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 9}:  AnvlSkip, // Router test but this is the host suite.
+	{11, 10}: AnvlSkip, // Router test but this is the host suite.
+	{11, 11}: AnvlSkip, // Router test but this is the host suite.
 	{11, 12}: Pass,
 	{12, 1}:  Pass,
 	{12, 2}:  Pass,
@@ -321,45 +321,45 @@ var ipv6ndpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{12, 6}:  Pass,
 	{12, 7}:  Pass,
 	{12, 8}:  Pass,
-	{12, 9}:  AnvlSkip,
-	{13, 1}:  AnvlSkip,
-	{13, 2}:  AnvlSkip,
-	{13, 3}:  AnvlSkip,
-	{13, 4}:  AnvlSkip,
-	{13, 5}:  AnvlSkip,
-	{13, 6}:  AnvlSkip,
-	{13, 7}:  AnvlSkip,
-	{13, 8}:  AnvlSkip,
-	{13, 9}:  AnvlSkip,
-	{13, 10}: AnvlSkip,
-	{13, 11}: AnvlSkip,
-	{13, 12}: AnvlSkip,
-	{13, 13}: AnvlSkip,
-	{13, 14}: AnvlSkip,
-	{13, 15}: AnvlSkip,
-	{13, 16}: AnvlSkip,
-	{13, 17}: AnvlSkip,
-	{13, 18}: AnvlSkip,
-	{14, 1}:  AnvlSkip,
-	{14, 2}:  AnvlSkip,
-	{15, 1}:  AnvlSkip,
+	{12, 9}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 1}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 3}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 4}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 5}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 6}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 7}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 8}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 9}:  AnvlSkip, // Router test but this is the host suite.
+	{13, 10}: AnvlSkip, // Router test but this is the host suite.
+	{13, 11}: AnvlSkip, // Router test but this is the host suite.
+	{13, 12}: AnvlSkip, // Router test but this is the host suite.
+	{13, 13}: AnvlSkip, // Router test but this is the host suite.
+	{13, 14}: AnvlSkip, // Router test but this is the host suite.
+	{13, 15}: AnvlSkip, // Router test but this is the host suite.
+	{13, 16}: AnvlSkip, // Router test but this is the host suite.
+	{13, 17}: AnvlSkip, // Router test but this is the host suite.
+	{13, 18}: AnvlSkip, // Router test but this is the host suite.
+	{14, 1}:  AnvlSkip, // Router test but this is the host suite.
+	{14, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{15, 1}:  AnvlSkip, // Router test but this is the host suite.
 	{16, 1}:  Pass,
-	{16, 2}:  AnvlSkip,
-	{16, 3}:  AnvlSkip,
-	{17, 1}:  AnvlSkip,
-	{17, 2}:  AnvlSkip,
-	{17, 3}:  AnvlSkip,
-	{17, 4}:  AnvlSkip,
+	{16, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{16, 3}:  AnvlSkip, // Router test but this is the host suite.
+	{17, 1}:  AnvlSkip, // Router test but this is the host suite.
+	{17, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{17, 3}:  AnvlSkip, // Router test but this is the host suite.
+	{17, 4}:  AnvlSkip, // Router test but this is the host suite.
 	{18, 1}:  Pass,
-	{18, 2}:  AnvlSkip,
-	{18, 3}:  AnvlSkip,
-	{18, 4}:  AnvlSkip,
-	{18, 5}:  AnvlSkip,
-	{18, 6}:  AnvlSkip,
-	{18, 7}:  AnvlSkip,
-	{18, 8}:  AnvlSkip,
-	{18, 9}:  AnvlSkip,
-	{19, 1}:  AnvlSkip,
+	{18, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 3}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 4}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 5}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 6}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 7}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 8}:  AnvlSkip, // Router test but this is the host suite.
+	{18, 9}:  AnvlSkip, // Router test but this is the host suite.
+	{19, 1}:  AnvlSkip, // Router test but this is the host suite.
 	{20, 1}:  Pass,
 	{21, 1}:  Pass,
 	{21, 2}:  Pass,
@@ -413,8 +413,8 @@ var ipv6ndpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{26, 1}:  Pass,
 	{26, 2}:  Pass,
 	{27, 1}:  Pass,
-	{27, 2}:  AnvlSkip,
-	{27, 3}:  AnvlSkip,
+	{27, 2}:  AnvlSkip, // Router test but this is the host suite.
+	{27, 3}:  AnvlSkip, // Router test but this is the host suite.
 	{27, 4}:  Pass,
 	{27, 5}:  Pass,
 	{27, 6}:  Pass,
@@ -423,7 +423,7 @@ var ipv6ndpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{28, 5}:  Fail,
 	{28, 6}:  Pass,
 	{29, 1}:  Pass,
-	{29, 2}:  AnvlSkip,
+	{29, 2}:  AnvlSkip, // Router test but this is the host suite.
 	{29, 3}:  Pass,
 	{29, 4}:  Pass,
 	{29, 5}:  Pass,
@@ -443,7 +443,7 @@ var ipv6ndpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{30, 15}: Pass,
 	{30, 16}: Pass,
 	{30, 17}: Pass,
-	{31, 1}:  AnvlSkip,
+	{31, 1}:  AnvlSkip, // Router test but this is the host suite.
 	{32, 1}:  Pass,
 	{32, 2}:  Pass,
 	{32, 3}:  Pass,
@@ -461,10 +461,10 @@ var ipv6ndpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{33, 11}: Inconclusive,
 	{33, 12}: Inconclusive,
 	{33, 13}: Inconclusive,
-	{33, 14}: AnvlSkip,
-	{33, 15}: AnvlSkip,
-	{34, 1}:  AnvlSkip,
-	{34, 2}:  AnvlSkip,
+	{33, 14}: AnvlSkip, // Router test but this is the host suite.
+	{33, 15}: AnvlSkip, // Router test but this is the host suite.
+	{34, 1}:  AnvlSkip, // Router test but this is the host suite.
+	{34, 2}:  AnvlSkip, // Router test but this is the host suite.
 	{35, 1}:  Pass,
 	{35, 2}:  Pass,
 	{35, 3}:  Pass,

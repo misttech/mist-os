@@ -36,30 +36,30 @@ var tcpAdvancedV6Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseN
 	{8, 21}:  Fail,
 	{8, 22}:  Fail,
 	{8, 23}:  Fail,
-	{9, 1}:   AnvlSkip,
-	{9, 2}:   AnvlSkip,
-	{10, 2}:  AnvlSkip,
-	{10, 17}: AnvlSkip,
-	{10, 18}: AnvlSkip,
-	{10, 19}: AnvlSkip,
-	{10, 20}: AnvlSkip,
-	{11, 17}: AnvlSkip,
-	{12, 2}:  AnvlSkip,
-	{12, 17}: AnvlSkip,
-	{13, 1}:  AnvlSkip,
-	{14, 17}: Skip, // TODO(https://fxbug.dev/400788238): ANVL exits with abnormal code.
-	{14, 19}: Skip, // TODO(https://fxbug.dev/400788238): ANVL exits with abnormal code.
+	{9, 1}:   AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{9, 2}:   AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 2}:  AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 17}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 18}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 19}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 20}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{11, 17}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{12, 2}:  AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{12, 17}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{13, 1}:  AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{14, 17}: Skip,     // TODO(https://fxbug.dev/400788238): ANVL exits with abnormal code.
+	{14, 19}: Skip,     // TODO(https://fxbug.dev/400788238): ANVL exits with abnormal code.
 	{14, 20}: Fail,
 	{15, 17}: Fail,
 	{15, 18}: Pass,
 	{15, 19}: Pass,
 	{15, 20}: Pass,
-	{16, 1}:  AnvlSkip,
-	{16, 2}:  AnvlSkip,
-	{16, 3}:  AnvlSkip,
-	{16, 4}:  AnvlSkip,
-	{16, 5}:  AnvlSkip,
-	{16, 6}:  AnvlSkip,
+	{16, 1}:  Flaky, // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 2}:  Flaky, // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 3}:  Flaky, // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 4}:  Flaky, // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 5}:  Flaky, // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 6}:  Flaky, // TODO(https://fxbug.dev/414886191): Fix flakiness.
 	{17, 1}:  Pass,
 	{17, 17}: Pass,
 	{17, 18}: Fail,
@@ -84,47 +84,47 @@ var tcpAdvancedV6ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCa
 	{2, 25}:  Fail,
 	{3, 17}:  Pass,
 	{4, 17}:  Pass,
-	{5, 17}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
-	{5, 18}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
-	{5, 19}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
-	{5, 20}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
-	{5, 21}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
-	{5, 22}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
-	{5, 23}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
+	{5, 17}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
+	{5, 18}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
+	{5, 19}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
+	{5, 20}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
+	{5, 21}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
+	{5, 22}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
+	{5, 23}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
 	{6, 17}:  Pass,
-	{7, 17}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
-	{7, 18}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
-	{8, 17}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
-	{8, 18}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
-	{8, 19}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
-	{8, 20}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
+	{7, 17}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
+	{7, 18}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
+	{8, 17}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
+	{8, 18}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
+	{8, 19}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
+	{8, 20}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
 	{8, 21}:  Fail,
-	{8, 22}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
-	{8, 23}:  Skip, // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER to unskip.
-	{9, 1}:   AnvlSkip,
-	{9, 2}:   AnvlSkip,
-	{10, 2}:  AnvlSkip,
-	{10, 17}: AnvlSkip,
-	{10, 18}: AnvlSkip,
-	{10, 19}: AnvlSkip,
-	{10, 20}: AnvlSkip,
-	{11, 17}: AnvlSkip,
-	{12, 2}:  AnvlSkip,
-	{12, 17}: AnvlSkip,
-	{13, 1}:  AnvlSkip,
-	{14, 17}: Skip, // TODO(https://fxbug.dev/400788238): ANVL exits with abnormal code.
+	{8, 22}:  Skip,     // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
+	{8, 23}:  Skip,     // TODO(https://fxbug.dev/42095226): Implement IP_MTU_DISCOVER.
+	{9, 1}:   AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{9, 2}:   AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 2}:  AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 17}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 18}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 19}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 20}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{11, 17}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{12, 2}:  AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{12, 17}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{13, 1}:  AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{14, 17}: Skip,     // TODO(https://fxbug.dev/400788238): ANVL exits with abnormal code.
 	{14, 19}: Pass,
 	{14, 20}: Fail,
 	{15, 17}: Fail,
 	{15, 18}: Pass,
 	{15, 19}: Pass,
 	{15, 20}: Pass,
-	{16, 1}:  AnvlSkip,
-	{16, 2}:  AnvlSkip,
-	{16, 3}:  AnvlSkip,
-	{16, 4}:  AnvlSkip,
-	{16, 5}:  AnvlSkip,
-	{16, 6}:  AnvlSkip,
+	{16, 1}:  Flaky, // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 2}:  Flaky, // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 3}:  Flaky, // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 4}:  Flaky, // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 5}:  Flaky, // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 6}:  Flaky, // TODO(https://fxbug.dev/414886191): Fix flakiness.
 	{17, 1}:  Fail,
 	{17, 17}: Pass,
 	{17, 18}: Fail,

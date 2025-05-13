@@ -7,26 +7,23 @@ package expectation
 import "go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/expectation/outcome"
 
 var ipv6AutoconfigExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
-	{1, 1}: Pass,
-	{1, 2}: Pass,
-	{1, 3}: Pass,
-	{1, 4}: Pass,
-	{1, 5}: Pass,
-	{2, 1}: Pass,
-	// Skipped due to lack of support for setting DAD transmits.
-	{2, 2}: Skip,
-	{2, 3}: Pass,
-	// Skipped due to lack of support for setting DAD transmits.
-	{3, 1}: Skip,
-	{3, 2}: AnvlSkip,
-	{3, 3}: Pass,
-	{3, 4}: Pass,
-	{3, 5}: Pass,
-	{4, 1}: Pass,
-	{4, 2}: Pass,
-	// Skipped due to lack of support for setting DAD transmits.
-	{5, 1}:  Skip,
-	{5, 2}:  AnvlSkip,
+	{1, 1}:  Pass,
+	{1, 2}:  Pass,
+	{1, 3}:  Pass,
+	{1, 4}:  Pass,
+	{1, 5}:  Pass,
+	{2, 1}:  Pass,
+	{2, 2}:  Skip, // Skipped due to lack of support for setting DAD transmits.
+	{2, 3}:  Pass,
+	{3, 1}:  Skip,     // Skipped due to lack of support for setting DAD transmits.
+	{3, 2}:  AnvlSkip, // TODO(https://fxbug.dev/416093959): Need router version of this suite.
+	{3, 3}:  Pass,
+	{3, 4}:  Pass,
+	{3, 5}:  Pass,
+	{4, 1}:  Pass,
+	{4, 2}:  Pass,
+	{5, 1}:  Skip, // Skipped due to lack of support for setting DAD transmits.
+	{5, 2}:  Pass,
 	{5, 3}:  Pass,
 	{5, 4}:  Pass,
 	{6, 1}:  Pass,
@@ -59,14 +56,14 @@ var ipv6AutoconfigExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlC
 	{2, 2}:  Fail,
 	{2, 3}:  Pass,
 	{3, 1}:  Pass,
-	{3, 2}:  AnvlSkip,
+	{3, 2}:  AnvlSkip, // TODO(https://fxbug.dev/416093959): Need router version of this suite.
 	{3, 3}:  Pass,
 	{3, 4}:  Pass,
 	{3, 5}:  Fail,
 	{4, 1}:  Pass,
 	{4, 2}:  Pass,
 	{5, 1}:  Pass,
-	{5, 2}:  AnvlSkip,
+	{5, 2}:  Pass,
 	{5, 3}:  Pass,
 	{5, 4}:  Pass,
 	{6, 1}:  Pass,

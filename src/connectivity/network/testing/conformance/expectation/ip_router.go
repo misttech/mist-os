@@ -15,9 +15,9 @@ var ipRouterExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber
 	{2, 2}:  Pass,
 	{2, 3}:  Pass,
 	{2, 4}:  Pass,
-	{3, 1}:  AnvlSkip,
-	{3, 2}:  AnvlSkip,
-	{3, 3}:  AnvlSkip,
+	{3, 1}:  AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
+	{3, 2}:  AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
+	{3, 3}:  AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{3, 4}:  Pass,
 	{3, 5}:  Pass,
 	{3, 6}:  Pass,
@@ -33,21 +33,21 @@ var ipRouterExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber
 	{5, 2}:  Pass,
 	{5, 3}:  Fail,
 	{5, 4}:  Fail,
-	{5, 5}:  AnvlSkip,
+	{5, 5}:  AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{5, 6}:  Pass,
 	{5, 7}:  Inconclusive,
 	{5, 8}:  Fail,
 	{5, 9}:  Inconclusive,
 	{5, 10}: Inconclusive,
 	{5, 11}: Fail,
-	{5, 12}: AnvlSkip,
+	{5, 12}: AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{5, 13}: Pass,
 	{5, 14}: Pass,
 	{5, 15}: Inconclusive,
 	{5, 16}: Inconclusive,
 	{5, 17}: Inconclusive,
 	{5, 18}: Pass,
-	{5, 19}: AnvlSkip,
+	{5, 19}: AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{5, 20}: Pass,
 	{5, 21}: Pass,
 	{5, 22}: Inconclusive,
@@ -55,9 +55,9 @@ var ipRouterExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber
 	{5, 24}: Pass,
 	{5, 25}: Inconclusive,
 	{5, 26}: Inconclusive,
-	{5, 27}: AnvlSkip,
+	{5, 27}: AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{5, 28}: Inconclusive,
-	{5, 29}: AnvlSkip,
+	{5, 29}: AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{6, 1}:  Pass,
 	{6, 2}:  Pass,
 	{6, 3}:  Pass,
@@ -68,7 +68,7 @@ var ipRouterExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber
 	{6, 8}:  Pass,
 	{6, 9}:  Pass,
 	{6, 10}: Pass,
-	{6, 11}: AnvlSkip,
+	{6, 11}: AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{6, 12}: Pass,
 	{6, 13}: Fail,
 	{7, 1}:  Pass,
@@ -88,9 +88,9 @@ var ipRouterExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNum
 	{2, 2}:  Pass,
 	{2, 3}:  Pass,
 	{2, 4}:  Pass,
-	{3, 1}:  AnvlSkip,
-	{3, 2}:  AnvlSkip,
-	{3, 3}:  AnvlSkip,
+	{3, 1}:  AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
+	{3, 2}:  AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
+	{3, 3}:  AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{3, 4}:  Pass,
 	{3, 5}:  Pass,
 	{3, 6}:  Pass,
@@ -106,21 +106,21 @@ var ipRouterExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNum
 	{5, 2}:  Pass,
 	{5, 3}:  Fail,
 	{5, 4}:  Fail,
-	{5, 5}:  AnvlSkip,
+	{5, 5}:  AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{5, 6}:  Fail,
 	{5, 7}:  Inconclusive,
 	{5, 8}:  Fail,
 	{5, 9}:  Inconclusive,
 	{5, 10}: Inconclusive,
 	{5, 11}: Fail,
-	{5, 12}: AnvlSkip,
+	{5, 12}: AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{5, 13}: Pass,
 	{5, 14}: Inconclusive,
 	{5, 15}: Inconclusive,
 	{5, 16}: Inconclusive,
 	{5, 17}: Inconclusive,
 	{5, 18}: Pass,
-	{5, 19}: AnvlSkip,
+	{5, 19}: AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{5, 20}: Pass,
 	{5, 21}: Inconclusive,
 	{5, 22}: Inconclusive,
@@ -128,9 +128,9 @@ var ipRouterExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNum
 	{5, 24}: Pass,
 	{5, 25}: Inconclusive,
 	{5, 26}: Inconclusive,
-	{5, 27}: AnvlSkip,
+	{5, 27}: AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{5, 28}: Inconclusive,
-	{5, 29}: AnvlSkip,
+	{5, 29}: AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{6, 1}:  Fail,
 	{6, 2}:  Fail,
 	{6, 3}:  Fail,
@@ -141,7 +141,7 @@ var ipRouterExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNum
 	{6, 8}:  Fail,
 	{6, 9}:  Inconclusive,
 	{6, 10}: Inconclusive,
-	{6, 11}: AnvlSkip,
+	{6, 11}: AnvlSkip, // TODO(https://fxbug.dev/42095222): Support configuring MTU.
 	{6, 12}: Inconclusive,
 	{6, 13}: Fail,
 	{7, 1}:  Pass,

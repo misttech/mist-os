@@ -44,7 +44,7 @@ var tcpcorev6Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumbe
 	{3, 22}: Pass,
 	{3, 23}: Pass,
 	{4, 1}:  Pass,
-	{4, 17}: AnvlSkip,
+	{4, 17}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{4, 20}: Pass,
 	{4, 21}: Pass,
 	{4, 22}: Fail,
@@ -129,13 +129,13 @@ var tcpcorev6Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumbe
 	{12, 17}: Skip,
 	// TODO(https://fxbug.dev/42181094): Figure out why ANVL crashes.
 	{12, 18}: Skip,
-	{12, 19}: AnvlSkip,
-	{12, 20}: AnvlSkip,
+	{12, 19}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{12, 20}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{12, 21}: Pass,
-	{12, 22}: AnvlSkip,
+	{12, 22}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{12, 23}: Pass,
-	{12, 24}: AnvlSkip,
-	{12, 25}: AnvlSkip,
+	{12, 24}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{12, 25}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{12, 26}: Pass,
 	{12, 27}: Fail,
 	{12, 28}: Pass,
@@ -154,8 +154,8 @@ var tcpcorev6Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumbe
 	{13, 21}: Pass,
 	{14, 19}: Pass,
 	{14, 20}: Pass,
-	{15, 20}: AnvlSkip,
-	{15, 21}: AnvlSkip,
+	{15, 20}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{15, 21}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{15, 22}: Pass,
 	{15, 24}: Pass,
 	{15, 25}: Pass,
@@ -163,7 +163,7 @@ var tcpcorev6Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumbe
 	{15, 27}: Fail,
 	{15, 28}: Fail,
 	{15, 29}: Pass,
-	{15, 30}: AnvlSkip,
+	{15, 30}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{16, 17}: Pass,
 	{16, 18}: Pass,
 	{16, 19}: Pass,
@@ -176,21 +176,21 @@ var tcpcorev6Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumbe
 	{17, 20}: Pass,
 	{18, 17}: Pass,
 	{18, 21}: Pass,
-	{19, 17}: Fail,
-	{19, 20}: Fail,
-	{19, 21}: AnvlSkip,
-	{19, 22}: AnvlSkip,
-	{19, 23}: AnvlSkip,
+	{19, 17}: Skip, // Tests setting Urgent pointer on send which is obsolete.
+	{19, 20}: Skip, // Tests a clause in RFC 1122 that was removed in RFC 9293.
+	{19, 21}: Skip, // Tests setting Urgent pointer on send which is obsolete.
+	{19, 22}: Skip, // Tests a clause in RFC 793 that was removed in RFC 9293.
+	{19, 23}: Skip, // Tests setting Urgent pointer on send which is obsolete.
 	{20, 17}: Pass,
 	{20, 18}: Pass,
 	{20, 19}: Pass,
 	{20, 20}: Pass,
 	{23, 1}:  Pass,
 	{23, 2}:  Pass,
-	{23, 3}:  AnvlSkip,
+	{23, 3}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{23, 4}:  Pass,
-	{23, 5}:  AnvlSkip,
-	{23, 6}:  AnvlSkip,
+	{23, 5}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{23, 6}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 }
 
 var tcpcorev6ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
@@ -231,7 +231,7 @@ var tcpcorev6ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNu
 	{3, 22}: Fail,
 	{3, 23}: Fail,
 	{4, 1}:  Pass,
-	{4, 17}: AnvlSkip,
+	{4, 17}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{4, 20}: Pass,
 	{4, 21}: Pass,
 	{4, 22}: Fail,
@@ -316,13 +316,13 @@ var tcpcorev6ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNu
 	{12, 17}: Skip,
 	// TODO(https://fxbug.dev/42181094): Figure out why ANVL crashes.
 	{12, 18}: Skip,
-	{12, 19}: AnvlSkip,
-	{12, 20}: AnvlSkip,
+	{12, 19}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{12, 20}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{12, 21}: Pass,
-	{12, 22}: AnvlSkip,
+	{12, 22}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{12, 23}: Pass,
-	{12, 24}: AnvlSkip,
-	{12, 25}: AnvlSkip,
+	{12, 24}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{12, 25}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{12, 26}: Pass,
 	{12, 27}: Pass,
 	{12, 28}: Pass,
@@ -341,8 +341,8 @@ var tcpcorev6ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNu
 	{13, 21}: Pass,
 	{14, 19}: Pass,
 	{14, 20}: Pass,
-	{15, 20}: AnvlSkip,
-	{15, 21}: AnvlSkip,
+	{15, 20}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{15, 21}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{15, 22}: Pass,
 	{15, 24}: Pass,
 	{15, 25}: Pass,
@@ -350,7 +350,7 @@ var tcpcorev6ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNu
 	{15, 27}: Fail,
 	{15, 28}: Flaky,
 	{15, 29}: Flaky,
-	{15, 30}: AnvlSkip,
+	{15, 30}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{16, 17}: Pass,
 	{16, 18}: Pass,
 	{16, 19}: Fail,
@@ -363,19 +363,19 @@ var tcpcorev6ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNu
 	{17, 20}: Pass,
 	{18, 17}: Pass,
 	{18, 21}: Pass,
-	{19, 17}: Fail,
-	{19, 20}: Fail,
-	{19, 21}: AnvlSkip,
-	{19, 22}: AnvlSkip,
-	{19, 23}: AnvlSkip,
+	{19, 17}: Skip, // Tests setting Urgent pointer on send which is obsolete.
+	{19, 20}: Skip, // Tests a clause in RFC 1122 that was removed in RFC 9293.
+	{19, 21}: Skip, // Tests setting Urgent pointer on send which is obsolete.
+	{19, 22}: Skip, // Tests a clause in RFC 793 that was removed in RFC 9293.
+	{19, 23}: Skip, // Tests setting Urgent pointer on send which is obsolete.
 	{20, 17}: Pass,
 	{20, 18}: Pass,
 	{20, 19}: Pass,
 	{20, 20}: Pass,
 	{23, 1}:  Pass,
 	{23, 2}:  Pass,
-	{23, 3}:  AnvlSkip,
+	{23, 3}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{23, 4}:  Pass,
-	{23, 5}:  AnvlSkip,
-	{23, 6}:  AnvlSkip,
+	{23, 5}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{23, 6}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 }

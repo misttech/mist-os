@@ -18,9 +18,9 @@ var udpV6Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]ou
 	{2, 8}:  Pass,
 	{2, 9}:  Pass,
 	{2, 10}: Pass,
-	{2, 11}: AnvlSkip,
-	{2, 12}: AnvlSkip,
-	{2, 13}: AnvlSkip,
+	{2, 11}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{2, 12}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{2, 13}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{3, 1}:  Pass,
 	{3, 2}:  Pass,
 	{3, 3}:  Pass,
@@ -30,17 +30,17 @@ var udpV6Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]ou
 	{3, 7}:  Pass,
 	{3, 8}:  Pass,
 	{4, 1}:  Fail,
-	{5, 1}:  AnvlSkip,
+	{5, 1}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{5, 2}:  Fail,
 	{5, 3}:  Pass,
-	{6, 3}:  AnvlSkip,
-	{6, 6}:  AnvlSkip,
+	{6, 3}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{6, 6}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{7, 1}:  Pass,
 	{7, 3}:  Pass,
 	{8, 1}:  Pass,
-	{8, 2}:  AnvlSkip,
+	{8, 2}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{9, 1}:  Pass,
-	{9, 2}:  AnvlSkip,
+	{9, 2}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{10, 1}: Fail,
 }
 
@@ -56,9 +56,9 @@ var udpV6ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber
 	{2, 8}:  Pass,
 	{2, 9}:  Pass,
 	{2, 10}: Pass,
-	{2, 11}: AnvlSkip,
-	{2, 12}: AnvlSkip,
-	{2, 13}: AnvlSkip,
+	{2, 11}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{2, 12}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{2, 13}: AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{3, 1}:  Pass,
 	{3, 2}:  Pass,
 	{3, 3}:  Pass,
@@ -68,16 +68,16 @@ var udpV6ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber
 	{3, 7}:  Pass,
 	{3, 8}:  Pass,
 	{4, 1}:  Fail,
-	{5, 1}:  AnvlSkip,
+	{5, 1}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{5, 2}:  Fail,
 	{5, 3}:  Pass,
-	{6, 3}:  AnvlSkip,
-	{6, 6}:  AnvlSkip,
+	{6, 3}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
+	{6, 6}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{7, 1}:  Pass,
 	{7, 3}:  Pass,
 	{8, 1}:  Pass,
-	{8, 2}:  AnvlSkip,
+	{8, 2}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{9, 1}:  Pass,
-	{9, 2}:  AnvlSkip,
+	{9, 2}:  AnvlSkip, // IPv4 test, but this is the IPv6 suite.
 	{10, 1}: Fail,
 }
