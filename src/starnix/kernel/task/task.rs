@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::memory_attribution::MemoryAttributionLifecycleEvent;
-use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor};
+use crate::mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor};
 use crate::mutable_state::{state_accessor, state_implementation};
 use crate::security;
 use crate::signals::{KernelSignal, RunState, SignalInfo, SignalState};
@@ -18,19 +18,14 @@ use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
 use macro_rules_attribute::apply;
 use starnix_logging::{log_warn, set_current_task_info, set_zx_name};
-use starnix_sync::{LockBefore, Locked, MmDumpable, Mutex, RwLock, RwLockWriteGuard, TaskRelease};
+use starnix_sync::{Locked, Mutex, RwLock, RwLockWriteGuard, TaskRelease};
 use starnix_types::ownership::{
     OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef,
 };
 use starnix_types::stats::TaskTimeStats;
-use starnix_uapi::auth::{
-    Credentials, FsCred, PtraceAccessMode, CAP_KILL, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,
-    PTRACE_MODE_REALCREDS,
-};
+use starnix_uapi::auth::{Credentials, FsCred};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::signals::{
-    sigaltstack_contains_pointer, SigSet, Signal, UncheckedSignal, SIGCONT,
-};
+use starnix_uapi::signals::{sigaltstack_contains_pointer, SigSet, Signal};
 use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
@@ -1292,83 +1287,6 @@ impl Task {
         Ok(())
     }
 
-    // See "Ptrace access mode checking" in https://man7.org/linux/man-pages/man2/ptrace.2.html
-    pub fn check_ptrace_access_mode<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        mode: PtraceAccessMode,
-        target: &Task,
-    ) -> Result<(), Errno>
-    where
-        L: LockBefore<MmDumpable>,
-    {
-        // (1)  If the calling thread and the target thread are in the same
-        //      thread group, access is always allowed.
-        if self.thread_group().leader == target.thread_group().leader {
-            return Ok(());
-        }
-
-        // (2)  If the access mode specifies PTRACE_MODE_FSCREDS, then, for
-        //      the check in the next step, employ the caller's filesystem
-        //      UID and GID.  (As noted in credentials(7), the filesystem
-        //      UID and GID almost always have the same values as the
-        //      corresponding effective IDs.)
-        //
-        //      Otherwise, the access mode specifies PTRACE_MODE_REALCREDS,
-        //      so use the caller's real UID and GID for the checks in the
-        //      next step.  (Most APIs that check the caller's UID and GID
-        //      use the effective IDs.  For historical reasons, the
-        //      PTRACE_MODE_REALCREDS check uses the real IDs instead.)
-        let creds = self.creds();
-        let (uid, gid) = if mode.contains(PTRACE_MODE_FSCREDS) {
-            let fscred = creds.as_fscred();
-            (fscred.uid, fscred.gid)
-        } else if mode.contains(PTRACE_MODE_REALCREDS) {
-            (creds.uid, creds.gid)
-        } else {
-            unreachable!();
-        };
-
-        // (3)  Deny access if neither of the following is true:
-        //
-        //      -  The real, effective, and saved-set user IDs of the target
-        //         match the caller's user ID, and the real, effective, and
-        //         saved-set group IDs of the target match the caller's
-        //         group ID.
-        //
-        //      -  The caller has the CAP_SYS_PTRACE capability in the user
-        //         namespace of the target.
-        let target_creds = target.creds();
-        if !(target_creds.uid == uid
-            && target_creds.euid == uid
-            && target_creds.saved_uid == uid
-            && target_creds.gid == gid
-            && target_creds.egid == gid
-            && target_creds.saved_gid == gid)
-        {
-            security::check_task_capable(self, CAP_SYS_PTRACE)?;
-        }
-
-        // (4)  Deny access if the target process "dumpable" attribute has a
-        //      value other than 1 (SUID_DUMP_USER; see the discussion of
-        //      PR_SET_DUMPABLE in prctl(2)), and the caller does not have
-        //      the CAP_SYS_PTRACE capability in the user namespace of the
-        //      target process.
-        let dumpable = *target.mm().ok_or_else(|| errno!(EINVAL))?.dumpable.lock(locked);
-        if dumpable != DumpPolicy::User {
-            security::check_task_capable(self, CAP_SYS_PTRACE)?;
-        }
-
-        // TODO: Implement the LSM security_ptrace_access_check() interface.
-        //
-        // (5)  The kernel LSM security_ptrace_access_check() interface is
-        //      invoked to see if ptrace access is permitted.
-
-        // (6)  If access has not been denied by any of the preceding steps,
-        //      then access is allowed.
-        Ok(())
-    }
-
     /// Signals the vfork event, if any, to unblock waiters.
     pub fn signal_vfork(&self) {
         if let Some(event) = &self.vfork_event {
@@ -1472,34 +1390,6 @@ impl Task {
 
     pub fn as_fscred(&self) -> FsCred {
         self.creds().as_fscred()
-    }
-
-    pub fn can_signal(
-        &self,
-        target: &Task,
-        unchecked_signal: UncheckedSignal,
-    ) -> Result<(), Errno> {
-        // If both the tasks share a thread group the signal can be sent. This is not documented
-        // in kill(2) because kill does not support task-level granularity in signal sending.
-        if self.thread_group == target.thread_group {
-            return Ok(());
-        }
-
-        let self_creds = self.creds();
-
-        if self_creds.has_same_uid(&target.creds()) {
-            return Ok(());
-        }
-
-        if Signal::try_from(unchecked_signal) == Ok(SIGCONT) {
-            let target_session = target.thread_group().read().process_group.session.leader;
-            let self_session = self.thread_group().read().process_group.session.leader;
-            if target_session == self_session {
-                return Ok(());
-            }
-        }
-
-        security::check_task_capable(self, CAP_KILL)
     }
 
     /// Interrupts the current task.

@@ -33,7 +33,7 @@ impl KernelState {
     }
 }
 
-/// Opaque structure encapsulating security state for a `ThreadGroup`.
+/// Opaque structure encapsulating active security state for a `Task`.
 #[derive(Debug)]
 pub struct TaskState(Mutex<selinux_hooks::TaskAttrs>);
 

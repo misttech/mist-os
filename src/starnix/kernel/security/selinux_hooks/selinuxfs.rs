@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://github.com/rust-lang/rust/issues/39371): remove
-#![allow(non_upper_case_globals)]
-
-use super::{check_permission, superblock};
+use super::{check_permission, superblock, task_effective_sid};
 
 use crate::task::CurrentTask;
 use crate::vfs::FileHandle;
@@ -65,7 +62,7 @@ pub(in crate::security) fn selinuxfs_check_access(
     current_task: &CurrentTask,
     permission: SecurityPermission,
 ) -> Result<(), Errno> {
-    let source_sid = current_task.security_state.lock().current_sid;
+    let source_sid = task_effective_sid(current_task);
     let target_sid = SecurityId::initial(InitialSid::Security);
     let permission_check = security_server.as_permission_check();
     check_permission(

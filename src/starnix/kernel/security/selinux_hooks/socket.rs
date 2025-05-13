@@ -4,7 +4,9 @@
 
 use super::audit::Auditable;
 use super::fs_node::compute_new_fs_node_sid;
-use super::{check_permission, fs_node_effective_sid_and_class, todo_check_permission};
+use super::{
+    check_permission, fs_node_effective_sid_and_class, task_effective_sid, todo_check_permission,
+};
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::socket::{
     NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketPeer, SocketProtocol,
@@ -177,7 +179,7 @@ pub(in crate::security) fn check_socket_create_access(
         return Ok(());
     }
 
-    let current_sid = current_task.security_state.lock().current_sid;
+    let effective_sid = task_effective_sid(current_task);
     let new_socket_class = compute_socket_security_class(domain, socket_type, protocol);
     let new_socket_sid = compute_new_fs_node_sid(
         security_server,
@@ -194,7 +196,7 @@ pub(in crate::security) fn check_socket_create_access(
     has_socket_permission_for_sid(
         &security_server.as_permission_check(),
         current_task.kernel(),
-        current_sid,
+        effective_sid,
         new_socket_sid,
         CommonFsNodePermission::Create.for_class(new_socket_class),
         current_task.into(),
@@ -221,7 +223,7 @@ pub(in crate::security) fn check_socket_bind_access(
         return Ok(());
     };
 
-    let current_sid = current_task.security_state.lock().current_sid;
+    let current_sid = task_effective_sid(current_task);
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
         panic!("check_socket_bind_access called for non-Socket class")
     };
@@ -254,7 +256,7 @@ pub(in crate::security) fn check_socket_connect_access(
         return Ok(());
     };
 
-    let current_sid = current_task.security_state.lock().current_sid;
+    let current_sid = task_effective_sid(current_task);
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
         panic!("check_socket_connect_access called for non-Socket class")
     };
@@ -286,7 +288,7 @@ pub(in crate::security) fn check_socket_listen_access(
         return Ok(());
     };
 
-    let current_sid = current_task.security_state.lock().current_sid;
+    let current_sid = task_effective_sid(current_task);
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
         panic!("check_socket_listen_access called for non-Socket class")
     };
@@ -317,7 +319,7 @@ pub(in crate::security) fn check_socket_getsockopt_access(
         );
         return Ok(());
     };
-    let current_sid = current_task.security_state.lock().current_sid;
+    let current_sid = task_effective_sid(current_task);
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
         panic!("check_socket_getsockopt_access called for non-Socket class")
     };
@@ -348,7 +350,7 @@ pub(in crate::security) fn check_socket_setsockopt_access(
         );
         return Ok(());
     };
-    let current_sid = current_task.security_state.lock().current_sid;
+    let current_sid = task_effective_sid(current_task);
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
         panic!("check_socket_setsockopt_access called for non-Socket class")
     };
@@ -379,7 +381,7 @@ pub(in crate::security) fn check_socket_shutdown_access(
         return Ok(());
     };
 
-    let current_sid = current_task.security_state.lock().current_sid;
+    let current_sid = task_effective_sid(current_task);
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
         panic!("check_socket_shutdown_access called for non-Socket class")
     };
@@ -494,7 +496,7 @@ mod tests {
                 let task_sid = security_server
                     .security_context_to_sid(b"u:object_r:test_socket_create_yes_t:s0".into())
                     .expect("invalid security context");
-                current_task.security_state.lock().current_sid = task_sid;
+                current_task.security_state.lock().effective_sid = task_sid;
 
                 let socket_node = new_socket_file(
                     locked,
@@ -522,7 +524,7 @@ mod tests {
                 let task_sid = security_server
                     .security_context_to_sid(b"u:object_r:test_socket_create_yes_t:s0".into())
                     .expect("invalid security context");
-                current_task.security_state.lock().current_sid = task_sid;
+                current_task.security_state.lock().effective_sid = task_sid;
 
                 assert_matches!(
                     new_socket_file(
@@ -547,7 +549,7 @@ mod tests {
                 let task_sid = security_server
                     .security_context_to_sid(b"u:object_r:test_socket_create_no_t:s0".into())
                     .expect("invalid security context");
-                current_task.security_state.lock().current_sid = task_sid;
+                current_task.security_state.lock().effective_sid = task_sid;
 
                 assert_matches!(new_socket_file(
                     locked,

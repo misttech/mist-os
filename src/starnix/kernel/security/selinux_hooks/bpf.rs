@@ -5,7 +5,9 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use super::{check_permission, check_self_permission, BpfMapState, BpfProgState};
+use super::{
+    check_permission, check_self_permission, task_effective_sid, BpfMapState, BpfProgState,
+};
 
 use crate::bpf::program::Program;
 use crate::bpf::BpfMap;
@@ -19,13 +21,13 @@ use zerocopy::FromBytes;
 /// Returns the security state to be assigned to a BPF map. This is defined as the security
 /// context of the creating task.
 pub(in crate::security) fn bpf_map_alloc(current_task: &CurrentTask) -> BpfMapState {
-    BpfMapState { sid: current_task.security_state.lock().current_sid }
+    BpfMapState { sid: task_effective_sid(current_task) }
 }
 
 /// Returns the security state to be assigned to a BPF program. This is defined as the
 /// security context of the creating task.
 pub(in crate::security) fn bpf_prog_alloc(current_task: &CurrentTask) -> BpfProgState {
-    BpfProgState { sid: current_task.security_state.lock().current_sid }
+    BpfProgState { sid: task_effective_sid(current_task) }
 }
 
 /// Returns whether `current_task` can perform the bpf `cmd`.
@@ -38,7 +40,7 @@ pub(in crate::security) fn check_bpf_access<Attr: FromBytes>(
 ) -> Result<(), Errno> {
     let audit_context = current_task.into();
 
-    let sid: SecurityId = current_task.security_state.lock().current_sid;
+    let sid: SecurityId = task_effective_sid(current_task);
     let permission = match cmd {
         bpf_cmd_BPF_MAP_CREATE => BpfPermission::MapCreate,
         bpf_cmd_BPF_PROG_LOAD => BpfPermission::ProgLoad,
@@ -64,7 +66,7 @@ pub(in crate::security) fn check_bpf_map_access(
 ) -> Result<(), Errno> {
     let audit_context = current_task.into();
 
-    let subject_sid = current_task.security_state.lock().current_sid;
+    let subject_sid = task_effective_sid(current_task);
     let mut permissions = Vec::new();
     if flags.contains(PermissionFlags::READ) {
         permissions.push(BpfPermission::MapRead);
@@ -94,7 +96,7 @@ pub fn check_bpf_prog_access(
 ) -> Result<(), Errno> {
     let audit_context = current_task.into();
 
-    let subject_sid = current_task.security_state.lock().current_sid;
+    let subject_sid = task_effective_sid(current_task);
     check_permission(
         &security_server.as_permission_check(),
         current_task.kernel(),

@@ -740,16 +740,12 @@ pub fn task_alloc_for_kernel() -> TaskState {
     TaskState(selinux_hooks::TaskAttrs::for_kernel().into())
 }
 
-/// Returns `TaskState` for a new `Task`, based on that of `task`, and the specified clone flags.
+/// Returns `TaskState` for a new `Task`, based on that of `current_task`, and the specified clone
+/// flags.
 /// Corresponds to the `task_alloc()` LSM hook.
-pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
+pub fn task_alloc(current_task: &CurrentTask, clone_flags: u64) -> TaskState {
     track_hook_duration!(c"security.hooks.task_alloc");
-    let attrs = if task.kernel().security_state.state.is_some() {
-        selinux_hooks::task::task_alloc(&task, clone_flags)
-    } else {
-        selinux_hooks::TaskAttrs::for_selinux_disabled()
-    };
-    TaskState(attrs.into())
+    TaskState(selinux_hooks::task::task_alloc(current_task, clone_flags).into())
 }
 
 /// Labels an [`crate::vfs::FsNode`], by attaching a pseudo-label to the `fs_node`, which allows
@@ -800,17 +796,17 @@ pub fn task_get_context(current_task: &CurrentTask, target: &Task) -> Result<Vec
 /// Assesses if a task has all of the given capabilities.
 /// Corresponds to the `capable()` LSM hook.
 pub fn is_task_capable_noaudit(
-    task: &Task,
+    current_task: &CurrentTask,
     capabilities: starnix_uapi::auth::Capabilities,
 ) -> bool {
     track_hook_duration!(c"security.hooks.is_task_capable_noaudit");
-    return task.creds().has_capability(capabilities)
+    return current_task.creds().has_capability(capabilities)
         && if_selinux_else(
-            task,
+            current_task,
             |security_server| {
                 selinux_hooks::task::is_task_capable_noaudit(
                     &security_server.as_permission_check(),
-                    &task,
+                    &current_task,
                     capabilities,
                 )
             },
@@ -821,17 +817,17 @@ pub fn is_task_capable_noaudit(
 /// Checks if a task has all of the given capabilities.
 /// Corresponds to the `capable()` LSM hook.
 pub fn check_task_capable(
-    task: &Task,
+    current_task: &CurrentTask,
     capabilities: starnix_uapi::auth::Capabilities,
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_task_capable");
-    if !task.creds().has_capability(capabilities) {
+    if !current_task.creds().has_capability(capabilities) {
         return error!(EPERM);
     }
-    if_selinux_else_default_ok(task, |security_server| {
+    if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::task::check_task_capable(
             &security_server.as_permission_check(),
-            &task,
+            &current_task,
             capabilities,
         )
     })
@@ -1824,11 +1820,12 @@ mod tests {
             let target_sid = SecurityId::initial(InitialSid::Unlabeled);
             let elf_state = ResolvedElfState { sid: Some(target_sid) };
 
-            assert!(current_task.security_state.lock().current_sid != target_sid);
+            assert!(selinux_hooks::task_effective_sid(current_task) != target_sid);
 
-            let before_hook_sid = current_task.security_state.lock().current_sid;
+            let before_hook_sid = selinux_hooks::task_effective_sid(current_task);
             update_state_on_exec(current_task, &elf_state);
-            assert_eq!(current_task.security_state.lock().current_sid, before_hook_sid);
+            assert_eq!(selinux_hooks::task_effective_sid(current_task), before_hook_sid);
+            assert_eq!(current_task.security_state.lock().current_sid, before_hook_sid)
         })
     }
 
@@ -1840,7 +1837,7 @@ mod tests {
             let initial_state = current_task.security_state.lock().clone();
             let elf_sid = SecurityId::initial(InitialSid::Unlabeled);
             let elf_state = ResolvedElfState { sid: Some(elf_sid) };
-            assert_ne!(elf_sid, initial_state.current_sid);
+            assert_ne!(elf_sid, selinux_hooks::task_effective_sid(current_task));
             update_state_on_exec(current_task, &elf_state);
             assert_eq!(*current_task.security_state.lock(), initial_state);
         })
@@ -1857,8 +1854,9 @@ mod tests {
                     .security_context_to_sid(b"u:object_r:fork_no_t:s0".into())
                     .expect("invalid security context");
                 let elf_state = ResolvedElfState { sid: Some(elf_sid) };
-                assert_ne!(elf_sid, initial_state.current_sid);
+                assert_ne!(elf_sid, selinux_hooks::task_effective_sid(current_task));
                 update_state_on_exec(current_task, &elf_state);
+                assert_eq!(selinux_hooks::task_effective_sid(current_task), elf_sid);
                 assert_eq!(current_task.security_state.lock().current_sid, elf_sid);
             },
         )

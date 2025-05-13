@@ -27,7 +27,7 @@ use selinux::{
     InitialSid, KernelPermission, ProcessPermission, SecurityId, SecurityServer,
 };
 use starnix_logging::{bug_ref, track_stub, BugRef};
-use starnix_sync::Mutex;
+use starnix_sync::{Mutex, MutexGuard};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::error;
@@ -521,6 +521,10 @@ pub(super) struct TaskAttrs {
     /// Current SID for the task.
     pub current_sid: SecurityId,
 
+    /// Effective SID for the task. This is usually equal to |current_sid|, but this may be changed
+    /// internally for the current task. This should only be accessed for the running task.
+    effective_sid: SecurityId,
+
     /// SID for the task upon the next execve call.
     pub exec_sid: Option<SecurityId>,
 
@@ -552,6 +556,7 @@ impl TaskAttrs {
     pub(super) fn for_sid(sid: SecurityId) -> Self {
         Self {
             current_sid: sid,
+            effective_sid: sid,
             previous_sid: sid,
             exec_sid: None,
             fscreate_sid: None,
@@ -559,6 +564,28 @@ impl TaskAttrs {
             sockcreate_sid: None,
         }
     }
+
+    /// Sets the current SID and resets the effective SID to match.
+    pub(super) fn set_current_sid(&mut self, sid: SecurityId) {
+        self.current_sid = sid;
+        self.effective_sid = sid
+    }
+}
+
+/// Returns the effective SID of a task, i.e. the one that should be used for all checks where the
+/// task is the active entity.
+pub(in crate::security) fn task_effective_sid(current_task: &CurrentTask) -> SecurityId {
+    current_task.security_state.lock().effective_sid
+}
+
+/// Returns the SID of a task. Panics if the current and effective SID are not consistent. This
+/// should be used for operations that do not make sense under an assumed identity.
+pub(in crate::security) fn task_consistent_attrs(
+    current_task: &CurrentTask,
+) -> MutexGuard<'_, TaskAttrs> {
+    let task_attrs = current_task.security_state.lock();
+    assert_eq!(task_attrs.effective_sid, task_attrs.current_sid);
+    task_attrs
 }
 
 /// Security state for a [`crate::vfs::FileObject`] instance. This currently just holds the SID
