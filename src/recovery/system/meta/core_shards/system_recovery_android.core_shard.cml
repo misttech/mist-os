@@ -35,5 +35,10 @@
             to: "#system_recovery",
             subdir: "sys/platform",
         },
+        {
+            directory: "build-info",
+            from: "parent",
+            to: "#system_recovery",
+        },
     ],
 }

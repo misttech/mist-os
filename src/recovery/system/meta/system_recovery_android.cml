@@ -19,5 +19,11 @@
                 "fuchsia.paver.Paver",
             ],
         },
+        {
+            directory: "build-info",
+            from: "parent",
+            rights: [ "r*" ],
+            path: "/config/build-info",
+        },
     ],
 }

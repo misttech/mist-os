@@ -69,6 +69,7 @@ struct RecoveryViewAssistant {
     view_sender: ViewSender,
     font_face: FontFace,
     logo_file: Option<rive_rs::File>,
+    build_info: String,
     scene: Option<Scene>,
     menu: Menu,
     logs: Option<Vec<String>>,
@@ -83,12 +84,20 @@ impl RecoveryViewAssistant {
     fn new(view_key: ViewKey, app_sender: AppSender) -> Result<RecoveryViewAssistant, Error> {
         let font_face = recovery_ui::font::get_default_font_face().clone();
         let logo_file = load_rive(LOGO_IMAGE_PATH).ok();
+        let product = std::fs::read_to_string("/config/build-info/product").unwrap_or_default();
+        let board = std::fs::read_to_string("/config/build-info/board").unwrap_or_default();
+        let product_version =
+            std::fs::read_to_string("/config/build-info/product_version").unwrap_or_default();
+        let platform_version =
+            std::fs::read_to_string("/config/build-info/platform_version").unwrap_or_default();
+        let build_info = format!("{product}/{board}:{product_version}/{platform_version}");
         let menu = Menu::new(menu::MAIN_MENU);
 
         Ok(RecoveryViewAssistant {
             view_sender: ViewSender::new(app_sender, view_key),
             font_face,
             logo_file,
+            build_info,
             scene: None,
             menu,
             logs: None,
@@ -193,7 +202,30 @@ impl ViewAssistant for RecoveryViewAssistant {
                         },
                     );
 
-                    builder.space(size2(size.width, 40.0));
+                    builder.space(size2(size.width, 10.0));
+
+                    builder
+                        .group()
+                        .row()
+                        .max_size()
+                        .cross_align(CrossAxisAlignment::Start)
+                        .contents(|builder| {
+                            builder.space(size2(size.width * 0.1, text_size));
+                            builder.text(
+                                self.font_face.clone(),
+                                &self.build_info,
+                                text_size,
+                                Point::zero(),
+                                TextFacetOptions {
+                                    color: HEADER_COLOR,
+                                    horizontal_alignment: TextHorizontalAlignment::Left,
+                                    max_width: Some(size.width * 0.8),
+                                    ..TextFacetOptions::default()
+                                },
+                            );
+                        });
+
+                    builder.space(size2(size.width, 30.0));
 
                     builder
                         .group()
