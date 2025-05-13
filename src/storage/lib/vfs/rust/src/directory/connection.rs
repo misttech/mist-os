@@ -262,6 +262,11 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             fio::DirectoryRequest::Rename { src: _, dst_parent_token: _, dst: _, responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::DeprecatedSetAttr { flags: _, attributes: _, responder } => {
+                responder.send(Status::NOT_SUPPORTED.into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::SetAttr { flags: _, attributes: _, responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw())?;
             }

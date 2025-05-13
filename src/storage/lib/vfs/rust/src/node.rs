@@ -192,6 +192,11 @@ impl<N: Node> Connection<N> {
                     crate::common::io2_to_io1_attrs(self.node.as_ref(), self.options.rights).await;
                 responder.send(status.into_raw(), &attrs)?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::NodeRequest::DeprecatedSetAttr { flags: _, attributes: _, responder } => {
+                responder.send(Status::BAD_HANDLE.into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::NodeRequest::SetAttr { flags: _, attributes: _, responder } => {
                 responder.send(Status::BAD_HANDLE.into_raw())?;
             }

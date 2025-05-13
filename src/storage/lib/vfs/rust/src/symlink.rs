@@ -136,6 +136,11 @@ impl<T: Symlink> Connection<T> {
                 .await;
                 responder.send(status.into_raw(), &attrs)?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::DeprecatedSetAttr { responder, .. } => {
+                responder.send(Status::ACCESS_DENIED.into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::SymlinkRequest::SetAttr { responder, .. } => {
                 responder.send(Status::ACCESS_DENIED.into_raw())?;
             }

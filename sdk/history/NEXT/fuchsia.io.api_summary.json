@@ -170,6 +170,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/Directory.DeprecatedSetAttr",
+        "strictness": "strict",
+        "ordinal": "4721673413776871238",
+        "direction": "two_way",
+        "request": "fuchsia.io/NodeDeprecatedSetAttrRequest",
+        "response": "fuchsia.io/NodeDeprecatedSetAttrResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/Directory.DeprecatedSetFlags",
         "strictness": "strict",
         "ordinal": "5950864159036794675",
@@ -315,15 +324,6 @@
         "ordinal": "1635123508515392625",
         "direction": "two_way",
         "response": "fuchsia.io/DirectoryRewindResponse"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Directory.SetAttr",
-        "strictness": "strict",
-        "ordinal": "4721673413776871238",
-        "direction": "two_way",
-        "request": "fuchsia.io/NodeSetAttrRequest",
-        "response": "fuchsia.io/NodeSetAttrResponse"
     },
     {
         "kind": "protocol/member",
@@ -784,6 +784,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/File.DeprecatedSetAttr",
+        "strictness": "strict",
+        "ordinal": "4721673413776871238",
+        "direction": "two_way",
+        "request": "fuchsia.io/NodeDeprecatedSetAttrRequest",
+        "response": "fuchsia.io/NodeDeprecatedSetAttrResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/File.DeprecatedSetFlags",
         "strictness": "strict",
         "ordinal": "5950864159036794675",
@@ -945,15 +954,6 @@
         "request": "fuchsia.io/FileSeekRequest",
         "response": "fuchsia.io/File_Seek_Response",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/File.SetAttr",
-        "strictness": "strict",
-        "ordinal": "4721673413776871238",
-        "direction": "two_way",
-        "request": "fuchsia.io/NodeSetAttrRequest",
-        "response": "fuchsia.io/NodeSetAttrResponse"
     },
     {
         "kind": "protocol/member",
@@ -1669,6 +1669,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/Node.DeprecatedSetAttr",
+        "strictness": "strict",
+        "ordinal": "4721673413776871238",
+        "direction": "two_way",
+        "request": "fuchsia.io/NodeDeprecatedSetAttrRequest",
+        "response": "fuchsia.io/NodeDeprecatedSetAttrResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/Node.DeprecatedSetFlags",
         "strictness": "strict",
         "ordinal": "5950864159036794675",
@@ -1762,15 +1771,6 @@
         "request": "fuchsia.io/NodeRemoveExtendedAttributeRequest",
         "response": "fuchsia.io/Node_RemoveExtendedAttribute_Response",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Node.SetAttr",
-        "strictness": "strict",
-        "ordinal": "4721673413776871238",
-        "direction": "two_way",
-        "request": "fuchsia.io/NodeSetAttrRequest",
-        "response": "fuchsia.io/NodeSetAttrResponse"
     },
     {
         "kind": "protocol/member",
@@ -2006,6 +2006,32 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.io/NodeDeprecatedSetAttrRequest.attributes",
+        "ordinal": "2",
+        "type": "fuchsia.io/NodeAttributes"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/NodeDeprecatedSetAttrRequest.flags",
+        "ordinal": "1",
+        "type": "fuchsia.io/NodeAttributeFlags"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.io/NodeDeprecatedSetAttrRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/NodeDeprecatedSetAttrResponse.s",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.io/NodeDeprecatedSetAttrResponse"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.io/NodeDeprecatedSetFlagsRequest.flags",
         "ordinal": "1",
         "type": "fuchsia.io/OpenFlags"
@@ -2174,32 +2200,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.io/NodeRemoveExtendedAttributeRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/NodeSetAttrRequest.attributes",
-        "ordinal": "2",
-        "type": "fuchsia.io/NodeAttributes"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/NodeSetAttrRequest.flags",
-        "ordinal": "1",
-        "type": "fuchsia.io/NodeAttributeFlags"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/NodeSetAttrRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/NodeSetAttrResponse.s",
-        "ordinal": "1",
-        "type": "int32"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/NodeSetAttrResponse"
     },
     {
         "kind": "struct/member",
@@ -2593,6 +2593,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/Symlink.DeprecatedSetAttr",
+        "strictness": "strict",
+        "ordinal": "4721673413776871238",
+        "direction": "two_way",
+        "request": "fuchsia.io/NodeDeprecatedSetAttrRequest",
+        "response": "fuchsia.io/NodeDeprecatedSetAttrResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/Symlink.DeprecatedSetFlags",
         "strictness": "strict",
         "ordinal": "5950864159036794675",
@@ -2704,15 +2713,6 @@
         "request": "fuchsia.io/NodeRemoveExtendedAttributeRequest",
         "response": "fuchsia.io/Node_RemoveExtendedAttribute_Response",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Symlink.SetAttr",
-        "strictness": "strict",
-        "ordinal": "4721673413776871238",
-        "direction": "two_way",
-        "request": "fuchsia.io/NodeSetAttrRequest",
-        "response": "fuchsia.io/NodeSetAttrResponse"
     },
     {
         "kind": "protocol/member",

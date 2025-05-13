@@ -621,6 +621,17 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 .trace(trace::trace_future_args!(c"storage", c"File::GetAttr"))
                 .await?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::FileRequest::DeprecatedSetAttr { flags, attributes, responder } => {
+                async move {
+                    let result =
+                        self.handle_update_attributes(io1_to_io2_attrs(flags, attributes)).await;
+                    responder.send(Status::from_result(result).into_raw())
+                }
+                .trace(trace::trace_future_args!(c"storage", c"File::SetAttr"))
+                .await?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::FileRequest::SetAttr { flags, attributes, responder } => {
                 async move {
                     let result =

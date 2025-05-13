@@ -154,7 +154,12 @@ void DirectoryConnection::GetAttr(GetAttrCompleter::Sync& completer) {
   }
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void DirectoryConnection::DeprecatedSetAttr(DeprecatedSetAttrRequestView request,
+                                            DeprecatedSetAttrCompleter::Sync& completer) {
+#else
 void DirectoryConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) {
+#endif
   VnodeAttributesUpdate update =
       VnodeAttributesUpdate::FromIo1(request->attributes, request->flags);
   completer.Reply(Connection::NodeUpdateAttributes(update).status_value());

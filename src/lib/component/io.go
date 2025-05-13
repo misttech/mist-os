@@ -143,7 +143,7 @@ func (*Service) GetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	}, nil
 }
 
-func (*Service) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) (int32, error) {
+func (*Service) DeprecatedSetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) (int32, error) {
 	return int32(zx.ErrNotSupported), nil
 }
 
@@ -330,7 +330,7 @@ func (*directoryState) GetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	}, nil
 }
 
-func (*directoryState) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) (int32, error) {
+func (*directoryState) DeprecatedSetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) (int32, error) {
 	return int32(zx.ErrNotSupported), nil
 }
 
@@ -736,7 +736,7 @@ func (fState *fileState) GetAttr(fidl.Context) (int32, io.NodeAttributes, error)
 	}, nil
 }
 
-func (*fileState) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) (int32, error) {
+func (*fileState) DeprecatedSetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) (int32, error) {
 	return int32(zx.ErrNotSupported), nil
 }
 

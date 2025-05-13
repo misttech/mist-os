@@ -78,6 +78,18 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
                 let result = this.handle_rename(src, Handle::from(dst_parent_token), dst).await;
                 responder.send(result.map_err(Status::into_raw))?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::DeprecatedSetAttr { flags, attributes, responder } => {
+                let status = match this
+                    .handle_update_attributes(io1_to_io2_attrs(flags, attributes))
+                    .await
+                {
+                    Ok(()) => Status::OK,
+                    Err(status) => status,
+                };
+                responder.send(status.into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::SetAttr { flags, attributes, responder } => {
                 let status = match this
                     .handle_update_attributes(io1_to_io2_attrs(flags, attributes))

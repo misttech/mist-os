@@ -177,7 +177,12 @@ void FileConnection::GetAttr(GetAttrCompleter::Sync& completer) {
   }
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void FileConnection::DeprecatedSetAttr(DeprecatedSetAttrRequestView request,
+                                       DeprecatedSetAttrCompleter::Sync& completer) {
+#else
 void FileConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) {
+#endif
   VnodeAttributesUpdate update =
       VnodeAttributesUpdate::FromIo1(request->attributes, request->flags);
   completer.Reply(Connection::NodeUpdateAttributes(update).status_value());

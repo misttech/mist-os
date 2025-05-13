@@ -3287,7 +3287,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_set_attrs() {
+    async fn test_deprecated_set_attrs() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
@@ -3312,7 +3312,7 @@ mod tests {
         attrs.creation_time = crtime;
         attrs.modification_time = mtime;
         let status = dir
-            .set_attr(fio::NodeAttributeFlags::CREATION_TIME, &attrs)
+            .deprecated_set_attr(fio::NodeAttributeFlags::CREATION_TIME, &attrs)
             .await
             .expect("FIDL call failed");
         zx::Status::ok(status).expect("set_attr failed");
@@ -3327,7 +3327,7 @@ mod tests {
         attrs.creation_time = 0u64; // This should be ignored since we don't set the flag.
         attrs.modification_time = mtime;
         let status = dir
-            .set_attr(fio::NodeAttributeFlags::MODIFICATION_TIME, &attrs)
+            .deprecated_set_attr(fio::NodeAttributeFlags::MODIFICATION_TIME, &attrs)
             .await
             .expect("FIDL call failed");
         zx::Status::ok(status).expect("set_attr failed");

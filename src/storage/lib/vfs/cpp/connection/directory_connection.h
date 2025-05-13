@@ -52,7 +52,12 @@ class DirectoryConnection final : public Connection,
   void Query(QueryCompleter::Sync& completer) final;
   void Sync(SyncCompleter::Sync& completer) final;
   void GetAttr(GetAttrCompleter::Sync& completer) final;
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  void DeprecatedSetAttr(DeprecatedSetAttrRequestView request,
+                         DeprecatedSetAttrCompleter::Sync& completer) final;
+#else
   void SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) final;
+#endif
   void GetFlags(GetFlagsCompleter::Sync& completer) final;
   void SetFlags(SetFlagsRequestView, SetFlagsCompleter::Sync& completer) final;
 #if FUCHSIA_API_LEVEL_AT_LEAST(27)

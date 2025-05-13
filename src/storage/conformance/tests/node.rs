@@ -74,7 +74,7 @@ async fn test_open_node_on_file() {
 }
 
 #[fuchsia::test]
-async fn test_set_attr_and_deprecated_set_flags_on_node() {
+async fn test_deprecated_set_attr_and_set_flags_on_node() {
     let harness = TestHarness::new().await;
     let entries = vec![file("file", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
@@ -85,7 +85,7 @@ async fn test_set_attr_and_deprecated_set_flags_on_node() {
     assert_eq!(
         zx::Status::ok(
             proxy
-                .set_attr(
+                .deprecated_set_attr(
                     fio::NodeAttributeFlags::MODIFICATION_TIME,
                     &fio::NodeAttributes {
                         mode: 0,

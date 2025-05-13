@@ -236,7 +236,7 @@ TEST_F(ConnectionTest, InheritPermissionsDirectoryRightExpansion) {
   }
 }
 
-TEST_F(ConnectionTest, GetSetIo1Attrs) {
+TEST_F(ConnectionTest, DeprecatedGetSetAttrs) {
   // Create connection to vfs
   auto root = fidl::Endpoints<fio::Directory>::Create();
   ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
@@ -257,7 +257,7 @@ TEST_F(ConnectionTest, GetSetIo1Attrs) {
   // Ensure we can't set creation time.
   {
     auto io1_attrs =
-        fidl::WireCall(fc->client)->SetAttr(fio::NodeAttributeFlags::kCreationTime, {});
+        fidl::WireCall(fc->client)->DeprecatedSetAttr(fio::NodeAttributeFlags::kCreationTime, {});
     ASSERT_EQ(io1_attrs.status(), ZX_OK);
     // ASSERT_EQ(io1_attrs->s, ZX_ERR_NOT_SUPPORTED);
   }
@@ -265,8 +265,8 @@ TEST_F(ConnectionTest, GetSetIo1Attrs) {
   // Update modification time.
   {
     auto io1_attrs = fidl::WireCall(fc->client)
-                         ->SetAttr(fio::NodeAttributeFlags::kModificationTime,
-                                   fio::wire::NodeAttributes{.modification_time = 1234});
+                         ->DeprecatedSetAttr(fio::NodeAttributeFlags::kModificationTime,
+                                             fio::wire::NodeAttributes{.modification_time = 1234});
     ASSERT_EQ(io1_attrs.status(), ZX_OK);
     ASSERT_EQ(io1_attrs->s, ZX_OK);
   }
@@ -279,8 +279,8 @@ TEST_F(ConnectionTest, GetSetIo1Attrs) {
   }
 }
 
-// Test that the io2 GetAttributes and UpdateAttributes methods work as expected.
-TEST_F(ConnectionTest, GetUpdateIo2Attrs) {
+// Test that the GetAttributes and UpdateAttributes methods work as expected.
+TEST_F(ConnectionTest, GetUpdateAttributes) {
   // Create connection to vfs
   auto root = fidl::Endpoints<fio::Directory>::Create();
   ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);

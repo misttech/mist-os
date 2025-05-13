@@ -86,7 +86,12 @@ void NodeConnection::GetAttr(GetAttrCompleter::Sync& completer) {
   }
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void NodeConnection::DeprecatedSetAttr(DeprecatedSetAttrRequestView request,
+                                       DeprecatedSetAttrCompleter::Sync& completer) {
+#else
 void NodeConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) {
+#endif
   completer.Reply(ZX_ERR_BAD_HANDLE);
 }
 

@@ -412,8 +412,22 @@ open protocol Node {
     ///
     /// This method requires following rights: `OpenFlags.RIGHT_WRITABLE`, otherwise returns
     /// `ZX_ERR_BAD_HANDLE`.
+    @available(replaced=NEXT, renamed="DeprecatedSetAttr")
     @selector("fuchsia.io1/Node.SetAttr")
     strict SetAttr(struct {
+        flags NodeAttributeFlags;
+        attributes NodeAttributes;
+    }) -> (struct {
+        s zx.Status;
+    });
+
+
+    /// DEPRECATED - Use `Node.UpdateAttributes` instead.
+    // TODO(https://fxbug.dev/324081103): Delete (don't just set removed=NEXT) this method once all
+    // we have no remaining out-of-tree callers, or when we drop support for API level 28.
+    @available(added=NEXT, deprecated=HEAD, note="Use fuchsia.io/Node.UpdateAttributes instead.")
+    @selector("fuchsia.io1/Node.SetAttr")
+    strict DeprecatedSetAttr(struct {
         flags NodeAttributeFlags;
         attributes NodeAttributes;
     }) -> (struct {
