@@ -136,9 +136,9 @@ closed protocol TargetCollectionReader {
 /// targets that have been seen on the network.
 type TargetQuery = table {
     /// A string matcher is something that can match either the:
-    /// - Target nodename (partial matches okay).
+    /// - Target nodename
     /// - Target IP (any that have been seen).
-    /// - Serial number (partial matches okay).
+    /// - Serial number
     ///
     /// IPv6 and IPv4 addresses are both acceptable queries. If the address being
     /// queried is ipv6 and includes a port number, the address (and
@@ -246,7 +246,7 @@ closed protocol TargetCollection {
     /// is one that has responded over the network recently.
     ///
     /// An optional query string can be passed that will limit results to only
-    /// targets whose metadata matches. Matching is limited to partial string
+    /// targets whose metadata matches. Matching is limited to string
     /// matches via the target's nodename, serial number, or IP address.
     ///
     /// The client receives updates by handling calls to `Next` in the

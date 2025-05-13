@@ -12,7 +12,6 @@ use std::net::SocketAddr;
 #[derive(Debug, Clone)]
 pub enum TargetInfoQuery {
     /// Attempts to match the nodename, falling back to serial (in that order).
-    /// TODO(b/299345828): Make this an exact match by default, fall back to substring matching
     NodenameOrSerial(String),
     Serial(String),
     Addr(SocketAddr),
@@ -58,11 +57,10 @@ impl TargetInfoQuery {
         match self {
             Self::NodenameOrSerial(arg) => {
                 if let Some(ref nodename) = t.nodename {
-                    if nodename.contains(arg) {
+                    if nodename == arg {
                         return true;
                     }
                 }
-                // Serial numbers require an exact match
                 if let Some(ref serial) = t.serial {
                     if serial == arg {
                         return true;
@@ -71,7 +69,6 @@ impl TargetInfoQuery {
                 false
             }
             Self::Serial(arg) => {
-                // Serial numbers require an exact match
                 if let Some(ref serial) = t.serial {
                     if serial == arg {
                         return true;
@@ -94,11 +91,10 @@ impl TargetInfoQuery {
         match self {
             Self::NodenameOrSerial(arg) => {
                 if let Some(ref nodename) = t.nodename {
-                    if nodename.contains(arg) {
+                    if nodename == arg {
                         return true;
                     }
                 }
-                // Serial numbers require an exact match
                 if let Some(ref serial) = t.serial_number {
                     if serial == arg {
                         return true;
@@ -107,7 +103,6 @@ impl TargetInfoQuery {
                 false
             }
             Self::Serial(arg) => {
-                // Serial numbers require an exact match
                 if let Some(ref serial) = t.serial_number {
                     if serial == arg {
                         return true;

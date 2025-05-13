@@ -133,8 +133,6 @@ Where `ffx` accepts a target on the command line it may be specified as:
 - The target's IP address (any address mentioned in `ffx target list`).
 - The target's serial number.
 
-For node name and serial number, `ffx` will find partial matches.
-
 IPv6 and IPv4 addresses are both acceptable. If the address being
 queried is ipv6 and includes a port number, the address (and
 scope id if present) must be enclosed in square brackets. Scope and port

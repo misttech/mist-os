@@ -1206,11 +1206,6 @@ mod tests {
         assert!(opt.is_none(), "Target found")
     }
 
-    #[track_caller]
-    fn expect_ambiguous_target(tc: &TargetCollection, query: &TargetInfoQuery) {
-        tc.query_single_enabled_target(query).expect_err("Query not ambiguous");
-    }
-
     #[fuchsia::test]
     async fn test_target_collection_insert_new_disabled() {
         let tc = TargetCollection::new_with_queue();
@@ -1622,7 +1617,12 @@ mod tests {
         assert_eq!(tc.discover_target(&TargetInfoQuery::First).await.unwrap(), t);
 
         // Find by partial match
-        assert_eq!(tc.discover_target(&TargetInfoQuery::from("clam".to_owned())).await.unwrap(), t);
+        assert_eq!(
+            tc.discover_target(&TargetInfoQuery::from("clam-chowder-is-tasty".to_owned()))
+                .await
+                .unwrap(),
+            t
+        );
 
         tc.merge_insert(Target::new_autoconnected("this-is-a-crunchy-falafel"));
         tc.discover_target(&TargetInfoQuery::First).await.unwrap_err(); // Too many targets found
@@ -2095,62 +2095,6 @@ mod tests {
             expect_target(&tc, &TargetInfoQuery::NodenameOrSerial(string.to_owned()));
         assert_eq!(string, found_target.serial().expect("target should have serial number"));
         assert!(found_target.nodename().is_none());
-    }
-
-    #[fuchsia::test]
-    async fn test_no_ambiguous_target_when_disabled() {
-        let tc = TargetCollection::new_with_queue();
-
-        tc.merge_insert(Target::new_named("this-is-not-connected"));
-        tc.merge_insert(Target::new_autoconnected("this-is-connected"));
-
-        let found_target = expect_enabled_target(&tc, &TargetInfoQuery::First);
-        assert_eq!(
-            "this-is-connected",
-            found_target.nodename().expect("target should have nodename")
-        );
-
-        let found_target =
-            expect_enabled_target(&tc, &TargetInfoQuery::from("connected".to_owned()));
-        assert_eq!(
-            "this-is-connected",
-            found_target.nodename().expect("target should have nodename")
-        );
-    }
-
-    #[fuchsia::test]
-    async fn test_no_ambiguous_target_when_matching_identity() {
-        let tc = TargetCollection::new_with_queue();
-
-        let anonymous = tc.merge_insert(Target::new());
-        let connected = tc.merge_insert(Target::new_autoconnected("this-is-connected"));
-        let other = tc.merge_insert(Target::new_named("this-is-not-connected"));
-
-        tc.merge_insert({
-            let updated = Target::new_with_id(anonymous.id());
-            updated.replace_identity(Identity::from_name("this-is-connected"));
-            updated.enable();
-            updated
-        });
-
-        for query in [TargetInfoQuery::from("this-is-connected".to_owned()), TargetInfoQuery::First]
-        {
-            let found_target = expect_enabled_target(&tc, &query);
-            assert!(
-                Rc::ptr_eq(&connected, &found_target),
-                "expected connected target to be preferred, got {found_target:?}"
-            );
-        }
-
-        tc.merge_insert({
-            let updated = Target::new_with_id(other.id());
-            updated.enable();
-            updated
-        });
-
-        for query in [TargetInfoQuery::from("connected".to_owned()), TargetInfoQuery::First] {
-            expect_ambiguous_target(&tc, &query);
-        }
     }
 
     /* TARGET QUERIES */

@@ -1009,7 +1009,6 @@ mod tests {
         const NAME2: &'static str = "bar";
         const NAME3: &'static str = "baz";
         const NON_MATCHING_NAME: &'static str = "mlorp";
-        const PARTIAL_NAME_MATCH: &'static str = "ba";
         let (call_started_sender, call_started_receiver) = async_channel::unbounded::<()>();
         let (target_sender, r) = async_channel::unbounded::<ffx::MdnsEventType>();
         let mdns_protocol =
@@ -1065,16 +1064,6 @@ mod tests {
         let res = list_targets(Some(NAME3), &tc).await;
         assert_eq!(res.len(), 1, "received: {:?}", res);
         assert_eq!(res[0].nodename.as_ref().unwrap(), NAME3);
-
-        let res = list_targets(Some(PARTIAL_NAME_MATCH), &tc).await;
-        assert_eq!(res.len(), 2, "received: {:?}", res);
-        assert!(res.iter().all(|t| {
-            let name = t.nodename.as_ref().unwrap();
-            // Check either partial match just in case the backing impl
-            // changes ordering. Possible todo here would be to return multiple
-            // targets when there is a partial match.
-            name == NAME3 || name == NAME2
-        }));
 
         // Regression test for b/308490757:
         // Targets with a long compatibility message fail to send across FIDL boundary.
