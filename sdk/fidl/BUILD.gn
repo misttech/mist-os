@@ -246,6 +246,7 @@ sdk_molecule("fidl") {
     ":*",
     "//build/fidl:sdk_fidl",
     "//sdk:*",
+    "//vendor/*",
   ]
 
   category = "partner"

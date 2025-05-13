@@ -387,6 +387,7 @@ if (!is_host) {
 }  # end if (!is_host)
 
 sdk_molecule("fuchsia_idk_atoms_host_tests") {
+  visibility += [ "//vendor/*" ]
   category = "partner"
   deps = [ ":core_experimental_python_e2e_tests" ]
 }
@@ -603,6 +604,7 @@ if (is_host) {
 
   # TODO(https://fxbug.dev/42177692): Remove these once the emulators are available independently.
   sdk_molecule("emulators") {
+    visibility += [ "//vendor/*" ]
     category = "partner"
     deps = [
       ":emulators_required_by_bazel_sdk",
@@ -624,7 +626,10 @@ if (is_host) {
   # `host_toolchain`, and includes host tools for other host toolchains when
   # `sdk_cross_compile_host_tools` is true.
   sdk_molecule("host_tools_for_configured_host_cpus") {
-    visibility += [ "//sdk/pdk:*" ]
+    visibility += [
+      "//sdk/pdk:*",
+      "//vendor/*",
+    ]
 
     category = "partner"
 
@@ -654,7 +659,16 @@ if (is_host) {
   }
 }  # end if (is_host)
 
+group("common_non_sdk_deps_build_tests_for_all_builds") {
+  visibility += [ "//vendor/*" ]
+  deps = [
+    # Successfully building at each API level, including PLATFORM, is the test.
+    "//zircon/system:availability_test",
+  ]
+}
+
 sdk_molecule("core_bindlib") {
+  visibility += [ "//vendor/*" ]
   category = "partner"
   deps = [
     "//src/devices/bind/fuchsia:fuchsia_sdk",
@@ -699,6 +713,7 @@ sdk_molecule("core_bindlib") {
 }
 
 sdk_molecule("core_packages") {
+  visibility += [ "//vendor/*" ]
   category = "partner"
   deps = [
     "//src/developer/build_info/testing:fake-build-info-sdk",
@@ -715,6 +730,7 @@ sdk_molecule("core_packages") {
 }
 
 sdk_molecule("core_data") {
+  visibility += [ "//vendor/*" ]
   category = "partner"
   deps = [
     # TODO(ddorwin): Rename these to make it clear that they are data (e.g., _shards).
@@ -729,11 +745,13 @@ sdk_molecule("core_data") {
 }
 
 sdk_molecule("core_dart_library") {
+  visibility += [ "//vendor/*" ]
   category = "partner"
   deps = [ "//sdk/testing/sl4f/client:client_sdk($dart_toolchain)" ]
 }
 
 sdk_molecule("core_experimental_python_e2e_tests") {
+  visibility += [ "//vendor/*" ]
   category = "partner"
   if (host_os == "linux") {
     deps = [
@@ -745,6 +763,7 @@ sdk_molecule("core_experimental_python_e2e_tests") {
 # C/C++ code that must be provided as prebuilt libraries for each supported API
 # level. Must export symbols with C linkage.
 sdk_molecule("core_cc_prebuilt_libraries") {
+  visibility += [ "//vendor/*" ]
   category = "partner"
   deps = [
     "//sdk/lib/async-default:async-default_sdk",
@@ -773,6 +792,7 @@ sdk_molecule("core_cc_prebuilt_libraries") {
 # TODO(https://fxbug.dev/42083950): Ensure the libraries build and are
 # complete at all API levels.
 sdk_molecule("core_cc_source_libraries") {
+  visibility += [ "//vendor/*" ]
   category = "partner"
   deps = [
     "//sdk/lib/async:async-cpp_sdk",
@@ -832,12 +852,14 @@ sdk_molecule("core_cc_source_libraries") {
 }
 
 sdk_molecule("core_sysroot") {
+  visibility += [ "//vendor/*" ]
   category = "partner"
   deps = [ "//zircon/public/sysroot_sdk" ]
 }
 
 # License/copyright files for the SDK.
 sdk_molecule("core_licenses") {
+  visibility += [ "//vendor/*" ]
   category = "partner"
   deps = [
     ":musl_license",

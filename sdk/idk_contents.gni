@@ -4,25 +4,20 @@
 
 assert(current_toolchain == default_toolchain)
 
-_common_non_sdk_deps_build_tests_for_all_builds = [
-  # Successfully building at each API level, including PLATFORM, is the test.
-  "//zircon/system:availability_test",
-]
-
 _common_atoms_independent_of_api_level_and_cpu_arch = [
-  ":core_bindlib",
-  ":core_data",
-  ":version_history_sdk($default_toolchain)",
+  "//sdk:core_bindlib",
+  "//sdk:core_data",
+  "//sdk:version_history_sdk($default_toolchain)",
 ]
 _common_fidl_libraries = [ "//sdk/fidl" ]
-_common_prebuilt_libraries = [ ":core_cc_prebuilt_libraries" ]
-_common_source_libraries = [ ":core_cc_source_libraries" ]
-_common_sysroot = [ ":core_sysroot" ]
+_common_prebuilt_libraries = [ "//sdk:core_cc_prebuilt_libraries" ]
+_common_source_libraries = [ "//sdk:core_cc_source_libraries" ]
+_common_sysroot = [ "//sdk:core_sysroot" ]
 
 # Defines the contents of the Fuchsia IDK that is distributed to out-of-tree developers.
 fuchsia_idk_contents = {
   non_sdk_deps_build_tests_for_all_builds =
-      _common_non_sdk_deps_build_tests_for_all_builds
+      [ "//sdk:common_non_sdk_deps_build_tests_for_all_builds" ]
 
   atoms_independent_of_api_level_and_cpu_arch =
       _common_atoms_independent_of_api_level_and_cpu_arch
@@ -32,12 +27,12 @@ fuchsia_idk_contents = {
   source_libraries = _common_source_libraries
   sysroot = _common_sysroot
 
-  dart_library = [ ":core_dart_library" ]
-  packages = [ ":core_packages" ]
+  dart_library = [ "//sdk:core_dart_library" ]
+  packages = [ "//sdk:core_packages" ]
   vulkan_layers = [ "//src/lib/vulkan:vulkan_layers" ]
 
   docs = [
-    ":core_licenses",
+    "//sdk:core_licenses",
     "//sdk/docs",
   ]
   docs_dependent_on_fidl = [ "//tools/docsgen:ref_docs_sdk" ]
@@ -46,7 +41,7 @@ fuchsia_idk_contents = {
     # These host tests are (currently) unversioned and only need to be
     # built once.
     # TODO(https://fxbug.dev/330373943): Move once tests are versioned.
-    ":fuchsia_idk_atoms_host_tests",
+    "//sdk:fuchsia_idk_atoms_host_tests",
   ]
 
   host_tools = [
@@ -55,12 +50,12 @@ fuchsia_idk_contents = {
     # TODO(https://fxbug.dev/349889250): Move host tools to
     # :fuchsia_idk_atoms_at_platform_for_host_cpu_arch_only and/or
     # :fuchsia_idk_atoms_for_each_api_level as appropriate.
-    ":host_tools_for_configured_host_cpus",
+    "//sdk:host_tools_for_configured_host_cpus",
 
     # Emulators that we include along with the SDK.
     # TODO(https://fxbug.dev/42177692): Remove these once the emulators are
     # available independently.
-    ":emulators($host_toolchain)",
+    "//sdk:emulators($host_toolchain)",
   ]
 
   # TODO(https://fxbug.dev/310006516): Remove these once the Bazel SDK and all
@@ -73,7 +68,7 @@ fuchsia_idk_contents = {
 # Defines the contents of the in-tree IDK.
 in_tree_idk_contents = {
   non_sdk_deps_build_tests_for_all_builds =
-      _common_non_sdk_deps_build_tests_for_all_builds
+      [ "//sdk:common_non_sdk_deps_build_tests_for_all_builds" ]
 
   atoms_independent_of_api_level_and_cpu_arch =
       _common_atoms_independent_of_api_level_and_cpu_arch
@@ -101,9 +96,9 @@ in_tree_idk_contents = {
 
   # The minimum set of tools required to support the Bazel SDK.
   host_tools = [
-    ":build_host_tools($host_toolchain)",
-    ":non_build_host_tools_required_by_bazel_sdk($host_toolchain)",
-    ":emulators_required_by_bazel_sdk($host_toolchain)",
+    "//sdk:build_host_tools($host_toolchain)",
+    "//sdk:non_build_host_tools_required_by_bazel_sdk($host_toolchain)",
+    "//sdk:emulators_required_by_bazel_sdk($host_toolchain)",
   ]
 
   # TODO(https://fxbug.dev/385406226): Exclude these from the in-tree IDK
