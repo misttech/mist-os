@@ -15,8 +15,9 @@ pub fn decode_page_fault_exception_report(
     let faulting_address = x86_64_data.cr2;
     let not_present = x86_64_data.err_code & 0x01 == 0; // Low bit means "present"
     let is_write = x86_64_data.err_code & 0x02 != 0;
+    let is_execute = x86_64_data.err_code & 0xF0 != 0;
 
-    PageFaultExceptionReport { faulting_address, not_present, is_write }
+    PageFaultExceptionReport { faulting_address, not_present, is_write, is_execute }
 }
 
 pub fn get_signal_for_general_exception(

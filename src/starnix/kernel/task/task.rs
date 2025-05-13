@@ -1038,6 +1038,7 @@ pub struct PageFaultExceptionReport {
     pub faulting_address: u64,
     pub not_present: bool, // Set when the page fault was due to a not-present page.
     pub is_write: bool,    // Set when the triggering memory operation was a write.
+    pub is_execute: bool,  // Set when the triggering memory operation was an execute.
 }
 
 impl Task {

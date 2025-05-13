@@ -8,6 +8,7 @@ use starnix_uapi::signals::Signal;
 // See "4.1.8 Supervisor Cause Register" in "The RISC-V Instruction Set Manual, Volume II:
 // Privileged Architecture".
 const RISCV64_EXCEPTION_STORE_PAGE_FAULT: u64 = 15;
+const RISCV64_EXCEPTION_INSTRUCTION_PAGE_FAULT: u64 = 12;
 
 pub fn decode_page_fault_exception_report(
     report: &zx::sys::zx_exception_report_t,
@@ -20,8 +21,9 @@ pub fn decode_page_fault_exception_report(
     let not_present = true;
 
     let is_write = riscv_data.cause == RISCV64_EXCEPTION_STORE_PAGE_FAULT;
+    let is_execute = riscv_data.cause == RISCV64_EXCEPTION_INSTRUCTION_PAGE_FAULT;
 
-    PageFaultExceptionReport { faulting_address, not_present, is_write }
+    PageFaultExceptionReport { faulting_address, not_present, is_write, is_execute }
 }
 
 pub fn get_signal_for_general_exception(
