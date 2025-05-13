@@ -909,8 +909,11 @@ mod arch32 {
     }
 
     pub use super::{
+        sys_pidfd_send_signal as sys_arch32_pidfd_send_signal,
         sys_rt_sigaction as sys_arch32_rt_sigaction,
+        sys_rt_sigqueueinfo as sys_arch32_rt_sigqueueinfo,
         sys_rt_sigtimedwait as sys_arch32_rt_sigtimedwait,
+        sys_rt_tgsigqueueinfo as sys_arch32_rt_tgsigqueueinfo,
         sys_sigaltstack as sys_arch32_sigaltstack, sys_signalfd4 as sys_arch32_signalfd4,
         sys_waitid as sys_arch32_waitid,
     };

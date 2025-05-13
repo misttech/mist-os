@@ -155,15 +155,14 @@ pub fn dispatch_syscall(
         };
         pub use crate::perf::sys_arch32_perf_event_open;
         pub use crate::signals::syscalls::{
-            sys_arch32_rt_sigaction, sys_arch32_rt_sigtimedwait, sys_arch32_sigaltstack,
+            sys_arch32_pidfd_send_signal, sys_arch32_rt_sigaction, sys_arch32_rt_sigqueueinfo,
+            sys_arch32_rt_sigtimedwait, sys_arch32_rt_tgsigqueueinfo, sys_arch32_sigaltstack,
             sys_arch32_signalfd, sys_arch32_signalfd4, sys_arch32_waitid,
             sys_kill as sys_arch32_kill, sys_restart_syscall as sys_arch32_restart_syscall,
             sys_rt_sigpending as sys_arch32_rt_sigpending,
             sys_rt_sigprocmask as sys_arch32_rt_sigprocmask,
-            sys_rt_sigqueueinfo as sys_arch32_rt_sigqueueinfo,
             sys_rt_sigreturn as sys_arch32_rt_sigreturn,
-            sys_rt_sigsuspend as sys_arch32_rt_sigsuspend,
-            sys_rt_tgsigqueueinfo as sys_arch32_rt_tgsigqueueinfo, sys_tgkill as sys_arch32_tgkill,
+            sys_rt_sigsuspend as sys_arch32_rt_sigsuspend, sys_tgkill as sys_arch32_tgkill,
             sys_wait4 as sys_arch32_wait4,
         };
         pub use crate::syscalls::misc::{
@@ -393,6 +392,7 @@ pub fn dispatch_syscall(
             personality[1],
             pidfd_getfd[3],
             pidfd_open[2],
+            pidfd_send_signal[4],
             pipe2[2],
             poll[3],
             ppoll[5],
