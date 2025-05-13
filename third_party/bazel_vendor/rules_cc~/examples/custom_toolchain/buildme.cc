@@ -1,2 +1,4 @@
 
-int some_function() { return 0; }
+int some_function() {
+  return 0;
+}

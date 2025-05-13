@@ -57,6 +57,7 @@ per-file test-stats=crjohns@google.com
 per-file triage = file: /src/diagnostics/OWNERS
 per-file unarchive-package=thomasalpinus@google.com
 per-file update-3p-owners = file: /tools/auto_owners/OWNERS
+per-file update-bazel-vendor-dir=jayzhuang@google.com
 per-file update-rustc-third-party = file: /scripts/rust/OWNERS
 per-file zedmon=claridge@google.com
 per-file lib/count-ninja-actions.py = file: /src/lib/analytics/OWNERS

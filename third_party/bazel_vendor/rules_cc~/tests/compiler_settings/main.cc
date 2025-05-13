@@ -17,4 +17,6 @@
 #define STRINGIFY(x) #x
 #define TO_STRING(x) STRINGIFY(x)
 
-int main() { std::cout << "Hello, " << TO_STRING(COMPILER) << "!" << std::endl; }
+int main() {
+  std::cout << "Hello, " << TO_STRING(COMPILER) << "!" << std::endl;
+}

@@ -206,6 +206,7 @@ done
 
 GIT_FILTER=(
   "$@"
+  ":(top,exclude)third_party/bazel_vendor"
   ":(top,exclude)third_party/golibs/vendor"
   ":(top,exclude)third_party/rust_crates"
   ":(top,exclude)src/devices/tools/fidlgen_banjo/tests"
