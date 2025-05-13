@@ -105,6 +105,21 @@ zx_status_t map(const StackType& type, fbl::RefPtr<VmObjectPaged>& vmo, uint64_t
   return ZX_OK;
 }
 
+zx_status_t unmap(const StackType& type, KernelStack::Mapping& map) {
+  if (!map.vmar_) {
+    return ZX_OK;
+  }
+  LTRACEF("removing vmar at at %#" PRIxPTR "\n", map.vmar_->base());
+
+  zx_status_t status = map.vmar_->Destroy();
+  if (status != ZX_OK) {
+    return status;
+  }
+  map.vmar_.reset();
+  vm_kernel_stack_bytes.Add(-static_cast<int64_t>(type.size));
+  return ZX_OK;
+}
+
 }  // namespace
 
 vaddr_t KernelStack::Mapping::base() const {
@@ -193,35 +208,20 @@ KernelStack::~KernelStack() {
 }
 
 zx_status_t KernelStack::Teardown() {
-  if (main_map_.vmar_) {
-    LTRACEF("removing vmar at at %#" PRIxPTR "\n", main_map_.vmar_->base());
-    zx_status_t status = main_map_.vmar_->Destroy();
-    if (status != ZX_OK) {
-      return status;
-    }
-    main_map_.vmar_.reset();
-    vm_kernel_stack_bytes.Add(-static_cast<int64_t>(kSafe.size));
+  zx_status_t status = unmap(kSafe, main_map_);
+  if (status != ZX_OK) {
+    return status;
   }
 #if __has_feature(safe_stack)
-  if (unsafe_map_.vmar_) {
-    LTRACEF("removing unsafe vmar at at %#" PRIxPTR "\n", unsafe_map_.vmar_->base());
-    zx_status_t status = unsafe_map_.vmar_->Destroy();
-    if (status != ZX_OK) {
-      return status;
-    }
-    unsafe_map_.vmar_.reset();
-    vm_kernel_stack_bytes.Add(-static_cast<int64_t>(kUnsafe.size));
+  status = unmap(kUnsafe, unsafe_map_);
+  if (status != ZX_OK) {
+    return status;
   }
 #endif
 #if __has_feature(shadow_call_stack)
-  if (shadow_call_map_.vmar_) {
-    LTRACEF("removing shadow call vmar at at %#" PRIxPTR "\n", shadow_call_map_.vmar_->base());
-    zx_status_t status = shadow_call_map_.vmar_->Destroy();
-    if (status != ZX_OK) {
-      return status;
-    }
-    shadow_call_map_.vmar_.reset();
-    vm_kernel_stack_bytes.Add(-static_cast<int64_t>(kShadowCall.size));
+  status = unmap(kShadowCall, shadow_call_map_);
+  if (status != ZX_OK) {
+    return status;
   }
 #endif
   return ZX_OK;
