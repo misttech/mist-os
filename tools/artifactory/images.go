@@ -85,6 +85,14 @@ func imageUploads(mods imgModules, namespace string) ([]Upload, error) {
 					Size:   info.Size(),
 				},
 			})
+		default:
+			files = append(files, Upload{
+				Source:      filepath.Join(mods.BuildDir(), img.Path),
+				Destination: path.Join(namespace, img.Path),
+				Compress:    true,
+				// Images should be signed for release builds.
+				Signed: true,
+			})
 		}
 	}
 	return files, nil

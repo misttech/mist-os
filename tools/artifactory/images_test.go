@@ -44,6 +44,35 @@ func TestImageUploads(t *testing.T) {
 		buildDir: dir,
 		imgs: []build.Image{
 			{
+				PaveArgs: []string{"--bootloader"},
+				Name:     "bootloader",
+				Path:     "bootloader",
+				Type:     "blk",
+			},
+			{
+				PaveArgs: []string{"--zirconr"},
+				Name:     "zircon-r",
+				Path:     "zedboot.zbi",
+				Type:     "zbi",
+			},
+			{
+				PaveArgs: []string{"--zircona"},
+				Name:     "zircon-a",
+				Path:     "fuchsia.zbi",
+				Type:     "zbi",
+			},
+			{
+				NetbootArgs: []string{"--boot"},
+				Name:        "fuchsia",
+				Path:        "fuchsia.zbi",
+				Type:        "zbi",
+			},
+			{
+				Name: "qemu-kernel",
+				Path: "qemu-kernel.bin",
+				Type: "kernel",
+			},
+			{
 				Name: "uefi-disk",
 				Path: "disk.raw",
 				Type: "blk",
@@ -54,6 +83,30 @@ func TestImageUploads(t *testing.T) {
 		{
 			Source:      "BUILD_DIR/IMAGE_MANIFEST",
 			Destination: "namespace/IMAGE_MANIFEST",
+			Signed:      true,
+		},
+		{
+			Source:      filepath.Join(dir, "bootloader"),
+			Destination: "namespace/bootloader",
+			Compress:    true,
+			Signed:      true,
+		},
+		{
+			Source:      filepath.Join(dir, "zedboot.zbi"),
+			Destination: "namespace/zedboot.zbi",
+			Compress:    true,
+			Signed:      true,
+		},
+		{
+			Source:      filepath.Join(dir, "fuchsia.zbi"),
+			Destination: "namespace/fuchsia.zbi",
+			Compress:    true,
+			Signed:      true,
+		},
+		{
+			Source:      filepath.Join(dir, "qemu-kernel.bin"),
+			Destination: "namespace/qemu-kernel.bin",
+			Compress:    true,
 			Signed:      true,
 		},
 		{
