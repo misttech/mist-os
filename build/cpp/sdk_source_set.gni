@@ -38,11 +38,6 @@ import("//build/sdk/sdk_atom.gni")
 #   sdk_name (required)
 #     Name of the library in the SDK.
 #
-#   source_dir (optional)
-#     If set, path to the base directory of the sources.
-#     This is useful if the sources are generated and therefore not hosted
-#     directly under the directory where the GN rules are declared.
-#
 #   include_base (optional)
 #     Path to the root directory for includes.
 #     Defaults to "include".
@@ -148,7 +143,6 @@ template("sdk_source_set") {
                              "non_sdk_public_deps",
                              "non_sdk_local_deps",
                              "sdk_headers_for_internal_use",
-                             "source_dir",
                              "stable",
                            ])
 
@@ -291,7 +285,6 @@ template("sdk_source_set") {
     plasa_fragment_cc(_plasa_artifacts_target_name) {
       forward_variables_from(invoker,
                              [
-                               "source_dir",
                                "testonly",
                                "all_headers",
                                "all_deps",
@@ -367,7 +360,6 @@ template("sdk_source_set") {
 
     forward_variables_from(invoker,
                            [
-                             "source_dir",
                              "testonly",
                              "sdk_area",
                            ])
