@@ -804,20 +804,9 @@
                 "FstatfsTest.BlocksFree",
 
                 // tuntap_test
+                // All TuntapTest fails because Starnix doesn't have /dev/net/tun.
                 "TuntapStaticTest.NetTunExists",
-                "TuntapTest.CreateInterfaceNoCap",
-                "TuntapTest.PingKernel",
-                "TuntapTest.CreateFixedNameInterface",
-                "TuntapTest.CreateInterface",
-                "TuntapTest.LargeWritesFailWithEMSGSIZE",
-                "TuntapTest.InvalidReadWrite",
-                "TuntapTest.ZeroWrite",
-                "TuntapTest.SendUdpTriggersArpResolution",
-                "TuntapTest.TUNNoPacketInfo",
-                "TuntapTest.WriteHangBug155928773",
-                "TuntapTest.TCPNonBlockingConnectFailsArpResolution",
-                "TuntapTest.TCPBlockingConnectFailsArpResolution",
-                "TuntapTest.RawPacketSocket",
+                "TuntapTest.*",
 
                 // semaphore_test
                 "SemaphoreTest.*",
