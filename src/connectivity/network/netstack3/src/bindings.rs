@@ -1559,6 +1559,8 @@ impl NetstackSeed {
         std::mem::drop(inspect_nodes);
         inspector.root().clear_recorded();
 
+        info!("shutdown complete");
+
         // Last thing to happen is dropping the context.
         ctx.try_destroy_last().expect("all Ctx references must have been dropped")
     }
