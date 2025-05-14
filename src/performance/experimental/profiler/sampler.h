@@ -83,6 +83,7 @@ class Sampler : public fxl::RefCountedThreadSafe<Sampler> {
   fxl::WeakPtrFactory<Sampler> weak_factory_;
   async::TaskMethod<profiler::Sampler, &profiler::Sampler::CollectSamples> sample_task_{this};
   elf_search::Searcher searcher_;
+  std::map<zx_koid_t, std::map<std::vector<std::byte>, profiler::Module>> contexts_;
 };
 }  // namespace profiler
 #endif  // SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_SAMPLER_H_

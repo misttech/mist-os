@@ -10,7 +10,8 @@
 namespace profiler::symbolizer_markup {
 
 const std::string kReset = "{{{reset}}}\n";
-std::string FormatModule(const Module& mod);
+std::string FormatModule(uint32_t module_id, const std::vector<std::byte>& build_id,
+                         const Module& mod);
 std::string FormatSample(const Sample& sample);
 
 }  // namespace profiler::symbolizer_markup

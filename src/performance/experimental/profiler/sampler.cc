@@ -284,14 +284,14 @@ void profiler::Sampler::CollectSamples(async_dispatcher_t* dispatcher, async::Ta
 
 zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
-  std::map<zx_koid_t, std::vector<profiler::Module>> contexts;
   zx::result<> res = targets_.ForEachProcess(
-      [&contexts, this](cpp20::span<const zx_koid_t>,
-                        const ProcessTarget& target) mutable -> zx::result<> {
-        zx::result<std::vector<profiler::Module>> modules =
+      [this](cpp20::span<const zx_koid_t>, const ProcessTarget& target) mutable -> zx::result<> {
+        zx::result<std::map<std::vector<std::byte>, profiler::Module>> modules =
             profiler::GetProcessModules(target.handle, searcher_);
         if (modules.is_ok()) {
-          contexts[target.pid] = *modules;
+          for (auto& [build_id, mod] : *modules) {
+            contexts_[target.pid].try_emplace(build_id, mod);
+          }
         }
         // It's possible that the process we were profiling no longer exists -- it exited before the
         // profile ended. If this happens, we don't want ForEachProcess to short circuit and stop,
@@ -301,7 +301,7 @@ zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
   if (res.is_error()) {
     return res.take_error();
   }
-  return zx::ok(profiler::SymbolizationContext{std::move(contexts)});
+  return zx::ok(profiler::SymbolizationContext{contexts_});
 }
 
 void profiler::Sampler::AddThread(std::vector<zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid,

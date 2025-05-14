@@ -66,8 +66,8 @@ struct ProcessTarget {
   std::unique_ptr<UnwinderData> unwinder_data;
 };
 
-zx::result<std::vector<Module>> GetProcessModules(const zx::process&,
-                                                  elf_search::Searcher& searcher);
+zx::result<std::map<std::vector<std::byte>, profiler::Module>> GetProcessModules(
+    const zx::process&, elf_search::Searcher& searcher);
 
 // Given a process, create a process target containing it and all its threads
 zx::result<profiler::ProcessTarget> MakeProcessTarget(zx::process process,

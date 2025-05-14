@@ -17,6 +17,7 @@
 #include <zircon/system/ulib/elf-search/include/elf-search.h>
 #include <zircon/types.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <unordered_map>
 #include <utility>
@@ -192,12 +193,12 @@ zx::result<profiler::ProcessTarget> profiler::MakeProcessTarget(zx::process proc
   }
   profiler::ProcessTarget process_target{std::move(process), handle_info.koid, std::move(threads)};
 
-  zx::result<std::vector<profiler::Module>> modules =
+  zx::result<std::map<std::vector<std::byte>, profiler::Module>> modules =
       GetProcessModules(*zx::unowned_process{process_target.handle}, searcher);
   if (modules.is_error()) {
     return zx::error(modules.error_value());
   }
-  for (const auto& module : *modules) {
+  for (const auto& [build_id, module] : *modules) {
     process_target.unwinder_data->modules.emplace_back(module.vaddr,
                                                        &process_target.unwinder_data->memory,
                                                        unwinder::Module::AddressMode::kProcess);
@@ -436,25 +437,27 @@ zx::result<> profiler::TargetTree::ForEachProcess(
   return zx::ok();
 }
 
-zx::result<std::vector<profiler::Module>> profiler::GetProcessModules(
+zx::result<std::map<std::vector<std::byte>, profiler::Module>> profiler::GetProcessModules(
     const zx::process& process, elf_search::Searcher& searcher) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
-  std::vector<profiler::Module> modules;
-  zx_status_t search_result = searcher.ForEachModule(
-      process, [&modules, count = 0u](const elf_search::ModuleInfo& info) mutable {
+  std::map<std::vector<std::byte>, profiler::Module> modules;
+  zx_status_t search_result =
+      searcher.ForEachModule(process, [&modules](const elf_search::ModuleInfo& info) mutable {
         TRACE_DURATION("cpu_profiler", "ForEachModule");
-        profiler::Module& mod = modules.emplace_back();
-        mod.module_id = count++;
-        mod.module_name = info.name;
-        mod.vaddr = info.vaddr;
-        std::transform(info.build_id.begin(), info.build_id.end(), std::back_inserter(mod.build_id),
-                       [](const uint8_t byte) { return std::byte{byte}; });
+        std::vector<std::byte> build_id;
+        std::ranges::transform(info.build_id, std::back_inserter(build_id),
+                               [](const uint8_t byte) { return std::byte{byte}; });
+        auto [it, inserted] = modules.try_emplace(build_id);
+        if (inserted) {
+          it->second.module_name = info.name;
+          it->second.vaddr = info.vaddr;
 
-        for (const auto& phdr : info.phdrs) {
-          if (phdr.p_type != PT_LOAD) {
-            continue;
+          for (const auto& phdr : info.phdrs) {
+            if (phdr.p_type != PT_LOAD) {
+              continue;
+            }
+            it->second.loads.push_back({phdr.p_vaddr, phdr.p_memsz, phdr.p_flags});
           }
-          mod.loads.push_back({phdr.p_vaddr, phdr.p_memsz, phdr.p_flags});
         }
       });
   return zx::make_result(search_result, std::move(modules));

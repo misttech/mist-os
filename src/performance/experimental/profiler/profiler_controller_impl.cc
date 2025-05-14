@@ -112,12 +112,12 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
     profiler::ProcessTarget process_target{std::move(process), pid,
                                            std::unordered_map<zx_koid_t, profiler::ThreadTarget>{}};
     FX_LOGS(DEBUG) << "Collecting process modules for process " << pid << ".";
-    zx::result<std::vector<profiler::Module>> modules =
+    zx::result<std::map<std::vector<std::byte>, profiler::Module>> modules =
         profiler::GetProcessModules(process_target.handle, searcher);
     if (modules.is_error()) {
       return zx::error(modules.error_value());
     }
-    for (const auto& module : *modules) {
+    for (const auto& [build_id, module] : *modules) {
       process_target.unwinder_data->modules.emplace_back(module.vaddr,
                                                          &process_target.unwinder_data->memory,
                                                          unwinder::Module::AddressMode::kProcess);
@@ -499,8 +499,10 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
       return;
     }
     auto process_modules = modules->process_contexts[pid];
-    for (const profiler::Module& mod : process_modules) {
-      if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::FormatModule(mod), socket_)) {
+    uint32_t module_id = 0;
+    for (const auto& [build_id, mod] : process_modules) {
+      if (!fsl::BlockingCopyFromString(
+              profiler::symbolizer_markup::FormatModule(module_id++, build_id, mod), socket_)) {
         FX_LOGS(ERROR) << "Failed to write modules to socket";
         return;
       }
