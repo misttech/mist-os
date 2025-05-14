@@ -199,7 +199,7 @@ impl<Key: FutexKey> FutexTable<Key> {
 
         let tid = current_task.get_tid() as u32;
 
-        {
+        let new_owner_tid = {
             // Unfortunately, we need these operations to actually be atomic, which means we need
             // to create a mapping for this memory in the kernel address space. Churning these
             // mappings is painfully slow. We should be able to optimize this operation with
@@ -209,7 +209,8 @@ impl<Key: FutexKey> FutexTable<Key> {
 
             let mut current_value = value.load(Ordering::Relaxed);
             loop {
-                if current_value & FUTEX_TID_MASK == tid {
+                let new_owner_tid = current_value & FUTEX_TID_MASK;
+                if new_owner_tid == tid {
                     // From <https://man7.org/linux/man-pages/man2/futex.2.html>:
                     //
                     //   EDEADLK
@@ -244,11 +245,11 @@ impl<Key: FutexKey> FutexTable<Key> {
                     current_value = observed_state;
                     continue;
                 }
-                break;
+                break new_owner_tid;
             }
 
             // We will drop the mapping when we leave this scope.
-        }
+        };
 
         let event = InterruptibleEvent::new();
         let guard = event.begin_wait();
@@ -256,7 +257,16 @@ impl<Key: FutexKey> FutexTable<Key> {
         state.get_rt_mutex_waiters_or_default(key).push_back(RtMutexWaiter { tid, notifiable });
         std::mem::drop(state);
 
-        current_task.block_until(guard, deadline)
+        // ESRCH  (FUTEX_LOCK_PI, FUTEX_LOCK_PI2, FUTEX_TRYLOCK_PI,
+        //        FUTEX_CMP_REQUEUE_PI) The thread ID in the futex word at
+        //        uaddr does not exist.
+        let new_owner = current_task
+            .get_task(new_owner_tid as i32)
+            .upgrade()
+            .map(|o| o.thread.read().as_ref().map(Arc::clone))
+            .flatten()
+            .ok_or_else(|| errno!(ESRCH))?;
+        current_task.block_with_owner_until(guard, &new_owner, deadline)
     }
 
     /// Unlock the futex at the given address.

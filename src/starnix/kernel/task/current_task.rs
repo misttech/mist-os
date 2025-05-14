@@ -439,7 +439,21 @@ impl CurrentTask {
         deadline: zx::MonotonicInstant,
     ) -> Result<(), Errno> {
         self.run_in_state(RunState::Event(guard.event().clone()), move || {
-            guard.block_until(deadline).map_err(|e| match e {
+            guard.block_until(None, deadline).map_err(|e| match e {
+                WakeReason::Interrupted => errno!(EINTR),
+                WakeReason::DeadlineExpired => errno!(ETIMEDOUT),
+            })
+        })
+    }
+
+    pub fn block_with_owner_until(
+        &self,
+        guard: EventWaitGuard<'_>,
+        new_owner: &zx::Thread,
+        deadline: zx::MonotonicInstant,
+    ) -> Result<(), Errno> {
+        self.run_in_state(RunState::Event(guard.event().clone()), move || {
+            guard.block_until(Some(new_owner), deadline).map_err(|e| match e {
                 WakeReason::Interrupted => errno!(EINTR),
                 WakeReason::DeadlineExpired => errno!(ETIMEDOUT),
             })

@@ -4420,6 +4420,7 @@ impl BinderDriver {
             }
 
             // Put this thread to sleep.
+            // TODO(https://fxbug.dev/401258133) pass a thread handle for priority inheritance
             current_task.block_until(guard, zx::MonotonicInstant::INFINITE)?;
         }
     }

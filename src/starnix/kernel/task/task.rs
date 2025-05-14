@@ -974,7 +974,7 @@ pub struct Task {
     ///
     /// Some tasks lack an underlying Zircon thread. These tasks are used internally by the
     /// Starnix kernel to track background work, typically on a `kthread`.
-    pub thread: RwLock<Option<zx::Thread>>,
+    pub thread: RwLock<Option<Arc<zx::Thread>>>,
 
     /// The file descriptor table for this task.
     ///
@@ -1173,7 +1173,7 @@ impl Task {
             pid: thread_group.leader,
             kernel: Arc::clone(&thread_group.kernel),
             thread_group: Some(thread_group),
-            thread: RwLock::new(thread),
+            thread: RwLock::new(thread.map(Arc::new)),
             files,
             mm,
             fs: Some(RwLock::new(fs)),
@@ -1417,7 +1417,7 @@ impl Task {
     pub fn set_command_name(&self, name: CString) {
         // Set the name on the Linux thread.
         if let Some(thread) = self.thread.read().as_ref() {
-            set_zx_name(thread, name.as_bytes());
+            set_zx_name(&**thread, name.as_bytes());
         }
         // If this is the thread group leader, use this name for the process too.
         if self.is_leader() {
@@ -1466,8 +1466,9 @@ impl Task {
     }
 
     pub fn time_stats(&self) -> TaskTimeStats {
+        use zx::Task;
         let info = match &*self.thread.read() {
-            Some(thread) => zx::Task::get_runtime_info(thread).expect("Failed to get thread stats"),
+            Some(thread) => thread.get_runtime_info().expect("Failed to get thread stats"),
             None => return TaskTimeStats::default(),
         };
 

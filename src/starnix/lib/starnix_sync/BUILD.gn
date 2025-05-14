@@ -26,6 +26,7 @@ rustc_library("starnix_sync") {
 
   test_deps = [
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-runtime",
     "//third_party/rust_crates:test-case",
   ]
 

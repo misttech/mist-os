@@ -32,6 +32,7 @@ use starnix_uapi::signals::SIGKILL;
 use starnix_uapi::{errno, error};
 use std::os::unix::thread::JoinHandleExt;
 use std::sync::mpsc::sync_channel;
+use std::sync::Arc;
 use zx::{
     AsHandleRef, {self as zx},
 };
@@ -563,7 +564,11 @@ where
     let pthread = join_handle.as_pthread_t();
     let raw_thread_handle =
         unsafe { zx::Unowned::<'_, zx::Thread>::from_raw_handle(thrd_get_zx_handle(pthread)) };
-    *task_thread_guard = Some(raw_thread_handle.duplicate(zx::Rights::SAME_RIGHTS).unwrap());
+    *task_thread_guard = Some(Arc::new(
+        raw_thread_handle
+            .duplicate(zx::Rights::SAME_RIGHTS)
+            .expect("must have RIGHT_DUPLICATE on handle we created"),
+    ));
 
     // Reset the process handle used to create threads.
     unsafe {
