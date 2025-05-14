@@ -1400,7 +1400,13 @@ impl Task {
     pub fn interrupt(&self) {
         self.read().signals.run_state.wake();
         if let Some(thread) = self.thread.read().as_ref() {
-            crate::execution::interrupt_thread(thread);
+            let status = unsafe { zx::sys::zx_restricted_kick(thread.raw_handle(), 0) };
+            if status != zx::sys::ZX_OK {
+                // zx_restricted_kick() could return ZX_ERR_BAD_STATE if the target thread is already in the
+                // DYING or DEAD states. That's fine since it means that the task is in the process of
+                // tearing down, so allow it.
+                assert_eq!(status, zx::sys::ZX_ERR_BAD_STATE);
+            }
         }
     }
 

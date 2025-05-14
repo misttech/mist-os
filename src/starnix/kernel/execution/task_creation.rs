@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::execution::TaskInfo;
 use crate::mm::MemoryManager;
 use crate::security;
 use crate::signals::SignalActions;
@@ -13,7 +12,7 @@ use crate::task::{
 use crate::vfs::{FdTable, FsContext};
 use starnix_sync::{LockBefore, Locked, ProcessGroupState, RwLockWriteGuard, TaskRelease};
 use starnix_types::arch::ArchWidth;
-use starnix_types::ownership::{OwnedRef, ReleaseGuard, Share, TempRef};
+use starnix_types::ownership::{OwnedRef, Releasable, ReleaseGuard, Share, TempRef};
 use starnix_types::release_on_error;
 use starnix_uapi::auth::Credentials;
 use starnix_uapi::errors::Errno;
@@ -23,6 +22,26 @@ use starnix_uapi::{errno, error, from_status_like_fdio, pid_t, rlimit};
 use std::ffi::CString;
 use std::sync::Arc;
 use zx::AsHandleRef;
+
+/// Result returned when creating new Zircon threads and processes for tasks.
+pub struct TaskInfo {
+    /// The thread that was created for the task.
+    pub thread: Option<zx::Thread>,
+
+    /// The thread group that the task should be added to.
+    pub thread_group: OwnedRef<ThreadGroup>,
+
+    /// The memory manager to use for the task.
+    pub memory_manager: Option<Arc<MemoryManager>>,
+}
+
+impl Releasable for TaskInfo {
+    type Context<'a: 'b, 'b> = &'b mut PidTable;
+
+    fn release<'a: 'b, 'b>(self, pids: Self::Context<'a, 'b>) {
+        self.thread_group.release(pids);
+    }
+}
 
 pub fn create_zircon_process<L>(
     locked: &mut Locked<'_, L>,

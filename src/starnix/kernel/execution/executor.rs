@@ -5,13 +5,12 @@
 #![allow(non_camel_case_types)]
 
 use crate::arch::execution::new_syscall;
-use crate::mm::MemoryManager;
 use crate::signals::{deliver_signal, dequeue_signal, prepare_to_restart_syscall, SignalInfo};
 use crate::syscalls::table::dispatch_syscall;
 use crate::task::{
     ptrace_attach_from_state, ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask,
-    ExceptionResult, ExitStatus, PidTable, PtraceCoreState, SeccompStateValue, StopState,
-    TaskBuilder, TaskFlags, ThreadGroup,
+    ExceptionResult, ExitStatus, PtraceCoreState, SeccompStateValue, StopState, TaskBuilder,
+    TaskFlags,
 };
 use crate::vfs::DelayedReleaser;
 use anyhow::{format_err, Error};
@@ -27,13 +26,12 @@ use starnix_logging::{
 use starnix_sync::{LockBefore, Locked, TaskRelease, Unlocked};
 use starnix_syscalls::decls::{Syscall, SyscallDecl};
 use starnix_syscalls::SyscallResult;
-use starnix_types::ownership::{OwnedRef, Releasable, WeakRef};
+use starnix_types::ownership::WeakRef;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::SIGKILL;
 use starnix_uapi::{errno, error};
 use std::os::unix::thread::JoinHandleExt;
 use std::sync::mpsc::sync_channel;
-use std::sync::Arc;
 use zx::{
     AsHandleRef, {self as zx},
 };
@@ -621,16 +619,6 @@ fn process_completed_exception(
     }
 }
 
-pub fn interrupt_thread(thread: &zx::Thread) {
-    let status = unsafe { zx::sys::zx_restricted_kick(thread.raw_handle(), 0) };
-    if status != zx::sys::ZX_OK {
-        // zx_restricted_kick() could return ZX_ERR_BAD_STATE if the target thread is already in the
-        // DYING or DEAD states. That's fine since it means that the task is in the process of
-        // tearing down, so allow it.
-        assert_eq!(status, zx::sys::ZX_ERR_BAD_STATE);
-    }
-}
-
 /// Contains context to track the most recently failing system call.
 ///
 /// When a task exits with a non-zero exit code, this context is logged to help debugging which
@@ -642,26 +630,6 @@ pub struct ErrorContext {
 
     /// The error that was returned for the system call.
     pub error: Errno,
-}
-
-/// Result returned when creating new Zircon threads and processes for tasks.
-pub struct TaskInfo {
-    /// The thread that was created for the task.
-    pub thread: Option<zx::Thread>,
-
-    /// The thread group that the task should be added to.
-    pub thread_group: OwnedRef<ThreadGroup>,
-
-    /// The memory manager to use for the task.
-    pub memory_manager: Option<Arc<MemoryManager>>,
-}
-
-impl Releasable for TaskInfo {
-    type Context<'a: 'b, 'b> = &'b mut PidTable;
-
-    fn release<'a: 'b, 'b>(self, pids: Self::Context<'a, 'b>) {
-        self.thread_group.release(pids);
-    }
 }
 
 /// Executes the provided `syscall` in `current_task`.
