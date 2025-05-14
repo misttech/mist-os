@@ -277,8 +277,8 @@ fn line_buffer_std_message(
     ret
 }
 
-// Binds to test manager component and returns suite runner service.
-pub async fn connect_to_suite_runner() -> Result<ftest_manager::SuiteRunnerProxy, Error> {
+// Binds to test manager component and returns run builder service.
+pub async fn connect_to_test_manager() -> Result<ftest_manager::RunBuilderProxy, Error> {
     let realm = client::connect_to_protocol::<fcomponent::RealmMarker>()
         .context("could not connect to Realm service")?;
 
@@ -290,8 +290,8 @@ pub async fn connect_to_suite_runner() -> Result<ftest_manager::SuiteRunnerProxy
         .context("open_exposed_dir fidl call failed for test manager")?
         .map_err(|e| format_err!("failed to create test manager: {:?}", e))?;
 
-    connect_to_protocol_at_dir_root::<ftest_manager::SuiteRunnerMarker>(&dir)
-        .context("failed to open test suite runner service")
+    connect_to_protocol_at_dir_root::<ftest_manager::RunBuilderMarker>(&dir)
+        .context("failed to open test suite service")
 }
 
 fn create_ns_from_current_ns(

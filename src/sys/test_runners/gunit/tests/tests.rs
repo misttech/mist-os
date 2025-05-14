@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use fidl_fuchsia_test_manager as ftest_manager;
-use fidl_fuchsia_test_manager::RunSuiteOptions;
+use fidl_fuchsia_test_manager::RunOptions;
 use ftest_manager::{CaseStatus, SuiteStatus};
 use maplit::hashset;
 use pretty_assertions::assert_eq;
 use std::collections::{HashMap, HashSet};
 use test_manager_test_lib::{GroupRunEventByTestCase, GroupedRunEvents, RunEvent};
+use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
 /*
 The only difference between inputs to gunit and gtest framework are the  name of the flags.
@@ -20,13 +20,15 @@ simulated gunit test and get correct output. Exhaustive testing can be found at
 
 pub async fn run_test(
     test_url: &str,
-    run_options: RunSuiteOptions,
+    run_options: RunOptions,
 ) -> Result<(Vec<RunEvent>, Vec<String>), Error> {
-    let suite_runner = test_runners_test_lib::connect_to_suite_runner().await?;
-    let runner = test_manager_test_lib::SuiteRunner::new(suite_runner);
+    let run_builder = test_runners_test_lib::connect_to_test_manager().await?;
+    let builder = test_manager_test_lib::TestBuilder::new(run_builder);
     let suite_instance =
-        runner.start_suite_run(test_url, run_options).context("suite runner execution failed")?;
+        builder.add_suite(test_url, run_options).await.context("Cannot create suite instance")?;
+    let builder_run = fasync::Task::spawn(async move { builder.run().await });
     let ret = test_runners_test_lib::process_events(suite_instance, false).await;
+    builder_run.await.context("builder execution failed")?;
     ret.map(|(mut events, logs)| {
         let () = events.retain(|event| match event {
             RunEvent::CaseStdout { name: _, stdout_message } => {
@@ -54,10 +56,14 @@ pub fn assert_events_eq(
     }
 }
 
-fn default_options() -> ftest_manager::RunSuiteOptions {
-    ftest_manager::RunSuiteOptions {
+fn default_options() -> ftest_manager::RunOptions {
+    ftest_manager::RunOptions {
         run_disabled_tests: Some(false),
-        max_concurrent_test_case_runs: Some(10),
+        parallel: Some(10),
+        arguments: None,
+        timeout: None,
+        case_filters_to_run: None,
+        log_iterator: None,
         ..Default::default()
     }
 }

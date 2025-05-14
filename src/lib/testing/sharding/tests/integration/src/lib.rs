@@ -5,12 +5,12 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 
-use fidl_fuchsia_test_manager::{CaseStatus, RunSuiteOptions};
-use fuchsia_async;
+use ftest_manager::RunOptions;
 use futures::StreamExt;
 use pretty_assertions::assert_eq;
 use regex::Regex;
 use test_manager_test_lib::RunEvent;
+use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
 pub async fn run_test(
     test_url: String,
@@ -19,18 +19,20 @@ pub async fn run_test(
     test_args: Vec<String>,
 ) -> Vec<RunEvent> {
     let time_taken = Regex::new(r" \(.*?\)$").unwrap();
-    let suite_runner =
-        test_runners_test_lib::connect_to_suite_runner().await.expect("connect to suite runner");
-    let runner = test_manager_test_lib::SuiteRunner::new(suite_runner);
-    let run_options = RunSuiteOptions {
+    let run_builder =
+        test_runners_test_lib::connect_to_test_manager().await.expect("connect to test manager");
+    let builder = test_manager_test_lib::TestBuilder::new(run_builder);
+    let run_options = RunOptions {
         run_disabled_tests: Some(run_disabled_tests),
-        max_concurrent_test_case_runs: parallel,
+        parallel,
         arguments: Some(test_args),
         ..Default::default()
     };
-    let suite_instance = runner
-        .start_suite_run(&test_url, run_options)
+    let suite_instance = builder
+        .add_suite(&test_url, run_options)
+        .await
         .expect("should successfully create suite instance");
+    let builder_run = fasync::Task::spawn(builder.run());
     let (mut events, _logs) = test_runners_test_lib::process_events(suite_instance, false)
         .await
         .expect("process events without error");
@@ -45,6 +47,8 @@ pub async fn run_test(
             _ => {}
         }
     }
+    let _: Vec<test_manager_test_lib::TestRunEvent> =
+        builder_run.await.expect("builder execution failed");
     events
 }
 
@@ -72,7 +76,7 @@ async fn run_example_sharded_test() {
         .into_iter()
         .filter_map(|event| match event {
             RunEvent::CaseStopped { name, status } => {
-                assert_eq!(status, CaseStatus::Passed, "case {name} failed");
+                assert_eq!(status, ftest_manager::CaseStatus::Passed, "case {name} failed");
                 Some(name)
             }
             _ => None,
@@ -114,7 +118,7 @@ async fn run_example_sharded_test_with_expectations() {
         .into_iter()
         .filter_map(|event| match event {
             RunEvent::CaseStopped { name, status } => {
-                assert_eq!(status, CaseStatus::Passed, "case {name} failed");
+                assert_eq!(status, ftest_manager::CaseStatus::Passed, "case {name} failed");
                 Some(name)
             }
             _ => None,
@@ -154,7 +158,7 @@ async fn run_example_sharded_test_with_shard_part_regex() {
         for event in events {
             match event {
                 RunEvent::CaseStopped { name, status } => {
-                    assert_eq!(status, CaseStatus::Passed, "case {name} failed");
+                    assert_eq!(status, ftest_manager::CaseStatus::Passed, "case {name} failed");
                     let (section, _case) =
                         name.split_once("::").expect("should match format section_*::case_*");
                     match section_to_shard.entry(section.to_string()) {

@@ -3,24 +3,23 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use fidl_fuchsia_test_manager as ftest_manager;
-use ftest_manager::{CaseStatus, RunSuiteOptions, SuiteStatus};
+use ftest_manager::{CaseStatus, RunOptions, SuiteStatus};
 use pretty_assertions::assert_eq;
 use test_manager_test_lib::{GroupRunEventByTestCase, RunEvent};
+use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
-fn default_options() -> RunSuiteOptions {
-    RunSuiteOptions::default()
+fn default_options() -> RunOptions {
+    RunOptions::default()
 }
 
-pub async fn run_test(
-    test_url: &str,
-    run_options: RunSuiteOptions,
-) -> Result<Vec<RunEvent>, Error> {
-    let suite_runner = test_runners_test_lib::connect_to_suite_runner().await?;
-    let runner = test_manager_test_lib::SuiteRunner::new(suite_runner);
+pub async fn run_test(test_url: &str, run_options: RunOptions) -> Result<Vec<RunEvent>, Error> {
+    let run_builder = test_runners_test_lib::connect_to_test_manager().await?;
+    let builder = test_manager_test_lib::TestBuilder::new(run_builder);
     let suite_instance =
-        runner.start_suite_run(test_url, run_options).context("suite runner execution failed")?;
+        builder.add_suite(test_url, run_options).await.context("Cannot create suite instance")?;
+    let builder_run = fasync::Task::spawn(async move { builder.run().await });
     let (events, _logs) = test_runners_test_lib::process_events(suite_instance, false).await?;
+    builder_run.await.context("builder execution failed")?;
     Ok(events)
 }
 

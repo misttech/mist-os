@@ -9,8 +9,7 @@ use diagnostics_data::{
     Timestamp,
 };
 use fake_archive_accessor::FakeArchiveAccessor;
-use fidl_fuchsia_test_manager as ftest_manager;
-use ftest_manager::{CaseStatus, RunSuiteOptions, SuiteStatus};
+use ftest_manager::{CaseStatus, RunOptions, SuiteStatus};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
 use futures::prelude::*;
@@ -18,6 +17,7 @@ use paste::paste;
 use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
 use test_manager_test_lib::{GroupRunEventByTestCase, RunEvent};
+use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
 #[derive(Debug)]
 struct IntegrationCaseStatus {
@@ -113,7 +113,7 @@ async fn run_test(
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol::<ftest_manager::SuiteRunnerMarker>())
+                .capability(Capability::protocol::<ftest_manager::RunBuilderMarker>())
                 .from(&test_manager)
                 .to(Ref::parent()),
         )
@@ -121,16 +121,19 @@ async fn run_test(
 
     let instance = builder.build().await?;
 
-    let suite_runner =
-        instance.root.connect_to_protocol_at_exposed_dir::<ftest_manager::SuiteRunnerMarker>()?;
-    let runner = test_manager_test_lib::SuiteRunner::new(suite_runner);
-    let suite_instance = runner
-        .start_suite_run(
+    let run_builder =
+        instance.root.connect_to_protocol_at_exposed_dir::<ftest_manager::RunBuilderMarker>()?;
+    let run_builder = test_manager_test_lib::TestBuilder::new(run_builder);
+    let suite_instance = run_builder
+        .add_suite(
             test_url,
-            RunSuiteOptions { max_concurrent_test_case_runs: Some(1), ..Default::default() },
+            RunOptions { run_disabled_tests: Some(false), parallel: Some(1), ..Default::default() },
         )
-        .context("suite runner execution failed")?;
+        .await
+        .context("Cannot create suite instance")?;
+    let builder_run = fasync::Task::spawn(async move { run_builder.run().await });
     let (events, _logs) = test_runners_test_lib::process_events(suite_instance, false).await?;
+    builder_run.await.context("builder execution failed")?;
 
     Ok(IntegrationCaseStatus {
         events: events,
