@@ -15,13 +15,13 @@
     }
   ],
   "notes": [
-    "Sets the `target.default` configuration key in 'User Configuration'\nscope.\n\nAfter setting the default target, `ffx target list` will mark the default\nwith a `*` in the output list."
+    "Sets the default target in 'User Configuration' scope.\n\nAfter setting the default target, `ffx target list` will mark the default\nwith a `*` in the output list."
   ],
   "commands": [],
   "positionals": [
     {
       "name": "nodename",
-      "description": "node name of the target",
+      "description": "the target's specifier",
       "optionality": "required",
       "hidden": false
     }

@@ -46,8 +46,8 @@ LOG_DIR = "$FUCHSIA_TEST_OUTDIR/ffx_logs"
 ffx daemon start > "$LOG_DIR/ffx.daemon.log" 2> "$LOG_DIR/ffx.daemon.log" &
 
 # If interacting with a device:
-ffx config target.default "$FUCHSIA_DEVICE_ADDR"
 ffx target add "$FUCHSIA_DEVICE_ADDR"
+export FUCHSIA_NODENAME="$FUCHSIA_DEVICE_ADDR"
 ```
 
 When the test is completed, the test author needs to clean up the isolate directory. Deleting

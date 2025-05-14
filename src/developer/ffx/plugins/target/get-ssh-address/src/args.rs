@@ -12,8 +12,8 @@ use ffx_core::ffx_command;
     subcommand,
     name = "get-ssh-address",
     description = "Get the target's ssh address",
-    note = "Return the SSH address of the default target defined in the
-`target.default` key. By default this comes from the 'User Configuration'.
+    note = "Return the SSH address of the default target, which can be retrieved
+with `ffx target default get`.
 
 The command takes a <timeout> value in seconds with a default of `1.0`
 and overrides the value in the `target.interaction.timeout` key.",

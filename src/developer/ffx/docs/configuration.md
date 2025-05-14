@@ -210,11 +210,6 @@ When updating, please add the value in alphabetical order.
     | `ssh.keepalive_timeout`                 | Time for an ssh connection to wait |
     |                                         | before timing out.                 |
     |                                         | Defaults to `20` seconds.          |
-    | `target.default`                        | The default target to use if one   |
-    |                                         | is unspecified.                    |
-    |                                         | Defaults to first available of:    |
-    |                                         |   `$FUCHSIA_DEVICE_ADDR`           |
-    |                                         |   `$FUCHSIA_NODENAME`              |
     | `target.host_pipe_ssh_timeout`          | Time the target waits for an       |
     |                                         | initial response from ssh on the   |
     |                                         | target (currently, only in `ffx    |

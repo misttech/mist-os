@@ -131,6 +131,7 @@ async fn remove_aliases(repo_url: &str, rewrite_proxy: EngineProxy) -> Result<()
 mod test {
     use super::*;
     use camino::Utf8PathBuf;
+    use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::ConfigLevel;
     use ffx_writer::TestBuffers;
     use fidl::endpoints::ServerEnd;
@@ -253,7 +254,7 @@ mod test {
         let default_repo_name = "default-repo";
         pkg::config::set_default_repository(default_repo_name).await.unwrap();
         env.context
-            .query("target.default")
+            .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("some-target".into())
             .await
@@ -286,7 +287,7 @@ mod test {
         let default_repo_name = "default-repo";
         pkg::config::set_default_repository(default_repo_name).await.unwrap();
         env.context
-            .query("target.default")
+            .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
             .set("some-target".into())
             .await
