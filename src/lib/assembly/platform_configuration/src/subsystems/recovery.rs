@@ -82,7 +82,8 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
                 SystemRecovery::Fdr => builder.platform_bundle("recovery_fdr"),
                 SystemRecovery::Android => {
                     builder.platform_bundle("recovery_android");
-                    builder.platform_bundle("fastbootd_usb_support")
+                    builder.platform_bundle("fastbootd_usb_support");
+                    builder.platform_bundle("adb_support");
                 }
             }
 

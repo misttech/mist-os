@@ -10,7 +10,8 @@
 #include "adb.h"
 
 int main(int argc, char** argv) {
-  fuchsia_logging::SetTags({"adb"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"adb"}).BuildAndInitialize();
 
   async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
   auto status = loop.StartThread("adb-thread");

@@ -5053,14 +5053,22 @@ assembly_input_bundle("recovery_fdr") {
 }
 
 assembly_input_bundle("recovery_android") {
-  base_packages = [ "//src/recovery/system:system_recovery_android" ]
+  base_packages = [
+    "//src/recovery/system:system_recovery_android",
+    "//src/developer/adb/bin:adb",
+  ]
   compiled_packages = [
     {
       name = "core"
       components = [
         {
           component_name = "core"
-          shards = [ "//src/recovery/system/meta/core_shards/system_recovery_android.core_shard.cml" ]
+          shards = [
+            "//src/recovery/system/meta/core_shards/system_recovery_android.core_shard.cml",
+            "//src/developer/adb/bin/adb/meta/adb.core_shard.cml",
+            "//src/developer/adb/bin/adb-file-sync/meta/adb-file-sync.core_shard.cml",
+            "//src/developer/adb/bin/adb-reboot/meta/adb-reboot.core_shard.cml",
+          ]
         },
       ]
     },
