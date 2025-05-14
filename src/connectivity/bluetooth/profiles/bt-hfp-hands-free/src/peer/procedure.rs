@@ -60,7 +60,7 @@ macro_rules! at_cmd {
 pub(crate) use at_cmd;
 
 #[macro_export]
-macro_rules! make_from {
+macro_rules! impl_from_to_variant {
     ($source: path, $destination: ident, $destination_variant: ident) => {
         impl From<$source> for $destination {
             fn from(source: $source) -> $destination {
@@ -85,8 +85,8 @@ pub enum ProcedureInput {
     CommandFromHf(CommandFromHf),
 }
 
-make_from!(at_connection::Response, ProcedureInput, AtResponseFromAg);
-make_from!(CommandFromHf, ProcedureInput, CommandFromHf);
+impl_from_to_variant!(at_connection::Response, ProcedureInput, AtResponseFromAg);
+impl_from_to_variant!(CommandFromHf, ProcedureInput, CommandFromHf);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommandToHf {
@@ -107,8 +107,8 @@ pub enum ProcedureOutput {
     CommandToHf(CommandToHf),
 }
 
-make_from!(at::Command, ProcedureOutput, AtCommandToAg);
-make_from!(CommandToHf, ProcedureOutput, CommandToHf);
+impl_from_to_variant!(at::Command, ProcedureOutput, AtCommandToAg);
+impl_from_to_variant!(CommandToHf, ProcedureOutput, CommandToHf);
 
 pub trait ProcedureInputT<O: ProcedureOutputT>: Clone + Debug + PartialEq + Unpin {
     fn to_initialized_procedure(&self) -> Option<Box<dyn Procedure<Self, O>>>;

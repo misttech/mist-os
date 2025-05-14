@@ -78,37 +78,22 @@ impl SlcInitProcedure {
 
     fn receive_supported_ag_indicators(
         &mut self,
-        _ordered_indicators: Vec<AgIndicatorIndex>,
+        ordered_indicators: Vec<AgIndicatorIndex>,
     ) -> Vec<ProcedureOutput> {
         self.state = State::ReceivedSupportedAgIndicators;
-        // TODO(fxbug.dev/108331): Read actual indicator values by parsing raw bytes.
-        // Note that the values of the indices here match the out-of-order values in the tests.
-        // This will allow the tests to pass, but when this is rewritten to actually parse the
-        // indicator indices, the tests should pass naturally.
-        vec![
-            CommandToHf::SetAgIndicatorIndex {
-                indicator: AgIndicatorIndex::ServiceAvailable,
-                index: 7,
-            }
-            .into(),
-            CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::Call, index: 1 }.into(),
-            CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::CallSetup, index: 2 }
-                .into(),
-            CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::CallHeld, index: 3 }
-                .into(),
-            CommandToHf::SetAgIndicatorIndex {
-                indicator: AgIndicatorIndex::SignalStrength,
-                index: 4,
-            }
-            .into(),
-            CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::Roaming, index: 5 }
-                .into(),
-            CommandToHf::SetAgIndicatorIndex {
-                indicator: AgIndicatorIndex::BatteryCharge,
-                index: 6,
-            }
-            .into(),
-        ]
+
+        let outputs = ordered_indicators
+            .into_iter()
+            .enumerate()
+            .map(|(index, indicator)| {
+                let index: i64 =
+                    index.try_into().expect("Failed to fit AG indicator index into i64?");
+                // Indicator indices are 1-indexed
+                let index: i64 = index + 1;
+                CommandToHf::SetAgIndicatorIndex { indicator, index }.into()
+            })
+            .collect();
+        outputs
     }
 
     fn read_ag_indicator_statuses(&mut self) -> Vec<ProcedureOutput> {
@@ -351,11 +336,6 @@ mod tests {
         battery_charge: i64,
     ) -> Vec<ProcedureOutput> {
         vec![
-            CommandToHf::SetAgIndicatorIndex {
-                indicator: AgIndicatorIndex::ServiceAvailable,
-                index: service_available,
-            }
-            .into(),
             CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::Call, index: call }
                 .into(),
             CommandToHf::SetAgIndicatorIndex {
@@ -381,6 +361,11 @@ mod tests {
             CommandToHf::SetAgIndicatorIndex {
                 indicator: AgIndicatorIndex::BatteryCharge,
                 index: battery_charge,
+            }
+            .into(),
+            CommandToHf::SetAgIndicatorIndex {
+                indicator: AgIndicatorIndex::ServiceAvailable,
+                index: service_available,
             }
             .into(),
         ]

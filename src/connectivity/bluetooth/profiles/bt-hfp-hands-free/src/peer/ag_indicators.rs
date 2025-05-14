@@ -6,9 +6,11 @@ use anyhow::{format_err, Result};
 use bt_hfp::call::indicators as call_indicators;
 use fidl_fuchsia_bluetooth_hfp::SignalStrength;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
-#[allow(unused)]
-#[derive(Clone, Copy, Debug, Hash, PartialEq)]
+use crate::impl_from_to_variant;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum AgIndicatorIndex {
     Call,
     CallSetup,
@@ -17,6 +19,85 @@ pub enum AgIndicatorIndex {
     SignalStrength,
     Roaming,
     BatteryCharge,
+}
+
+struct Range {
+    min: i64,
+    max: i64,
+}
+
+// These ranges are from HFP v1.8 4.32.2 section on AT+CIND.
+static ALLOWED_INDICATOR_RANGES: LazyLock<HashMap<AgIndicatorIndex, Range>> = LazyLock::new(|| {
+    use AgIndicatorIndex::*;
+
+    let mut map = HashMap::new();
+
+    let _ = map.insert(Call, Range { min: 0, max: 1 });
+    let _ = map.insert(CallSetup, Range { min: 0, max: 3 });
+    let _ = map.insert(CallHeld, Range { min: 0, max: 2 });
+    let _ = map.insert(ServiceAvailable, Range { min: 0, max: 1 });
+    let _ = map.insert(SignalStrength, Range { min: 0, max: 5 });
+    let _ = map.insert(Roaming, Range { min: 0, max: 1 });
+    let _ = map.insert(BatteryCharge, Range { min: 0, max: 5 });
+
+    map
+});
+
+pub fn check_ag_indicator_range_allowed(
+    indicator: AgIndicatorIndex,
+    min: i64,
+    max: i64,
+) -> Result<()> {
+    let allowed_range_option = ALLOWED_INDICATOR_RANGES.get(&indicator);
+    let allowed_range = allowed_range_option.expect("No allowed range specified for AG Indicator");
+
+    if allowed_range.min != min {
+        Err(format_err!(
+            "Min allowed value {:} doesn't match provided min value {:} for AG Indicator {:?}",
+            allowed_range.min,
+            min,
+            indicator
+        ))?;
+    }
+
+    if allowed_range.max != max {
+        Err(format_err!(
+            "Max allowed value {:} doesn't match provided max value {:} for AG Indicator {:?}",
+            allowed_range.max,
+            max,
+            indicator
+        ))?;
+    }
+
+    Ok(())
+}
+
+/// Convert from the AT response +CIND names for the indicators to an enum variant
+impl TryFrom<&str> for AgIndicatorIndex {
+    type Error = anyhow::Error;
+
+    fn try_from(str: &str) -> Result<Self> {
+        match str {
+            "call" => Ok(Self::Call),
+            "callsetup" => Ok(Self::CallSetup),
+            "callheld" => Ok(Self::CallHeld),
+            "service" => Ok(Self::ServiceAvailable),
+            "signal" => Ok(Self::SignalStrength),
+            "roam" => Ok(Self::Roaming),
+            "battchg" => Ok(Self::BatteryCharge),
+            other => Err(format_err!("Unknown AG indicator {:}", other)),
+        }
+    }
+}
+
+/// Convert from the AT response +CIND names for the indicators to an enum variant
+impl TryFrom<&[u8]> for AgIndicatorIndex {
+    type Error = anyhow::Error;
+
+    fn try_from(bytes: &[u8]) -> Result<Self> {
+        let str = std::str::from_utf8(bytes)?;
+        str.try_into()
+    }
 }
 
 /// Keeps track of which indices are used for the indicators being received from an AG peer.
@@ -32,6 +113,10 @@ pub enum CallIndicator {
     CallSetup(call_indicators::CallSetup),
     CallHeld(call_indicators::CallHeld),
 }
+
+impl_from_to_variant!(call_indicators::Call, CallIndicator, Call);
+impl_from_to_variant!(call_indicators::CallSetup, CallIndicator, CallSetup);
+impl_from_to_variant!(call_indicators::CallHeld, CallIndicator, CallHeld);
 
 #[derive(Debug, PartialEq)]
 pub enum NetworkInformationIndicator {
@@ -104,6 +189,10 @@ pub enum AgIndicator {
     NetworkInformation(NetworkInformationIndicator),
     BatteryCharge(BatteryChargeIndicator),
 }
+
+impl_from_to_variant!(CallIndicator, AgIndicator, Call);
+impl_from_to_variant!(NetworkInformationIndicator, AgIndicator, NetworkInformation);
+impl_from_to_variant!(BatteryChargeIndicator, AgIndicator, BatteryCharge);
 
 impl AgIndicatorTranslator {
     pub fn new() -> Self {

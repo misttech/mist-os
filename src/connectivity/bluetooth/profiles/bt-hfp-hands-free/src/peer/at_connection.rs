@@ -20,6 +20,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use crate::peer::ag_indicators::AgIndicatorIndex;
+use crate::peer::parse_cind_test;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Response {
@@ -142,8 +143,9 @@ impl Connection {
     }
 
     fn parse_unparsed_bytes(bytes: Vec<u8>) -> Result<Response> {
-        // TODO(http://fxbug.dev/108331): Parse bytes for CindTest.
-        return Err(format_err!("parse_unparse_bytes unimplemented"));
+        let response = parse_cind_test::parse(bytes)?;
+        // Add more parses here if necessary.
+        Ok(response)
     }
 }
 
@@ -175,8 +177,6 @@ mod test {
         assert_eq!(response, expected_response);
     }
 
-    // TODO(b/416536459) This test is broken until CindTest is properly parsed.
-    #[ignore]
     #[fuchsia::test]
     fn unparsed_response_received() {
         let mut exec = fasync::TestExecutor::new();
@@ -192,7 +192,8 @@ mod test {
             .expect("Received channel read closed error")
             .expect("Received channel read Zircon error");
 
-        let expected_response = Response::CindTest { ordered_indicators: vec![] };
+        let expected_response =
+            Response::CindTest { ordered_indicators: vec![AgIndicatorIndex::ServiceAvailable] };
         assert_eq!(response, expected_response);
     }
 
