@@ -270,7 +270,7 @@ void TimeoutWakeLease::DepositWakeLease(zx::eventpair wake_lease, zx::time timeo
 
 zx::result<zx::eventpair> TimeoutWakeLease::TakeWakeLease() {
   lease_task_.Cancel();
-  return lease_.TakeWakeLease();
+  return lease_.End();
 }
 
 zx::result<zx::eventpair> TimeoutWakeLease::GetWakeLeaseCopy() { return lease_.GetWakeLeaseCopy(); }
