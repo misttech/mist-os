@@ -488,7 +488,7 @@ group("libm") {
 }
 
 group("linked-hash-map") {
-  public_deps = [ ":linked-hash-map-v0_5_3" ]
+  public_deps = [ ":linked-hash-map-v0_5_6" ]
 }
 
 if (current_os == "fuchsia") {
@@ -8592,19 +8592,19 @@ rust_library("libm-v0_2_1") {
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
-license("linked-hash-map-v0_5_3.license") {
+license("linked-hash-map-v0_5_6.license") {
   public_package_name = "linked_hash_map"
   license_files = [
-    "//third_party/rust_crates/vendor/linked-hash-map-0.5.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/linked-hash-map-0.5.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/linked-hash-map-0.5.6/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/linked-hash-map-0.5.6/LICENSE-MIT",
   ]
 }
 
-rust_library("linked-hash-map-v0_5_3") {
+rust_library("linked-hash-map-v0_5_6") {
   crate_name = "linked_hash_map"
   crate_root =
-      "//third_party/rust_crates/vendor/linked-hash-map-0.5.3/src/lib.rs"
-  output_name = "linked_hash_map-b9b35caede8d8189"
+      "//third_party/rust_crates/vendor/linked-hash-map-0.5.6/src/lib.rs"
+  output_name = "linked_hash_map-8c7e807bcd1d0a5a"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -8614,13 +8614,13 @@ rust_library("linked-hash-map-v0_5_3") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=b9b35caede8d8189",
-    "-Cextra-filename=-b9b35caede8d8189",
+    "-Cmetadata=8c7e807bcd1d0a5a",
+    "-Cextra-filename=-8c7e807bcd1d0a5a",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":linked-hash-map-v0_5_3.license" ]
+  applicable_licenses = [ ":linked-hash-map-v0_5_6.license" ]
 }
 
 license("lipsum-v0_6_0.license") {
@@ -8766,7 +8766,7 @@ rust_library("lru-cache-v0_1_2") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":linked-hash-map-v0_5_3" ]
+  deps += [ ":linked-hash-map-v0_5_6" ]
 
   rustenv = []
 
@@ -17191,7 +17191,7 @@ rust_library("toml_edit-v0_2_1") {
   deps = []
   deps += [ ":chrono-v0_4_34" ]
   deps += [ ":combine-v4_6_2" ]
-  deps += [ ":linked-hash-map-v0_5_3" ]
+  deps += [ ":linked-hash-map-v0_5_6" ]
 
   rustenv = []
 

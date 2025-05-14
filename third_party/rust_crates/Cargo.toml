@@ -142,7 +142,7 @@ json5format = "0.2.6"
 lazy_static = "1.4"
 libc = { version = "0.2.171", features = ["extra_traits"] }
 libm = "0.2.1"
-linked-hash-map = "0.5.3"
+linked-hash-map = "0.5.6"
 lock_api = "0.4.11"
 log = { version = "0.4.22", features = ["kv", "std"] }
 lru-cache = "0.1.2"
