@@ -14,11 +14,14 @@ include /src/lib/assembly/OWNERS
 include /src/lib/assembly/component_manager_config/OWNERS
 include /src/lib/testing/expectation/OWNERS
 include /src/power/OWNERS
+include /src/security/OWNERS
 include /src/security/lib/scrutiny/OWNERS
 include /src/starnix/OWNERS
 include /src/starnix/lib/selinux/OWNERS
 include /src/sys/lib/component_id_index/OWNERS
+include /src/tee/OWNERS
 include /tools/cmc/OWNERS
+include /tools/component_id_index/OWNERS
 include /tools/configc/OWNERS
 include /tools/jq5/OWNERS
 include /tools/lib/cml/OWNERS

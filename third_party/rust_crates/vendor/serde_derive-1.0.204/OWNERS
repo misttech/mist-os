@@ -9,6 +9,7 @@ include /src/power/OWNERS
 include /src/power/metrics-logger/OWNERS
 include /src/security/bin/tee_manager/OWNERS
 include /src/sys/pkg/OWNERS
+include /src/tee/OWNERS
 include /third_party/rust_crates/vendor/criterion-0.2.11/OWNERS
 include /third_party/rust_crates/vendor/serde-1.0.204/OWNERS
 include /third_party/rust_crates/vendor/tuf-0.3.0-beta13/OWNERS

@@ -3,6 +3,9 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /examples/fuzzers/OWNERS
+include /src/connectivity/lib/OWNERS
+include /src/connectivity/lib/packet-formats/OWNERS
+include /src/connectivity/network/OWNERS
 include /src/connectivity/wlan/OWNERS
 include /src/connectivity/wlan/wlancfg/OWNERS
 include /src/diagnostics/OWNERS

@@ -2,9 +2,12 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
+include /third_party/rust_crates/forks/num-bigint-dig/OWNERS
 include /third_party/rust_crates/vendor/aes-gcm-siv-0.11.1/OWNERS
 include /third_party/rust_crates/vendor/crypto-bigint-0.4.9/OWNERS
 include /third_party/rust_crates/vendor/der-0.6.1/OWNERS
+include /third_party/rust_crates/vendor/der-0.7.9/OWNERS
 include /third_party/rust_crates/vendor/elliptic-curve-0.12.3/OWNERS
 include /third_party/rust_crates/vendor/rfc6979-0.3.1/OWNERS
+include /third_party/rust_crates/vendor/rsa-0.9.7/OWNERS
 include /third_party/rust_crates/vendor/sec1-0.3.0/OWNERS

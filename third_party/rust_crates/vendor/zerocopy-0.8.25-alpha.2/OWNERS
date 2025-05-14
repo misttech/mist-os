@@ -6,6 +6,7 @@ include /sdk/fidl/zbi/OWNERS
 include /sdk/rust/zx/OWNERS
 include /sdk/rust/zx-types/OWNERS
 include /src/bringup/bin/netsvc/OWNERS
+include /src/connectivity/lib/OWNERS
 include /src/connectivity/lib/net-types/OWNERS
 include /src/connectivity/lib/network-device/rust/OWNERS
 include /src/connectivity/lib/packet-formats/OWNERS
@@ -18,11 +19,14 @@ include /src/connectivity/network/dhcpv4/OWNERS
 include /src/connectivity/network/dhcpv6/OWNERS
 include /src/connectivity/overnet/OWNERS
 include /src/connectivity/overnet/usb/OWNERS
+include /src/connectivity/ppp/OWNERS
 include /src/connectivity/wlan/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/devices/pci/OWNERS
 include /src/devices/usb/OWNERS
 include /src/diagnostics/OWNERS
+include /src/firmware/OWNERS
+include /src/graphics/OWNERS
 include /src/lib/assembly/OWNERS
 include /src/lib/diagnostics/OWNERS
 include /src/lib/fidl/rust_next/OWNERS
@@ -34,6 +38,7 @@ include /src/lib/network/packet/OWNERS
 include /src/lib/process_builder/OWNERS
 include /src/lib/ui/wayland/OWNERS
 include /src/lib/usb_rs/OWNERS
+include /src/media/OWNERS
 include /src/performance/memory/OWNERS
 include /src/power/metrics-logger/OWNERS
 include /src/starnix/OWNERS
@@ -45,5 +50,6 @@ include /src/sys/component_manager/OWNERS
 include /src/sys/lib/fuchsia-bootfs/OWNERS
 include /src/sys/lib/fuchsia-zbi/OWNERS
 include /src/sys/pkg/OWNERS
+include /src/virtualization/OWNERS
 include /tools/make-fuchsia-vol/OWNERS
 include /zircon/tools/zither/OWNERS

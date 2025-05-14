@@ -3,3 +3,4 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/connectivity/wlan/OWNERS
+include /src/tee/OWNERS

@@ -4,4 +4,5 @@
 
 include /src/power/OWNERS
 include /src/ui/lib/scene_management/OWNERS
+include /third_party/rust_crates/forks/num-bigint-dig/OWNERS
 include /third_party/rust_crates/vendor/num-traits-0.2.19/OWNERS

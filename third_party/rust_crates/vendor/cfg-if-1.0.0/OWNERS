@@ -16,6 +16,7 @@ include /third_party/rust_crates/vendor/filetime-0.2.14/OWNERS
 include /third_party/rust_crates/vendor/getrandom-0.2.10/OWNERS
 include /third_party/rust_crates/vendor/half-2.4.1/OWNERS
 include /third_party/rust_crates/vendor/instant-0.1.9/OWNERS
+include /third_party/rust_crates/vendor/loom-0.7.1/OWNERS
 include /third_party/rust_crates/vendor/md-5-0.10.6/OWNERS
 include /third_party/rust_crates/vendor/mockall-0.9.0/OWNERS
 include /third_party/rust_crates/vendor/mockall_derive-0.9.0/OWNERS

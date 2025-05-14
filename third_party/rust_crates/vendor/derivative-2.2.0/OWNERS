@@ -10,6 +10,7 @@ include /src/connectivity/network/OWNERS
 include /src/connectivity/network/dhcpv4/OWNERS
 include /src/connectivity/network/dhcpv6/OWNERS
 include /src/connectivity/network/netlink/OWNERS
+include /src/connectivity/network/testing/network-test-realm/OWNERS
 include /src/connectivity/network/tests/integration/OWNERS
 include /src/connectivity/policy/OWNERS
 include /src/connectivity/wlan/OWNERS

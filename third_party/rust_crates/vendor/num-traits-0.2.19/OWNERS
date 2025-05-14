@@ -20,6 +20,7 @@ include /src/lib/diagnostics/hierarchy/rust/OWNERS
 include /src/lib/diagnostics/inspect/format/rust/OWNERS
 include /src/lib/fuchsia-runtime/OWNERS
 include /src/lib/process_builder/OWNERS
+include /src/media/OWNERS
 include /src/power/OWNERS
 include /src/power/metrics-logger/OWNERS
 include /src/recovery/OWNERS
@@ -30,6 +31,8 @@ include /src/tee/OWNERS
 include /src/testing/sl4f/OWNERS
 include /src/ui/bin/brightness_manager/OWNERS
 include /src/ui/lib/scene_management/OWNERS
+include /src/virtualization/OWNERS
+include /third_party/rust_crates/forks/num-bigint-dig/OWNERS
 include /third_party/rust_crates/vendor/chrono-0.4.34/OWNERS
 include /third_party/rust_crates/vendor/criterion-0.2.11/OWNERS
 include /third_party/rust_crates/vendor/euclid-0.22.1/OWNERS
@@ -41,4 +44,5 @@ include /third_party/rust_crates/vendor/num-integer-0.1.46/OWNERS
 include /third_party/rust_crates/vendor/num-iter-0.1.45/OWNERS
 include /third_party/rust_crates/vendor/num-rational-0.4.2/OWNERS
 include /third_party/rust_crates/vendor/proptest-1.5.0/OWNERS
+include /third_party/rust_crates/vendor/rsa-0.9.7/OWNERS
 include /tools/zedmon/OWNERS

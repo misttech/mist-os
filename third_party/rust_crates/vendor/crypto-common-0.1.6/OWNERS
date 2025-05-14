@@ -2,6 +2,7 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
+include /src/tee/OWNERS
 include /third_party/rust_crates/vendor/aead-0.5.2/OWNERS
 include /third_party/rust_crates/vendor/cipher-0.4.4/OWNERS
 include /third_party/rust_crates/vendor/digest-0.10.7/OWNERS

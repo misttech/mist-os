@@ -20,4 +20,5 @@ include /src/starnix/OWNERS
 include /src/sys/lib/fuchsia-zbi/OWNERS
 include /src/tee/OWNERS
 include /src/testing/sl4f/OWNERS
+include /src/virtualization/OWNERS
 include /tools/zedmon/OWNERS

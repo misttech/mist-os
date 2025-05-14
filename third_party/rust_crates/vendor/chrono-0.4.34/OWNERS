@@ -17,6 +17,7 @@ include /src/hwinfo/OWNERS
 include /src/lib/diagnostics/OWNERS
 include /src/lib/injectable-time/OWNERS
 include /src/lib/testing/fuchsia-hyper-test-support/OWNERS
+include /src/lib/ui/carnelian/OWNERS
 include /src/lib/versioning/version-history/OWNERS
 include /src/storage/OWNERS
 include /src/sys/lib/elf_runner/OWNERS
