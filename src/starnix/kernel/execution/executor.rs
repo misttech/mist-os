@@ -5,8 +5,8 @@
 #![allow(non_camel_case_types)]
 
 use crate::arch::execution::new_syscall;
+use crate::execution::table::dispatch_syscall;
 use crate::signals::{deliver_signal, dequeue_signal, prepare_to_restart_syscall, SignalInfo};
-use crate::syscalls::table::dispatch_syscall;
 use crate::task::{
     ptrace_attach_from_state, ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask,
     ExceptionResult, ExitStatus, PtraceCoreState, SeccompStateValue, StopState, TaskBuilder,
