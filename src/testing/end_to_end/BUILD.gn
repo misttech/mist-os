@@ -52,6 +52,9 @@ template("group_with_no_dir_target_deps") {
 
 ############################# Test groups - Start ##############################
 
+# Note - For the test groups related to internal products, please refer to
+# `//v/g/bundles/buildbot/<PRODUCT>/<BOARD>/BUILD.gn`
+
 # core.x64
 group_with_no_dir_target_deps("core_x64_stable_sl4f_tests") {
   testonly = true
@@ -212,39 +215,6 @@ group("workbench_vim3_staging_tests") {
   public_deps = [
     ":workbench_vim3_stable_tests",
     ":workbench_vim3_unstable_tests",
-  ]
-}
-
-# smart_display.nelson
-group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
-  testonly = true
-  public_deps = [
-    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
-    "honeydew/honeydew/affordances/connectivity/netstack/tests/functional_tests:netstack_test($host_toolchain)",
-    "honeydew/honeydew/affordances/location/tests/functional_tests:location_test($host_toolchain)",
-    "honeydew/honeydew/affordances/session/tests/functional_tests:test_session",
-    "honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
-    "honeydew/honeydew/affordances/ui/screenshot/tests/functional_tests:test_screenshot",
-    "honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
-    "honeydew/honeydew/fuchsia_device/tests/functional_tests:nelson_test($host_toolchain)",
-    "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_test($host_toolchain)",
-    "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_using_serial_test($host_toolchain)",
-    "honeydew/honeydew/transports/ffx/tests/functional_tests:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
-    "honeydew/honeydew/transports/ffx/tests/functional_tests:test_ffx_on_nelson",
-  ]
-}
-
-group_with_no_dir_target_deps("smart_display_nelson_unstable_tests") {
-  testonly = true
-  public_deps = []
-}
-
-group("smart_display_nelson_staging_tests") {
-  testonly = true
-  public_deps = [
-    ":smart_display_nelson_stable_tests",
-    ":smart_display_nelson_unstable_tests",
   ]
 }
 
