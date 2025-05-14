@@ -18,8 +18,8 @@
 #include <string_view>
 
 #include "allocator.h"
-#include "bootstrap.h"
 #include "posix.h"
+#include "startup-bootstrap.h"
 #include "startup-diagnostics.h"
 
 namespace ld {
@@ -202,10 +202,7 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
       DiagnosticsReport(startup),
       elfldltl::DiagnosticsPanicFlags{},
   };
-
-  BootstrapModule vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso, startup.page_size);
-  BootstrapModule self_module = BootstrapSelfModule(bootstrap_diag, vdso_module.module);
-  CompleteBootstrapModule(self_module.module, startup.page_size);
+  StartupBootstrap bootstrap{bootstrap_diag, vdso, startup.page_size};
 
   // Check for the LD_DEBUG environment variable.
   for (char** ep = startup.envp; *ep; ++ep) {
@@ -240,8 +237,8 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
     return {};
   };
 
-  StartupModule::LinkModules(diag, scratch, initial_exec, main_executable, open_file,
-                             {vdso_module, self_module}, needed_count, startup.page_size);
+  StartupModule::LinkModules(diag, scratch, initial_exec, main_executable, open_file, bootstrap,
+                             needed_count, startup.page_size);
 
   // Bail out before relocation if there were any loading errors.
   CheckErrors(diag);

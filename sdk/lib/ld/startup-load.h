@@ -26,8 +26,8 @@
 #include <fbl/intrusive_double_list.h>
 
 #include "allocator.h"
-#include "bootstrap.h"
 #include "mutable-abi.h"
+#include "startup-bootstrap.h"
 #include "startup-diagnostics.h"
 
 namespace ld {
@@ -181,8 +181,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
             typename... LoaderArgs>
   static void LinkModules(Diagnostics& diag, ScratchAllocator& scratch,
                           InitialExecAllocator& initial_exec, StartupLoadModule* main_executable,
-                          GetDepFile&& get_dep_file,
-                          std::initializer_list<BootstrapModule> preloaded_module_list,
+                          GetDepFile&& get_dep_file, StartupBootstrap& bootstrap,
                           size_t executable_needed_count, LoaderArgs&&... loader_args) {
     main_executable->decoded().module().symbols_visible = true;
 
@@ -193,7 +192,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
     List modules = main_executable->MakeList();
     List preloaded_modules =
-        MakePreloadedList(diag, scratch, preloaded_module_list, loader_args...);
+        MakePreloadedList(diag, scratch, bootstrap.preloaded(), loader_args...);
 
     // This will be incremented by each Load() of a module that has a PT_TLS.
     size_type max_tls_modid = main_executable->tls_module_id();
@@ -229,7 +228,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
   template <typename Allocator, typename... LoaderArgs>
   static List MakePreloadedList(Diagnostics& diag, Allocator& allocator,
-                                std::initializer_list<BootstrapModule> modules,
+                                std::span<Bootstrap::Preloaded> modules,
                                 LoaderArgs&&... loader_args) {
     List preloaded_modules;
     for (const auto& [module, dyn] : modules) {
