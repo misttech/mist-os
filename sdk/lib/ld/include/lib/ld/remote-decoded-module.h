@@ -6,6 +6,7 @@
 #define LIB_LD_REMOTE_DECODED_MODULE_H_
 
 #include <lib/elfldltl/container.h>
+#include <lib/elfldltl/dynamic.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/loadinfo-mapped-memory.h>
 #include <lib/elfldltl/mapped-vmo-file.h>
@@ -238,6 +239,7 @@ class RemoteDecodedModule : public RemoteDecodedFile, public RemoteDecodedModule
   struct ExecInfo {
     size_type relative_entry = 0;         // File-relative entry point address.
     std::optional<size_type> stack_size;  // Any requested initial stack size.
+    std::span<const Addr> preinit_array;  // DT_PREINIT_ARRAY
   };
 
   // This is the Memory API object returned by memory_metadata(), below.
@@ -394,7 +396,8 @@ class RemoteDecodedModule : public RemoteDecodedFile, public RemoteDecodedModule
     // their offsets and then those are reified into strings afterwards.
     RemoteContainer<size_type> needed_offsets;
     if (auto result =
-            this->DecodeDynamic(diag, memory, dyn_phdr, Base::MakeNeededObserver(needed_offsets));
+            this->DecodeDynamic(diag, memory, dyn_phdr, Base::MakeNeededObserver(needed_offsets),
+                                elfldltl::DynamicPreinitObserver<Elf>(exec_info_.preinit_array));
         result.is_error()) [[unlikely]] {
       return result.error_value();
     }

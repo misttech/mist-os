@@ -134,8 +134,9 @@ struct Abi {
   using AbiBases = Template<>;
 
   template <template <auto...> class Template>
-  using AbiMembers = Template<&Abi::loaded_modules, &Abi::static_tls_modules,
-                              &Abi::static_tls_offsets, &Abi::static_tls_layout>;
+  using AbiMembers =
+      Template<&Abi::loaded_modules, &Abi::loaded_modules_count, &Abi::preinit_array,
+               &Abi::static_tls_modules, &Abi::static_tls_offsets, &Abi::static_tls_layout>;
 };
 
 // This is the standard PT_INTERP value for using a compatible dynamic linker

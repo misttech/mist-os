@@ -31,6 +31,18 @@ TYPED_TEST(LdLoadTests, PassiveAbiRdebug) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, PassiveAbiPreinitArray) {
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("passive-abi-preinit-array"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
 TYPED_TEST(LdLoadTests, PassiveAbiManyDeps) {
   constexpr int64_t kReturnValue = 17;
 

@@ -245,6 +245,8 @@ struct RemoteAbiTranscriberImpl<T, RemoteAbiTranscriberImplType::kClass> {
     static_assert((std::is_member_object_pointer_v<decltype(M)> && ...));
     static_assert((!std::is_void_v<decltype(std::declval<T>().*M)> && ...));
 
+    static constexpr size_t kSizeBytes = (sizeof(std::declval<T>().*M) + ...);
+
     template <typename F>
     static constexpr bool OnAllMembers(F&& f, T& x) {
       return (std::invoke(f, x.*M) && ...);
@@ -275,6 +277,9 @@ struct RemoteAbiTranscriberImpl<T, RemoteAbiTranscriberImplType::kClass> {
   static constexpr bool FromLocal(Context&& ctx, T& out, const Local& in) {
     return Bases::FromLocal(ctx, out, in) && Members::FromLocal(ctx, out, in);
   }
+
+  static_assert(sizeof(T) == Members::kSizeBytes,
+                "AbiMembers list incomplete or struct has implicit padding");
 };
 
 // This will quickly prevent compilation for any type not handled by the

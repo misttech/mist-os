@@ -537,6 +537,19 @@ class RemoteAbi {
     abi.static_tls_modules = heap_->Remote(heap_vaddr, abi_tls_modules_);
     abi.static_tls_offsets = heap_->Remote(heap_vaddr, abi_tls_offsets_);
 
+    // When there is a main executable, it can have a DT_PREINIT_ARRAY.  This
+    // isn't in every Abi::Module since it's not used for most.  So it has its
+    // own Abi::preinit_array member, pointing into the executable's image.
+    if (modules.front().name() == LocalAbi::kExecutableName) {
+      using Remote = decltype(abi.preinit_array);
+      Remote& remote = abi.preinit_array;
+      const auto& local = modules.front().decoded().exec_info().preinit_array;
+      const auto context = make_module_context(vaddr_maps.front());
+      if (!RemoteAbiTranscriber<Remote>::FromLocal(context, remote, local)) {
+        return false;
+      }
+    }
+
     return true;
   }
 
