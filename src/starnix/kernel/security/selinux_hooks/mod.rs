@@ -301,7 +301,8 @@ fn has_fs_node_permissions(
 
     let target = fs_node_effective_sid_and_class(fs_node);
 
-    let audit_context = [audit_context, fs_node.into()];
+    let fs = fs_node.fs();
+    let audit_context = [audit_context, fs_node.into(), fs.as_ref().into()];
     for permission in permissions {
         check_permission(
             permission_check,
@@ -332,6 +333,8 @@ fn todo_has_fs_node_permissions(
 
     let target = fs_node_effective_sid_and_class(fs_node);
 
+    let fs = fs_node.fs();
+    let audit_context = [audit_context, fs_node.into(), fs.as_ref().into()];
     for permission in permissions {
         todo_check_permission(
             bug.clone(),
@@ -340,7 +343,7 @@ fn todo_has_fs_node_permissions(
             subject_sid,
             target.sid,
             permission.clone(),
-            audit_context,
+            (&audit_context).into(),
         )?;
     }
 
