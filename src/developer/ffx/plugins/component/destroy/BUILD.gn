@@ -8,14 +8,21 @@ ffx_plugin("ffx_component_destroy") {
   sdk_category = "not-yet-specified"
   version = "0.1.0"
   edition = "2021"
+  with_unit_tests = true
   deps = [
-    "//src/developer/ffx/lib/errors:lib",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/component/common:ffx_component",
+    "//src/sys/lib/cm_types",
     "//src/sys/lib/component_debug",
+    "//src/sys/lib/moniker",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:schemars",
+    "//third_party/rust_crates:serde",
   ]
 
   args_sources = [ "src/args.rs" ]
@@ -24,5 +31,15 @@ ffx_plugin("ffx_component_destroy") {
     "//third_party/rust_crates:argh",
   ]
 
+  test_deps = [
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+  ]
+
   sources = [ "src/lib.rs" ]
+}
+
+group("host_tests") {
+  testonly = true
+  deps = [ ":ffx_component_destroy_tests" ]
 }

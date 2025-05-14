@@ -1,3 +1,4 @@
+component_destroy.json
 component_show.json
 daemon_stop.json
 debug_symbol-index_list.json

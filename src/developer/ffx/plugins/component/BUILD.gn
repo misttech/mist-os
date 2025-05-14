@@ -89,6 +89,7 @@ if (is_host) {
     testonly = true
     deps = [
       "create:host_tests",
+      "destroy:host_tests",
       "run:host_tests",
     ]
   }

@@ -1,3 +1,4 @@
+ffx component destroy
 ffx component show
 ffx daemon stop
 ffx debug symbol-index list
