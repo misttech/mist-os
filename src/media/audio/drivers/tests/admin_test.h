@@ -94,6 +94,18 @@ class AdminTest : public TestBase {
   void ValidateGainElements();
   void ValidateVendorSpecificElements();
 
+  void RetrieveInitialElementStates();
+  void ValidateElementStates();
+  void ValidateDaiElementStates();
+  void ValidateDynamicsElementStates();
+  void ValidateEqualizerElementStates();
+  void ValidateGainElementStates();
+  void ValidateVendorSpecificElementStates();
+  void FailOnWatchElementStateCompletion(fuchsia::hardware::audio::signalprocessing::ElementId id);
+  void WatchElementStateAndExpectDisconnect(
+      fuchsia::hardware::audio::signalprocessing::ElementId id, zx_status_t expected_error);
+  void WatchUnknownElementStateAndExpectDisconnect(zx_status_t expected_error);
+
   void RequestTopologies();
   void RetrieveInitialTopology();
   void SetAllTopologies();
@@ -154,6 +166,25 @@ class AdminTest : public TestBase {
   static void ValidateVendorSpecificElement(
       const fuchsia::hardware::audio::signalprocessing::Element& element);
 
+  static void ValidateElementState(
+      const fuchsia::hardware::audio::signalprocessing::Element& element,
+      const fuchsia::hardware::audio::signalprocessing::ElementState& state);
+  static void ValidateDaiElementState(
+      const fuchsia::hardware::audio::signalprocessing::Element& element,
+      const fuchsia::hardware::audio::signalprocessing::ElementState& state);
+  static void ValidateDynamicsElementState(
+      const fuchsia::hardware::audio::signalprocessing::Element& element,
+      const fuchsia::hardware::audio::signalprocessing::ElementState& state);
+  static void ValidateEqualizerElementState(
+      const fuchsia::hardware::audio::signalprocessing::Element& element,
+      const fuchsia::hardware::audio::signalprocessing::ElementState& state);
+  static void ValidateGainElementState(
+      const fuchsia::hardware::audio::signalprocessing::Element& element,
+      const fuchsia::hardware::audio::signalprocessing::ElementState& state);
+  static void ValidateVendorSpecificElementState(
+      const fuchsia::hardware::audio::signalprocessing::Element& element,
+      const fuchsia::hardware::audio::signalprocessing::ElementState& state);
+
   fidl::InterfacePtr<fuchsia::hardware::audio::RingBuffer> ring_buffer_;
   std::optional<bool> ring_buffer_is_incoming_ = std::nullopt;
   std::optional<fuchsia::hardware::audio::RingBufferProperties> ring_buffer_props_;
@@ -183,6 +214,10 @@ class AdminTest : public TestBase {
   std::optional<fuchsia::hardware::audio::signalprocessing::TopologyId> pending_set_topology_id_;
   std::optional<fuchsia::hardware::audio::signalprocessing::TopologyId> current_topology_id_ =
       std::nullopt;
+
+  std::map<fuchsia::hardware::audio::signalprocessing::TopologyId,
+           fuchsia::hardware::audio::signalprocessing::ElementState>
+      initial_element_states_;
 
   std::optional<uint64_t> ring_buffer_id_;  // Ring buffer process element id.
   std::optional<uint64_t> dai_id_;          // DAI interconnect process element id.

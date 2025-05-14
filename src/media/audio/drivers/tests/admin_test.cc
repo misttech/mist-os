@@ -137,7 +137,7 @@ std::optional<bool> AdminTest::ElementIsIncoming(
   }
 
   if (!current_topology_id_.has_value()) {
-    ADD_FAILURE() << "current_topology_id_ is n ot set";
+    ADD_FAILURE() << "current_topology_id_ is not set";
     return std::nullopt;
   }
 
@@ -415,6 +415,7 @@ void AdminTest::RetrieveRingBufferFormats() {
     return;
   }
   RequestTopologies();
+  RetrieveInitialTopology();
 
   // If ring_buffer_id_ is set, then a ring-buffer element exists for this composite device.
   // Retrieve the supported ring buffer formats for that node.
@@ -454,6 +455,7 @@ void AdminTest::RetrieveDaiFormats() {
   }
 
   RequestTopologies();
+  RetrieveInitialTopology();
 
   // If dai_id_ is set, request the DAI formats for this interconnect.
   if (dai_id_.has_value()) {
@@ -882,6 +884,55 @@ void AdminTest::SetUnknownTopologyAndExpectError() {
   ExpectCallbacks();
 }
 
+void AdminTest::RetrieveInitialElementStates() {
+  ASSERT_TRUE(signalprocessing_is_supported_.value_or(false))
+      << "signalprocessing is required for this test";
+  ASSERT_FALSE(elements_.empty());
+
+  if (!initial_element_states_.empty()) {
+    return;
+  }
+
+  for (const auto& e : elements_) {
+    ASSERT_TRUE(e.has_id());
+
+    fhasp::ElementState state;
+    signal_processing()->WatchElementState(
+        e.id(),
+        AddCallback("initial WatchElementState(" + std::to_string(e.id()) + ")",
+                    [&state](const fhasp::ElementState& result) { state = fidl::Clone(result); }));
+    ExpectCallbacks();
+
+    initial_element_states_.emplace(e.id(), std::move(state));
+  }
+}
+
+void AdminTest::FailOnWatchElementStateCompletion(fhasp::ElementId id) {
+  signal_processing()->WatchElementState(
+      id, AddUnexpectedCallback("unexpected WatchElementState completion"));
+}
+
+void AdminTest::WatchElementStateAndExpectDisconnect(fhasp::ElementId id,
+                                                     zx_status_t expected_error) {
+  FailOnWatchElementStateCompletion(id);
+  ExpectError(signal_processing(), expected_error);
+  CooldownAfterSignalProcessingDisconnect();
+}
+
+void AdminTest::WatchUnknownElementStateAndExpectDisconnect(zx_status_t expected_error) {
+  fhasp::ElementId unknown_id = 0;
+  while (std::ranges::any_of(
+      elements_, [unknown_id](const auto& el) { return el.has_id() && el.id() == unknown_id; })) {
+    ++unknown_id;
+  }
+
+  signal_processing()->WatchElementState(
+      unknown_id, AddUnexpectedCallback("WatchElementState(" + std::to_string(unknown_id) + ")"));
+  ASSERT_TRUE(signal_processing().is_bound())
+      << "SignalProcessing disconnected after setting an unknown topology";
+  ExpectError(signal_processing(), expected_error);
+}
+
 // Validate that the collection of element IDs found in the topology list are complete and correct.
 void AdminTest::ValidateElementTopologyClosure() {
   ASSERT_FALSE(elements().empty());
@@ -950,19 +1001,21 @@ void AdminTest::ValidateElementTopologyClosure() {
       << ") were not referenced in any topology";
 }
 
+// For all elements, validate their non-type-specific fields.
 void AdminTest::ValidateElements() {
-  ASSERT_FALSE(elements().empty());
   std::unordered_set<fhasp::ElementId> ids;
   for (const auto& element : elements()) {
+    // id must be unique within the given array of elements.
     ASSERT_TRUE(element.has_id());
     ASSERT_FALSE(ids.contains(element.id()));
     ids.insert(element.id());
+
     ValidateElement(element);
   }
 }
 
+// For DAI_INTERCONNECT elements, validate their type-specific field.
 void AdminTest::ValidateDaiElements() {
-  ASSERT_FALSE(elements().empty());
   bool found_one = false;
   for (const auto& element : elements()) {
     ASSERT_TRUE(element.has_type());
@@ -976,8 +1029,8 @@ void AdminTest::ValidateDaiElements() {
   }
 }
 
+// For DYNAMICS elements, validate their type-specific field.
 void AdminTest::ValidateDynamicsElements() {
-  ASSERT_FALSE(elements().empty());
   bool found_one = false;
   for (const auto& element : elements()) {
     ASSERT_TRUE(element.has_type());
@@ -991,8 +1044,8 @@ void AdminTest::ValidateDynamicsElements() {
   }
 }
 
+// For EQUALIZER elements, validate their type-specific field.
 void AdminTest::ValidateEqualizerElements() {
-  ASSERT_FALSE(elements().empty());
   bool found_one = false;
   for (const auto& element : elements()) {
     ASSERT_TRUE(element.has_type());
@@ -1006,8 +1059,8 @@ void AdminTest::ValidateEqualizerElements() {
   }
 }
 
+// For GAIN elements, validate their type-specific field.
 void AdminTest::ValidateGainElements() {
-  ASSERT_FALSE(elements().empty());
   bool found_one = false;
   for (const auto& element : elements()) {
     ASSERT_TRUE(element.has_type());
@@ -1021,8 +1074,8 @@ void AdminTest::ValidateGainElements() {
   }
 }
 
+// For VENDOR_SPECIFIC elements, validate their type-specific field.
 void AdminTest::ValidateVendorSpecificElements() {
-  ASSERT_FALSE(elements().empty());
   bool found_one = false;
   for (const auto& element : elements()) {
     ASSERT_TRUE(element.has_type());
@@ -1036,9 +1089,15 @@ void AdminTest::ValidateVendorSpecificElements() {
   }
 }
 
+// Validate the non-type-specific portion of this Element.
 void AdminTest::ValidateElement(const fhasp::Element& element) {
-  ASSERT_TRUE(element.has_id()) << "ElementId is a required field";
-  ASSERT_TRUE(element.has_type()) << "ElementType is a required field";
+  // id: Required.
+  ASSERT_TRUE(element.has_id());
+
+  // type: Required.
+  ASSERT_TRUE(element.has_type());
+
+  // type_specific: Required for 5 Element types, disallowed for the others.
   bool should_have_type_specific = (element.type() == fhasp::ElementType::DAI_INTERCONNECT ||
                                     element.type() == fhasp::ElementType::DYNAMICS ||
                                     element.type() == fhasp::ElementType::EQUALIZER ||
@@ -1049,51 +1108,67 @@ void AdminTest::ValidateElement(const fhasp::Element& element) {
       << " be set, for this ElementType";
 }
 
+// Validate the type-specific portion of this DAI_INTERCONNECT Element.
 void AdminTest::ValidateDaiElement(
     const fuchsia::hardware::audio::signalprocessing::Element& element) {
+  // type_specific: Required (for this element type) and must be the DAI_INTERCONNECT variant.
   ASSERT_TRUE(element.has_type_specific());
   ASSERT_TRUE(element.type_specific().is_dai_interconnect());
+
+  // plug_detect_capabilities: Required.
   ASSERT_TRUE(element.type_specific().dai_interconnect().has_plug_detect_capabilities());
 }
 
+// Validate the type-specific portion of this DYNAMICS Element.
 void AdminTest::ValidateDynamicsElement(
     const fuchsia::hardware::audio::signalprocessing::Element& element) {
+  // type_specific: Required (for this element type) and must be the DYNAMICS variant.
   ASSERT_TRUE(element.has_type_specific());
   ASSERT_TRUE(element.type_specific().is_dynamics());
+
+  // bands: Required. Cannot be empty.
   ASSERT_TRUE(element.type_specific().dynamics().has_bands());
   ASSERT_FALSE(element.type_specific().dynamics().bands().empty());
 
-  // Each band ID should be unique within this element.
   std::unordered_set<uint64_t> band_ids;
   for (const auto& band : element.type_specific().dynamics().bands()) {
+    // id: Required. Must be unique within this element
     ASSERT_TRUE(band.has_id());
     ASSERT_FALSE(band_ids.contains(band.id()));
     band_ids.insert(band.id());
   }
 }
 
+// Validate the type-specific portion of this EQUALIZER Element.
 void AdminTest::ValidateEqualizerElement(
     const fuchsia::hardware::audio::signalprocessing::Element& element) {
+  // type_specific: Required (for this element type) and must be the EQUALIZER variant.
   ASSERT_TRUE(element.has_type_specific());
   ASSERT_TRUE(element.type_specific().is_equalizer());
   const auto& eq = element.type_specific().equalizer();
 
+  // bands: Required. Cannot be empty.
   ASSERT_TRUE(eq.has_bands());
   ASSERT_FALSE(eq.bands().empty());
 
-  // Each band ID should be unique within this element.
   std::unordered_set<uint64_t> band_ids;
   for (const auto& band : element.type_specific().equalizer().bands()) {
+    // id: Required. Must be unique within this element
     ASSERT_TRUE(band.has_id());
     ASSERT_FALSE(band_ids.contains(band.id()));
     band_ids.insert(band.id());
   }
 
+  // min_frequency, max_frequency: Required. min_frequency must <= max_frequency.
   ASSERT_TRUE(eq.has_min_frequency());
   ASSERT_TRUE(eq.has_max_frequency());
   ASSERT_LE(eq.min_frequency(), eq.max_frequency());
+
+  // max_q: Optional. If present, must be finite (like all floats) and positive.
   ASSERT_TRUE(!eq.has_max_q() || (std::isfinite(eq.max_q()) && eq.max_q() > 0.0f));
 
+  // min_gain_db, max_gain_db: Required for 3 suppported_controls values; disallowed otherwise.
+  // min_gain_db must <= max_gain_db; both must be finite (like all floats).
   bool requires_gain_db_vals =
       eq.has_supported_controls() && (fhasp::EqualizerSupportedControls::SUPPORTS_TYPE_PEAK ||
                                       fhasp::EqualizerSupportedControls::SUPPORTS_TYPE_LOW_SHELF ||
@@ -1104,36 +1179,341 @@ void AdminTest::ValidateEqualizerElement(
               eq.min_gain_db() <= eq.max_gain_db());
 }
 
+// Validate the type-specific portion of this GAIN Element.
 void AdminTest::ValidateGainElement(
     const fuchsia::hardware::audio::signalprocessing::Element& element) {
+  // type_specific: Required (for this element type) and must be the GAIN variant.
   ASSERT_TRUE(element.has_type_specific());
   ASSERT_TRUE(element.type_specific().is_gain());
+
+  // type: Required.
   ASSERT_TRUE(element.type_specific().gain().has_type());
 
+  // min_gain: Required. Must be finite. Must be non-negative, if GainType is PERCENT.
   ASSERT_TRUE(element.type_specific().gain().has_min_gain());
   ASSERT_TRUE(std::isfinite(element.type_specific().gain().min_gain()));
-  // If GainType is PERCENT, then min_gain must be >= 0%
   ASSERT_TRUE(element.type_specific().gain().type() != fhasp::GainType::PERCENT ||
               element.type_specific().gain().min_gain() >= 0.0);
 
+  // max_gain: Required. Must be finite. Cannot exceed 100, if GainType is PERCENT.
   ASSERT_TRUE(element.type_specific().gain().has_max_gain());
   ASSERT_TRUE(std::isfinite(element.type_specific().gain().max_gain()));
-  // If GainType is PERCENT, then max_gain must be <= 100%
   ASSERT_TRUE(element.type_specific().gain().type() != fhasp::GainType::PERCENT ||
               element.type_specific().gain().max_gain() <= 100.0);
+  // min_gain <= max_gain.
   ASSERT_LE(element.type_specific().gain().min_gain(), element.type_specific().gain().max_gain());
 
+  // min_gain_step: Required. Must be non-negative. Cannot exceed (max_gain - min_gain).
   ASSERT_TRUE(element.type_specific().gain().has_min_gain_step());
   ASSERT_TRUE(std::isfinite(element.type_specific().gain().min_gain_step()));
+  ASSERT_GE(element.type_specific().gain().min_gain_step(), 0.0f);
   ASSERT_LE(element.type_specific().gain().min_gain_step(),
             element.type_specific().gain().max_gain() - element.type_specific().gain().min_gain());
-  ASSERT_GE(element.type_specific().gain().min_gain_step(), 0.0f);
 }
 
+// Validate the type-specific portion of this VENDOR_SPECIFIC Element.
 void AdminTest::ValidateVendorSpecificElement(
     const fuchsia::hardware::audio::signalprocessing::Element& element) {
+  // type_specific: Required (for this element type) and must be the VENDOR_SPECIFIC variant.
   ASSERT_TRUE(element.has_type_specific());
   ASSERT_TRUE(element.type_specific().is_vendor_specific());
+}
+
+// Validate each ElementState, considering the Element that produced it.
+void AdminTest::ValidateElementStates() {
+  ASSERT_FALSE(initial_element_states_.empty());
+
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_id());
+    ASSERT_TRUE(initial_element_states_.contains(element.id()));
+    const auto& state = initial_element_states_.at(element.id());
+    ValidateElementState(element, state);
+  }
+}
+
+// For DAI_INTERCONNECT elements, validate the type-specific portions of their ElementStates.
+void AdminTest::ValidateDaiElementStates() {
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fhasp::ElementType::DAI_INTERCONNECT) {
+      found_one = true;
+      ASSERT_TRUE(element.has_id());
+      ASSERT_TRUE(initial_element_states_.contains(element.id()));
+      const auto& state = initial_element_states_.at(element.id());
+      ValidateDaiElementState(element, state);
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No DAI_INTERCONNECT Elements, cannot validate DAI_INTERCONNECT ElementState";
+  }
+}
+
+// For DYNAMICS elements, validate the type-specific portions of their ElementStates.
+void AdminTest::ValidateDynamicsElementStates() {
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fhasp::ElementType::DYNAMICS) {
+      found_one = true;
+      ASSERT_TRUE(element.has_id());
+      ASSERT_TRUE(initial_element_states_.contains(element.id()));
+      const auto& state = initial_element_states_.at(element.id());
+      ValidateDynamicsElementState(element, state);
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No DYNAMICS Elements, cannot validate DYNAMICS ElementState";
+  }
+}
+
+// For EQUALIZER elements, validate the type-specific portions of their ElementStates.
+void AdminTest::ValidateEqualizerElementStates() {
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fhasp::ElementType::EQUALIZER) {
+      found_one = true;
+      ASSERT_TRUE(element.has_id());
+      ASSERT_TRUE(initial_element_states_.contains(element.id()));
+      const auto& state = initial_element_states_.at(element.id());
+      ValidateEqualizerElementState(element, state);
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No EQUALIZER Elements, cannot validate EQUALIZER ElementState";
+  }
+}
+
+// For GAIN elements, validate the type-specific portions of their ElementStates.
+void AdminTest::ValidateGainElementStates() {
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fhasp::ElementType::GAIN) {
+      found_one = true;
+      ASSERT_TRUE(element.has_id());
+      ASSERT_TRUE(initial_element_states_.contains(element.id()));
+      const auto& state = initial_element_states_.at(element.id());
+      ValidateGainElementState(element, state);
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No GAIN Elements, cannot validate GAIN ElementState";
+  }
+}
+
+// For VENDOR_SPECIFIC elements, validate the type-specific portions of their ElementStates.
+void AdminTest::ValidateVendorSpecificElementStates() {
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fhasp::ElementType::VENDOR_SPECIFIC) {
+      found_one = true;
+      ASSERT_TRUE(element.has_id());
+      ASSERT_TRUE(initial_element_states_.contains(element.id()));
+      const auto& state = initial_element_states_.at(element.id());
+      ValidateVendorSpecificElementState(element, state);
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No VENDOR_SPECIFIC Elements, cannot validate VENDOR_SPECIFIC ElementState";
+  }
+}
+
+// Validate the non-type-specific portion of this ElementState.
+void AdminTest::ValidateElementState(const fhasp::Element& element,
+                                     const fhasp::ElementState& state) {
+  ASSERT_TRUE(element.has_type());
+
+  // state: Required. If stopped then the element must support this.
+  ASSERT_TRUE(state.has_started());
+  ASSERT_TRUE(state.started() || (element.has_can_stop() && element.can_stop()));
+
+  // type_specific: "Optional". Actually required for 5 element types, disallowed for the others.
+  bool should_have_type_specific_state = (element.type() == fhasp::ElementType::DAI_INTERCONNECT ||
+                                          element.type() == fhasp::ElementType::DYNAMICS ||
+                                          element.type() == fhasp::ElementType::EQUALIZER ||
+                                          element.type() == fhasp::ElementType::GAIN ||
+                                          element.type() == fhasp::ElementType::VENDOR_SPECIFIC);
+  ASSERT_TRUE(state.has_type_specific() == should_have_type_specific_state);
+
+  // bypassed: Optional. If present and set, then the element must support this.
+  ASSERT_TRUE(!state.has_bypassed() || !state.bypassed() || element.can_bypass());
+
+  // delays: Optional. If present then value cannot be negative.
+  ASSERT_TRUE(!state.has_turn_on_delay() || state.turn_on_delay() >= 0);
+  ASSERT_TRUE(!state.has_turn_off_delay() || state.turn_off_delay() >= 0);
+  ASSERT_TRUE(!state.has_processing_delay() || state.processing_delay() >= 0);
+
+  // vendor_specific_data: Optional (for ALL element types). If present, cannot be empty.
+  ASSERT_FALSE(state.has_vendor_specific_data() && state.vendor_specific_data().empty());
+
+  // enabled | latency: Deprecated (removed in SDK 20), thus disallowed.
+  ASSERT_FALSE(state.has_enabled());
+  ASSERT_FALSE(state.has_latency());
+}
+
+// Validate the type-specific portion of the ElementState returned by a DAI_INTERCONNECT element.
+void AdminTest::ValidateDaiElementState(const fhasp::Element& element,
+                                        const fhasp::ElementState& state) {
+  ASSERT_TRUE(element.type_specific().dai_interconnect().has_plug_detect_capabilities());
+
+  // type_specific: Required. Must contain the variant that matches its Element (DAI_INTERCONNECT).
+  ASSERT_TRUE(state.has_type_specific());
+  ASSERT_TRUE(state.type_specific().is_dai_interconnect());
+
+  // plug_state: Required.
+  ASSERT_TRUE(state.type_specific().dai_interconnect().has_plug_state());
+
+  // plug_state.plugged: Required. If unplugged, the element must support that.
+  ASSERT_TRUE(state.type_specific().dai_interconnect().plug_state().has_plugged());
+  EXPECT_TRUE(element.type_specific().dai_interconnect().plug_detect_capabilities() ==
+                  fhasp::PlugDetectCapabilities::CAN_ASYNC_NOTIFY ||
+              state.type_specific().dai_interconnect().plug_state().plugged());
+
+  // plug_state.plug_state_time: Required. Must be >= 0
+  ASSERT_TRUE(state.type_specific().dai_interconnect().plug_state().has_plug_state_time());
+  EXPECT_GE(state.type_specific().dai_interconnect().plug_state().plug_state_time(), 0);
+
+  EXPECT_TRUE(!state.type_specific().dai_interconnect().has_external_delay() ||
+              state.type_specific().dai_interconnect().external_delay() >= 0);
+}
+
+// Validate the type-specific portion of the ElementState returned by a DYNAMICS element.
+void AdminTest::ValidateDynamicsElementState(const fhasp::Element& element,
+                                             const fhasp::ElementState& state) {
+  ASSERT_TRUE(element.type_specific().dynamics().has_bands());
+  ASSERT_FALSE(element.type_specific().dynamics().bands().empty());
+  std::unordered_set<uint64_t> band_ids;
+  for (const auto& band : element.type_specific().dynamics().bands()) {
+    ASSERT_TRUE(band.has_id());
+    band_ids.insert(band.id());
+  }
+
+  // type_specific: Required. Must contain the variant that matches its Element (DYNAMICS).
+  ASSERT_TRUE(state.has_type_specific());
+  ASSERT_TRUE(state.type_specific().is_dynamics());
+
+  // band_states: Required. Cannot be empty.
+  ASSERT_TRUE(state.type_specific().dynamics().has_band_states());
+  ASSERT_FALSE(state.type_specific().dynamics().band_states().empty());
+
+  for (const auto& band_state : state.type_specific().dynamics().band_states()) {
+    // id: Required. Must be found in Element.TypeSpecific.Dynamics.bands.
+    ASSERT_TRUE(band_state.has_id());
+    ASSERT_TRUE(band_ids.contains(band_state.id())) << "Unknown dynamics band ID";
+    band_ids.extract(band_state.id());
+
+    // min_frequency and max_frequency: Required. Min must <= max.
+    ASSERT_TRUE(band_state.has_min_frequency());
+    ASSERT_TRUE(band_state.has_max_frequency());
+    ASSERT_LE(band_state.min_frequency(), band_state.max_frequency());
+
+    // threshold_db: Required. Like all floats, must be finite.
+    ASSERT_TRUE(band_state.has_threshold_db());
+    ASSERT_TRUE(std::isfinite(band_state.threshold_db()));
+
+    // threshold_type: Required.
+    ASSERT_TRUE(band_state.has_threshold_type());
+
+    // ratio: Required. Like all floats, it must be finite.
+    ASSERT_TRUE(band_state.has_ratio());
+    ASSERT_TRUE(std::isfinite(band_state.ratio()));
+
+    // knee_width_db: Optional. If present, like all floats it must be finite.
+    ASSERT_TRUE(!band_state.has_knee_width_db() || std::isfinite(band_state.knee_width_db()));
+
+    // attack: Optional. If present, like all durations it must be non-negative.
+    ASSERT_TRUE(!band_state.has_attack() || band_state.attack() >= 0);
+
+    // release: Optional. If present, like all durations it must be non-negative.
+    ASSERT_TRUE(!band_state.has_release() || band_state.release() >= 0);
+
+    // output_gain_db: Optional. If present, like all floats it must be finite.
+    ASSERT_TRUE(!band_state.has_output_gain_db() || std::isfinite(band_state.output_gain_db()));
+
+    // input_gain_db: Optional. If present, like all floats it must be finite.
+    ASSERT_TRUE(!band_state.has_input_gain_db() || std::isfinite(band_state.input_gain_db()));
+
+    // lookahead: Optional. If present, like all durations it must be non-negative.
+    ASSERT_TRUE(!band_state.has_lookahead() || band_state.lookahead() >= 0);
+  }
+
+  // band_states must contain every band_id in the element's TypeSpecific.Dynamics.bands.
+  ASSERT_TRUE(band_ids.empty()) << "DynamicsState did not contain every band ID";
+}
+
+// Validate the type-specific portion of the ElementState returned by an EQUALIZER element.
+void AdminTest::ValidateEqualizerElementState(const fhasp::Element& element,
+                                              const fhasp::ElementState& state) {
+  ASSERT_TRUE(element.type_specific().equalizer().has_bands());
+  std::unordered_set<uint64_t> band_ids;
+  for (const auto& band : element.type_specific().equalizer().bands()) {
+    ASSERT_TRUE(band.has_id());
+    band_ids.insert(band.id());
+  }
+
+  // type_specific: Required. Must contain the variant that matches its Element (EQUALIZER).
+  ASSERT_TRUE(state.has_type_specific());
+  ASSERT_TRUE(state.type_specific().is_equalizer());
+
+  // bands_state: Deprecated in SDK 20, thus disallowed.
+  ASSERT_FALSE(state.type_specific().equalizer().has_bands_state());
+
+  // band_states: Required. Cannot be empty.
+  ASSERT_TRUE(state.type_specific().equalizer().has_band_states());
+  ASSERT_FALSE(state.type_specific().equalizer().band_states().empty());
+
+  for (const auto& band_state : state.type_specific().equalizer().band_states()) {
+    // id: Required. Must be found in the element's TypeSpecific.Equalizer.bands.
+    ASSERT_TRUE(band_state.has_id());
+    ASSERT_TRUE(band_ids.contains(band_state.id())) << "Unknown EQ band ID";
+    band_ids.extract(band_state.id());
+
+    // type: Required (Optional in FIDL definition, but without it a band has no function).
+    ASSERT_TRUE(band_state.has_type());
+
+    // frequency: Required (Optional in FIDL definition, but without it a band cannot function).
+    ASSERT_TRUE(band_state.has_frequency());
+
+    // q: Optional but must be positive and finite, if present
+    ASSERT_TRUE(!band_state.has_q() || (std::isfinite(band_state.q()) && band_state.q() > 0.0));
+
+    // gain_db: Required for peak/shelves, disallowed for notch/cuts.
+    ASSERT_TRUE(!band_state.has_gain_db() || std::isfinite(band_state.gain_db()));
+    ASSERT_TRUE(band_state.has_gain_db() ==
+                (band_state.type() == fhasp::EqualizerBandType::PEAK ||
+                 band_state.type() == fhasp::EqualizerBandType::LOW_SHELF ||
+                 band_state.type() == fhasp::EqualizerBandType::HIGH_SHELF));
+  }
+  // band_states must contain every band_id in the element's TypeSpecific.Equalizer.bands.
+  ASSERT_TRUE(band_ids.empty()) << "EqualizerState did not contain every band ID";
+}
+
+// Validate the type-specific portion of the ElementState returned by a GAIN element.
+void AdminTest::ValidateGainElementState(const fhasp::Element& element,
+                                         const fhasp::ElementState& state) {
+  ASSERT_TRUE(element.type_specific().gain().has_min_gain());
+  ASSERT_TRUE(element.type_specific().gain().has_max_gain());
+
+  // type_specific: Required. Must contain the variant that matches its Element (GAIN).
+  ASSERT_TRUE(state.has_type_specific());
+  ASSERT_TRUE(state.type_specific().is_gain());
+
+  // gain: Required. Must be finite and within [min_gain, max_gain].
+  ASSERT_TRUE(state.type_specific().gain().has_gain());
+  ASSERT_TRUE(std::isfinite(state.type_specific().gain().gain()));
+  EXPECT_GE(state.type_specific().gain().gain(), element.type_specific().gain().min_gain());
+  EXPECT_LE(state.type_specific().gain().gain(), element.type_specific().gain().max_gain());
+}
+
+// Validate the type-specific portion of the ElementState returned by a VENDOR_SPECIFIC element.
+void AdminTest::ValidateVendorSpecificElementState(const fhasp::Element& element,
+                                                   const fhasp::ElementState& state) {
+  // type_specific: Required. Must contain the variant that matches its Element (VENDOR_SPECIFIC).
+  ASSERT_TRUE(state.has_type_specific());
+  EXPECT_TRUE(state.type_specific().is_vendor_specific());
 }
 
 #define DEFINE_ADMIN_TEST_CLASS(CLASS_NAME, CODE)                               \
@@ -1154,48 +1534,144 @@ DEFINE_ADMIN_TEST_CLASS(CompositeHealth, { RequestHealthAndExpectHealthy(); });
 // Verify a valid unique_id, manufacturer, product are successfully received.
 DEFINE_ADMIN_TEST_CLASS(CompositeProperties, {
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+
   ValidateProperties();
   WaitForError();
 });
 
 // Verify that a valid element list is successfully received.
+// Validate the base Element properties, for all elements.
 DEFINE_ADMIN_TEST_CLASS(GetElements, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
   if (kDisplayElementsAndTopologies) {
     DisplayElements(elements());
   }
+
   ASSERT_NO_FAILURE_OR_SKIP(ValidateElements());
   WaitForError();
 });
 
+// There are five element types that have additional type-specific element properties.
+//
+// Validate Element.type_specific, for DAI elements.
 DEFINE_ADMIN_TEST_CLASS(DaiElements, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+
   ASSERT_NO_FAILURE_OR_SKIP(ValidateDaiElements());
   WaitForError();
 });
 
+// Validate Element.type_specific, for Dynamics elements.
 DEFINE_ADMIN_TEST_CLASS(DynamicsElements, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+
   ASSERT_NO_FAILURE_OR_SKIP(ValidateDynamicsElements());
   WaitForError();
 });
 
+// Validate Element.type_specific, for Equalizer elements.
 DEFINE_ADMIN_TEST_CLASS(EqualizerElements, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+
   ASSERT_NO_FAILURE_OR_SKIP(ValidateEqualizerElements());
   WaitForError();
 });
 
+// Validate Element.type_specific, for Gain elements.
 DEFINE_ADMIN_TEST_CLASS(GainElements, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+
   ASSERT_NO_FAILURE_OR_SKIP(ValidateGainElements());
   WaitForError();
 });
 
+// Validate Element.type_specific, for Vendor-specific elements.
 DEFINE_ADMIN_TEST_CLASS(VendorSpecificElements, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+
   ASSERT_NO_FAILURE_OR_SKIP(ValidateVendorSpecificElements());
   WaitForError();
+});
+
+// Validate the base ElementState for all elements.
+DEFINE_ADMIN_TEST_CLASS(InitialElementStates, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  ValidateElementStates();
+  WaitForError();
+});
+
+// There are five element types that have additional type-specific element state.
+//
+// Validate ElementState.type_specific, for DAI elements.
+DEFINE_ADMIN_TEST_CLASS(DaiElementStates, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  ValidateDaiElementStates();
+  WaitForError();
+});
+
+// Validate ElementState.type_specific, for Dynamics elements.
+DEFINE_ADMIN_TEST_CLASS(DynamicsElementStates, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  ValidateDynamicsElementStates();
+  WaitForError();
+});
+
+// Validate ElementState.type_specific, for Equalizer elements.
+DEFINE_ADMIN_TEST_CLASS(EqualizerElementStates, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  ValidateEqualizerElementStates();
+  WaitForError();
+});
+
+// Validate ElementState.type_specific, for Gain elements.
+DEFINE_ADMIN_TEST_CLASS(GainElementStates, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  ValidateGainElementStates();
+  WaitForError();
+});
+
+// Validate ElementState.type_specific, for Vendor-specific elements.
+DEFINE_ADMIN_TEST_CLASS(VendorSpecificElementStates, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  ValidateVendorSpecificElementStates();
+  WaitForError();
+});
+
+// Verify that calling WatchTopology while a previous call is still pending causes a disconnect.
+DEFINE_ADMIN_TEST_CLASS(WatchElementStateWhilePendingShouldDisconnect, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  fhasp::ElementId id = elements().front().id();
+  ASSERT_NO_FAILURE_OR_SKIP(FailOnWatchElementStateCompletion(id));
+  ASSERT_NO_FAILURE_OR_SKIP(WaitForError());
+
+  WatchElementStateAndExpectDisconnect(id, ZX_ERR_BAD_STATE);
+});
+
+// Verify that an unknown element_id causes a disconnect.
+DEFINE_ADMIN_TEST_CLASS(WatchUnknownElementStateShouldError, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+
+  WatchUnknownElementStateAndExpectDisconnect(ZX_ERR_INVALID_ARGS);
 });
 
 // Verify that a valid topology list is successfully received.
@@ -1210,6 +1686,7 @@ DEFINE_ADMIN_TEST_CLASS(GetTopologies, {
 // Verify that a valid topology is successfully received.
 DEFINE_ADMIN_TEST_CLASS(InitialTopology, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+
   RetrieveInitialTopology();
   WaitForError();
 });
@@ -1241,7 +1718,7 @@ DEFINE_ADMIN_TEST_CLASS(SetUnknownTopologyShouldError, {
   WaitForError();
 });
 
-// Verify that an unknown topology causes an error but does not disconnect.
+// Verify that calling WatchTopology while a previous call is still pending causes a disconnect.
 DEFINE_ADMIN_TEST_CLASS(WatchTopologyWhilePendingShouldDisconnect, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
@@ -1255,6 +1732,7 @@ DEFINE_ADMIN_TEST_CLASS(WatchTopologyWhilePendingShouldDisconnect, {
 // Verify that format-retrieval responses are successfully received and are complete and valid.
 DEFINE_ADMIN_TEST_CLASS(CompositeRingBufferFormats, {
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   WaitForError();
 });
@@ -1262,6 +1740,7 @@ DEFINE_ADMIN_TEST_CLASS(CompositeRingBufferFormats, {
 // Verify that format-retrieval responses are successfully received and are complete and valid.
 DEFINE_ADMIN_TEST_CLASS(CompositeDaiFormats, {
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveDaiFormats());
   WaitForError();
 });
@@ -1675,7 +2154,15 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
 
     // signalprocessing ElementState test cases
     //
-    // TODO(https://fxbug.dev/42077405): Add testing for SignalProcessing ElementState methods.
+    REGISTER_ADMIN_TEST(InitialElementStates, device_entry);
+    REGISTER_ADMIN_TEST(DaiElementStates, device_entry);
+    REGISTER_ADMIN_TEST(DynamicsElementStates, device_entry);
+    REGISTER_ADMIN_TEST(EqualizerElementStates, device_entry);
+    REGISTER_ADMIN_TEST(GainElementStates, device_entry);
+    REGISTER_ADMIN_TEST(VendorSpecificElementStates, device_entry);
+    REGISTER_ADMIN_TEST(WatchElementStateWhilePendingShouldDisconnect, device_entry);
+    REGISTER_ADMIN_TEST(WatchUnknownElementStateShouldError, device_entry);
+    // TODO(https://fxbug.dev/42077405): Add testing for SignalProcessing SetElementState.
 
     // RingBuffer test cases
     //
@@ -1775,16 +2262,13 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
   }
 }
 
-// TODO(https://fxbug.dev/42075676): Add remaining tests for Codec protocol methods.
-//
+// TODO(https://fxbug.dev/302704556): Add Watch-while-still-pending tests for delay and position.
+
+// TODO(https://fxbug.dev/42075676): Add testing for Composite protocol methods.
 // SetDaiFormatUnsupported
 //    Codec::SetDaiFormat with bad format returns the expected ZX_ERR_INVALID_ARGS.
 //    Codec should still be usable (protocol channel still open), after an error is returned.
 // SetDaiFormatWhileUnplugged (not testable in automated environment)
-
-// TODO(https://fxbug.dev/302704556): Add Watch-while-still-pending tests for delay and position.
-
-// TODO(https://fxbug.dev/42075676): Add testing for Composite protocol methods.
 
 // TODO(https://fxbug.dev/42077405): Add remaining testing for SignalProcessing methods.
 //
@@ -1799,52 +2283,20 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
 //    SetTopology returns callback (does not fail or close channel).
 //    WatchTopology acknowledges the change made by SetTopology.
 
-// InitialElementState
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    If WatchElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other
-//    error. Else set a static var for this driver instance that SignalProcessing is supported.
-//    WatchElementState immediately returns when initially called.
-//    Callback contains a valid complete ElementState that matches the ElementType.
-// WatchElementStateBadId
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    WatchElementState(badId) returns ZX_ERR_INVALID_ARGS and does not close. Fail on other
-//    error.
-// TODO(https://fxbug.dev/302704556): Add Watch-while-still-pending test for WatchElementState.
-// WatchElementStateWhilePending
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    If WatchElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other
-//    error. Else set a static var for this driver instance that SignalProcessing is supported.
-//    WatchElementState immediately returns when initially called.
-//    WatchElementState (again) closes the protocol channel with ZX_ERR_BAD_STATE
-
-// SetElementState
-//    If SetElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    Else set a static var for this driver instance that SignalProcessing is supported.
-//    SetElementState returns callback.  Any other observable state?
-// SetElementStateElementSpecific
-//    Detailed checks of specific input or output fields that are unique to the element type.
-//    ... likely multiple test cases here, one for each ElementType
 // SetElementStateNoChange
-//    If SetElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    Else set a static var for this driver instance that SignalProcessing is supported.
 //    SetElementState does not returns callback, trigger WatchElementStateChange or close channel.
 // SetElementStateBadId
-//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
 //    SetElementState(badId) returns ZX_ERR_INVALID_ARGS, not close channel. Fail on other error.
 // SetElementStateBadValues
-//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
 //    SetElementState(badVal) returns ZX_ERR_INVALID_ARGS, not close channel. Fail on other error.
 // SetElementStateInvalidated
-//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
 //    First make a change that invalidates the SignalProcessing configuration, then
 //    SetElementState should return ZX_ERR_BAD_STATE and not close channel.
 // SetElementStateReconfigured
 //    First invalidate the SignalProcessing configuration, then retrieve new elements/topologies.
 //    SetElementState returns callback (does not fail or close channel).
+
 // WatchElementStateChange
-//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    Else set a static var for this driver instance that SignalProcessing is supported.
 //    WatchElementState pends until SetElementState is called.
 //    Upon change, returns callback with values that match SetElementState.
 
