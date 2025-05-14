@@ -7,6 +7,7 @@ use bt_hfp::call::indicators as call_indicators;
 use fidl_fuchsia_bluetooth_hfp::SignalStrength;
 use std::collections::HashMap;
 
+#[allow(unused)]
 #[derive(Clone, Copy, Debug, Hash, PartialEq)]
 pub enum AgIndicatorIndex {
     Call,

@@ -12,26 +12,32 @@ use fuchsia_bluetooth::types::{Channel, PeerId};
 use futures::io::AsyncWriteExt;
 use futures::stream::FusedStream;
 use futures::Stream;
-use log::warn;
+use log::{debug, warn};
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-pub struct AtConnection {
+#[derive(Debug, Eq, PartialEq)]
+pub enum Response {
+    ParsedResponse(at::Response),
+    UnparsedBytes(Vec<u8>),
+}
+
+pub struct Connection {
     peer_id: PeerId,
     rfcomm: Channel,
-    unreturned_responses: VecDeque<at::Response>,
+    unreturned_responses: VecDeque<Response>,
     remaining_bytes: DeserializeBytes,
 }
 
-/// Stream for AtConnection.  The stream produces at::Responses coming in from the peer.  These are
+/// Stream for Connection.  The stream produces at::Responses coming in from the peer.  These are
 /// yielded one at a time.  While we expect spec-compliant peers to give us one AT response per
 /// RFCOMM data transfer, this stream will assemble fragmented AT responses and split multiple AT
 /// responses which arrive together into a series of well formed responses.
-impl Stream for AtConnection {
-    type Item = Result<at::Response, zx::Status>;
+impl Stream for Connection {
+    type Item = Result<Response, zx::Status>;
 
     fn poll_next(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
@@ -63,15 +69,25 @@ impl Stream for AtConnection {
                         remaining_bytes,
                     } = at::Response::deserialize(&mut cursor, remaining_bytes);
                     self.remaining_bytes = remaining_bytes;
+
+                    let mut parsed_responses = deserialized_values
+                        .into_iter()
+                        .map(Response::ParsedResponse)
+                        .collect::<VecDeque<_>>();
+                    self.unreturned_responses.append(&mut parsed_responses);
+
                     if let Some(error) = deserialize_error {
                         // In this case, we may have other commands that deserialized correctly, so continue.
-                        warn!(
+                        // This is probably an AT command that isn't specified in a .at file, so let it
+                        // be returned up to the client for manual parsing.
+                        debug!(
                             "Could not deserialize AT response received from peer {}: {:?}",
                             self.peer_id, error
                         );
+                        let unparsed_bytes = Response::UnparsedBytes(error.bytes);
+                        self.unreturned_responses.push_back(unparsed_bytes);
                     }
 
-                    self.unreturned_responses.append(&mut deserialized_values.into());
                     // Loop.
                 }
             }
@@ -79,13 +95,13 @@ impl Stream for AtConnection {
     }
 }
 
-impl FusedStream for AtConnection {
+impl FusedStream for Connection {
     fn is_terminated(&self) -> bool {
         self.unreturned_responses.is_empty() && self.rfcomm.is_terminated()
     }
 }
 
-impl AtConnection {
+impl Connection {
     pub fn new(peer_id: PeerId, rfcomm: Channel) -> Self {
         Self {
             peer_id,
@@ -134,7 +150,7 @@ mod test {
         let mut exec = fasync::TestExecutor::new();
         let (mut near, far) = Channel::create();
 
-        let mut conn = AtConnection::new(PeerId(1), far);
+        let mut conn = Connection::new(PeerId(1), far);
 
         let response_bytes = "+BRSF:0\r".as_bytes();
         exec.run_singlethreaded(near.write_all(&response_bytes)).expect("Sent AT");
@@ -144,7 +160,28 @@ mod test {
             .expect("Received channel read closed error")
             .expect("Received channel read Zircon error");
 
-        let expected_response = at::Response::Success(at::Success::Brsf { features: 0 });
+        let expected_response =
+            Response::ParsedResponse(at::Response::Success(at::Success::Brsf { features: 0 }));
+        assert_eq!(response, expected_response);
+    }
+
+    #[fuchsia::test]
+    fn unparsed_response_received() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut near, far) = Channel::create();
+
+        let mut conn = Connection::new(PeerId(1), far);
+
+        let response_bytes = "+CIND: (\"service\",(0,1))\r".as_bytes();
+        exec.run_singlethreaded(near.write_all(&response_bytes)).expect("Sent AT");
+
+        let response = exec
+            .run_singlethreaded(conn.next())
+            .expect("Received channel read closed error")
+            .expect("Received channel read Zircon error");
+
+        let expected_bytes = &response_bytes[0..response_bytes.len() - 1]; // Strip off the newline.
+        let expected_response = Response::UnparsedBytes(expected_bytes.to_vec());
         assert_eq!(response, expected_response);
     }
 
@@ -153,7 +190,7 @@ mod test {
         let mut exec = fasync::TestExecutor::new();
         let (mut near, far) = Channel::create();
 
-        let mut conn = AtConnection::new(PeerId(1), far);
+        let mut conn = Connection::new(PeerId(1), far);
 
         let response_bytes = "+BRSF:1\r+BRSF:2\r".as_bytes();
         exec.run_singlethreaded(near.write_all(&response_bytes)).expect("Sent AT");
@@ -163,7 +200,8 @@ mod test {
             .expect("Received channel read closed error")
             .expect("Received channel read Zircon error");
 
-        let expected_response_1 = at::Response::Success(at::Success::Brsf { features: 1 });
+        let expected_response_1 =
+            Response::ParsedResponse(at::Response::Success(at::Success::Brsf { features: 1 }));
         assert_eq!(response_1, expected_response_1);
 
         let response_2 = exec
@@ -171,7 +209,8 @@ mod test {
             .expect("Received AT connection closed error")
             .expect("Received AT connection Zircon error");
 
-        let expected_response_2 = at::Response::Success(at::Success::Brsf { features: 2 });
+        let expected_response_2 =
+            Response::ParsedResponse(at::Response::Success(at::Success::Brsf { features: 2 }));
         assert_eq!(response_2, expected_response_2);
     }
 
@@ -180,7 +219,7 @@ mod test {
         let mut exec = fasync::TestExecutor::new();
         let (mut near, far) = Channel::create();
 
-        let mut conn = AtConnection::new(PeerId(1), far);
+        let mut conn = Connection::new(PeerId(1), far);
 
         let response_bytes_1 = "+BRS".as_bytes();
         let response_bytes_2 = "F:0\r".as_bytes();
@@ -196,7 +235,8 @@ mod test {
             .expect("Received channel read closed error")
             .expect("Received channel read Zircon error");
 
-        let expected_response = at::Response::Success(at::Success::Brsf { features: 0 });
+        let expected_response =
+            Response::ParsedResponse(at::Response::Success(at::Success::Brsf { features: 0 }));
         assert_eq!(response, expected_response);
     }
 
@@ -205,7 +245,7 @@ mod test {
         let mut exec = fasync::TestExecutor::new();
         let (mut near, far) = Channel::create();
 
-        let mut conn = AtConnection::new(PeerId(1), far);
+        let mut conn = Connection::new(PeerId(1), far);
 
         let command_1 = at::Command::Brsf { features: 1 };
         let command_2 = at::Command::Brsf { features: 2 };
@@ -228,7 +268,7 @@ mod test {
         let mut exec = fasync::TestExecutor::new();
         let (mut near, far) = Channel::create();
 
-        let mut conn = AtConnection::new(PeerId(1), far);
+        let mut conn = Connection::new(PeerId(1), far);
 
         let response_bytes = "+BRSF:0\r".as_bytes();
         exec.run_singlethreaded(near.write_all(&response_bytes)).expect("Sent AT");
@@ -246,7 +286,8 @@ mod test {
             .expect("Received channel read closed error")
             .expect("Received channel read Zircon error");
 
-        let expected_response = at::Response::Success(at::Success::Brsf { features: 0 });
+        let expected_response =
+            Response::ParsedResponse(at::Response::Success(at::Success::Brsf { features: 0 }));
         assert_eq!(response, expected_response);
 
         // Read again to get a closed channel

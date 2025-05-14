@@ -16,9 +16,11 @@ use {at_commands as at, fidl_fuchsia_bluetooth_hfp as fidl_hfp, fuchsia_async as
 
 use crate::config::HandsFreeFeatureSupport;
 use crate::peer::ag_indicators::{AgIndicator, AgIndicatorTranslator};
-use crate::peer::at_connection::AtConnection;
+use crate::peer::at_connection;
 use crate::peer::calls::Calls;
-use crate::peer::procedure::{CommandFromHf, CommandToHf, ProcedureInput, ProcedureOutput};
+use crate::peer::procedure::{
+    AtResponse, CommandFromHf, CommandToHf, HandParsedAtResponse, ProcedureInput, ProcedureOutput,
+};
 use crate::peer::procedure_manager::ProcedureManager;
 
 const DEFAULT_CODEC: CodecId = CodecId::CVSD;
@@ -27,7 +29,7 @@ pub struct PeerTask {
     peer_id: PeerId,
     procedure_manager: ProcedureManager<ProcedureInput, ProcedureOutput>,
     peer_handler_request_stream: fidl_hfp::PeerHandlerRequestStream,
-    at_connection: AtConnection,
+    at_connection: at_connection::Connection,
     ag_indicator_translator: AgIndicatorTranslator,
     calls: Calls,
     sco_connector: sco::Connector,
@@ -46,7 +48,7 @@ impl PeerTask {
         audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
     ) -> fasync::Task<()> {
         let procedure_manager = ProcedureManager::new(peer_id, config);
-        let at_connection = AtConnection::new(peer_id, rfcomm);
+        let at_connection = at_connection::Connection::new(peer_id, rfcomm);
         let calls = Calls::new(peer_id);
         let ag_indicator_translator = AgIndicatorTranslator::new();
         let sco_state = sco::InspectableState::default();
@@ -216,34 +218,57 @@ impl PeerTask {
         self.procedure_manager.enqueue(ProcedureInput::CommandFromHf(command_from_hf));
     }
 
-    fn handle_at_response(&mut self, at_response: at::Response) -> Result<()> {
+    fn handle_at_response(
+        &mut self,
+        possibly_unparsed_at_response: at_connection::Response,
+    ) -> Result<()> {
+        let at_response = match possibly_unparsed_at_response {
+            at_connection::Response::ParsedResponse(resp) => AtResponse::Generated(resp),
+            at_connection::Response::UnparsedBytes(bytes) => {
+                let parsed_response = Self::parse_unknown_at_response(bytes)?;
+                AtResponse::HandParsed(parsed_response)
+            }
+        };
+
         if Self::at_response_is_unsolicted(&at_response) {
-            self.handle_unsolicited_response(at_response)
+            self.handle_unsolicited_response(at_response)?
         } else {
             let procedure_input = ProcedureInput::AtResponseFromAg(at_response);
             self.procedure_manager.enqueue(procedure_input);
-            Ok(())
         }
+
+        Ok(())
     }
 
-    fn at_response_is_unsolicted(at_response: &at::Response) -> bool {
+    fn parse_unknown_at_response(_bytes: Vec<u8>) -> Result<HandParsedAtResponse> {
+        // TODO(fxbug.dev/108331): Parse bytes for CindTest.
+        Err(format_err!("parse_unknown_at_response unimplemented"))
+    }
+
+    fn at_response_is_unsolicted(at_response: &AtResponse) -> bool {
         match at_response {
-            at::Response::Success(at::Success::Ciev { .. })
-            | at::Response::Success(at::Success::Clip { .. }) => true,
+            AtResponse::Generated(at::Response::Success(at::Success::Ciev { .. }))
+            | AtResponse::Generated(at::Response::Success(at::Success::Clip { .. })) => true,
             _ => false,
         }
     }
 
     // Must take an unolicited AT Response--a +CIEV or a +CLIP.
-    fn handle_unsolicited_response(&mut self, at_response: at::Response) -> Result<()> {
+    fn handle_unsolicited_response(&mut self, at_response: AtResponse) -> Result<()> {
         match at_response {
-            at::Response::Success(at::Success::Ciev { ind, value }) => {
-                let indicator = self.ag_indicator_translator.translate_indicator(ind, value)?;
-                self.handle_ag_indicator(indicator);
+            AtResponse::Generated(at::Response::Success(at::Success::Ciev { ind, value })) => {
+                let indicator = self.ag_indicator_translator.translate_indicator(ind, value);
+                match indicator {
+                    Ok(ind) => self.handle_ag_indicator(ind),
+                    // HFP v1.8 sec. 4.10: Unknown indicators are not an error.
+                    Err(err) => info!("Got unknown indicator: {:?}", err),
+                }
             }
             // TODO(htps://fxbug.dec/135158) Handle setting phone numbers.
-            at::Response::Success(at::Success::Clip { .. }) => error!("+CLIP not handled"),
-            _ => error!("Received unexpected unsolicited AT response: {:?}", at_response),
+            AtResponse::Generated(at::Response::Success(at::Success::Clip { .. })) => {
+                warn!("+CLIP not handled")
+            }
+            _ => warn!("Received unexpected unsolicited AT response: {:?}", at_response),
         }
 
         Ok(())

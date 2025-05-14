@@ -5,7 +5,7 @@
 use anyhow::{format_err, Result};
 use at_commands as at;
 
-use super::{at_cmd, at_ok, CommandFromHf, Procedure, ProcedureInput, ProcedureOutput};
+use super::{at_cmd, at_ok, AtResponse, CommandFromHf, Procedure, ProcedureInput, ProcedureOutput};
 
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 

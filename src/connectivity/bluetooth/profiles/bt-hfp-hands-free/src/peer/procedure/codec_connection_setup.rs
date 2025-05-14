@@ -7,7 +7,9 @@ use at_commands as at;
 use bt_hfp::codec_id::CodecId;
 use log::warn;
 
-use super::{at_cmd, at_ok, at_resp, CommandToHf, Procedure, ProcedureInput, ProcedureOutput};
+use super::{
+    at_cmd, at_ok, at_resp, AtResponse, CommandToHf, Procedure, ProcedureInput, ProcedureOutput,
+};
 
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 

@@ -26,19 +26,19 @@ use slc_initialization::SlcInitProcedure;
 
 macro_rules! at_ok {
     () => {
-        ProcedureInput::AtResponseFromAg(at::Response::Ok)
+        ProcedureInput::AtResponseFromAg(AtResponse::Generated(at::Response::Ok))
     };
 }
 pub(crate) use at_ok;
 
 macro_rules! at_resp {
     ($variant: ident) => {
-        ProcedureInput::AtResponseFromAg(at::Response::Success(
+        ProcedureInput::AtResponseFromAg(AtResponse::Generated(at::Response::Success(
             at::Success::$variant { .. },
-        ))
+        )))
     };
     ($variant: ident $args: tt) => {
-        ProcedureInput::AtResponseFromAg(at::Response::Success(at::Success::$variant $args ))
+        ProcedureInput::AtResponseFromAg(AtResponse::Generated(at::Response::Success(at::Success::$variant $args )))
     };
 }
 pub(crate) use at_resp;
@@ -62,6 +62,18 @@ macro_rules! make_from {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum HandParsedAtResponse {
+    #[allow(unused)]
+    CindTest { ordered_indicators: Vec<AgIndicatorIndex> },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum AtResponse {
+    Generated(at::Response),
+    HandParsed(HandParsedAtResponse),
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum CommandFromHf {
     CallActionDialFromNumber { number: String },
     CallActionDialFromMemory { memory: String },
@@ -72,17 +84,23 @@ pub enum CommandFromHf {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProcedureInput {
-    AtResponseFromAg(at::Response),
+    AtResponseFromAg(AtResponse),
     CommandFromHf(CommandFromHf),
 }
 
-make_from!(at::Response, ProcedureInput, AtResponseFromAg);
+make_from!(AtResponse, ProcedureInput, AtResponseFromAg);
 make_from!(CommandFromHf, ProcedureInput, CommandFromHf);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommandToHf {
-    SetInitialAgIndicatorValues { values: Vec<i64> },
-    SetAgIndicatorIndex { indicator: AgIndicatorIndex, index: i64 },
+    SetInitialAgIndicatorValues {
+        values: Vec<i64>,
+    },
+    #[allow(unused)]
+    SetAgIndicatorIndex {
+        indicator: AgIndicatorIndex,
+        index: i64,
+    },
     AwaitRemoteSco,
 }
 
