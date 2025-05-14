@@ -6,14 +6,12 @@
 
 use crate::arch::execution::new_syscall;
 use crate::mm::MemoryManager;
-use crate::signals::{
-    deliver_signal, dequeue_signal, prepare_to_restart_syscall, SignalActions, SignalInfo,
-};
+use crate::signals::{deliver_signal, dequeue_signal, prepare_to_restart_syscall, SignalInfo};
 use crate::syscalls::table::dispatch_syscall;
 use crate::task::{
     ptrace_attach_from_state, ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask,
-    ExceptionResult, ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState,
-    SeccompStateValue, StopState, TaskBuilder, TaskFlags, ThreadGroup, ThreadGroupWriteGuard,
+    ExceptionResult, ExitStatus, PidTable, PtraceCoreState, SeccompStateValue, StopState,
+    TaskBuilder, TaskFlags, ThreadGroup,
 };
 use crate::vfs::DelayedReleaser;
 use anyhow::{format_err, Error};
@@ -26,13 +24,13 @@ use starnix_logging::{
     CATEGORY_STARNIX, NAME_EXECUTE_SYSCALL, NAME_HANDLE_EXCEPTION, NAME_READ_RESTRICTED_STATE,
     NAME_RESTRICTED_KICK, NAME_RUN_TASK, NAME_WRITE_RESTRICTED_STATE,
 };
-use starnix_sync::{LockBefore, Locked, ProcessGroupState, TaskRelease, Unlocked};
+use starnix_sync::{LockBefore, Locked, TaskRelease, Unlocked};
 use starnix_syscalls::decls::{Syscall, SyscallDecl};
 use starnix_syscalls::SyscallResult;
-use starnix_types::ownership::{OwnedRef, Releasable, ReleaseGuard, WeakRef};
+use starnix_types::ownership::{OwnedRef, Releasable, WeakRef};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::SIGKILL;
-use starnix_uapi::{errno, error, from_status_like_fdio, pid_t};
+use starnix_uapi::{errno, error};
 use std::os::unix::thread::JoinHandleExt;
 use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
@@ -398,47 +396,6 @@ fn process_restricted_exit(
     Ok(None)
 }
 
-pub fn create_zircon_process<L>(
-    locked: &mut Locked<'_, L>,
-    kernel: &Arc<Kernel>,
-    parent: Option<ThreadGroupWriteGuard<'_>>,
-    pid: pid_t,
-    process_group: Arc<ProcessGroup>,
-    signal_actions: Arc<SignalActions>,
-    name: &[u8],
-) -> Result<ReleaseGuard<TaskInfo>, Errno>
-where
-    L: LockBefore<ProcessGroupState>,
-{
-    // Don't allow new processes to be created once the kernel has started shutting down.
-    if kernel.is_shutting_down() {
-        return error!(EBUSY);
-    }
-    let (process, root_vmar) =
-        create_shared(&kernel.kthreads.starnix_process, zx::ProcessOptions::empty(), name)
-            .map_err(|status| from_status_like_fdio!(status))?;
-
-    // Make sure that if this process panics in normal mode that the whole kernel's job is killed.
-    fuchsia_runtime::job_default()
-        .set_critical(zx::JobCriticalOptions::RETCODE_NONZERO, &process)
-        .map_err(|status| from_status_like_fdio!(status))?;
-
-    let memory_manager =
-        Arc::new(MemoryManager::new(root_vmar).map_err(|status| from_status_like_fdio!(status))?);
-
-    let thread_group = ThreadGroup::new(
-        locked,
-        kernel.clone(),
-        process,
-        parent,
-        pid,
-        process_group,
-        signal_actions,
-    );
-
-    Ok(TaskInfo { thread: None, thread_group, memory_manager: Some(memory_manager) }.into())
-}
-
 pub fn execute_task_with_prerun_result<L, F, R, G>(
     locked: &mut Locked<'_, L>,
     task_builder: TaskBuilder,
@@ -661,44 +618,6 @@ fn process_completed_exception(
             }
             current_task.thread_state.registers = registers;
         }
-    }
-}
-
-/// Creates a process that shares half its address space with this process.
-///
-/// The created process will also share its handle table and futex context with `self`.
-///
-/// Returns the created process and a handle to the created process' restricted address space.
-///
-/// Wraps the
-/// [zx_process_create_shared](https://fuchsia.dev/fuchsia-src/reference/syscalls/process_create_shared.md)
-/// syscall.
-fn create_shared(
-    process: &zx::Process,
-    options: zx::ProcessOptions,
-    name: &[u8],
-) -> Result<(zx::Process, zx::Vmar), zx::Status> {
-    let self_raw = process.raw_handle();
-    let name_ptr = name.as_ptr();
-    let name_len = name.len();
-    let mut process_out = 0;
-    let mut restricted_vmar_out = 0;
-    let status = unsafe {
-        zx::sys::zx_process_create_shared(
-            self_raw,
-            options.bits(),
-            name_ptr,
-            name_len,
-            &mut process_out,
-            &mut restricted_vmar_out,
-        )
-    };
-    zx::ok(status)?;
-    unsafe {
-        Ok((
-            zx::Process::from(zx::Handle::from_raw(process_out)),
-            zx::Vmar::from(zx::Handle::from_raw(restricted_vmar_out)),
-        ))
     }
 }
 

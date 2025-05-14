@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::dynamic_thread_spawner::DynamicThreadSpawner;
+use crate::execution::create_kernel_thread;
 use crate::task::{CurrentTask, Kernel, Task, ThreadGroup};
 use fragile::Fragile;
 use fuchsia_async as fasync;
@@ -180,7 +181,7 @@ where
         let Some(system_task) = system_task.upgrade() else {
             return error!(ESRCH);
         };
-        CurrentTask::create_kernel_thread(locked, &system_task, CString::new("kthreadd").unwrap())?
+        create_kernel_thread(locked, &system_task, CString::new("kthreadd").unwrap())?
     };
     let result = f(locked, &current_task);
     current_task.release(locked);

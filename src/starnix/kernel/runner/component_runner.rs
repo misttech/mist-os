@@ -17,7 +17,7 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use serde::de::Error as _;
 use serde::Deserialize;
-use starnix_core::execution::execute_task_with_prerun_result;
+use starnix_core::execution::{create_init_child_process, execute_task_with_prerun_result};
 use starnix_core::fs::fuchsia::{create_file_from_handle, RemoteFs, SyslogFile};
 use starnix_core::task::{CurrentTask, ExitStatus, Task};
 use starnix_core::vfs::fs_args::MountParams;
@@ -215,7 +215,7 @@ pub async fn start_component(
     );
 
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
-    let current_task = CurrentTask::create_init_child_process(
+    let current_task = create_init_child_process(
         system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
         system_task.kernel(),
         &program.binary,

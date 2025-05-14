@@ -1155,6 +1155,7 @@ mod tests {
     use super::*;
     use crate::device::binder::tests::run_process_accessor;
     use crate::device::binder::BinderFs;
+    use crate::execution::create_init_child_process;
     use crate::mm::MemoryAccessor;
     use crate::testing::*;
     use crate::vfs::{FileSystemOptions, WhatToMount};
@@ -1224,7 +1225,7 @@ mod tests {
                 )
                 .expect("mount");
 
-                let task: AutoReleasableTask = CurrentTask::create_init_child_process(
+                let task: AutoReleasableTask = create_init_child_process(
                     locked,
                     &kernel,
                     &CString::new("remote_binder".to_string()).expect("CString"),

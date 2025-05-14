@@ -23,7 +23,9 @@ use futures::{FutureExt, StreamExt, TryStreamExt};
 use serde::Deserialize;
 use starnix_container_structured_config::Config as ContainerStructuredConfig;
 use starnix_core::container_namespace::ContainerNamespace;
-use starnix_core::execution::execute_task_with_prerun_result;
+use starnix_core::execution::{
+    create_init_process, create_system_task, execute_task_with_prerun_result,
+};
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
@@ -607,7 +609,7 @@ async fn create_container(
     // Lots of software assumes that the pid for the init process is 1.
     debug_assert_eq!(init_pid, 1);
 
-    let system_task = CurrentTask::create_system_task(
+    let system_task = create_system_task(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         &kernel,
         Arc::clone(&fs_context),
@@ -707,7 +709,7 @@ async fn create_container(
     }
 
     log_debug!("Creating init process.");
-    let init_task = CurrentTask::create_init_process(
+    let init_task = create_init_process(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         &kernel,
         init_pid,
