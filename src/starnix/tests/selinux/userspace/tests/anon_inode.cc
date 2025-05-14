@@ -20,9 +20,9 @@
 
 #include "src/starnix/tests/selinux/userspace/util.h"
 
-extern std::string DoPrePolicyLoadWork() { return "anon_inode_policy.pp"; }
-
 namespace {
+
+int g_before_policy_userfaultfd = -1;
 
 TEST(AnonInodeTest, EventFdIsUnlabeled) {
   fbl::unique_fd fd(eventfd(0, 0));
@@ -132,4 +132,19 @@ TEST(AnonInodeTest, PerfEventFdIsUnlabeled) {
   EXPECT_EQ(GetLabel(fd.get()), fit::error(ENOTSUP));
 }
 
+TEST(AnonInodeTest, EventFdBeforePolicy) {
+  // userfaultfd() created before policy load should have been labeled based on the "kernel" SID.
+  EXPECT_THAT(GetLabel(g_before_policy_userfaultfd),
+              IsOk("unlabeled_u:unlabeled_r:unlabeled_t:s0"));
+}
+
 }  // namespace
+
+extern std::string DoPrePolicyLoadWork() {
+  g_before_policy_userfaultfd = static_cast<int>(syscall(SYS_userfaultfd, O_CLOEXEC));
+  EXPECT_NE(g_before_policy_userfaultfd, -1)
+      << "Failed pre-policy userfaultfd: " << strerror(errno);
+  EXPECT_EQ(GetLabel(g_before_policy_userfaultfd), fit::error(EINVAL));
+
+  return "anon_inode_policy.pp";
+}

@@ -489,25 +489,23 @@ pub(in crate::security) fn fs_node_init_anon(
     let fs_node_class = FileClass::AnonFsNode.into();
 
     // TODO: https://fxbug.dev/405062002 - Fold this into the `fs_node_init_with_dentry*()` logic?
-    let maybe_label = if Anon::is_private(new_node) {
+    let sid = if Anon::is_private(new_node) {
         // TODO: https://fxbug.dev/404773987 - Introduce a new `FsNode` labeling state for this?
-        Some(FsNodeLabel::SecurityId { sid: SecurityId::initial(InitialSid::Unlabeled) })
+        SecurityId::initial(InitialSid::Unlabeled)
+    } else if security_server.has_policy() {
+        let task_sid = task_effective_sid(current_task);
+        security_server
+            .as_permission_check()
+            .compute_new_fs_node_sid(task_sid, task_sid, fs_node_class, node_type.into())
+            .expect("Compute label for anon_inode")
     } else {
-        security_server.has_policy().then(|| {
-            let task_sid = task_effective_sid(current_task);
-            let sid = security_server
-                .as_permission_check()
-                .compute_new_fs_node_sid(task_sid, task_sid, fs_node_class, node_type.into())
-                .expect("Compute label for anon_inode");
-            FsNodeLabel::SecurityId { sid }
-        })
+        // If no policy has been loaded then `anon_inode`s receive the "unlabeled" context.
+        SecurityId::initial(InitialSid::Unlabeled)
     };
 
     let mut state = new_node.security_state.lock();
     state.class = fs_node_class;
-    if let Some(label) = maybe_label {
-        state.label = label;
-    }
+    state.label = FsNodeLabel::SecurityId { sid };
 }
 
 /// Helper used by filesystem node creation checks to validate that `current_task` has necessary
@@ -1110,26 +1108,41 @@ pub(in crate::security) fn fs_node_getsecurity<L>(
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
-    if name == FsStr::new(XATTR_NAME_SELINUX.to_bytes()) && !Anon::is_private(fs_node) {
-        let sid = fs_node_effective_sid_and_class(&fs_node).sid;
-        if sid != SecurityId::initial(InitialSid::Unlabeled) {
-            if let Some(context) = security_server.sid_to_security_context(sid) {
-                return Ok(ValueOrSize::Value(context.into()));
-            }
-        }
-
-        // If the node is still unlabelled at this point then it most likely does have a value set for
-        // "security.selinux", but the value is not a valid Security Context, so we defer to the
-        // attribute value stored in the file system for this node.
+    // If the node is private or the xattr is not "security.selinux" then immediately fall back
+    // to `get_xattr()`.
+    if name != FsStr::new(XATTR_NAME_SELINUX.to_bytes()) || Anon::is_private(fs_node) {
+        return fs_node.ops().get_xattr(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            fs_node,
+            current_task,
+            name,
+            max_size,
+        );
     }
 
-    fs_node.ops().get_xattr(
-        &mut locked.cast_locked::<FileOpsCore>(),
-        fs_node,
-        current_task,
-        name,
-        max_size,
-    )
+    // If the SID cached on the node is "unlabeled" then the node may have an xattr with an invalid
+    // Security Context, which we should return, so return the `get_xattr()` result, unless it indicates
+    // that the filesystem does not support the attribute.
+    let sid = fs_node_effective_sid_and_class(&fs_node).sid;
+    if sid == SecurityId::initial(InitialSid::Unlabeled) {
+        let result = fs_node.ops().get_xattr(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            fs_node,
+            current_task,
+            name,
+            max_size,
+        );
+        if result != error!(ENOTSUP) {
+            return result;
+        }
+    }
+
+    // Serialize the SID to a Security Context and return it.
+    if let Some(context) = security_server.sid_to_security_context(sid) {
+        return Ok(ValueOrSize::Value(context.into()));
+    }
+
+    error!(ENOTSUP)
 }
 
 /// Sets the `name`d security attribute on `fs_node` and updates internal
