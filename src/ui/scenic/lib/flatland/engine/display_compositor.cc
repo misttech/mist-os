@@ -553,6 +553,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   if (num_images == 0) {
     // The Coordinator API doesn't allow zero layers.
     // TODO(https://fxbug.dev/399228128): Use a Coordinator color layer instead of Vulkan fallback.
+    TRACE_INSTANT("gfx", "scenic_d2d_failed: zero layers provided.", TRACE_SCOPE_THREAD);
     FLATLAND_VERBOSE_LOG << "SetRenderDataOnDisplay() failed: zero layers provided.";
     return false;
   }
@@ -562,6 +563,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   std::vector<fuchsia_hardware_display::wire::LayerId>& layers =
       display_engine_data_map_.at(data.display_id.value).layers;
   if (layers.size() < num_images) {
+    TRACE_INSTANT("gfx", "scenic_d2d_failed: insufficient layers available", TRACE_SCOPE_THREAD);
     FLATLAND_VERBOSE_LOG << "SetRenderDataOnDisplay() failed: insufficient layers available.";
     return false;
   }
@@ -578,6 +580,8 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
         ApplyLayerImage(layers[i], data.rectangles[i], data.images[i],
                         /*wait_id*/ kInvalidEventId);
       } else {
+        TRACE_INSTANT("gfx", "scenic_d2d_failed: image not imported for direct-display.",
+                      TRACE_SCOPE_THREAD);
         FLATLAND_VERBOSE_LOG
             << "SetRenderDataOnDisplay() failed: image not imported for direct-display.";
         return false;
@@ -594,6 +598,8 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
           rect.extent.y == static_cast<float>(display_size.y)) {
         ApplyLayerColor(layers[i], rect, data.images[i]);
       } else {
+        TRACE_INSTANT("gfx", "scenic_d2d_failed: violated solid-fill rect restrictions.",
+                      TRACE_SCOPE_THREAD);
         FLATLAND_VERBOSE_LOG
             << "SetRenderDataOnDisplay() failed: violated solid-fill rect restrictions.";
         return false;
@@ -877,7 +883,7 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
   // Note: TryDirectToDisplay() failing indicates hardware failure to do display composition.
   const bool fallback_to_gpu_composition = !enable_display_composition_ ||
                                            test_args.force_gpu_composition ||
-                                           !TryDirectToDisplay(render_data_list) || !CheckConfig();
+                                           !TryDirectToDisplay(render_data_list);
   if (fallback_to_gpu_composition) {
     // Discard only if we have attempted to TryDirectToDisplay() and have an unapplied config.
     // DiscardConfig call is costly and we should avoid calling when it isn't necessary.
@@ -885,11 +891,26 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
       DiscardConfig();
     }
 
-    if (!PerformGpuComposition(frame_number, presentation_time, render_data_list,
-                               std::move(release_fences), std::move(callback))) {
+    if (PerformGpuComposition(frame_number, presentation_time, render_data_list,
+                              std::move(release_fences), std::move(callback))) {
+      for (const auto& data : render_data_list) {
+        const int32_t num_render_data = static_cast<int32_t>(data.rectangles.size());
+        const uint64_t display_id = data.display_id.value;
+        TRACE_COUNTER("gfx", "Scenic D2D images", display_id, "count", TA_INT32(0));
+        TRACE_COUNTER("gfx", "Scenic GPU images", display_id, "count", TA_INT32(num_render_data));
+      }
+    } else {
       return RenderFrameResult::kFailure;
     }
+
   } else {
+    for (const auto& data : render_data_list) {
+      const int32_t num_render_data = static_cast<int32_t>(data.rectangles.size());
+      const uint64_t display_id = data.display_id.value;
+      TRACE_COUNTER("gfx", "Scenic D2D images", display_id, "count", TA_INT32(num_render_data));
+      TRACE_COUNTER("gfx", "Scenic GPU images", display_id, "count", TA_INT32(0));
+    }
+
     // CC was successfully applied to the config so we update the state machine.
     cc_state_machine_.SetApplyConfigSucceeded();
 
@@ -935,6 +956,10 @@ bool DisplayCompositor::TryDirectToDisplay(const std::vector<RenderData>& render
     }
   }
 
+  if (!CheckConfig()) {
+    TRACE_INSTANT("gfx", "scenic_d2d_failed: check config failed.", TRACE_SCOPE_THREAD);
+    return false;
+  }
   return true;
 }
 

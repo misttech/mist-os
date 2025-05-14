@@ -216,9 +216,13 @@ void DefaultFrameScheduler::MaybeRenderFrame(async_dispatcher_t*, async::TaskBas
   // TODO(https://fxbug.dev/42098738) Remove the presentation check, and pipeline frames within a
   // VSYNC interval.
   FX_DCHECK(last_presented_frame_number_ <= frame_number);
-  // Only one frame is allowed "in flight" at any given. Don't start rendering another frame until
-  // the previous frame is on the display.
+
+  // Only one frame is allowed "in flight" at any given time.
+  // Don't start rendering another frame until the previous frame is on the display.
   if (last_presented_frame_number_ < (frame_number - 1)) {
+    TRACE_INSTANT("gfx", "scenic_frame_dropped: too many frames in flight", TRACE_SCOPE_THREAD,
+                  "frame_number", frame_number);
+
     FLATLAND_VERBOSE_LOG << "FrameScheduler::MaybeRenderFrame() frame_number=" << frame_number
                          << "  target_presentation_time=" << target_presentation_time.get()
                          << "  skipping render because last_presented_frame_number="
