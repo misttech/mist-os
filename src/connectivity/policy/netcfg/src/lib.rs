@@ -37,9 +37,9 @@ use {
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_masquerade as fnet_masquerade, fidl_fuchsia_net_name as fnet_name,
-    fidl_fuchsia_net_ndp as fnet_ndp, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
-    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_net_virtualization as fnet_virtualization,
-    fuchsia_async as fasync,
+    fidl_fuchsia_net_ndp as fnet_ndp, fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_stack as fnet_stack,
+    fidl_fuchsia_net_virtualization as fnet_virtualization, fuchsia_async as fasync,
 };
 
 use anyhow::{anyhow, Context as _};
@@ -636,9 +636,6 @@ pub struct NetCfg<'a> {
     // Policy configuration to determine whether to provision an interface.
     interface_provisioning_policy: Vec<interface::ProvisioningRule>,
 
-    // TODO(https://fxbug.dev/416012531): Conditionally connect to the
-    // socketproxy's protocols when this is set to true.
-    #[allow(unused)]
     enable_socket_proxy: bool,
 }
 
@@ -1089,7 +1086,8 @@ impl<'a> NetCfg<'a> {
                 }
             }
             DnsServersUpdateSource::SocketProxy => {
-                todo!("https://fxbug.dev/416012531: Connect to socketproxy's DnsServerWatcher")
+                // Remove the SocketProxy DNS servers when the server watcher is complete.
+                Ok(self.update_dns_servers(source, vec![]).await)
             }
         }
     }
@@ -1138,6 +1136,26 @@ impl<'a> NetCfg<'a> {
                 .is_none(),
             "dns watchers should be empty"
         );
+
+        if self.enable_socket_proxy {
+            let socketproxy_dns_server_watcher = fuchsia_component::client::connect_to_protocol::<
+                fnp_socketproxy::DnsServerWatcherMarker,
+            >()
+            .context("error connecting to socketproxy dns server watcher")?;
+            let socketproxy_dns_server_stream =
+                dns_server_watcher::new_dns_server_stream_socketproxy(
+                    socketproxy_dns_server_watcher,
+                )
+                .boxed();
+
+            assert!(
+                dns_watchers
+                    .get_mut()
+                    .insert(DnsServersUpdateSource::SocketProxy, socketproxy_dns_server_stream)
+                    .is_none(),
+                "dns watchers should be empty"
+            );
+        }
 
         let mut masquerade_handler = MasqueradeHandler::default();
 

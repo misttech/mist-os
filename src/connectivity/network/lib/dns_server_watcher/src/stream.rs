@@ -4,9 +4,12 @@
 
 //! DNS Server watcher stream.
 
-use fidl_fuchsia_net_name::{DnsServerWatcherProxy, DnsServer_};
+use fidl_fuchsia_net_name::{
+    DnsServerSource, DnsServerWatcherProxy, DnsServer_, SocketProxyDnsServerSource,
+};
 
 use async_utils::stream::WithTag as _;
+use fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy;
 use futures::future::TryFutureExt as _;
 use futures::stream::Stream;
 
@@ -31,6 +34,50 @@ pub fn new_dns_server_stream(
         proxy.watch_servers().map_ok(move |s| Some((s, proxy)))
     })
     .tagged(source)
+}
+
+/// Returns a `Stream` of [`DnsServerWatcherEvent`]s from watching the server configuration
+/// provided by fnp_socketproxy's `DnsServerWatcher`.
+pub fn new_dns_server_stream_socketproxy(
+    proxy: fnp_socketproxy::DnsServerWatcherProxy,
+) -> impl Stream<Item = (DnsServersUpdateSource, Result<Vec<DnsServer_>, fidl::Error>)> {
+    futures::stream::try_unfold(proxy, move |proxy| {
+        proxy.watch_servers().map_ok(move |lists| {
+            let dns_list = lists
+                .into_iter()
+                .map(move |dns_server_list| dns_servers_from_dns_server_list(dns_server_list))
+                .flatten()
+                .collect::<Vec<_>>();
+
+            Some((dns_list, proxy))
+        })
+    })
+    .tagged(DnsServersUpdateSource::SocketProxy)
+}
+
+/// Returns a `Vec` of [`DnsServer_`] from a `fnp_socketproxy::DnsServerList`.
+/// Assumption: all DNS servers retrieved from the socketproxy are from interfaces
+/// that have been provisioned by an agent other than Fuchsia.
+fn dns_servers_from_dns_server_list(
+    fnp_socketproxy::DnsServerList { addresses, source_network_id, ..}: fnp_socketproxy::DnsServerList,
+) -> Vec<DnsServer_> {
+    let id: u64 = match source_network_id {
+        Some(id) => id.into(),
+        // When a network id is not specified, return an empty list.
+        None => return vec![],
+    };
+    addresses
+        .unwrap_or_default()
+        .into_iter()
+        .map(|addr| DnsServer_ {
+            address: Some(addr),
+            source: Some(DnsServerSource::SocketProxy(SocketProxyDnsServerSource {
+                source_interface: Some(id),
+                ..Default::default()
+            })),
+            ..Default::default()
+        })
+        .collect()
 }
 
 #[cfg(test)]

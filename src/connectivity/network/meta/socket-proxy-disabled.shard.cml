@@ -15,6 +15,12 @@
                 "#reachability",
             ],
         },
+        {
+            protocol: "fuchsia.net.policy.socketproxy.DnsServerWatcher",
+            from: "void",
+            to: "#netcfg",
+            availability: "optional",
+        },
     ],
     expose: [
         {
