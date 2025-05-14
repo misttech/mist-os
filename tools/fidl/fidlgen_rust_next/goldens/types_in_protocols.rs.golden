@@ -827,7 +827,7 @@ where
 impl<'de> ::fidl_next::FromWire<WireTable<'de>> for Table {
     #[inline]
     fn from_wire(wire: WireTable<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
         Self {}
     }
@@ -844,6 +844,10 @@ impl<'de> ::fidl_next::FromWireRef<WireTable<'de>> for Table {
 #[repr(C)]
 pub struct WireTable<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireTable<'de> {
+    fn drop(&mut self) {}
 }
 
 unsafe impl ::fidl_next::Wire for WireTable<'static> {
@@ -1002,10 +1006,10 @@ where
 impl ::fidl_next::FromWire<WireUnion> for Union {
     #[inline]
     fn from_wire(wire: WireUnion) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::B(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<bool>()
+                wire.raw.get().read_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1053,6 +1057,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalUnion> for Box<Union> {
 pub struct WireUnion {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnion {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<bool>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnion {
@@ -3324,7 +3340,7 @@ where
 impl<'de> ::fidl_next::FromWire<WireResourceTable<'de>> for ResourceTable {
     #[inline]
     fn from_wire(wire: WireResourceTable<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
         Self {}
     }
@@ -3334,6 +3350,10 @@ impl<'de> ::fidl_next::FromWire<WireResourceTable<'de>> for ResourceTable {
 #[repr(C)]
 pub struct WireResourceTable<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireResourceTable<'de> {
+    fn drop(&mut self) {}
 }
 
 unsafe impl ::fidl_next::Wire for WireResourceTable<'static> {
@@ -3446,10 +3466,10 @@ where
 impl ::fidl_next::FromWire<WireResourceUnion> for ResourceUnion {
     #[inline]
     fn from_wire(wire: WireResourceUnion) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::B(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<bool>()
+                wire.raw.get().read_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -3473,6 +3493,18 @@ impl ::fidl_next::FromWireOption<WireOptionalResourceUnion> for Box<ResourceUnio
 pub struct WireResourceUnion {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireResourceUnion {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<bool>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireResourceUnion {

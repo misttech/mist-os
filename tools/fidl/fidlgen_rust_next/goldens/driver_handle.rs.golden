@@ -318,11 +318,11 @@ where
 impl<'de> ::fidl_next::FromWire<WireT<'de>> for T {
     #[inline]
     fn from_wire(wire: WireT<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let zircon_handle = table.get(1);
+        let zircon_handle = wire.table.get(1);
 
-        let fdf_handle = table.get(2);
+        let fdf_handle = wire.table.get(2);
 
         Self {
             zircon_handle: zircon_handle.map(|envelope| {
@@ -347,6 +347,20 @@ impl<'de> ::fidl_next::FromWire<WireT<'de>> for T {
 #[repr(C)]
 pub struct WireT<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireT<'de> {
+    fn drop(&mut self) {
+        let _ = self.table.get(1).map(|envelope| unsafe {
+            envelope.read_unchecked::<::fidl_next::fuchsia::WireHandle>()
+        });
+
+        let _ = self.table.get(2)
+                .map(|envelope| unsafe {
+                    envelope.read_unchecked::<::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel,crate::DriverProtocol,
+        >>()
+                });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireT<'static> {

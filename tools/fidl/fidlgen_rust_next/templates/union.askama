@@ -176,12 +176,12 @@ where
 impl{{ de }} ::fidl_next::FromWire<{{ wire_name }}{{ de }}> for {{ name }} {
     #[inline]
     fn from_wire(wire: {{ wire_name }}{{ de }}) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             {% for member in union.members %}
                 {{ member.ordinal }} => Self::{{ member.name.camel()|ident }}(
                     ::fidl_next::FromWire::from_wire(
-                        unsafe { raw.get().read_unchecked::<{{ context.wire_type(member.ty) }}>() }
+                        unsafe { wire.raw.get().read_unchecked::<{{ context.wire_type(member.ty) }}>() }
                     )
                 ),
             {% endfor %}
@@ -237,6 +237,25 @@ impl{{ de }} ::fidl_next::FromWireOptionRef<{{ wire_optional_name }}{{ de }}> fo
 pub struct {{ wire_name }}{{ de }} {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<{{ phantom }}>,
+}
+
+impl{{ de }} Drop for {{ wire_name }}{{ de }} {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            {% for member in union.members %}
+                {{ member.ordinal }} => {
+                    let _ = unsafe {
+                        self.raw.get().read_unchecked::<{{ context.wire_type(member.ty) }}>()
+                    };
+                },
+            {% endfor %}
+            {% if union.is_strict %}
+                _ => unsafe { ::core::hint::unreachable_unchecked() },
+            {% else %}
+                _ => (),
+            {% endif %}
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for {{ wire_name }}{{ static_ }} {

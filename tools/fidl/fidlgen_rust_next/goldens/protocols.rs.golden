@@ -3448,10 +3448,10 @@ where
 impl ::fidl_next::FromWire<WireTheUnion> for TheUnion {
     #[inline]
     fn from_wire(wire: WireTheUnion) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::V(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireU32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireU32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -3499,6 +3499,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalTheUnion> for Box<TheUnion> {
 pub struct WireTheUnion {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireTheUnion {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireU32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireTheUnion {

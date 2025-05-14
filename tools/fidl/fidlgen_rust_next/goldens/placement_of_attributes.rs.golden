@@ -853,9 +853,9 @@ where
 impl<'de> ::fidl_next::FromWire<WireExampleTable<'de>> for ExampleTable {
     #[inline]
     fn from_wire(wire: WireExampleTable<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let member = table.get(1);
+        let member = wire.table.get(1);
 
         Self {
             member: member.map(|envelope| {
@@ -884,6 +884,15 @@ impl<'de> ::fidl_next::FromWireRef<WireExampleTable<'de>> for ExampleTable {
 #[repr(C)]
 pub struct WireExampleTable<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireExampleTable<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireU32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireExampleTable<'static> {
@@ -1045,10 +1054,10 @@ where
 impl ::fidl_next::FromWire<WireExampleUnion> for ExampleUnion {
     #[inline]
     fn from_wire(wire: WireExampleUnion) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::Variant(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireU32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireU32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1096,6 +1105,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalExampleUnion> for Box<ExampleUni
 pub struct WireExampleUnion {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireExampleUnion {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireU32>() };
+            }
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireExampleUnion {

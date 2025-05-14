@@ -320,10 +320,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -387,6 +387,18 @@ impl
 pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -702,9 +714,9 @@ impl<'de>
     fn from_wire(
         wire: WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse<'de>,
     ) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -739,6 +751,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -1127,10 +1148,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
     fn from_wire(
         wire: WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse,
     ) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1194,6 +1215,18 @@ impl
 pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -1511,9 +1544,9 @@ impl<'de>
     fn from_wire(
         wire: WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse<'de>,
     ) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -1548,6 +1581,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -2627,10 +2669,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionR
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -2692,6 +2734,18 @@ impl
 pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
@@ -2997,9 +3051,9 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolStrictTwoWayT
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -3033,6 +3087,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -3406,10 +3469,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionE
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -3473,6 +3536,18 @@ impl
 pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
@@ -3785,9 +3860,9 @@ impl<'de>
     fn from_wire(
         wire: WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse<'de>,
     ) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -3821,6 +3896,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -4187,10 +4271,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolStrictEventUnionRe
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsAjarProtocolStrictEventUnionRequest) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -4250,6 +4334,18 @@ impl
 pub struct WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
@@ -4553,9 +4649,9 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolStrictEventTa
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsAjarProtocolStrictEventTableRequest<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -4588,6 +4684,15 @@ impl<'de> ::fidl_next::FromWireRef<WireUnknownInteractionsAjarProtocolStrictEven
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolStrictEventTableRequest<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsAjarProtocolStrictEventTableRequest<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -4954,10 +5059,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolFlexibleEventUnion
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -5019,6 +5124,18 @@ impl
 pub struct WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
@@ -5324,9 +5441,9 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsAjarProtocolFlexibleEvent
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -5360,6 +5477,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -6806,10 +6932,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
     fn from_wire(
         wire: WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse,
     ) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -6873,6 +6999,18 @@ impl
 pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -7189,9 +7327,9 @@ impl<'de>
     fn from_wire(
         wire: WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse<'de>,
     ) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -7226,6 +7364,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -7620,10 +7767,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
     fn from_wire(
         wire: WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse,
     ) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -7689,6 +7836,18 @@ impl
 pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -8010,9 +8169,9 @@ impl<'de>
     fn from_wire(
         wire: WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse<'de>,
     ) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -8047,6 +8206,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -9087,10 +9255,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedProtocolStrictTwoWayUnio
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -9154,6 +9322,18 @@ impl
 pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
@@ -9463,9 +9643,9 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsClosedProtocolStrictTwoWa
     fn from_wire(
         wire: WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse<'de>,
     ) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -9499,6 +9679,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -9880,10 +10069,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedProtocolStrictTwoWayUnio
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -9947,6 +10136,18 @@ impl
 pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -10262,9 +10463,9 @@ impl<'de>
     fn from_wire(
         wire: WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse<'de>,
     ) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -10298,6 +10499,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -10666,10 +10876,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsClosedProtocolStrictEventUnion
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsClosedProtocolStrictEventUnionRequest) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -10731,6 +10941,18 @@ impl
 pub struct WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
@@ -11036,9 +11258,9 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsClosedProtocolStrictEvent
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsClosedProtocolStrictEventTableRequest<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -11072,6 +11294,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedProtocolStrictEventTableRequest<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsClosedProtocolStrictEventTableRequest<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -12256,10 +12487,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolStrictTwoWayUnio
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -12323,6 +12554,18 @@ impl
 pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
@@ -12632,9 +12875,9 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolStrictTwoWa
     fn from_wire(
         wire: WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse<'de>,
     ) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -12668,6 +12911,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -13049,10 +13301,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolStrictTwoWayUnio
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -13116,6 +13368,18 @@ impl
 pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -13431,9 +13695,9 @@ impl<'de>
     fn from_wire(
         wire: WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse<'de>,
     ) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -13467,6 +13731,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -13846,10 +14119,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUn
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -13913,6 +14186,18 @@ impl
 pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
@@ -14225,9 +14510,9 @@ impl<'de>
     fn from_wire(
         wire: WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'de>,
     ) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -14261,6 +14546,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -14647,10 +14941,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUn
     fn from_wire(
         wire: WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse,
     ) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -14714,6 +15008,18 @@ impl
 pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -15029,9 +15335,9 @@ impl<'de>
     fn from_wire(
         wire: WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse<'de>,
     ) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -15066,6 +15372,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -16670,10 +16985,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictTwoWayUnionRespo
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsProtocolStrictTwoWayUnionResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -16732,6 +17047,18 @@ impl
 pub struct WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
@@ -17032,9 +17359,9 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictTwoWayTable
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsProtocolStrictTwoWayTableResponse<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -17065,6 +17392,15 @@ impl<'de> ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolStrictTwoWayTa
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolStrictTwoWayTableResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsProtocolStrictTwoWayTableResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -17434,10 +17770,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictTwoWayUnionErrRe
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -17498,6 +17834,18 @@ impl
 pub struct WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
@@ -17803,9 +18151,9 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictTwoWayTable
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -17838,6 +18186,15 @@ impl<'de> ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolStrictTwoWayTa
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -18207,10 +18564,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleTwoWayUnionRes
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -18270,6 +18627,18 @@ impl
 pub struct WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
@@ -18573,9 +18942,9 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleTwoWayTab
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -18608,6 +18977,15 @@ impl<'de> ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolFlexibleTwoWay
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -18981,10 +19359,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleTwoWayUnionErr
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -19046,6 +19424,18 @@ impl
 pub struct WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
@@ -19351,9 +19741,9 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleTwoWayTab
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -19387,6 +19777,15 @@ impl<'de>
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire
@@ -19751,10 +20150,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictEventUnionReques
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsProtocolStrictEventUnionRequest) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -19812,6 +20211,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalUnknownInteractionsProtocolStric
 pub struct WireUnknownInteractionsProtocolStrictEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsProtocolStrictEventUnionRequest {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsProtocolStrictEventUnionRequest {
@@ -20112,9 +20523,9 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsProtocolStrictEventTableR
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsProtocolStrictEventTableRequest<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -20145,6 +20556,15 @@ impl<'de> ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolStrictEventTab
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolStrictEventTableRequest<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsProtocolStrictEventTableRequest<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsProtocolStrictEventTableRequest<'static> {
@@ -20506,10 +20926,10 @@ impl ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleEventUnionRequ
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsProtocolFlexibleEventUnionRequest) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -20568,6 +20988,18 @@ impl
 pub struct WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
@@ -20868,9 +21300,9 @@ impl<'de> ::fidl_next::FromWire<WireUnknownInteractionsProtocolFlexibleEventTabl
 {
     #[inline]
     fn from_wire(wire: WireUnknownInteractionsProtocolFlexibleEventTableRequest<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let some_field = table.get(1);
+        let some_field = wire.table.get(1);
 
         Self {
             some_field: some_field.map(|envelope| {
@@ -20901,6 +21333,15 @@ impl<'de> ::fidl_next::FromWireRef<WireUnknownInteractionsProtocolFlexibleEventT
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolFlexibleEventTableRequest<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireUnknownInteractionsProtocolFlexibleEventTableRequest<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI32>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire

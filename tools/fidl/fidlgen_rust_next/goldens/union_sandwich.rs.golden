@@ -114,10 +114,10 @@ where
 impl<'de> ::fidl_next::FromWire<WireUnionSize12Alignment4<'de>> for UnionSize12Alignment4 {
     #[inline]
     fn from_wire(wire: WireUnionSize12Alignment4<'de>) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::Variant(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<[u8; 6]>()
+                wire.raw.get().read_unchecked::<[u8; 6]>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -169,6 +169,18 @@ impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalUnionSize12Alignment4<'de>>
 pub struct WireUnionSize12Alignment4<'de> {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<&'de mut [::fidl_next::Chunk]>,
+}
+
+impl<'de> Drop for WireUnionSize12Alignment4<'de> {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<[u8; 6]>() };
+            }
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnionSize12Alignment4<'static> {
@@ -811,10 +823,10 @@ where
 impl<'de> ::fidl_next::FromWire<WireUnionSize24Alignment8<'de>> for UnionSize24Alignment8 {
     #[inline]
     fn from_wire(wire: WireUnionSize24Alignment8<'de>) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::Variant(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<crate::WireStructSize16Alignment8>()
+                wire.raw.get().read_unchecked::<crate::WireStructSize16Alignment8>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -866,6 +878,19 @@ impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalUnionSize24Alignment8<'de>>
 pub struct WireUnionSize24Alignment8<'de> {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<&'de mut [::fidl_next::Chunk]>,
+}
+
+impl<'de> Drop for WireUnionSize24Alignment8<'de> {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ =
+                    unsafe { self.raw.get().read_unchecked::<crate::WireStructSize16Alignment8>() };
+            }
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnionSize24Alignment8<'static> {
@@ -1322,10 +1347,10 @@ where
 impl<'de> ::fidl_next::FromWire<WireUnionSize36Alignment4<'de>> for UnionSize36Alignment4 {
     #[inline]
     fn from_wire(wire: WireUnionSize36Alignment4<'de>) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::Variant(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<[u8; 32]>()
+                wire.raw.get().read_unchecked::<[u8; 32]>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1377,6 +1402,18 @@ impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalUnionSize36Alignment4<'de>>
 pub struct WireUnionSize36Alignment4<'de> {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<&'de mut [::fidl_next::Chunk]>,
+}
+
+impl<'de> Drop for WireUnionSize36Alignment4<'de> {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<[u8; 32]>() };
+            }
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnionSize36Alignment4<'static> {
@@ -1823,10 +1860,10 @@ where
 impl ::fidl_next::FromWire<WireUnionSize8Alignment4> for UnionSize8Alignment4 {
     #[inline]
     fn from_wire(wire: WireUnionSize8Alignment4) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::Variant(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireU32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireU32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1876,6 +1913,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalUnionSize8Alignment4>
 pub struct WireUnionSize8Alignment4 {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnionSize8Alignment4 {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireU32>() };
+            }
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnionSize8Alignment4 {

@@ -134,14 +134,14 @@ where
 impl<'de> ::fidl_next::FromWire<WireFlexibleFoo<'de>> for FlexibleFoo {
     #[inline]
     fn from_wire(wire: WireFlexibleFoo<'de>) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::S(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireString<'de>>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireString<'de>>()
             })),
 
             2 => Self::I(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -193,6 +193,22 @@ impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalFlexibleFoo<'de>> for Box<F
 pub struct WireFlexibleFoo<'de> {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<&'de mut [::fidl_next::Chunk]>,
+}
+
+impl<'de> Drop for WireFlexibleFoo<'de> {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireString<'de>>() };
+            }
+
+            2 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireFlexibleFoo<'static> {
@@ -462,14 +478,14 @@ where
 impl<'de> ::fidl_next::FromWire<WireStrictFoo<'de>> for StrictFoo {
     #[inline]
     fn from_wire(wire: WireStrictFoo<'de>) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::S(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireString<'de>>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireString<'de>>()
             })),
 
             2 => Self::I(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireI32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -521,6 +537,22 @@ impl<'de> ::fidl_next::FromWireOptionRef<WireOptionalStrictFoo<'de>> for Box<Str
 pub struct WireStrictFoo<'de> {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<&'de mut [::fidl_next::Chunk]>,
+}
+
+impl<'de> Drop for WireStrictFoo<'de> {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireString<'de>>() };
+            }
+
+            2 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireI32>() };
+            }
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireStrictFoo<'static> {

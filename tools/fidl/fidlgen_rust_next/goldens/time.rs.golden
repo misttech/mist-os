@@ -438,15 +438,15 @@ where
 impl<'de> ::fidl_next::FromWire<WireComplexInstants<'de>> for ComplexInstants {
     #[inline]
     fn from_wire(wire: WireComplexInstants<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let monotonic = table.get(1);
+        let monotonic = wire.table.get(1);
 
-        let boot = table.get(2);
+        let boot = wire.table.get(2);
 
-        let monotonic_ticks = table.get(3);
+        let monotonic_ticks = wire.table.get(3);
 
-        let boot_ticks = table.get(4);
+        let boot_ticks = wire.table.get(4);
 
         Self {
             monotonic: monotonic.map(|envelope| {
@@ -511,6 +511,29 @@ impl<'de> ::fidl_next::FromWireRef<WireComplexInstants<'de>> for ComplexInstants
 #[repr(C)]
 pub struct WireComplexInstants<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireComplexInstants<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<[::fidl_next::WireI64; 10]>() });
+
+        let _ = self.table.get(2).map(|envelope| unsafe {
+            envelope.read_unchecked::<::fidl_next::WireVector<'de, ::fidl_next::WireI64>>()
+        });
+
+        let _ = self
+            .table
+            .get(3)
+            .map(|envelope| unsafe { envelope.read_unchecked::<[::fidl_next::WireI64; 10]>() });
+
+        let _ = self
+            .table
+            .get(4)
+            .map(|envelope| unsafe { envelope.read_unchecked::<[::fidl_next::WireI64; 10]>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireComplexInstants<'static> {

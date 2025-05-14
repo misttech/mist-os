@@ -131,10 +131,10 @@ where
 impl<'de> ::fidl_next::FromWire<{{ wire_name }}<'de>> for {{ name }} {
     #[inline]
     fn from_wire(wire: {{ wire_name }}<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
         {% for member in table.members %}
-            let {{ member.name.snake()|ident }} = table.get({{ member.ordinal }});
+            let {{ member.name.snake()|ident }} = wire.table.get({{ member.ordinal }});
         {% endfor %}
 
         Self {
@@ -169,6 +169,17 @@ impl<'de> ::fidl_next::FromWireRef<{{ wire_name }}<'de>> for {{ name }} {
 #[repr(C)]
 pub struct {{ wire_name }}<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for {{ wire_name }}<'de> {
+    fn drop(&mut self) {
+        {% for member in table.members %}
+            let _ = self.table.get({{ member.ordinal }})
+                .map(|envelope| unsafe {
+                    envelope.read_unchecked::<{{ context.wire_type(member.ty) }}>()
+                });
+        {% endfor %}
+    }
 }
 
 unsafe impl ::fidl_next::Wire for {{ wire_name }}<'static> {

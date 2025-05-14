@@ -287,9 +287,9 @@ impl<'de> ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding5<'de>>
 {
     #[inline]
     fn from_wire(wire: WireShouldNeverAppearInAnyBinding5<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let a = table.get(1);
+        let a = wire.table.get(1);
 
         Self {
             a: a.map(|envelope| {
@@ -318,6 +318,12 @@ impl<'de> ::fidl_next::FromWireRef<WireShouldNeverAppearInAnyBinding5<'de>>
 #[repr(C)]
 pub struct WireShouldNeverAppearInAnyBinding5<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireShouldNeverAppearInAnyBinding5<'de> {
+    fn drop(&mut self) {
+        let _ = self.table.get(1).map(|envelope| unsafe { envelope.read_unchecked::<bool>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireShouldNeverAppearInAnyBinding5<'static> {
@@ -486,10 +492,10 @@ where
 impl ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding6> for ShouldNeverAppearInAnyBinding6 {
     #[inline]
     fn from_wire(wire: WireShouldNeverAppearInAnyBinding6) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::A(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<bool>()
+                wire.raw.get().read_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -543,6 +549,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalShouldNeverAppearInAnyBinding6>
 pub struct WireShouldNeverAppearInAnyBinding6 {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireShouldNeverAppearInAnyBinding6 {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<bool>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireShouldNeverAppearInAnyBinding6 {
@@ -1482,9 +1500,9 @@ impl<'de> ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding2<'de>>
 {
     #[inline]
     fn from_wire(wire: WireShouldNeverAppearInAnyBinding2<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let a = table.get(1);
+        let a = wire.table.get(1);
 
         Self {
             a: a.map(|envelope| {
@@ -1513,6 +1531,12 @@ impl<'de> ::fidl_next::FromWireRef<WireShouldNeverAppearInAnyBinding2<'de>>
 #[repr(C)]
 pub struct WireShouldNeverAppearInAnyBinding2<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireShouldNeverAppearInAnyBinding2<'de> {
+    fn drop(&mut self) {
+        let _ = self.table.get(1).map(|envelope| unsafe { envelope.read_unchecked::<bool>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireShouldNeverAppearInAnyBinding2<'static> {
@@ -1681,10 +1705,10 @@ where
 impl ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding3> for ShouldNeverAppearInAnyBinding3 {
     #[inline]
     fn from_wire(wire: WireShouldNeverAppearInAnyBinding3) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::A(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<bool>()
+                wire.raw.get().read_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1738,6 +1762,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalShouldNeverAppearInAnyBinding3>
 pub struct WireShouldNeverAppearInAnyBinding3 {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireShouldNeverAppearInAnyBinding3 {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<bool>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireShouldNeverAppearInAnyBinding3 {
@@ -2586,9 +2622,9 @@ impl<'de> ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding8<'de>>
 {
     #[inline]
     fn from_wire(wire: WireShouldNeverAppearInAnyBinding8<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let a = table.get(1);
+        let a = wire.table.get(1);
 
         Self {
             a: a.map(|envelope| {
@@ -2617,6 +2653,12 @@ impl<'de> ::fidl_next::FromWireRef<WireShouldNeverAppearInAnyBinding8<'de>>
 #[repr(C)]
 pub struct WireShouldNeverAppearInAnyBinding8<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireShouldNeverAppearInAnyBinding8<'de> {
+    fn drop(&mut self) {
+        let _ = self.table.get(1).map(|envelope| unsafe { envelope.read_unchecked::<bool>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireShouldNeverAppearInAnyBinding8<'static> {
@@ -2785,10 +2827,10 @@ where
 impl ::fidl_next::FromWire<WireShouldNeverAppearInAnyBinding9> for ShouldNeverAppearInAnyBinding9 {
     #[inline]
     fn from_wire(wire: WireShouldNeverAppearInAnyBinding9) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::A(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<bool>()
+                wire.raw.get().read_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -2842,6 +2884,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalShouldNeverAppearInAnyBinding9>
 pub struct WireShouldNeverAppearInAnyBinding9 {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireShouldNeverAppearInAnyBinding9 {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<bool>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireShouldNeverAppearInAnyBinding9 {
@@ -6999,10 +7053,10 @@ where
 impl ::fidl_next::FromWire<WireOnlyLlcpp> for OnlyLlcpp {
     #[inline]
     fn from_wire(wire: WireOnlyLlcpp) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::X(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<::fidl_next::WireU32>()
+                wire.raw.get().read_unchecked::<::fidl_next::WireU32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -7050,6 +7104,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalOnlyLlcpp> for Box<OnlyLlcpp> {
 pub struct WireOnlyLlcpp {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireOnlyLlcpp {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<::fidl_next::WireU32>() };
+            }
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireOnlyLlcpp {
@@ -7299,7 +7365,7 @@ where
 impl<'de> ::fidl_next::FromWire<WireOnlyPython<'de>> for OnlyPython {
     #[inline]
     fn from_wire(wire: WireOnlyPython<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
         Self {}
     }
@@ -7316,6 +7382,10 @@ impl<'de> ::fidl_next::FromWireRef<WireOnlyPython<'de>> for OnlyPython {
 #[repr(C)]
 pub struct WireOnlyPython<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireOnlyPython<'de> {
+    fn drop(&mut self) {}
 }
 
 unsafe impl ::fidl_next::Wire for WireOnlyPython<'static> {
@@ -7442,7 +7512,7 @@ where
 impl<'de> ::fidl_next::FromWire<WireOnlyRust<'de>> for OnlyRust {
     #[inline]
     fn from_wire(wire: WireOnlyRust<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
         Self {}
     }
@@ -7459,6 +7529,10 @@ impl<'de> ::fidl_next::FromWireRef<WireOnlyRust<'de>> for OnlyRust {
 #[repr(C)]
 pub struct WireOnlyRust<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireOnlyRust<'de> {
+    fn drop(&mut self) {}
 }
 
 unsafe impl ::fidl_next::Wire for WireOnlyRust<'static> {

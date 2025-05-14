@@ -88,7 +88,7 @@ where
 impl<'de> ::fidl_next::FromWire<WireEmptyTable<'de>> for EmptyTable {
     #[inline]
     fn from_wire(wire: WireEmptyTable<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
         Self {}
     }
@@ -105,6 +105,10 @@ impl<'de> ::fidl_next::FromWireRef<WireEmptyTable<'de>> for EmptyTable {
 #[repr(C)]
 pub struct WireEmptyTable<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireEmptyTable<'de> {
+    fn drop(&mut self) {}
 }
 
 unsafe impl ::fidl_next::Wire for WireEmptyTable<'static> {
@@ -231,7 +235,7 @@ where
 impl<'de> ::fidl_next::FromWire<WireExtensionTable<'de>> for ExtensionTable {
     #[inline]
     fn from_wire(wire: WireExtensionTable<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
         Self {}
     }
@@ -248,6 +252,10 @@ impl<'de> ::fidl_next::FromWireRef<WireExtensionTable<'de>> for ExtensionTable {
 #[repr(C)]
 pub struct WireExtensionTable<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireExtensionTable<'de> {
+    fn drop(&mut self) {}
 }
 
 unsafe impl ::fidl_next::Wire for WireExtensionTable<'static> {
@@ -440,13 +448,13 @@ where
 impl<'de> ::fidl_next::FromWire<WireNewerSimpleTable<'de>> for NewerSimpleTable {
     #[inline]
     fn from_wire(wire: WireNewerSimpleTable<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let x = table.get(1);
+        let x = wire.table.get(1);
 
-        let y = table.get(5);
+        let y = wire.table.get(5);
 
-        let z = table.get(6);
+        let z = wire.table.get(6);
 
         Self {
             x: x.map(|envelope| {
@@ -499,6 +507,25 @@ impl<'de> ::fidl_next::FromWireRef<WireNewerSimpleTable<'de>> for NewerSimpleTab
 #[repr(C)]
 pub struct WireNewerSimpleTable<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireNewerSimpleTable<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(5)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(6)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireNewerSimpleTable<'static> {
@@ -690,9 +717,9 @@ where
 impl<'de> ::fidl_next::FromWire<WireOlderSimpleTable<'de>> for OlderSimpleTable {
     #[inline]
     fn from_wire(wire: WireOlderSimpleTable<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let x = table.get(1);
+        let x = wire.table.get(1);
 
         Self {
             x: x.map(|envelope| {
@@ -721,6 +748,15 @@ impl<'de> ::fidl_next::FromWireRef<WireOlderSimpleTable<'de>> for OlderSimpleTab
 #[repr(C)]
 pub struct WireOlderSimpleTable<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireOlderSimpleTable<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireOlderSimpleTable<'static> {
@@ -926,13 +962,13 @@ where
 impl<'de> ::fidl_next::FromWire<WireReverseOrdinalTable<'de>> for ReverseOrdinalTable {
     #[inline]
     fn from_wire(wire: WireReverseOrdinalTable<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let z = table.get(1);
+        let z = wire.table.get(1);
 
-        let y = table.get(2);
+        let y = wire.table.get(2);
 
-        let x = table.get(3);
+        let x = wire.table.get(3);
 
         Self {
             z: z.map(|envelope| {
@@ -985,6 +1021,25 @@ impl<'de> ::fidl_next::FromWireRef<WireReverseOrdinalTable<'de>> for ReverseOrdi
 #[repr(C)]
 pub struct WireReverseOrdinalTable<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireReverseOrdinalTable<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(2)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(3)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireReverseOrdinalTable<'static> {
@@ -1198,11 +1253,11 @@ where
 impl<'de> ::fidl_next::FromWire<WireSimpleTable<'de>> for SimpleTable {
     #[inline]
     fn from_wire(wire: WireSimpleTable<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let x = table.get(1);
+        let x = wire.table.get(1);
 
-        let y = table.get(5);
+        let y = wire.table.get(5);
 
         Self {
             x: x.map(|envelope| {
@@ -1243,6 +1298,20 @@ impl<'de> ::fidl_next::FromWireRef<WireSimpleTable<'de>> for SimpleTable {
 #[repr(C)]
 pub struct WireSimpleTable<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireSimpleTable<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(5)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireSimpleTable<'static> {
@@ -3315,135 +3384,135 @@ where
 impl<'de> ::fidl_next::FromWire<WireSixtyFourOrdinalTable<'de>> for SixtyFourOrdinalTable {
     #[inline]
     fn from_wire(wire: WireSixtyFourOrdinalTable<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let v1 = table.get(1);
+        let v1 = wire.table.get(1);
 
-        let v2 = table.get(2);
+        let v2 = wire.table.get(2);
 
-        let v3 = table.get(3);
+        let v3 = wire.table.get(3);
 
-        let v4 = table.get(4);
+        let v4 = wire.table.get(4);
 
-        let v5 = table.get(5);
+        let v5 = wire.table.get(5);
 
-        let v6 = table.get(6);
+        let v6 = wire.table.get(6);
 
-        let v7 = table.get(7);
+        let v7 = wire.table.get(7);
 
-        let v8 = table.get(8);
+        let v8 = wire.table.get(8);
 
-        let v9 = table.get(9);
+        let v9 = wire.table.get(9);
 
-        let v10 = table.get(10);
+        let v10 = wire.table.get(10);
 
-        let v11 = table.get(11);
+        let v11 = wire.table.get(11);
 
-        let v12 = table.get(12);
+        let v12 = wire.table.get(12);
 
-        let v13 = table.get(13);
+        let v13 = wire.table.get(13);
 
-        let v14 = table.get(14);
+        let v14 = wire.table.get(14);
 
-        let v15 = table.get(15);
+        let v15 = wire.table.get(15);
 
-        let v16 = table.get(16);
+        let v16 = wire.table.get(16);
 
-        let v17 = table.get(17);
+        let v17 = wire.table.get(17);
 
-        let v18 = table.get(18);
+        let v18 = wire.table.get(18);
 
-        let v19 = table.get(19);
+        let v19 = wire.table.get(19);
 
-        let v20 = table.get(20);
+        let v20 = wire.table.get(20);
 
-        let v21 = table.get(21);
+        let v21 = wire.table.get(21);
 
-        let v22 = table.get(22);
+        let v22 = wire.table.get(22);
 
-        let v23 = table.get(23);
+        let v23 = wire.table.get(23);
 
-        let v24 = table.get(24);
+        let v24 = wire.table.get(24);
 
-        let v25 = table.get(25);
+        let v25 = wire.table.get(25);
 
-        let v26 = table.get(26);
+        let v26 = wire.table.get(26);
 
-        let v27 = table.get(27);
+        let v27 = wire.table.get(27);
 
-        let v28 = table.get(28);
+        let v28 = wire.table.get(28);
 
-        let v29 = table.get(29);
+        let v29 = wire.table.get(29);
 
-        let v30 = table.get(30);
+        let v30 = wire.table.get(30);
 
-        let v31 = table.get(31);
+        let v31 = wire.table.get(31);
 
-        let v32 = table.get(32);
+        let v32 = wire.table.get(32);
 
-        let v33 = table.get(33);
+        let v33 = wire.table.get(33);
 
-        let v34 = table.get(34);
+        let v34 = wire.table.get(34);
 
-        let v35 = table.get(35);
+        let v35 = wire.table.get(35);
 
-        let v36 = table.get(36);
+        let v36 = wire.table.get(36);
 
-        let v37 = table.get(37);
+        let v37 = wire.table.get(37);
 
-        let v38 = table.get(38);
+        let v38 = wire.table.get(38);
 
-        let v39 = table.get(39);
+        let v39 = wire.table.get(39);
 
-        let v40 = table.get(40);
+        let v40 = wire.table.get(40);
 
-        let v41 = table.get(41);
+        let v41 = wire.table.get(41);
 
-        let v42 = table.get(42);
+        let v42 = wire.table.get(42);
 
-        let v43 = table.get(43);
+        let v43 = wire.table.get(43);
 
-        let v44 = table.get(44);
+        let v44 = wire.table.get(44);
 
-        let v45 = table.get(45);
+        let v45 = wire.table.get(45);
 
-        let v46 = table.get(46);
+        let v46 = wire.table.get(46);
 
-        let v47 = table.get(47);
+        let v47 = wire.table.get(47);
 
-        let v48 = table.get(48);
+        let v48 = wire.table.get(48);
 
-        let v49 = table.get(49);
+        let v49 = wire.table.get(49);
 
-        let v50 = table.get(50);
+        let v50 = wire.table.get(50);
 
-        let v51 = table.get(51);
+        let v51 = wire.table.get(51);
 
-        let v52 = table.get(52);
+        let v52 = wire.table.get(52);
 
-        let v53 = table.get(53);
+        let v53 = wire.table.get(53);
 
-        let v54 = table.get(54);
+        let v54 = wire.table.get(54);
 
-        let v55 = table.get(55);
+        let v55 = wire.table.get(55);
 
-        let v56 = table.get(56);
+        let v56 = wire.table.get(56);
 
-        let v57 = table.get(57);
+        let v57 = wire.table.get(57);
 
-        let v58 = table.get(58);
+        let v58 = wire.table.get(58);
 
-        let v59 = table.get(59);
+        let v59 = wire.table.get(59);
 
-        let v60 = table.get(60);
+        let v60 = wire.table.get(60);
 
-        let v61 = table.get(61);
+        let v61 = wire.table.get(61);
 
-        let v62 = table.get(62);
+        let v62 = wire.table.get(62);
 
-        let v63 = table.get(63);
+        let v63 = wire.table.get(63);
 
-        let v64 = table.get(64);
+        let v64 = wire.table.get(64);
 
         Self {
             v1: v1.map(|envelope| {
@@ -4228,6 +4297,330 @@ impl<'de> ::fidl_next::FromWireRef<WireSixtyFourOrdinalTable<'de>> for SixtyFour
 #[repr(C)]
 pub struct WireSixtyFourOrdinalTable<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireSixtyFourOrdinalTable<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(2)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(3)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(4)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(5)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(6)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(7)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(8)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(9)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(10)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(11)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(12)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(13)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(14)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(15)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(16)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(17)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(18)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(19)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(20)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(21)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(22)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(23)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(24)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(25)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(26)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(27)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(28)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(29)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(30)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(31)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(32)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(33)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(34)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(35)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(36)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(37)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(38)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(39)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(40)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(41)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(42)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(43)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(44)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(45)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(46)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(47)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(48)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(49)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(50)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(51)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(52)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(53)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(54)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(55)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(56)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(57)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(58)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(59)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(60)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(61)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(62)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(63)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+
+        let _ = self
+            .table
+            .get(64)
+            .map(|envelope| unsafe { envelope.read_unchecked::<crate::WireExtensionTable<'de>>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireSixtyFourOrdinalTable<'static> {
@@ -5273,9 +5666,9 @@ where
 impl<'de> ::fidl_next::FromWire<WireTableWithAttributes<'de>> for TableWithAttributes {
     #[inline]
     fn from_wire(wire: WireTableWithAttributes<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let x = table.get(1);
+        let x = wire.table.get(1);
 
         Self {
             x: x.map(|envelope| {
@@ -5304,6 +5697,15 @@ impl<'de> ::fidl_next::FromWireRef<WireTableWithAttributes<'de>> for TableWithAt
 #[repr(C)]
 pub struct WireTableWithAttributes<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireTableWithAttributes<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireI64>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireTableWithAttributes<'static> {

@@ -112,9 +112,9 @@ impl<'de> ::fidl_next::FromWire<WireComposedProtocolOneWayAnonComposedRequest<'d
 {
     #[inline]
     fn from_wire(wire: WireComposedProtocolOneWayAnonComposedRequest<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let a = table.get(1);
+        let a = wire.table.get(1);
 
         Self {
             a: a.map(|envelope| {
@@ -145,6 +145,15 @@ impl<'de> ::fidl_next::FromWireRef<WireComposedProtocolOneWayAnonComposedRequest
 #[repr(C)]
 pub struct WireComposedProtocolOneWayAnonComposedRequest<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireComposedProtocolOneWayAnonComposedRequest<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireU16>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireComposedProtocolOneWayAnonComposedRequest<'static> {
@@ -309,10 +318,10 @@ impl ::fidl_next::FromWire<WireComposedProtocolTwoWayAnonComposedRequest>
 {
     #[inline]
     fn from_wire(wire: WireComposedProtocolTwoWayAnonComposedRequest) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::B(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<bool>()
+                wire.raw.get().read_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -370,6 +379,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalComposedProtocolTwoWayAnonCompos
 pub struct WireComposedProtocolTwoWayAnonComposedRequest {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireComposedProtocolTwoWayAnonComposedRequest {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<bool>() };
+            }
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireComposedProtocolTwoWayAnonComposedRequest {
@@ -643,9 +664,9 @@ impl<'de> ::fidl_next::FromWire<WireComposedProtocolTwoWayAnonComposedResponse<'
 {
     #[inline]
     fn from_wire(wire: WireComposedProtocolTwoWayAnonComposedResponse<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let a = table.get(1);
+        let a = wire.table.get(1);
 
         Self {
             a: a.map(|envelope| {
@@ -676,6 +697,15 @@ impl<'de> ::fidl_next::FromWireRef<WireComposedProtocolTwoWayAnonComposedRespons
 #[repr(C)]
 pub struct WireComposedProtocolTwoWayAnonComposedResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireComposedProtocolTwoWayAnonComposedResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireU16>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireComposedProtocolTwoWayAnonComposedResponse<'static> {
@@ -841,9 +871,9 @@ impl<'de> ::fidl_next::FromWire<WireComposedProtocolTwoWayAnonComposedWithErrorR
 {
     #[inline]
     fn from_wire(wire: WireComposedProtocolTwoWayAnonComposedWithErrorRequest<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let a = table.get(1);
+        let a = wire.table.get(1);
 
         Self {
             a: a.map(|envelope| {
@@ -874,6 +904,15 @@ impl<'de> ::fidl_next::FromWireRef<WireComposedProtocolTwoWayAnonComposedWithErr
 #[repr(C)]
 pub struct WireComposedProtocolTwoWayAnonComposedWithErrorRequest<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireComposedProtocolTwoWayAnonComposedWithErrorRequest<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireU16>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireComposedProtocolTwoWayAnonComposedWithErrorRequest<'static> {
@@ -1043,10 +1082,10 @@ impl ::fidl_next::FromWire<WireComposedProtocolTwoWayAnonComposedWithErrorRespon
 {
     #[inline]
     fn from_wire(wire: WireComposedProtocolTwoWayAnonComposedWithErrorResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::B(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<bool>()
+                wire.raw.get().read_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1104,6 +1143,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalComposedProtocolTwoWayAnonCompos
 pub struct WireComposedProtocolTwoWayAnonComposedWithErrorResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireComposedProtocolTwoWayAnonComposedWithErrorResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<bool>() };
+            }
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireComposedProtocolTwoWayAnonComposedWithErrorResponse {
@@ -1382,10 +1433,10 @@ impl ::fidl_next::FromWire<WireComposedProtocolOnAnonComposedRequest>
 {
     #[inline]
     fn from_wire(wire: WireComposedProtocolOnAnonComposedRequest) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::B(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<bool>()
+                wire.raw.get().read_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1441,6 +1492,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalComposedProtocolOnAnonComposedRe
 pub struct WireComposedProtocolOnAnonComposedRequest {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireComposedProtocolOnAnonComposedRequest {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<bool>() };
+            }
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireComposedProtocolOnAnonComposedRequest {
@@ -1711,9 +1774,9 @@ where
 impl<'de> ::fidl_next::FromWire<WireTablePayload<'de>> for TablePayload {
     #[inline]
     fn from_wire(wire: WireTablePayload<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let a = table.get(1);
+        let a = wire.table.get(1);
 
         Self {
             a: a.map(|envelope| {
@@ -1742,6 +1805,15 @@ impl<'de> ::fidl_next::FromWireRef<WireTablePayload<'de>> for TablePayload {
 #[repr(C)]
 pub struct WireTablePayload<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireTablePayload<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireU16>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireTablePayload<'static> {
@@ -1903,10 +1975,10 @@ where
 impl ::fidl_next::FromWire<WireUnionPayload> for UnionPayload {
     #[inline]
     fn from_wire(wire: WireUnionPayload) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::B(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<bool>()
+                wire.raw.get().read_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1954,6 +2026,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalUnionPayload> for Box<UnionPaylo
 pub struct WireUnionPayload {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireUnionPayload {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<bool>() };
+            }
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireUnionPayload {
@@ -2846,9 +2930,9 @@ impl<'de> ::fidl_next::FromWire<WireMainProtocolOneWayAnonRequest<'de>>
 {
     #[inline]
     fn from_wire(wire: WireMainProtocolOneWayAnonRequest<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let a = table.get(1);
+        let a = wire.table.get(1);
 
         Self {
             a: a.map(|envelope| {
@@ -2879,6 +2963,15 @@ impl<'de> ::fidl_next::FromWireRef<WireMainProtocolOneWayAnonRequest<'de>>
 #[repr(C)]
 pub struct WireMainProtocolOneWayAnonRequest<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireMainProtocolOneWayAnonRequest<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireU16>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireMainProtocolOneWayAnonRequest<'static> {
@@ -3050,10 +3143,10 @@ where
 impl ::fidl_next::FromWire<WireMainProtocolTwoWayAnonRequest> for MainProtocolTwoWayAnonRequest {
     #[inline]
     fn from_wire(wire: WireMainProtocolTwoWayAnonRequest) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::B(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<bool>()
+                wire.raw.get().read_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -3105,6 +3198,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalMainProtocolTwoWayAnonRequest>
 pub struct WireMainProtocolTwoWayAnonRequest {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireMainProtocolTwoWayAnonRequest {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<bool>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireMainProtocolTwoWayAnonRequest {
@@ -3385,9 +3490,9 @@ impl<'de> ::fidl_next::FromWire<WireMainProtocolTwoWayAnonResponse<'de>>
 {
     #[inline]
     fn from_wire(wire: WireMainProtocolTwoWayAnonResponse<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let a = table.get(1);
+        let a = wire.table.get(1);
 
         Self {
             a: a.map(|envelope| {
@@ -3418,6 +3523,15 @@ impl<'de> ::fidl_next::FromWireRef<WireMainProtocolTwoWayAnonResponse<'de>>
 #[repr(C)]
 pub struct WireMainProtocolTwoWayAnonResponse<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireMainProtocolTwoWayAnonResponse<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireU16>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireMainProtocolTwoWayAnonResponse<'static> {
@@ -3581,9 +3695,9 @@ impl<'de> ::fidl_next::FromWire<WireMainProtocolTwoWayAnonWithErrorRequest<'de>>
 {
     #[inline]
     fn from_wire(wire: WireMainProtocolTwoWayAnonWithErrorRequest<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
-        let a = table.get(1);
+        let a = wire.table.get(1);
 
         Self {
             a: a.map(|envelope| {
@@ -3614,6 +3728,15 @@ impl<'de> ::fidl_next::FromWireRef<WireMainProtocolTwoWayAnonWithErrorRequest<'d
 #[repr(C)]
 pub struct WireMainProtocolTwoWayAnonWithErrorRequest<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireMainProtocolTwoWayAnonWithErrorRequest<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<::fidl_next::WireU16>() });
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireMainProtocolTwoWayAnonWithErrorRequest<'static> {
@@ -3787,10 +3910,10 @@ impl ::fidl_next::FromWire<WireMainProtocolTwoWayAnonWithErrorResponse>
 {
     #[inline]
     fn from_wire(wire: WireMainProtocolTwoWayAnonWithErrorResponse) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::B(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<bool>()
+                wire.raw.get().read_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -3846,6 +3969,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalMainProtocolTwoWayAnonWithErrorR
 pub struct WireMainProtocolTwoWayAnonWithErrorResponse {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireMainProtocolTwoWayAnonWithErrorResponse {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<bool>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireMainProtocolTwoWayAnonWithErrorResponse {
@@ -4136,10 +4271,10 @@ where
 impl ::fidl_next::FromWire<WireMainProtocolOnAnonRequest> for MainProtocolOnAnonRequest {
     #[inline]
     fn from_wire(wire: WireMainProtocolOnAnonRequest) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::B(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<bool>()
+                wire.raw.get().read_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -4191,6 +4326,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalMainProtocolOnAnonRequest>
 pub struct WireMainProtocolOnAnonRequest {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireMainProtocolOnAnonRequest {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<bool>() };
+            }
+
+            _ => (),
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireMainProtocolOnAnonRequest {

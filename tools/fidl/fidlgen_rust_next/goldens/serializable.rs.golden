@@ -234,7 +234,7 @@ where
 impl<'de> ::fidl_next::FromWire<WireSerializableTable<'de>> for SerializableTable {
     #[inline]
     fn from_wire(wire: WireSerializableTable<'de>) -> Self {
-        let table = ::core::mem::ManuallyDrop::new(wire.table);
+        let wire = ::core::mem::ManuallyDrop::new(wire);
 
         Self {}
     }
@@ -251,6 +251,10 @@ impl<'de> ::fidl_next::FromWireRef<WireSerializableTable<'de>> for SerializableT
 #[repr(C)]
 pub struct WireSerializableTable<'de> {
     table: ::fidl_next::WireTable<'de>,
+}
+
+impl<'de> Drop for WireSerializableTable<'de> {
+    fn drop(&mut self) {}
 }
 
 unsafe impl ::fidl_next::Wire for WireSerializableTable<'static> {
@@ -399,10 +403,10 @@ where
 impl ::fidl_next::FromWire<WireSerializableUnion> for SerializableUnion {
     #[inline]
     fn from_wire(wire: WireSerializableUnion) -> Self {
-        let raw = ::core::mem::ManuallyDrop::new(wire.raw);
-        match raw.ordinal() {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+        match wire.raw.ordinal() {
             1 => Self::Unused(::fidl_next::FromWire::from_wire(unsafe {
-                raw.get().read_unchecked::<bool>()
+                wire.raw.get().read_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -450,6 +454,18 @@ impl ::fidl_next::FromWireOptionRef<WireOptionalSerializableUnion> for Box<Seria
 pub struct WireSerializableUnion {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<()>,
+}
+
+impl Drop for WireSerializableUnion {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            1 => {
+                let _ = unsafe { self.raw.get().read_unchecked::<bool>() };
+            }
+
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl ::fidl_next::Wire for WireSerializableUnion {
