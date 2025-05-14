@@ -185,6 +185,7 @@ rustc_library("starnix_core") {
     "lib.rs",
     "loader.rs",
     "memory_attribution/mod.rs",
+    "mm/debugger.rs",
     "mm/futex_table.rs",
     "mm/mapping.rs",
     "mm/memory.rs",

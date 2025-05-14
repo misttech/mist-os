@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::execution::notify_debugger_of_module_list;
+use crate::mm::debugger::notify_debugger_of_module_list;
 use crate::mm::{
     DesiredAddress, FutexKey, IOVecPtr, MappingName, MappingOptions, MemoryAccessorExt,
     MremapFlags, PrivateFutexKey, ProtectionFlags, SharedFutexKey, PAGE_SIZE,
