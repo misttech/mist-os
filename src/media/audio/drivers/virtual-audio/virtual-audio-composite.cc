@@ -203,16 +203,12 @@ void VirtualAudioComposite::GetBuffer(GetBufferCompleter::Sync& completer) {
 // Health implementation
 //
 void VirtualAudioComposite::GetHealthState(GetHealthStateCompleter::Sync& completer) {
-  // Future: check here whether to succeed, fail, or infinitely pend.
-
   completer.Reply(fuchsia_hardware_audio::HealthState{}.healthy(true));
 }
 
 // Composite implementation
 //
 void VirtualAudioComposite::Reset(ResetCompleter::Sync& completer) {
-  // Future: check here whether to respond or to infinitely pend.
-
   // Must clear all state for DAIs.
   // Must stop all RingBuffers, close connections and clear all state for RingBuffers elements.
   // Must clear all state for signalprocessing elements.
@@ -223,8 +219,6 @@ void VirtualAudioComposite::Reset(ResetCompleter::Sync& completer) {
 
 void VirtualAudioComposite::GetProperties(
     fidl::Server<fuchsia_hardware_audio::Composite>::GetPropertiesCompleter::Sync& completer) {
-  // Future: check here whether to respond or to infinitely pend.
-
   fuchsia_hardware_audio::CompositeProperties properties;
   properties.unique_id(config_.unique_id());
   properties.product(config_.product_name());
@@ -236,12 +230,11 @@ void VirtualAudioComposite::GetProperties(
 
 void VirtualAudioComposite::GetDaiFormats(GetDaiFormatsRequest& request,
                                           GetDaiFormatsCompleter::Sync& completer) {
-  // Future: check here whether to respond or to infinitely pend.
-
   // This driver is limited to a single DAI interconnect.
-  // TODO(https://fxbug.dev/42075676): Add support for more DAI interconnects, allowing their
-  // configuration and observability via the virtual audio FIDL APIs.
+  // TODO(https://fxbug.dev/42075676): Add support for more DAI interconnects, enabling
+  // configuration and observability in the virtual_audio FIDL API.
   if (request.processing_element_id() != kDaiId) {
+    fdf::error("GetDaiFormats({}) bad element_id", request.processing_element_id());
     completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
@@ -254,18 +247,18 @@ void VirtualAudioComposite::GetDaiFormats(GetDaiFormatsRequest& request,
 
 void VirtualAudioComposite::SetDaiFormat(SetDaiFormatRequest& request,
                                          SetDaiFormatCompleter::Sync& completer) {
-  // Future: check here whether to respond or to infinitely pend.
-
   // This driver is limited to a single DAI interconnect.
-  // TODO(https://fxbug.dev/42075676): Add support for more DAI interconnects, allowing their
-  // configuration and observability via the virtual audio FIDL APIs.
+  // TODO(https://fxbug.dev/42075676): Add support for more DAI interconnects, enabling
+  // configuration and observability in the virtual_audio FIDL API.
   if (request.processing_element_id() != kDaiId) {
+    fdf::error("SetDaiFormat({}) bad element_id", request.processing_element_id());
     completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
   fuchsia_hardware_audio::DaiFormat format = request.format();
   if (format.frame_rate() > 192000) {
+    fdf::error("SetDaiFormat frame_rate ({}) too high", format.frame_rate());
     completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
@@ -336,18 +329,17 @@ void VirtualAudioComposite::SetDaiFormat(SetDaiFormatRequest& request,
       return;
     }
   }
-
+  fdf::error("SetDaiFormat: unsupported format");
   completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
 }
 
 void VirtualAudioComposite::GetRingBufferFormats(GetRingBufferFormatsRequest& request,
                                                  GetRingBufferFormatsCompleter::Sync& completer) {
-  // Future: check here whether to respond or to infinitely pend.
-
   // This driver is limited to a single ring buffer.
-  // TODO(https://fxbug.dev/42075676): Add support for more ring buffers, allowing their
-  // configuration and observability via the virtual audio FIDL APIs.
+  // TODO(https://fxbug.dev/42075676): Add support for more ring buffers, enabling configuration and
+  // observability in the virtual_audio FIDL API.
   if (request.processing_element_id() != kRingBufferId) {
+    fdf::error("GetRingBufferFormats({}) bad element_id", request.processing_element_id());
     completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
@@ -408,12 +400,11 @@ void VirtualAudioComposite::OnRingBufferClosed(fidl::UnbindInfo info) {
 
 void VirtualAudioComposite::CreateRingBuffer(CreateRingBufferRequest& request,
                                              CreateRingBufferCompleter::Sync& completer) {
-  // Future: check here whether to respond or to infinitely pend.
-
   // One ring buffer is supported by this driver.
-  // TODO(https://fxbug.dev/42075676): Add support for more ring buffers, allowing their
-  // configuration and observability via the virtual audio FIDL APIs.
+  // TODO(https://fxbug.dev/42075676): Add support for more ring buffers, enabling configuration and
+  // observability in the virtual_audio FIDL API.
   if (request.processing_element_id() != kRingBufferId) {
+    fdf::error("CreateRingBuffer({}) bad element_id", request.processing_element_id());
     completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
@@ -434,8 +425,7 @@ void VirtualAudioComposite::ResetRingBuffer() {
   position_info_completer_.reset();
   should_reply_to_delay_request_ = true;
   delay_info_completer_.reset();
-  // We don't reset ring_buffer_format_ and dai_format_ to allow for retrieval for
-  // observability.
+  // We don't reset ring_buffer_format_ and dai_format_ to allow for retrieval for observability.
 }
 
 // RingBuffer implementation
@@ -567,10 +557,7 @@ void VirtualAudioComposite::WatchClockRecoveryPositionInfo(
 
   if (position_info_completer_.has_value()) {
     // The client called WatchClockRecoveryPositionInfo when another hanging get was pending.
-    // This is an error condition and hence we unbind the channel.
-    FDF_LOG(
-        ERROR,
-        "WatchClockRecoveryPositionInfo called when another hanging get was pending, unbinding");
+    fdf::error("WatchClockRecoveryPositionInfo called while previous call was pending. Unbinding");
     should_reply_to_position_request_ = true;
     position_info_completer_.reset();
     completer.Close(ZX_ERR_BAD_STATE);
@@ -592,8 +579,7 @@ void VirtualAudioComposite::WatchDelayInfo(WatchDelayInfoCompleter::Sync& comple
     delay_info_completer_.emplace(completer.ToAsync());
   } else {
     // The client called WatchDelayInfo when another hanging get was pending.
-    // This is an error condition and hence we unbind the channel.
-    fdf::error("WatchDelayInfo called when another hanging get was pending, unbinding");
+    fdf::error("WatchDelayInfo called while previous call was pending. Unbinding");
     should_reply_to_delay_request_ = true;
     delay_info_completer_.reset();
     completer.Close(ZX_ERR_BAD_STATE);
@@ -620,6 +606,21 @@ void VirtualAudioComposite::SetActiveChannels(
   completer.Reply(zx::ok(active_channel_set_time_.get()));
 }
 
+// signalprocessing
+//
+void VirtualAudioComposite::SignalProcessingConnect(
+    SignalProcessingConnectRequest& request, SignalProcessingConnectCompleter::Sync& completer) {
+  if (signal_) {
+    fdf::error("Signal processing already bound");
+    request.protocol().Close(ZX_ERR_ALREADY_BOUND);
+    return;
+  }
+
+  SetupSignalProcessing();
+  signal_.emplace(dispatcher_, std::move(request.protocol()), this,
+                  std::mem_fn(&VirtualAudioComposite::OnSignalProcessingClosed));
+}
+
 void VirtualAudioComposite::OnSignalProcessingClosed(fidl::UnbindInfo info) {
   if (info.is_peer_closed()) {
     fdf::info("Client disconnected");
@@ -632,40 +633,37 @@ void VirtualAudioComposite::OnSignalProcessingClosed(fidl::UnbindInfo info) {
   if (signal_) {
     signal_.reset();
   }
-  for (bool& needs_reply : watch_element_state_needs_reply_) {
-    needs_reply = true;
-  }
-  for (std::optional<WatchElementStateCompleter::Async>& completer :
-       watch_element_state_completers_) {
-    completer.reset();
+  for (auto& [_element_id, snapshot] : element_states_) {
+    snapshot.completer.reset();
+    snapshot.last_notified.reset();
   }
   last_reported_topology_id_.reset();
   watch_topology_completer_.reset();
 }
 
-void VirtualAudioComposite::SignalProcessingConnect(
-    SignalProcessingConnectRequest& request, SignalProcessingConnectCompleter::Sync& completer) {
-  if (signal_) {
-    fdf::error("Signal processing already bound");
-    request.protocol().Close(ZX_ERR_ALREADY_BOUND);
-    return;
-  }
-  signal_.emplace(dispatcher_, std::move(request.protocol()), this,
-                  std::mem_fn(&VirtualAudioComposite::OnSignalProcessingClosed));
+void VirtualAudioComposite::SetupSignalProcessing() {
+  SetupSignalProcessingElements();
+  SetupSignalProcessingTopologies();
+  SetupSignalProcessingElementStates();
 }
 
-void VirtualAudioComposite::GetElements(GetElementsCompleter::Sync& completer) {
-  // This driver is limited to a single ring buffer and a single DAI interconnect.
-  // TODO(https://fxbug.dev/42075676): Add support for more elements provided by the driver (ring
-  // buffers, DAI interconnects and other processing elements), allowing their configuration and
-  // observability via the virtual audio FIDL APIs.
+// signalprocessing Element handling
+//
+// This driver is limited to a ring buffer, a DAI interconnect and a gain element.
+// TODO(https://fxbug.dev/42075676): Add support for more elements provided by the driver
+// (additional processing element types), enabling configuration and observability via the
+// virtual_audio FIDL API.
+void VirtualAudioComposite::SetupSignalProcessingElements() {
+  element_map_.clear();
+  elements_.clear();
+
   fuchsia_hardware_audio_signalprocessing::Element ring_buffer;
   ring_buffer.id(kRingBufferId)
       .type(fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer);
 
   fuchsia_hardware_audio_signalprocessing::Element dai;
   fuchsia_hardware_audio_signalprocessing::DaiInterconnect dai_interconnect;
-  // Customize this for plug_detect_capabilities?
+  // Connect this to the existing virtualaudio FIDL method for dynamic plug_state changes?
   dai_interconnect.plug_detect_capabilities(
       fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
   dai.id(kDaiId)
@@ -674,103 +672,64 @@ void VirtualAudioComposite::GetElements(GetElementsCompleter::Sync& completer) {
           fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithDaiInterconnect(
               std::move(dai_interconnect)));
 
-  std::vector elements{std::move(ring_buffer), std::move(dai)};
-  completer.Reply(zx::ok(elements));
-}
+  fuchsia_hardware_audio_signalprocessing::Element gain;
+  fuchsia_hardware_audio_signalprocessing::Gain gain_type_specific;
+  gain_type_specific.type(fuchsia_hardware_audio_signalprocessing::GainType::kDecibels)
+      .domain(fuchsia_hardware_audio_signalprocessing::GainDomain::kDigital)
+      .min_gain(-68.0)
+      .max_gain(+6.0)
+      .min_gain_step(0.5);
+  gain.id(kGainId)
+      .type(fuchsia_hardware_audio_signalprocessing::ElementType::kGain)
+      .type_specific(fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithGain(
+          gain_type_specific));
 
-void VirtualAudioComposite::WatchElementState(WatchElementStateRequest& request,
-                                              WatchElementStateCompleter::Sync& completer) {
-  // This driver is limited to a single ring buffer and a single DAI interconnect.
-  // TODO(https://fxbug.dev/42075676): Add support for more elements provided by the driver (ring
-  // buffers, DAI interconnects and other processing elements), allowing their configuration and
-  // observability via the virtual audio FIDL APIs.
-  size_t index = 0;
-  switch (request.processing_element_id()) {
-    case kRingBufferId:
-      index = 0;
-      break;
-    case kDaiId:
-      index = 1;
-      break;
-    default:
-      fdf::error("Invalid processing element id %lu, unbinding", request.processing_element_id());
-      completer.Close(ZX_ERR_INVALID_ARGS);
-      return;
-  }
-  if (watch_element_state_needs_reply_[index]) {
-    fuchsia_hardware_audio_signalprocessing::ElementState state;
-    if (index == 1) {
-      fuchsia_hardware_audio_signalprocessing::DaiInterconnectElementState dai_state;
-      fuchsia_hardware_audio_signalprocessing::PlugState plug_state;
-      plug_state.plugged(true).plug_state_time(0);
-      dai_state.plug_state(std::move(plug_state));
-      state.type_specific(
-          fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithDaiInterconnect(
-              std::move(dai_state)));
-    }
-    state.started(true);
-    watch_element_state_needs_reply_[index] = false;
-    completer.Reply(std::move(state));
-  } else if (!watch_element_state_completers_[index]) {
-    watch_element_state_completers_[index].emplace(completer.ToAsync());
-  } else {
-    // The client called WatchElementState when another hanging get was pending for the same id.
-    // This is an error condition and hence we unbind the channel.
-    fdf::error("WatchElementState called when another hanging get was pending, unbinding");
-    watch_element_state_needs_reply_[0] = true;
-    watch_element_state_needs_reply_[1] = true;
-    watch_element_state_completers_[0].reset();
-    watch_element_state_completers_[1].reset();
-    completer.Close(ZX_ERR_BAD_STATE);
+  elements_ = {{ring_buffer, dai, gain}};
+  for (auto& el : elements_) {
+    element_map_.insert({*el.id(), &el});
   }
 }
 
-void VirtualAudioComposite::SetElementState(SetElementStateRequest& request,
-                                            SetElementStateCompleter::Sync& completer) {
-  // This driver is limited to a single ring buffer and a single DAI interconnect.
-  // TODO(https://fxbug.dev/42075676): Add support for more elements provided by the driver (ring
-  // buffers, DAI interconnects and other processing elements), allowing their configuration and
-  // observability via the virtual audio FIDL APIs.
-  fuchsia_hardware_audio::ElementId id = request.processing_element_id();
-  if (id != kRingBufferId && id != kDaiId) {
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
-    return;
-  }
-  completer.Reply(zx::ok());
+void VirtualAudioComposite::GetElements(GetElementsCompleter::Sync& completer) {
+  completer.Reply(zx::ok(elements_));
 }
 
-void VirtualAudioComposite::GetTopologies(GetTopologiesCompleter::Sync& completer) {
-  // This driver exposes two elements: one ring buffer and one DAI interconnect.
-  // We expose two topologies: { Rb -> Dai } and { Dai -> Rb }.
-  // TODO(https://fxbug.dev/42075676): Add support for signalprocessing configuration and
-  // observability via the virtual audio FIDL APIs.
-  std::vector<fuchsia_hardware_audio_signalprocessing::Topology> topologies;
+// signalprocessing Topology handling
+//
+// We expose two topologies: { Rb -> Gain -> Dai } and { Dai -> Gain -> Rb }.
+// TODO(https://fxbug.dev/42075676): Add more complex topologies, including elements that are only
+// in some topologies (not all). Include signalprocessing configuration/observability in the
+// virtual_audio FIDL API.
+void VirtualAudioComposite::SetupSignalProcessingTopologies() {
+  topologies_.clear();
   fuchsia_hardware_audio_signalprocessing::Topology topology1, topology2;
   fuchsia_hardware_audio_signalprocessing::EdgePair edge1, edge2;
 
   topology1.id(kPlaybackTopologyId);
-  edge1.processing_element_id_from(kRingBufferId).processing_element_id_to(kDaiId);
-  topology1.processing_elements_edge_pairs(std::vector({std::move(edge1)}));
-  topologies.emplace_back(std::move(topology1));
+  edge1.processing_element_id_from(kRingBufferId).processing_element_id_to(kGainId);
+  edge2.processing_element_id_from(kGainId).processing_element_id_to(kDaiId);
+  topology1.processing_elements_edge_pairs(std::vector({std::move(edge1), std::move(edge2)}));
 
   topology2.id(kCaptureTopologyId);
-  edge2.processing_element_id_from(kDaiId).processing_element_id_to(kRingBufferId);
-  topology2.processing_elements_edge_pairs(std::vector({std::move(edge2)}));
-  topologies.emplace_back(std::move(topology2));
+  edge1.processing_element_id_from(kDaiId).processing_element_id_to(kGainId);
+  edge2.processing_element_id_from(kGainId).processing_element_id_to(kRingBufferId);
+  topology2.processing_elements_edge_pairs(std::vector({std::move(edge1), std::move(edge2)}));
 
   // By default (in the topology of kPlaybackTopologyId), our ring buffer will be an outgoing one.
   ring_buffer_is_outgoing_ = true;
   current_topology_id_ = kPlaybackTopologyId;
-  completer.Reply(zx::ok(std::move(topologies)));
+  topologies_.emplace_back(std::move(topology1));
+  topologies_.emplace_back(std::move(topology2));
+}
+
+void VirtualAudioComposite::GetTopologies(GetTopologiesCompleter::Sync& completer) {
+  completer.Reply(zx::ok(topologies_));
 }
 
 void VirtualAudioComposite::SetTopology(SetTopologyRequest& request,
                                         SetTopologyCompleter::Sync& completer) {
-  // This driver exposes two elements: one ring buffer and one DAI interconnect.
-  // We expose two topologies: { Rb -> Dai } and { Dai -> Rb }.
-  // TODO(https://fxbug.dev/42075676): Add support for signalprocessing configuration and
-  // observability via the virtual audio FIDL APIs.
   if (request.topology_id() != kPlaybackTopologyId && request.topology_id() != kCaptureTopologyId) {
+    fdf::error("SetTopology({}) unknown topology_id", request.topology_id());
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
@@ -784,8 +743,7 @@ void VirtualAudioComposite::SetTopology(SetTopologyRequest& request,
 void VirtualAudioComposite::WatchTopology(WatchTopologyCompleter::Sync& completer) {
   // The client should not call WatchTopology when a previous WatchTopology is pending.
   if (watch_topology_completer_.has_value()) {
-    // This is an error condition, so we unbind the channel.
-    fdf::error("WatchTopology was re-called while the previous call was still pending");
+    fdf::error("WatchTopology called while previous call was pending. Unbinding");
     completer.Close(ZX_ERR_BAD_STATE);
     return;
   }
@@ -806,14 +764,215 @@ void VirtualAudioComposite::MaybeCompleteWatchTopology() {
   }
 }
 
-// Complain loudly but don't close the connection, since it is possible for this test fixture to be
-// used with a client that is built with a newer SDK version.
+// signalprocessing ElementState handling
+//
+// This driver is limited to a ring buffer, a DAI interconnect and a gain element. Of these, DAI and
+// Gain return type-specific ElementState; only the Gain element has _settable_ type-specific state.
+// TODO(https://fxbug.dev/42075676): Add support for diverse element types, as well as dynamic
+// (unsolicited) state changes, with complex state that can be configured and observed via the
+// virtual_audio FIDL API.
+void VirtualAudioComposite::SetupSignalProcessingElementStates() {
+  element_states_.clear();
+
+  fuchsia_hardware_audio_signalprocessing::DaiInterconnectElementState dai_state;
+  fuchsia_hardware_audio_signalprocessing::PlugState plug_state;
+  plug_state.plugged(true).plug_state_time(0);
+  dai_state.plug_state(std::move(plug_state));
+  ElementSnapshot dai_snapshot;
+  dai_snapshot.current.started(true).bypassed(false).type_specific(
+      fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithDaiInterconnect(
+          std::move(dai_state)));
+  dai_snapshot.last_notified.reset();
+  dai_snapshot.completer.reset();
+  element_states_.insert({kDaiId, std::move(dai_snapshot)});
+
+  ElementSnapshot rb_snapshot;
+  rb_snapshot.current.started(true).bypassed(false).processing_delay(0);
+  rb_snapshot.last_notified.reset();
+  rb_snapshot.completer.reset();
+  element_states_.insert({kRingBufferId, std::move(rb_snapshot)});
+
+  fuchsia_hardware_audio_signalprocessing::GainElementState gain_state;
+  gain_state.gain(-6.0);
+  ElementSnapshot gain_snapshot;
+  gain_snapshot.current.started(true).bypassed(false).turn_on_delay(0).type_specific(
+      fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithGain(gain_state));
+  gain_snapshot.last_notified.reset();
+  gain_snapshot.completer.reset();
+  element_states_.insert({kGainId, std::move(gain_snapshot)});
+}
+
+// Note that the range of type-specific state for an element is greater than the range of
+// type-specific state that can be changed by clients. This is why we define two distinct unions:
+//
+// TypeSpecificElementState is used by the method WatchElementState.
+// This union defines variants for DAI, DYNAMICS, EQUALIZER, GAIN and VENDOR_SPECIFIC element types.
+//
+// SettableTypeSpecificElementState is used by the method SetElementState.
+// This union defines variants for DYNAMICS, EQUALIZER, GAIN and VENDOR_SPECIFIC element types.
+//
+// To verify these modes, the driver supports 1 ring buffer, 1 gain element and 1 DAI interconnect.
+// TODO(https://fxbug.dev/42075676): Add support for more elements specified in the Configuration,
+// enabling dynamic behavior and observability via the virtual_audio FIDL API.
+void VirtualAudioComposite::SetElementState(SetElementStateRequest& request,
+                                            SetElementStateCompleter::Sync& completer) {
+  fuchsia_hardware_audio::ElementId element_id = request.processing_element_id();
+
+  // Reject all error cases BEFORE changing any state variables.
+
+  // Error: unknown element_id
+  if (!element_map_.contains(element_id)) {
+    fdf::error("SetElementState({}) unknown element_id", element_id);
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+  const auto& ele = element_map_[element_id];
+
+  // Error: this element cannot Stop as requested.
+  if (request.state().started().has_value() && !(*request.state().started()) &&
+      !ele->can_stop().value_or(false)) {
+    fdf::error("SetElementState: element cannot be stopped");
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+  // Error: this element cannot Bypass as requested.
+  if (request.state().bypassed().has_value() && *request.state().bypassed() &&
+      !ele->can_bypass().value_or(false)) {
+    fdf::error("SetElementState: element cannot be bypassed");
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+  switch (element_id) {
+    case kRingBufferId:
+      // RING_BUFFER elements contain no type-specific state.
+      // TypeSpecificElementState contains no variant for the RING_BUFFER type.
+      __FALLTHROUGH;
+    case kDaiId:
+      // DAI_INTERCONNECT elements can specify type-specific state, but clients cannot CHANGE it.
+      // TypeSpecificElementState defines a DAI variant; SettableTypeSpecificElementState does not.
+      if (request.state().type_specific().has_value()) {
+        // Error: type_specific state in this request does not match this element type.
+        fdf::error("SetElementState: TypeSpecificElementState does not match this element type");
+        completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+        return;
+      }
+      break;
+    case kGainId:
+      if (request.state().type_specific().has_value()) {
+        // For this element, clients can specify type-specific state but it must be gain-specific.
+        if (!request.state().type_specific()->gain().has_value()) {
+          // Error: type_specific state in this request does not match this element type.
+          fdf::error("SetElementState: TypeSpecificElementState does not match this element type");
+          completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+          return;
+        }
+        // Error: SetElementState value is missing or non-finite.
+        if (!request.state().type_specific()->gain()->gain().has_value() ||
+            !std::isfinite(*request.state().type_specific()->gain()->gain())) {
+          fdf::error("SetElementState: Gain requires a finite gain");
+          completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+          return;
+        }
+        // Error: SetElementState value is outside the [min,max] bounds.
+        if (*request.state().type_specific()->gain()->gain() <
+                *element_map_[element_id]->type_specific()->gain()->min_gain() ||
+            *request.state().type_specific()->gain()->gain() >
+                *element_map_[element_id]->type_specific()->gain()->max_gain()) {
+          fdf::error("SetElementState: Gain {} is outside the allowed range [{}, {}]",
+                     *request.state().type_specific()->gain()->gain(),
+                     *element_map_[element_id]->type_specific()->gain()->min_gain(),
+                     *element_map_[element_id]->type_specific()->gain()->max_gain());
+          completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+          return;
+        }
+
+        // We passed every check so we can record this state change. First: type-specific changes.
+        element_states_.at(element_id)
+            .current.type_specific(
+                fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithGain(
+                    request.state().type_specific()->gain().value()));
+      }
+      break;
+    default:
+      // Error: we don't recognize this element_id.
+      fdf::error("SetElementState({}) unknown element_id", element_id);
+      completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+      return;
+  }
+
+  // All error cases have exited. Record the non-type-specific state changes, if any.
+  if (request.state().started().has_value()) {
+    element_states_.at(element_id).current.started() = request.state().started();
+  }
+  if (request.state().bypassed().has_value()) {
+    element_states_.at(element_id).current.bypassed() = request.state().bypassed();
+  }
+  if (request.state().vendor_specific_data().has_value()) {
+    fdf::warn("SetElementState({}): ignoring {} bytes of vendor_specific_data (unsupported)",
+              element_id, request.state().vendor_specific_data()->size());
+  }
+
+  completer.Reply(zx::ok());
+  MaybeCompleteWatchElementState(element_id);
+}
+
+// Immediately return the state of this element, if it has changed since last time this was called.
+// Otherwise, pend this call until the state DOES change.
+void VirtualAudioComposite::WatchElementState(WatchElementStateRequest& request,
+                                              WatchElementStateCompleter::Sync& completer) {
+  if (!element_states_.contains(request.processing_element_id())) {
+    fdf::error("WatchElementState({}) unknown element_id. Unbinding",
+               request.processing_element_id());
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
+  if (element_states_.at(request.processing_element_id()).completer.has_value()) {
+    // The client called WatchElementState when another hanging get was pending for the same id.
+    fdf::error("WatchElementState({}) called while previous call was pending. Unbinding",
+               request.processing_element_id());
+    completer.Close(ZX_ERR_BAD_STATE);
+    return;
+  }
+
+  element_states_.at(request.processing_element_id()).completer = completer.ToAsync();
+  MaybeCompleteWatchElementState(request.processing_element_id());
+}
+
+// WatchElementState or SetElementState were called for this element (or it changed state for some
+// other reason). If there is a pending WatchElementState to complete, do so.
+void VirtualAudioComposite::MaybeCompleteWatchElementState(
+    fuchsia_hardware_audio_signalprocessing::ElementId element_id) {
+  if (!element_states_.at(element_id).completer.has_value()) {
+    fdf::debug("We don't have a completer, so we can't complete this");
+    return;
+  }
+  const auto& prev = element_states_.at(element_id).last_notified;
+  const auto& curr = element_states_.at(element_id).current;
+  if (prev.has_value() && prev->type_specific() == curr.type_specific() &&
+      prev->started().value_or(true) == curr.started().value_or(true) &&
+      prev->bypassed().value_or(false) == curr.bypassed().value_or(false)) {
+    fdf::debug("The value is unchanged, so we won't complete this");
+    return;
+  }
+
+  auto completer = std::move(element_states_.at(element_id).completer);
+  element_states_.at(element_id).completer.reset();
+  element_states_.at(element_id).last_notified = element_states_.at(element_id).current;
+  completer->Reply(element_states_.at(element_id).current);
+}
+
+// Driver doesn't support a new RingBuffer method. Complain loudly but don't disconnect, since
+// this test fixture might be used with a client that is built with a newer SDK version.
 void VirtualAudioComposite::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
   fdf::error("VirtualAudioComposite::handle_unknown_method (RingBuffer) ordinal {}",
              metadata.method_ordinal);
 }
+
+// Driver doesn't support a new SignalProcessing method. Complain loudly but don't disconnect, since
+// this test fixture might be used with a client that is built with a newer SDK version.
 void VirtualAudioComposite::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {

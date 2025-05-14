@@ -43,12 +43,16 @@ class VirtualAudioComposite
   zx::result<> Init(fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent);
 
  private:
-  static constexpr size_t kNumberOfTopologies = 2;
-  static constexpr fuchsia_hardware_audio_signalprocessing::TopologyId kPlaybackTopologyId = 789;
-  static constexpr fuchsia_hardware_audio_signalprocessing::TopologyId kCaptureTopologyId = 987;
-  static constexpr size_t kNumberOfElements = 2;
+  static constexpr size_t kNumberOfElements = 3;
   static constexpr fuchsia_hardware_audio_signalprocessing::ElementId kRingBufferId = 123;
+  static constexpr fuchsia_hardware_audio_signalprocessing::ElementId kGainId = 321;
   static constexpr fuchsia_hardware_audio_signalprocessing::ElementId kDaiId = 456;
+
+  static constexpr size_t kNumberOfTopologies = 2;
+  // This topology is RingBuffer (123) -> Gain (321) -> Dai        (456)
+  static constexpr fuchsia_hardware_audio_signalprocessing::TopologyId kPlaybackTopologyId = 789;
+  // This topology is Dai        (456) -> Gain (321) -> RingBuffer (123)
+  static constexpr fuchsia_hardware_audio_signalprocessing::TopologyId kCaptureTopologyId = 987;
 
   // virtualaudio.Device implementation.
   void GetFormat(GetFormatCompleter::Sync& completer) override;
@@ -92,21 +96,26 @@ class VirtualAudioComposite
       fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  // fuchsia.hardware.audio.signalprocessing.SignalProcessing implementation.
+  // fuchsia.hardware.audio.signalprocessing implementation (SignalProcessing and Reader).
   void GetElements(GetElementsCompleter::Sync& completer) override;
-  void WatchElementState(WatchElementStateRequest& request,
-                         WatchElementStateCompleter::Sync& completer) override;
+  void GetTopologies(GetTopologiesCompleter::Sync& completer) override;
+  void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) override;
+  void WatchTopology(WatchTopologyCompleter::Sync& completer) override;
   void SetElementState(SetElementStateRequest& request,
                        SetElementStateCompleter::Sync& completer) override;
-  void GetTopologies(GetTopologiesCompleter::Sync& completer) override;
-  void WatchTopology(WatchTopologyCompleter::Sync& completer) override;
-  void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) override;
+  void WatchElementState(WatchElementStateRequest& request,
+                         WatchElementStateCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>
           metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  void SetupSignalProcessing();
+  void SetupSignalProcessingElements();
+  void SetupSignalProcessingTopologies();
+  void SetupSignalProcessingElementStates();
   void MaybeCompleteWatchTopology();
+  void MaybeCompleteWatchElementState(fuchsia_hardware_audio_signalprocessing::ElementId);
 
   void Serve(fidl::ServerEnd<fuchsia_hardware_audio::Composite> server);
   void ResetRingBuffer();
@@ -117,41 +126,60 @@ class VirtualAudioComposite
     return config_.device_specific()->composite().value();
   }
 
-  bool ring_buffer_is_outgoing_;
-
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio::Composite>> composite_binding_;
 
-  // One ring buffer and one DAI interconnect only are supported by this driver.
+  // This driver exposes only one ring buffer element.
+  bool ring_buffer_is_outgoing_;
   fzl::VmoMapper ring_buffer_mapper_;
   uint32_t notifications_per_ring_ = 0;
   uint32_t num_ring_buffer_frames_ = 0;
   uint32_t frame_size_ = 4;
   zx::vmo ring_buffer_vmo_;
 
-  bool should_reply_to_delay_request_ = true;
-  std::optional<WatchDelayInfoCompleter::Async> delay_info_completer_;
-  bool should_reply_to_position_request_ = true;
-  std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_info_completer_;
-
+  // ring-buffer state
   bool ring_buffer_vmo_fetched_ = false;
   bool ring_buffer_started_ = false;
   std::optional<fuchsia_hardware_audio::Format> ring_buffer_format_;
   uint64_t ring_buffer_active_channel_mask_;
   zx::time active_channel_set_time_;
 
+  // ring-buffer hanging gets
+  bool should_reply_to_delay_request_ = true;
+  std::optional<WatchDelayInfoCompleter::Async> delay_info_completer_;
+  bool should_reply_to_position_request_ = true;
+  std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_info_completer_;
+
+  // This driver exposes only one DAI element.
   std::optional<fuchsia_hardware_audio::DaiFormat> dai_format_;
+
   fuchsia_virtualaudio::Configuration config_;
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio::RingBuffer>> ring_buffer_;
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
       signal_;
 
+  std::vector<fuchsia_hardware_audio_signalprocessing::Element> elements_;
+  std::unordered_map<fuchsia_hardware_audio_signalprocessing::ElementId,
+                     fuchsia_hardware_audio_signalprocessing::Element*>
+      element_map_;
+
+  std::vector<fuchsia_hardware_audio_signalprocessing::Topology> topologies_;
   fuchsia_hardware_audio_signalprocessing::TopologyId current_topology_id_;
   std::optional<fuchsia_hardware_audio_signalprocessing::TopologyId> last_reported_topology_id_;
   std::optional<WatchTopologyCompleter::Async> watch_topology_completer_;
 
-  bool watch_element_state_needs_reply_[kNumberOfElements] = {true, true};
-  std::optional<WatchElementStateCompleter::Async>
-      watch_element_state_completers_[kNumberOfElements];
+  struct ElementSnapshot {
+    ElementSnapshot() = default;
+    ElementSnapshot(const ElementSnapshot&) = delete;
+    ElementSnapshot(ElementSnapshot&&) = default;
+    ElementSnapshot& operator=(const ElementSnapshot&) = delete;
+    ElementSnapshot& operator=(ElementSnapshot&&) = default;
+
+    fuchsia_hardware_audio_signalprocessing::ElementState current;
+    std::optional<fuchsia_hardware_audio_signalprocessing::ElementState> last_notified;
+    std::optional<WatchElementStateCompleter::Async> completer;
+  };
+  std::unordered_map<fuchsia_hardware_audio_signalprocessing::ElementId, ElementSnapshot>
+      element_states_;
 
   async_dispatcher_t* dispatcher_;
   fidl::ServerBinding<fuchsia_virtualaudio::Device> device_binding_;
