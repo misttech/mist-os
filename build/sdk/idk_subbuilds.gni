@@ -47,9 +47,9 @@ import("//sdk/config.gni")
 #    subbuild_prefix  (optional)
 #      [string] A name prefix for all sub-build directories. Default is
 #          "idk_subbuild.<name>"  where <name> is the name of the sdk_collection_label
-#          target. This is useful to differentiatte idk_subbuilds() instances that
+#          target. This is useful to differentiate idk_subbuilds() instances that
 #          reference collections with the same name, but different directories
-#          (e.g. `//sdk:core` and `//vendor/acme/sdk:core`).
+#          (e.g. `//sdk:partner` and `//vendor/acme/sdk:partner`).
 #
 #   sdk_collection_name (optional)
 #     The name of the collection specified by `sdk_collection_label`.

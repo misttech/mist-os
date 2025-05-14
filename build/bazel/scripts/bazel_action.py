@@ -153,7 +153,7 @@ _BAZEL_NO_CONTENT_HASH_REPOSITORIES = (
 #   Bazel workspace. For example:
 #
 #      @fuchsia_sdk//pkg/fdio:include/lib/fdio/vfs.h
-#        --symlink--> $NINJA_OUTPUT_DIR/sdk/exported/core/pkg/fdio/include/lib/fdio/vfs.h
+#        --symlink--> $NINJA_OUTPUT_DIR/sdk/exported/in_tree_collection/pkg/fdio/include/lib/fdio/vfs.h
 #          --symlink--> $FUCHSIA_DIR/sdk/lib/fdio/include/lib/fdio/vfs.h
 #
 #      @fuchsia_clang//:lib
