@@ -348,10 +348,8 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Constant except for in tests.
   bool enable_display_composition_ = true;
 
-  // TODO(https://fxbug.dev/42078234): Display controller currently doesn't allow flipping one image
-  // on one layer, but keeping the image on another layer the same in consecutive configs. As a
-  // result, using multiple layers is broken. This field is used to limit it.
-  uint32_t max_display_layers_ = 1;
+  // The maximum number of layers that can be displayed at once, on a given display.
+  const uint32_t max_display_layers_;
 
   ColorConversionStateMachine cc_state_machine_;
 

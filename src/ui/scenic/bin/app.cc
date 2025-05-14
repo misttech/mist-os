@@ -53,6 +53,10 @@ static constexpr zx::duration kShutdownTimeout = zx::sec(1);
 // all resources are cleaned up.
 static constexpr zx::duration kEscherCleanupRetryInterval{10'000'000};  // 10 millisecond
 
+// The maximum number of "layers" that can be passed to the display hardware in a single frame,
+// per display.
+static constexpr uint32_t kMaxDisplayLayers = 4;
+
 std::optional<fuchsia_hardware_display_types::wire::DisplayId> GetDisplayId(
     const scenic_structured_config::Config& values) {
   if (values.i_can_haz_display_id() < 0) {
@@ -427,7 +431,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     flatland_compositor_ = std::make_shared<flatland::DisplayCompositor>(
         async_get_default_dispatcher(), display_manager_->default_display_coordinator(),
         flatland_renderer, utils::CreateSysmemAllocatorSyncPtr("flatland::DisplayCompositor"),
-        config_values_.display_composition(), /*max_display_layers=*/1,
+        config_values_.display_composition(), kMaxDisplayLayers,
         config_values_.visual_debugging_level());
   }
 
