@@ -10,6 +10,7 @@
 #include <lib/elfldltl/layout.h>
 
 #include <array>
+#include <concepts>
 #include <type_traits>
 #include <utility>
 
@@ -239,6 +240,13 @@ struct RemoteAbiTranscriberImpl<T, RemoteAbiTranscriberImplType::kClass> {
     return ctx.template MemberFromLocal<Member, MemberType, LocalMember, Local>(out.*Member, in);
   }
 
+  static constexpr bool Same(auto a, decltype(a) b) { return a == b; }
+  template <typename A, typename B>
+    requires(!std::same_as<A, B>)
+  static constexpr bool Same(A a, B b) {
+    return false;
+  }
+
   template <auto... M>
   struct MembersImpl {
     // Ensure that all the template arguments are pointers to members of T.
@@ -246,6 +254,14 @@ struct RemoteAbiTranscriberImpl<T, RemoteAbiTranscriberImplType::kClass> {
     static_assert((!std::is_void_v<decltype(std::declval<T>().*M)> && ...));
 
     static constexpr size_t kSizeBytes = (sizeof(std::declval<T>().*M) + ...);
+
+    template <auto O>
+    static constexpr bool kHas = (Same(O, M) || ...);
+
+    template <auto... O>
+    struct HasAllOf {
+      static constexpr bool value = (kHas<O> && ...);
+    };
 
     template <typename F>
     static constexpr bool OnAllMembers(F&& f, T& x) {
@@ -280,6 +296,15 @@ struct RemoteAbiTranscriberImpl<T, RemoteAbiTranscriberImplType::kClass> {
 
   static_assert(sizeof(T) == Members::kSizeBytes,
                 "AbiMembers list incomplete or struct has implicit padding");
+
+  // This will check that the template parameter lists all the members in
+  // T::AbiMembers.
+  template <auto... M>
+  static constexpr void AssertAbiMembers() {
+    using CheckMembers = MembersImpl<M...>;
+    using HasAll = T::template AbiMembers<CheckMembers::template HasAllOf>;
+    static_assert(HasAll::value);
+  }
 };
 
 // This will quickly prevent compilation for any type not handled by the

@@ -537,18 +537,28 @@ class RemoteAbi {
     abi.static_tls_modules = heap_->Remote(heap_vaddr, abi_tls_modules_);
     abi.static_tls_offsets = heap_->Remote(heap_vaddr, abi_tls_offsets_);
 
-    // When there is a main executable, it can have a DT_PREINIT_ARRAY.  This
-    // isn't in every Abi::Module since it's not used for most.  So it has its
-    // own Abi::preinit_array member, pointing into the executable's image.
+    // When there is a main executable, it can have a DT_PREINIT_ARRAY and its
+    // PT_GNU_STACK can have a p_memsz.  These aren't in every Abi::Module
+    // since they're not used for most.  So they have their own Abi::stack_size
+    // and Abi::preinit_array members, pointing into the executable's image.
     if (modules.front().name() == LocalAbi::kExecutableName) {
+      const auto& exec_info = modules.front().decoded().exec_info();
+      abi.stack_size = exec_info.stack_size.value_or(0);
       using Remote = decltype(abi.preinit_array);
       Remote& remote = abi.preinit_array;
-      const auto& local = modules.front().decoded().exec_info().preinit_array;
+      const auto& local = exec_info.preinit_array;
       const auto context = make_module_context(vaddr_maps.front());
       if (!RemoteAbiTranscriber<Remote>::FromLocal(context, remote, local)) {
         return false;
       }
     }
+
+    // Since we don't use the AbiTranscriber, this lists out each member we set
+    // directly in this method to ensure there will be a static_assert failure
+    // if a new one is omitted.
+    AbiTranscriber::template AssertAbiMembers<
+        &Abi::loaded_modules, &Abi::loaded_modules_count, &Abi::stack_size, &Abi::preinit_array,
+        &Abi::static_tls_modules, &Abi::static_tls_offsets, &Abi::static_tls_layout>();
 
     return true;
   }

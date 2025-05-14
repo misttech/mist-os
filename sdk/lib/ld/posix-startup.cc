@@ -67,7 +67,7 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
     // handling command line args for various behavior options and for the name
     // of an executable to load as if it had been executed with a PT_INTERP
     // pointing at this dynamic linker.
-    diag.FormatError("dynamic linker executed directly, not via PT_INTERP");
+    diag.SystemError("dynamic linker executed directly, not via PT_INTERP");
     __builtin_trap();
   }
 
@@ -141,6 +141,7 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
       StartupModule::NeededCountObserver(needed_count),
       StartupModule::PreinitObserver(preinit_array)));
   mutable_abi.preinit_array = preinit_array;
+  mutable_abi.stack_size = phdr_info->stack_size.value_or(0);
 
   return {main_executable, needed_count};
 }

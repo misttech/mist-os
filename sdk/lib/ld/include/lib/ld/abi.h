@@ -71,6 +71,16 @@ struct Abi {
   // This is the number of elements in the loaded_modules list.
   Addr loaded_modules_count;
 
+  // This is the p_memsz of the PT_GNU_STACK of the main executable.  A size of
+  // zero means nothing: some default should be applied.  A nonzero size is the
+  // requested stack size the program's builder warrants will be sufficient for
+  // its initial thread, set via the `-z stack-size=...` linker switch.  This
+  // size need not be an exact multiple of the page size, but it's always
+  // rounded up to page size when used.  The system program loader may actually
+  // start the process with a different stack size; then the C library startup
+  // code switches to a new stack it allocates after consulting this value.
+  Addr stack_size;
+
   // This is the DT_PREINIT_ARRAY of the main executable, if it had one.  Since
   // only the executable's preinit array is ever consulted, there is no field
   // for it in each Module.
@@ -134,9 +144,9 @@ struct Abi {
   using AbiBases = Template<>;
 
   template <template <auto...> class Template>
-  using AbiMembers =
-      Template<&Abi::loaded_modules, &Abi::loaded_modules_count, &Abi::preinit_array,
-               &Abi::static_tls_modules, &Abi::static_tls_offsets, &Abi::static_tls_layout>;
+  using AbiMembers = Template<&Abi::loaded_modules, &Abi::loaded_modules_count, &Abi::stack_size,
+                              &Abi::preinit_array, &Abi::static_tls_modules,
+                              &Abi::static_tls_offsets, &Abi::static_tls_layout>;
 };
 
 // This is the standard PT_INTERP value for using a compatible dynamic linker

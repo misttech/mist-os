@@ -187,6 +187,7 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   LoadExecutableResult main =
       LoadExecutable(diag, startup, scratch, initial_exec, std::move(startup.executable_vmo));
   mutable_abi.preinit_array = main.preinit_array;
+  mutable_abi.stack_size = main.stack_size.value_or(0);
 
   // It doesn't matter whether or how this dynamic linker binary itself is
   // instrumented.  It's only the executable's instrumentation details that

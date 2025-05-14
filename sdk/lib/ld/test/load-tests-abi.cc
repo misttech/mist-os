@@ -43,6 +43,18 @@ TYPED_TEST(LdLoadTests, PassiveAbiPreinitArray) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, PassiveAbiStackSize) {
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("passive-abi-stack-size"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
 TYPED_TEST(LdLoadTests, PassiveAbiManyDeps) {
   constexpr int64_t kReturnValue = 17;
 

@@ -143,6 +143,7 @@ load_tests_in_process = [
   "passive-abi-many-deps",
   "passive-abi-preinit-array",
   "passive-abi-rdebug",
+  "passive-abi-stack-size",
   "relative-reloc",
   "ret17",
   "symbolic-namespace",
