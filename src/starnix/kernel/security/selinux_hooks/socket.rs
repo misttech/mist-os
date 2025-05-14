@@ -429,8 +429,7 @@ pub(in crate::security) fn unix_may_send(
         panic!("unix_may_send called for non-Socket class")
     };
 
-    todo_has_socket_permission(
-        TODO_DENY!("https://fxbug.dev/364569339", "Enforce unix_may_send permission"),
+    has_socket_permission(
         &security_server.as_permission_check(),
         current_task.kernel(),
         sending_sid,
