@@ -105,6 +105,11 @@ zx::result<> profiler::KernelSampler::Start(size_t buffer_size_mb) {
   zx::result known_threads_res = targets_.ForEachProcess(
       [this](cpp20::span<const zx_koid_t> job_path, const ProcessTarget& p) -> zx::result<> {
         TRACE_DURATION("cpu_profiler", "KernelSampler::Start/ForEachProcess");
+
+        // Before we start sampling the thread, make sure we've recorded information about its
+        // process
+        CacheModules(p);
+
         for (const auto& [koid, thread] : p.threads) {
           zx::result res = session_->AttachThread(thread.handle);
           if (res.is_ok()) {
@@ -167,6 +172,11 @@ zx::result<> profiler::KernelSampler::AddTarget(JobTarget&& target) {
     zx::result<> res = target.ForEachProcess(
         [this](cpp20::span<const zx_koid_t> job_path, const ProcessTarget& p) -> zx::result<> {
           TRACE_DURATION("cpu_profiler", "KernelSampler::AddTarget/ForEachProcess");
+
+          // Before we start sampling the thread, make sure we've recorded information about its
+          // process
+          CacheModules(p);
+
           for (const auto& [koid, thread] : p.threads) {
             if (zx::result res = session_->AttachThread(thread.handle); res.is_error()) {
               FX_PLOGS(ERROR, res.error_value()) << "failed Add thread target";
@@ -269,6 +279,15 @@ zx::result<> profiler::KernelSampler::Stop() {
 void profiler::KernelSampler::AddThread(std::vector<zx_koid_t> job_path, zx_koid_t pid,
                                         zx_koid_t tid, zx::thread t) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__, "pid", pid, "tid", tid);
+  // Before we start sampling the thread, make sure we've recorded information about its process
+  if (!contexts_.contains(pid)) {
+    zx::result<ProcessTarget*> target = targets_.GetProcess(job_path, pid);
+    if (target.is_error()) {
+      FX_PLOGS(ERROR, target.status_value()) << "Failed to search up process: " << pid;
+    }
+    CacheModules(**target);
+  }
+
   if (zx::result res = session_->AttachThread(t); res.is_error()) {
     FX_PLOGS(ERROR, res.status_value()) << "Failed to start sampling thread: " << tid;
   }

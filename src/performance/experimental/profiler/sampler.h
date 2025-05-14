@@ -68,6 +68,7 @@ class Sampler : public fxl::RefCountedThreadSafe<Sampler> {
   virtual void RemoveThread(std::vector<zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid);
 
   void CollectSamples(async_dispatcher_t* dispatcher, async::TaskBase* task, zx_status_t status);
+  void CacheModules(const ProcessTarget& p);
 
   async_dispatcher_t* dispatcher_;
   TargetTree targets_;
@@ -78,12 +79,12 @@ class Sampler : public fxl::RefCountedThreadSafe<Sampler> {
   // Watchers cannot be moved, so we need to box them
   std::unordered_map<zx_koid_t, std::unique_ptr<ProcessWatcher>> process_watchers_;
   std::unordered_map<zx_koid_t, std::unique_ptr<JobWatcher>> job_watchers_;
+  std::map<zx_koid_t, std::map<std::vector<std::byte>, profiler::Module>> contexts_;
 
  private:
+  elf_search::Searcher searcher_;
   fxl::WeakPtrFactory<Sampler> weak_factory_;
   async::TaskMethod<profiler::Sampler, &profiler::Sampler::CollectSamples> sample_task_{this};
-  elf_search::Searcher searcher_;
-  std::map<zx_koid_t, std::map<std::vector<std::byte>, profiler::Module>> contexts_;
 };
 }  // namespace profiler
 #endif  // SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_SAMPLER_H_

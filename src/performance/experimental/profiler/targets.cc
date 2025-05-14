@@ -92,6 +92,23 @@ zx::result<> profiler::JobTarget::AddProcess(cpp20::span<const zx_koid_t> job_pa
   return next_child->second.AddProcess(job_path.subspan(1), std::move(process));
 }
 
+zx::result<profiler::ProcessTarget*> profiler::JobTarget::GetProcess(
+    std::span<const zx_koid_t> job_path, zx_koid_t pid) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  if (job_path.empty()) {
+    if (processes.contains(pid)) {
+      auto it = processes.find(pid);
+      return zx::ok(&it->second);
+    }
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  auto next_child = child_jobs.find(job_path[0]);
+  if (next_child == child_jobs.end()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  return next_child->second.GetProcess(job_path.subspan(1), pid);
+}
+
 zx::result<> profiler::JobTarget::AddThread(cpp20::span<const zx_koid_t> job_path, zx_koid_t pid,
                                             ThreadTarget&& thread) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
@@ -348,11 +365,27 @@ zx::result<> profiler::TargetTree::AddProcess(cpp20::span<const zx_koid_t> job_p
     auto [it, emplaced] = processes_.try_emplace(pid, std::move(process));
     return zx::make_result(emplaced ? ZX_OK : ZX_ERR_ALREADY_EXISTS);
   }
-
   zx_koid_t next_child_koid = job_path[0];
   auto it = jobs_.find(next_child_koid);
   return it == jobs_.end() ? zx::error(ZX_ERR_NOT_FOUND)
                            : it->second.AddProcess(job_path.subspan(1), std::move(process));
+}
+
+zx::result<profiler::ProcessTarget*> profiler::TargetTree::GetProcess(
+    std::span<const zx_koid_t> job_path, zx_koid_t pid) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  if (job_path.empty()) {
+    if (processes_.contains(pid)) {
+      auto it = processes_.find(pid);
+      zx::ok(&it->second);
+    }
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  zx_koid_t next_child_koid = job_path[0];
+  auto it = jobs_.find(next_child_koid);
+  return it == jobs_.end() ? zx::error(ZX_ERR_NOT_FOUND)
+                           : it->second.GetProcess(job_path.subspan(1), pid);
 }
 
 zx::result<> profiler::TargetTree::AddThread(zx_koid_t pid, ThreadTarget&& thread) {

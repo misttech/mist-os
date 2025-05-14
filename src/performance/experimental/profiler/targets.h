@@ -74,11 +74,11 @@ zx::result<profiler::ProcessTarget> MakeProcessTarget(zx::process process,
                                                       elf_search::Searcher& searcher);
 
 struct JobTarget {
-  explicit JobTarget(zx::job job, zx_koid_t job_id, cpp20::span<const zx_koid_t> ancestry)
+  explicit JobTarget(zx::job job, zx_koid_t job_id, std::span<const zx_koid_t> ancestry)
       : job(std::move(job)), job_id(job_id), ancestry(ancestry.begin(), ancestry.end()) {}
   JobTarget(zx::job job, zx_koid_t job_id, std::unordered_map<zx_koid_t, ProcessTarget> processes,
             std::unordered_map<zx_koid_t, JobTarget> child_jobs,
-            cpp20::span<const zx_koid_t> ancestry)
+            std::span<const zx_koid_t> ancestry)
       : job(std::move(job)),
         job_id(job_id),
         processes(std::move(processes)),
@@ -99,7 +99,7 @@ struct JobTarget {
 
   // Do a depth first search to call f on each process in the modeled job tree.
   zx::result<> ForEachProcess(
-      const fit::function<zx::result<>(cpp20::span<const zx_koid_t> job_path,
+      const fit::function<zx::result<>(std::span<const zx_koid_t> job_path,
                                        const ProcessTarget& target)>& f) const;
   // Do a depth first search to call f on each child job in the modeled job tree.
   zx::result<> ForEachJob(const fit::function<zx::result<>(const JobTarget& target)>& f) const;
@@ -112,28 +112,33 @@ struct JobTarget {
   //
   // Note: `ancestry` is the jobs that `job` will be placed under and does not include the job_id of
   // `job` itself.
-  zx::result<> AddJob(cpp20::span<const zx_koid_t> ancestry, JobTarget&& job);
+  zx::result<> AddJob(std::span<const zx_koid_t> ancestry, JobTarget&& job);
 
   // Add `process` into the job tree as a child to the job specified by `job_path`
   //
   // Returns zx::ok if the process was successfully added,
   // ZX_ERR_NOT_FOUND if there is no matching job_path
   // ZX_ERR_ALREADY_EXISTS if there is already an existing process at the location with the same pid
-  zx::result<> AddProcess(cpp20::span<const zx_koid_t> job_path, ProcessTarget&& process);
+  zx::result<> AddProcess(std::span<const zx_koid_t> job_path, ProcessTarget&& process);
+
+  // Get `process` from the job tree as a child to the job specified by `job_path`
+  //
+  // Returns zx::ok if the process was found,
+  // ZX_ERR_NOT_FOUND if there is no matching job_path or pid
+  zx::result<ProcessTarget*> GetProcess(std::span<const zx_koid_t> job_path, zx_koid_t pid);
 
   // Add `thread` into the job tree as a child to process in job specified by `pid` and `job_path`.
   //
   // Returns zx::ok if the thread was successfully added,
   // ZX_ERR_NOT_FOUND if there is no matching job_path
   // ZX_ERR_ALREADY_EXISTS if there is already an existing thread at the location with the same tid
-  zx::result<> AddThread(cpp20::span<const zx_koid_t> job_path, zx_koid_t pid,
-                         ThreadTarget&& thread);
-  zx::result<> RemoveThread(cpp20::span<const zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid);
+  zx::result<> AddThread(std::span<const zx_koid_t> job_path, zx_koid_t pid, ThreadTarget&& thread);
+  zx::result<> RemoveThread(std::span<const zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid);
 };
 
 // Given a job, create a job target containing it, its processes, their threads, and its child
 // jobs. Additionally, the created job will be given the ancestry specified by `ancestry`.
-zx::result<profiler::JobTarget> MakeJobTarget(zx::job job, cpp20::span<const zx_koid_t> ancestry,
+zx::result<profiler::JobTarget> MakeJobTarget(zx::job job, std::span<const zx_koid_t> ancestry,
                                               elf_search::Searcher& searcher);
 
 // Given a job, create a job target containing it, its processes, their threads, and its child
@@ -177,9 +182,9 @@ class TargetTree {
   //
   // Note: `ancestry` is the jobs that `job` will be placed under and does not include the job_id of
   // `job` itself.
-  zx::result<> AddJob(cpp20::span<const zx_koid_t> ancestry, JobTarget&& job);
+  zx::result<> AddJob(std::span<const zx_koid_t> ancestry, JobTarget&& job);
 
-  zx::result<> RemoveThread(cpp20::span<const zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid);
+  zx::result<> RemoveThread(std::span<const zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid);
 
   // Add `thread` into the job tree as a child to the job specified by `job_path` in the process
   // `pid`
@@ -187,15 +192,19 @@ class TargetTree {
   // Returns zx::ok if the thread was successfully added,
   // ZX_ERR_NOT_FOUND if there is no matching job_path
   // ZX_ERR_ALREADY_EXISTS if there is already an existing thread at the location with the same tid
-  zx::result<> AddThread(cpp20::span<const zx_koid_t> job_path, zx_koid_t pid,
-                         ThreadTarget&& thread);
+  zx::result<> AddThread(std::span<const zx_koid_t> job_path, zx_koid_t pid, ThreadTarget&& thread);
 
   // Add `process` into the job tree as a child in the job by `job_path`.
   //
   // Returns zx::ok if the process was successfully added,
   // ZX_ERR_NOT_FOUND if there is no matching job_path
   // ZX_ERR_ALREADY_EXISTS if there is already an existing thread at the location with the same tid
-  zx::result<> AddProcess(cpp20::span<const zx_koid_t> job_path, ProcessTarget&& process);
+  zx::result<> AddProcess(std::span<const zx_koid_t> job_path, ProcessTarget&& process);
+
+  // Search `pid` as a ProcessTarget from the job tree indexed by `job_path`.
+  //
+  // ZX_ERR_NOT_FOUND if there is no matching job_path and pid
+  zx::result<ProcessTarget*> GetProcess(std::span<const zx_koid_t> job_path, zx_koid_t pid);
   void Clear();
 
   // Call `f` on each Job in the TargetTree. The order each job is visited is unspecified. If `f`
@@ -206,9 +215,8 @@ class TargetTree {
   // Call `f` on each top level unparented process as well as every process in each added job. The
   // order each process is visited is unspecified. If `f` returns an error, the function will short
   // circuit and immediately return the error code without visiting any remaining processes.
-  zx::result<> ForEachProcess(
-      const fit::function<zx::result<>(cpp20::span<const zx_koid_t> job_path,
-                                       const ProcessTarget& target)>& f);
+  zx::result<> ForEachProcess(const fit::function<zx::result<>(std::span<const zx_koid_t> job_path,
+                                                               const ProcessTarget& target)>& f);
 
  private:
   std::unordered_map<zx_koid_t, JobTarget> jobs_;
