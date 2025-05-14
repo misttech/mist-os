@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_MAGMA_INCLUDE_LIB_MAGMA_SERVICE_MSD_H_
 
 #include <lib/async/dispatcher.h>
+#include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/magma_service/msd_defs.h>  // IWYU pragma: export
 #include <lib/stdcompat/span.h>
@@ -74,6 +75,12 @@ class Device {
   // Outputs a list of ICD components.
   virtual magma_status_t GetIcdList(std::vector<MsdIcdInfo>* icd_info_out) {
     return MAGMA_STATUS_UNIMPLEMENTED;
+  }
+
+  // Sets the power state of the device. The given |completer| will be invoked asynchronously
+  // when a power change is completed.
+  virtual void SetPowerState(int64_t power_state, fit::callback<void(magma_status_t)> completer) {
+    completer(MAGMA_STATUS_UNIMPLEMENTED);
   }
 
   virtual void DumpStatus(uint32_t dump_flags) {}

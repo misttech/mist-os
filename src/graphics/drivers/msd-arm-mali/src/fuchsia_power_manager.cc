@@ -183,7 +183,7 @@ void FuchsiaPowerManager::CheckRequiredLevel() {
         required_power_level_.Set(required_level);
 
         bool enabled = required_level == kPoweredUpPowerLevel;
-        owner_->SetPowerState(enabled, [this](bool powered_on) {
+        owner_->PostPowerStateChange(enabled, [this](bool powered_on) {
           uint8_t new_level = powered_on ? kPoweredUpPowerLevel : kPoweredDownPowerLevel;
           current_power_level_.Set(new_level);
           auto result = hardware_power_current_level_client_->Update(new_level);

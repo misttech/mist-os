@@ -261,7 +261,7 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
 
 class FakePowerOwner : public FuchsiaPowerManager::Owner {
  public:
-  void SetPowerState(bool enabled, PowerStateCallback completer) override {
+  void PostPowerStateChange(bool enabled, PowerStateCallback completer) override {
     enabled_calls_.push_back(enabled);
     completer(enabled);
   }

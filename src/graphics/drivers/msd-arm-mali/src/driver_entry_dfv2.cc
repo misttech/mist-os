@@ -96,11 +96,15 @@ class MaliDriver : public msd::MagmaDriverBase,
                      SetPowerStateCompleter::Sync& completer) override {
     std::lock_guard lock(magma_mutex());
 
-    msd::Device* dev = magma_system_device()->msd_dev();
-
-    static_cast<MsdArmDevice*>(dev)->SetPowerState(
-        request->enabled,
-        [completer = completer.ToAsync()](bool powered_on) mutable { completer.ReplySuccess(); });
+    int64_t power_state = request->enabled ? 1 : 0;
+    magma_system_device()->SetPowerState(
+        power_state, [completer = completer.ToAsync()](magma_status_t status) mutable {
+          if (status == MAGMA_STATUS_OK) {
+            completer.ReplySuccess();
+          } else {
+            completer.ReplyError(ZX_ERR_INTERNAL);
+          }
+        });
   }
 
   void GetPowerGoals(GetPowerGoalsCompleter::Sync& completer) override {

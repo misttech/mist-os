@@ -111,4 +111,9 @@ magma_status_t MagmaSystemDevice::GetIcdList(std::vector<MsdIcdInfo>* icd_list_o
   return msd_dev()->GetIcdList(icd_list_out);
 }
 
+void MagmaSystemDevice::SetPowerState(int64_t power_state,
+                                      fit::callback<void(magma_status_t)> completer) {
+  msd_dev()->SetPowerState(power_state, std::move(completer));
+}
+
 }  // namespace msd

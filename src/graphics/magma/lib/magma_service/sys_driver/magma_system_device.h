@@ -76,6 +76,8 @@ class MagmaSystemDevice final : public internal::PrimaryFidlServerHolder::Connec
 
   void SetMemoryPressureLevel(MagmaMemoryPressureLevel level);
 
+  void SetPowerState(int64_t power_state, fit::callback<void(magma_status_t)> completer);
+
   void set_perf_count_access_token_id(uint64_t id) { perf_count_access_token_id_ = id; }
   uint64_t perf_count_access_token_id() const override { return perf_count_access_token_id_; }
 

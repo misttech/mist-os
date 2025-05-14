@@ -43,6 +43,9 @@ struct MsdDriverCallbacks {
                                  const char* vthread, uint64_t vthread_id, uint64_t timestamp);
 };
 
+typedef void (*msd_device_set_power_state_callback_t)(uintptr_t callback_context,
+                                                      magma_status_t status);
+
 void msd_driver_register_callbacks(struct MsdDriverCallbacks* callbacks);
 
 struct MsdDevice* msd_driver_create_device(struct MsdPlatformDevice* platform_device);
@@ -51,6 +54,12 @@ void msd_device_release(struct MsdDevice* device);
 
 magma_status_t msd_device_query(struct MsdDevice* device, uint64_t id,
                                 magma_handle_t* result_buffer_out, uint64_t* result_out);
+
+// `callback` can be called from any thread context, so it is up to the client
+// to provide thread safety.
+void msd_device_set_power_state(struct MsdDevice* device, int64_t power_state,
+                                msd_device_set_power_state_callback_t callback,
+                                uintptr_t callback_context);
 
 struct MsdConnection* msd_device_create_connection(struct MsdDevice* device, uint64_t client_id);
 
