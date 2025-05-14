@@ -246,6 +246,14 @@ TEST(TracingTest, DestructorStopsTracing) {
 TEST(TracingTest, BasicWriteSucceeds) {
   Tracing tracing;
 
+  // Reset the contents of the trace buffer. This will ensure that the:
+  // 1. Metadata is present at the beginning of the trace.
+  // 2. Arbitrary reads/writes from other tests that ran prior to this one do not change the
+  //    behavior of this test.
+  tracing.Rewind();
+  tracing.Start(KTRACE_GRP_ALL);
+  tracing.Stop();
+
   std::ofstream human_readable_file = OpenFile("/tmp/unittest.fxt");
   ASSERT_TRUE(human_readable_file);
 
@@ -266,6 +274,7 @@ TEST(TracingTest, WritingToForbiddenFileFails) {
 TEST(TracingTest, WriteHumanReadableStopsTraces) {
   Tracing tracing;
 
+  tracing.Rewind();
   tracing.Start(KTRACE_GRP_ALL);
 
   std::ofstream human_readable_file = OpenFile("/tmp/unittest.ktrace");
@@ -279,6 +288,7 @@ TEST(TracingTest, WriteHumanReadableStopsTraces) {
 TEST(TracingTest, DurationStatsStopsTraces) {
   Tracing tracing;
 
+  tracing.Rewind();
   tracing.Start(KTRACE_GRP_ALL);
 
   std::vector<Tracing::DurationStats> duration_stats;
