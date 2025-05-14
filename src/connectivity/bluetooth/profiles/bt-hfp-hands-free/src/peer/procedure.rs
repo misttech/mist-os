@@ -8,6 +8,7 @@ use std::fmt;
 use std::fmt::Debug;
 
 use crate::peer::ag_indicators::AgIndicatorIndex;
+use crate::peer::at_connection;
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 
 #[cfg(test)]
@@ -26,26 +27,34 @@ use slc_initialization::SlcInitProcedure;
 
 macro_rules! at_ok {
     () => {
-        ProcedureInput::AtResponseFromAg(AtResponse::Generated(at::Response::Ok))
+        crate::peer::procedure::ProcedureInput::AtResponseFromAg(
+            crate::peer::at_connection::Response::Recognized(at_commands::Response::Ok),
+        )
     };
 }
 pub(crate) use at_ok;
 
 macro_rules! at_resp {
     ($variant: ident) => {
-        ProcedureInput::AtResponseFromAg(AtResponse::Generated(at::Response::Success(
-            at::Success::$variant { .. },
+        crate::peer::procedure::ProcedureInput::AtResponseFromAg(
+            crate::peer::at_connection::Response::Recognized(
+                at::Response::Success(
+                    at::Success::$variant { .. },
         )))
     };
     ($variant: ident $args: tt) => {
-        ProcedureInput::AtResponseFromAg(AtResponse::Generated(at::Response::Success(at::Success::$variant $args )))
+        crate::peer::procedure::ProcedureInput::AtResponseFromAg(
+            crate::peer::at_connection::Response::Recognized(
+                at::Response::Success(
+                    at_commands::Success::$variant $args
+        )))
     };
 }
 pub(crate) use at_resp;
 
 macro_rules! at_cmd {
     ($variant: ident $args: tt) => {
-        ProcedureOutput::AtCommandToAg(at::Command::$variant $args)
+        crate::peer::procedure::ProcedureOutput::AtCommandToAg(at::Command::$variant $args)
     };
 }
 pub(crate) use at_cmd;
@@ -62,18 +71,6 @@ macro_rules! make_from {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum HandParsedAtResponse {
-    #[allow(unused)]
-    CindTest { ordered_indicators: Vec<AgIndicatorIndex> },
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum AtResponse {
-    Generated(at::Response),
-    HandParsed(HandParsedAtResponse),
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub enum CommandFromHf {
     CallActionDialFromNumber { number: String },
     CallActionDialFromMemory { memory: String },
@@ -84,11 +81,11 @@ pub enum CommandFromHf {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProcedureInput {
-    AtResponseFromAg(AtResponse),
+    AtResponseFromAg(at_connection::Response),
     CommandFromHf(CommandFromHf),
 }
 
-make_from!(AtResponse, ProcedureInput, AtResponseFromAg);
+make_from!(at_connection::Response, ProcedureInput, AtResponseFromAg);
 make_from!(CommandFromHf, ProcedureInput, CommandFromHf);
 
 #[derive(Clone, Debug, PartialEq)]

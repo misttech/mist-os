@@ -16,11 +16,9 @@ use {at_commands as at, fidl_fuchsia_bluetooth_hfp as fidl_hfp, fuchsia_async as
 
 use crate::config::HandsFreeFeatureSupport;
 use crate::peer::ag_indicators::{AgIndicator, AgIndicatorTranslator};
-use crate::peer::at_connection;
+use crate::peer::at_connection::{self, Response as AtResponse};
 use crate::peer::calls::Calls;
-use crate::peer::procedure::{
-    AtResponse, CommandFromHf, CommandToHf, HandParsedAtResponse, ProcedureInput, ProcedureOutput,
-};
+use crate::peer::procedure::{CommandFromHf, CommandToHf, ProcedureInput, ProcedureOutput};
 use crate::peer::procedure_manager::ProcedureManager;
 
 const DEFAULT_CODEC: CodecId = CodecId::CVSD;
@@ -102,7 +100,7 @@ impl PeerTask {
                     .ok_or_else(||format_err!("FIDL Peer protocol request stream closed for peer {}", self.peer_id))?;
                 let peer_handler_request = peer_handler_request_result?;
 
-                self.handle_peer_handler_request(peer_handler_request);
+                self.handle_peer_handler_request(peer_handler_request)?;
             }
             at_response_result_option = self.at_connection.next() => {
                 // TODO(https://fxbug.dev/127362) Filter unsolicited AT messages.
@@ -116,7 +114,7 @@ impl PeerTask {
                         .ok_or_else(|| format_err!("AT connection stream closed for peer {}", self.peer_id))?;
                 let at_response = at_response_result?;
 
-                self.handle_at_response(at_response)?;
+                self.handle_at_response(at_response);
             }
             procedure_outputs_result_option = self.procedure_manager.next() => {
                 debug!("Received procedure outputs {:?} for peer {:?}",
@@ -168,7 +166,10 @@ impl PeerTask {
         Ok(())
     }
 
-    fn handle_peer_handler_request(&mut self, peer_handler_request: fidl_hfp::PeerHandlerRequest) {
+    fn handle_peer_handler_request(
+        &mut self,
+        peer_handler_request: fidl_hfp::PeerHandlerRequest,
+    ) -> Result<()> {
         // TODO(b/321278917) Refactor this method to be testable. Maybe move it to calls.rs
         // TODO(fxbug.dev/136796) asynchronously respond to requests when a procedure completes.
         let (command_from_hf, responder) = match peer_handler_request {
@@ -205,7 +206,11 @@ impl PeerTask {
                 );
                 (CommandFromHf::CallActionRedialLast, responder)
             }
-            _ => unimplemented!(),
+            _ => {
+                return Err(format_err!(
+                    "Unimplemented peer handle request {peer_handler_request:?}"
+                ))
+            }
         };
 
         // TODO(fxbug.dev/136796) asynchronously respond to this request when the procedure
@@ -216,47 +221,31 @@ impl PeerTask {
         }
 
         self.procedure_manager.enqueue(ProcedureInput::CommandFromHf(command_from_hf));
-    }
-
-    fn handle_at_response(
-        &mut self,
-        possibly_unparsed_at_response: at_connection::Response,
-    ) -> Result<()> {
-        let at_response = match possibly_unparsed_at_response {
-            at_connection::Response::ParsedResponse(resp) => AtResponse::Generated(resp),
-            at_connection::Response::UnparsedBytes(bytes) => {
-                let parsed_response = Self::parse_unknown_at_response(bytes)?;
-                AtResponse::HandParsed(parsed_response)
-            }
-        };
-
-        if Self::at_response_is_unsolicted(&at_response) {
-            self.handle_unsolicited_response(at_response)?
-        } else {
-            let procedure_input = ProcedureInput::AtResponseFromAg(at_response);
-            self.procedure_manager.enqueue(procedure_input);
-        }
 
         Ok(())
     }
 
-    fn parse_unknown_at_response(_bytes: Vec<u8>) -> Result<HandParsedAtResponse> {
-        // TODO(fxbug.dev/108331): Parse bytes for CindTest.
-        Err(format_err!("parse_unknown_at_response unimplemented"))
+    fn handle_at_response(&mut self, at_response: AtResponse) {
+        if Self::at_response_is_unsolicted(&at_response) {
+            self.handle_unsolicited_response(at_response)
+        } else {
+            let procedure_input = ProcedureInput::AtResponseFromAg(at_response);
+            self.procedure_manager.enqueue(procedure_input);
+        }
     }
 
     fn at_response_is_unsolicted(at_response: &AtResponse) -> bool {
         match at_response {
-            AtResponse::Generated(at::Response::Success(at::Success::Ciev { .. }))
-            | AtResponse::Generated(at::Response::Success(at::Success::Clip { .. })) => true,
+            AtResponse::Recognized(at::Response::Success(at::Success::Ciev { .. }))
+            | AtResponse::Recognized(at::Response::Success(at::Success::Clip { .. })) => true,
             _ => false,
         }
     }
 
     // Must take an unolicited AT Response--a +CIEV or a +CLIP.
-    fn handle_unsolicited_response(&mut self, at_response: AtResponse) -> Result<()> {
+    fn handle_unsolicited_response(&mut self, at_response: AtResponse) {
         match at_response {
-            AtResponse::Generated(at::Response::Success(at::Success::Ciev { ind, value })) => {
+            AtResponse::Recognized(at::Response::Success(at::Success::Ciev { ind, value })) => {
                 let indicator = self.ag_indicator_translator.translate_indicator(ind, value);
                 match indicator {
                     Ok(ind) => self.handle_ag_indicator(ind),
@@ -265,13 +254,11 @@ impl PeerTask {
                 }
             }
             // TODO(htps://fxbug.dec/135158) Handle setting phone numbers.
-            AtResponse::Generated(at::Response::Success(at::Success::Clip { .. })) => {
+            AtResponse::Recognized(at::Response::Success(at::Success::Clip { .. })) => {
                 warn!("+CLIP not handled")
             }
             _ => warn!("Received unexpected unsolicited AT response: {:?}", at_response),
         }
-
-        Ok(())
     }
 
     fn handle_ag_indicator(&mut self, indicator: AgIndicator) -> () {
@@ -303,7 +290,7 @@ impl PeerTask {
             // SetInitialIndicatorValues procedure output.
             // TODO(https://fxbug.dev/131815) Set initial BatteryCharge indicator value from
             // SetInitialIndicatorValues procedure output.
-            _ => unimplemented!("Unimplemented ProcedureOutput"),
+            _ => return Err(format_err!("Unimplemented ProcedureOutput")),
         };
 
         Ok(())

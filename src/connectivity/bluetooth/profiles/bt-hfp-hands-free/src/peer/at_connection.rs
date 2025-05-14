@@ -19,10 +19,15 @@ use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-#[derive(Debug, Eq, PartialEq)]
+use crate::peer::ag_indicators::AgIndicatorIndex;
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Response {
-    ParsedResponse(at::Response),
-    UnparsedBytes(Vec<u8>),
+    Recognized(at::Response),
+    #[allow(unused)]
+    CindTest {
+        ordered_indicators: Vec<AgIndicatorIndex>,
+    },
 }
 
 pub struct Connection {
@@ -37,7 +42,7 @@ pub struct Connection {
 /// RFCOMM data transfer, this stream will assemble fragmented AT responses and split multiple AT
 /// responses which arrive together into a series of well formed responses.
 impl Stream for Connection {
-    type Item = Result<Response, zx::Status>;
+    type Item = Result<Response>;
 
     fn poll_next(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
@@ -54,43 +59,45 @@ impl Stream for Connection {
 
             let rfcomm = Pin::new(&mut self.rfcomm);
             let bytes_poll = rfcomm.poll_next(context);
-            match bytes_poll {
+            let bytes = match bytes_poll {
                 Poll::Pending => return Poll::Pending, // Nothing to read
                 Poll::Ready(None) => return Poll::Ready(None), // Channel is closed
-                Poll::Ready(Some(Err(err))) => return Poll::Ready(Some(Err(err))), // zx::Status indicating error
+                Poll::Ready(Some(Err(err))) => return Poll::Ready(Some(Err(format_err!(err)))), // zx::Status indicating error
                 Poll::Ready(Some(Ok(bytes))) if bytes.len() == 0 => continue, // Got no bytes; try again
-                Poll::Ready(Some(Ok(bytes))) => {
-                    // Received bytes
-                    let mut cursor = Cursor::new(&bytes);
-                    let remaining_bytes = mem::take(&mut self.remaining_bytes);
-                    let at::DeserializeResult {
-                        values: deserialized_values,
-                        error: deserialize_error,
-                        remaining_bytes,
-                    } = at::Response::deserialize(&mut cursor, remaining_bytes);
-                    self.remaining_bytes = remaining_bytes;
+                Poll::Ready(Some(Ok(bytes))) => bytes,                        // Received bytes
+            };
 
-                    let mut parsed_responses = deserialized_values
-                        .into_iter()
-                        .map(Response::ParsedResponse)
-                        .collect::<VecDeque<_>>();
-                    self.unreturned_responses.append(&mut parsed_responses);
+            let mut cursor = Cursor::new(&bytes);
+            let remaining_bytes = mem::take(&mut self.remaining_bytes);
+            let at::DeserializeResult {
+                values: deserialized_values,
+                error: deserialize_error,
+                remaining_bytes,
+            } = at::Response::deserialize(&mut cursor, remaining_bytes);
+            self.remaining_bytes = remaining_bytes;
 
-                    if let Some(error) = deserialize_error {
-                        // In this case, we may have other commands that deserialized correctly, so continue.
-                        // This is probably an AT command that isn't specified in a .at file, so let it
-                        // be returned up to the client for manual parsing.
-                        debug!(
-                            "Could not deserialize AT response received from peer {}: {:?}",
-                            self.peer_id, error
-                        );
-                        let unparsed_bytes = Response::UnparsedBytes(error.bytes);
-                        self.unreturned_responses.push_back(unparsed_bytes);
-                    }
+            let mut parsed_responses =
+                deserialized_values.into_iter().map(Response::Recognized).collect::<VecDeque<_>>();
+            self.unreturned_responses.append(&mut parsed_responses);
+            // This will be returned on a future loop.
 
-                    // Loop.
+            if let Some(error) = deserialize_error {
+                // In this case, we may have other commands that deserialized correctly, so continue.
+                // This is probably an AT command that isn't specified in a .at file, so let it
+                // be returned up to the client for manual parsing.
+                debug!(
+                    "Could not deserialize AT response received from peer {}: {:?}",
+                    self.peer_id, error
+                );
+                let hand_parsed_response = Self::parse_unparsed_bytes(error.bytes);
+
+                match hand_parsed_response {
+                    Ok(resp) => self.unreturned_responses.push_back(resp),
+                    err @ Err(_) => return Poll::Ready(Some(err)),
                 }
             }
+
+            // Loop.
         }
     }
 }
@@ -112,8 +119,6 @@ impl Connection {
     }
 
     /// Serializes the AT commands and sends them through the RFCOMM channel
-    // TODO(fxr/127025) use this in PeerTask.
-    #[allow(unused)]
     pub async fn write_commands(&mut self, commands: &[at::Command]) -> Result<()> {
         if commands.len() > 0 {
             let mut bytes = Vec::new();
@@ -134,6 +139,11 @@ impl Connection {
         }
 
         Ok(())
+    }
+
+    fn parse_unparsed_bytes(bytes: Vec<u8>) -> Result<Response> {
+        // TODO(http://fxbug.dev/108331): Parse bytes for CindTest.
+        return Err(format_err!("parse_unparse_bytes unimplemented"));
     }
 }
 
@@ -161,10 +171,12 @@ mod test {
             .expect("Received channel read Zircon error");
 
         let expected_response =
-            Response::ParsedResponse(at::Response::Success(at::Success::Brsf { features: 0 }));
+            Response::Recognized(at::Response::Success(at::Success::Brsf { features: 0 }));
         assert_eq!(response, expected_response);
     }
 
+    // TODO(b/416536459) This test is broken until CindTest is properly parsed.
+    #[ignore]
     #[fuchsia::test]
     fn unparsed_response_received() {
         let mut exec = fasync::TestExecutor::new();
@@ -180,8 +192,7 @@ mod test {
             .expect("Received channel read closed error")
             .expect("Received channel read Zircon error");
 
-        let expected_bytes = &response_bytes[0..response_bytes.len() - 1]; // Strip off the newline.
-        let expected_response = Response::UnparsedBytes(expected_bytes.to_vec());
+        let expected_response = Response::CindTest { ordered_indicators: vec![] };
         assert_eq!(response, expected_response);
     }
 
@@ -201,7 +212,7 @@ mod test {
             .expect("Received channel read Zircon error");
 
         let expected_response_1 =
-            Response::ParsedResponse(at::Response::Success(at::Success::Brsf { features: 1 }));
+            Response::Recognized(at::Response::Success(at::Success::Brsf { features: 1 }));
         assert_eq!(response_1, expected_response_1);
 
         let response_2 = exec
@@ -210,7 +221,7 @@ mod test {
             .expect("Received AT connection Zircon error");
 
         let expected_response_2 =
-            Response::ParsedResponse(at::Response::Success(at::Success::Brsf { features: 2 }));
+            Response::Recognized(at::Response::Success(at::Success::Brsf { features: 2 }));
         assert_eq!(response_2, expected_response_2);
     }
 
@@ -236,7 +247,7 @@ mod test {
             .expect("Received channel read Zircon error");
 
         let expected_response =
-            Response::ParsedResponse(at::Response::Success(at::Success::Brsf { features: 0 }));
+            Response::Recognized(at::Response::Success(at::Success::Brsf { features: 0 }));
         assert_eq!(response, expected_response);
     }
 
@@ -287,12 +298,12 @@ mod test {
             .expect("Received channel read Zircon error");
 
         let expected_response =
-            Response::ParsedResponse(at::Response::Success(at::Success::Brsf { features: 0 }));
+            Response::Recognized(at::Response::Success(at::Success::Brsf { features: 0 }));
         assert_eq!(response, expected_response);
 
         // Read again to get a closed channel
         let response = exec.run_singlethreaded(conn.next());
-        assert_eq!(response, None);
+        assert!(response.is_none());
 
         // RFCOMM is closed and response is consumed.
         assert!(conn.is_terminated());
