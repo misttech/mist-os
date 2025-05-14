@@ -975,13 +975,8 @@
     },
     {
         "package": "fuchsia/third_party/vulkan_runtime/linux-amd64",
-        "version": "build_config:b16b8bd87e56d3379297b1f5765f041f3ed39e20d587b2af786fc4180e4b5035.1",
-        "instance_id": "IyuAsnmp7kOpQurA0-7SpQcKessXFCiTQP_7-pEvg8IC"
-    },
-    {
-        "package": "fuchsia/third_party/vulkan_runtime/mac-amd64",
-        "version": "build_config:b16b8bd87e56d3379297b1f5765f041f3ed39e20d587b2af786fc4180e4b5035.1",
-        "instance_id": "qwAlayBfc_zZVCrm4H0Vo_4GBiSzqVKi3-469MikHi8C"
+        "version": "build_config:ac2f8ba8ed2d607042d92d62aa72ba5b4bf4ef4bcd1f56322fb279780f27d6bc",
+        "instance_id": "uD8TZ08psIxv05JJjgMQb2FIskLx8PCF4HEDN0NKw8kC"
     },
     {
         "package": "fuchsia/third_party/zoneinfo",
