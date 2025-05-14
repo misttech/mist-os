@@ -3,11 +3,14 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Result};
+use bt_hfp::{audio, sco};
 use bt_rfcomm::profile as rfcomm;
 use fidl::endpoints::create_proxy_and_stream;
 use fuchsia_bluetooth::profile::ProtocolDescriptor;
 use fuchsia_bluetooth::types::{Channel, PeerId};
+use fuchsia_sync::Mutex;
 use log::{info, warn};
+use std::sync::Arc;
 use {
     fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
     fidl_fuchsia_bluetooth_hfp as fidl_hfp, fuchsia_async as fasync,
@@ -32,6 +35,8 @@ pub struct Peer {
     peer_id: PeerId,
     config: HandsFreeFeatureSupport,
     profile_proxy: bredr::ProfileProxy,
+    sco_connector: sco::Connector,
+    audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
     /// The processing task for data received from the remote peer over RFCOMM
     /// or FIDL APIs.
     /// This value is None if there is no RFCOMM channel present.
@@ -44,13 +49,15 @@ impl Peer {
         peer_id: PeerId,
         config: HandsFreeFeatureSupport,
         profile_proxy: bredr::ProfileProxy,
+        sco_connector: sco::Connector,
+        audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
     ) -> Self {
-        Self { peer_id, config, profile_proxy, task: None }
+        Self { peer_id, config, profile_proxy, sco_connector, audio_control, task: None }
     }
 
-    /// Handle an PeerConnected ProfileEvent.  This creates a new peer task, so return the
+    /// Handle a PeerConnected ProfileEvent.  This creates a new peer task, so return the
     /// PeerHandlerProxy appropriate to it.
-    pub fn handle_peer_connected(&mut self, channel: Channel) -> fidl_hfp::PeerHandlerProxy {
+    pub fn handle_peer_connected(&mut self, rfcomm: Channel) -> fidl_hfp::PeerHandlerProxy {
         if self.task.take().is_some() {
             info!(peer:% = self.peer_id; "Shutting down existing task on incoming RFCOMM channel");
         }
@@ -58,7 +65,14 @@ impl Peer {
         let (peer_handler_proxy, peer_handler_request_stream) =
             create_proxy_and_stream::<fidl_hfp::PeerHandlerMarker>();
 
-        let task = PeerTask::spawn(self.peer_id, self.config, peer_handler_request_stream, channel);
+        let task = PeerTask::spawn(
+            self.peer_id,
+            self.config,
+            peer_handler_request_stream,
+            rfcomm,
+            self.sco_connector.clone(),
+            self.audio_control.clone(),
+        );
         self.task = Some(task);
 
         peer_handler_proxy
@@ -77,9 +91,9 @@ impl Peer {
         // If we haven't started the task, connect to the peer and do so.
         info!(peer:% = self.peer_id; "Connecting RFCOMM.");
 
-        let channel_result = self.connect_from_protocol(protocol).await;
-        let channel = match channel_result {
-            Ok(channel) => channel,
+        let rfcomm_result = self.connect_from_protocol(protocol).await;
+        let rfcomm = match rfcomm_result {
+            Ok(rfcomm) => rfcomm,
             Err(err) => {
                 warn!(peer:% = self.peer_id, err:?; "Unable to connect RFCOMM to peer.");
                 return Err(err);
@@ -89,7 +103,14 @@ impl Peer {
         let (peer_handler_proxy, peer_handler_request_stream) =
             create_proxy_and_stream::<fidl_hfp::PeerHandlerMarker>();
 
-        let task = PeerTask::spawn(self.peer_id, self.config, peer_handler_request_stream, channel);
+        let task = PeerTask::spawn(
+            self.peer_id,
+            self.config,
+            peer_handler_request_stream,
+            rfcomm,
+            self.sco_connector.clone(),
+            self.audio_control.clone(),
+        );
         self.task = Some(task);
 
         Ok(Some(peer_handler_proxy))

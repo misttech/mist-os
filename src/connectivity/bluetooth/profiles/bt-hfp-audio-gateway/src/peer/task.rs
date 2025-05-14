@@ -16,7 +16,7 @@ use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use fuchsia_sync::Mutex;
 use futures::channel::mpsc::{self, Sender};
-use futures::future::{self, Either, Future};
+use futures::future::Either;
 use futures::stream::{empty, Empty};
 use futures::{select, FutureExt, SinkExt, StreamExt};
 use log::{error, info, warn};
@@ -576,9 +576,15 @@ impl PeerTask {
 
     pub async fn run(mut self, mut task_channel: mpsc::Receiver<PeerRequest>) -> Self {
         loop {
-            let mut active_sco_closed_fut = self.on_active_sco_closed().fuse();
             info!(peer:% = self.id, sco_state:? = self.sco_state; "Beginning select");
+
+            // Since IOwned doesn't implement DerefMut, we need to get a mutable reference to the
+            // underlying SCO state value to call mutable methods on it.  As this invalidates
+            // the enclosing struct, we need to drop this reference explicitiy in every match arm so
+            // we can can call method on self.
             let mut sco_state = self.sco_state.as_mut();
+            let mut active_sco_closed_fut = sco_state.on_closed();
+
             select! {
                 // Wait until the HF sets up a SCO connection.
                 conn_res = sco_state.on_connected() => {
@@ -843,14 +849,6 @@ impl PeerTask {
             _ => CodecId::CVSD,
         }
     }
-
-    fn on_active_sco_closed(&self) -> impl Future<Output = ()> + 'static {
-        match &*self.sco_state {
-            sco::State::Active(connection) => connection.on_closed().left_future(),
-            _ => future::pending().right_future(),
-        }
-    }
-
     /// Request to send the phone `status` by initiating the Phone Status Indicator
     /// procedure.
     async fn ring_update(&mut self, call: Call) {

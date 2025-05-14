@@ -4,9 +4,14 @@
 
 use anyhow::{format_err, Result};
 use bt_hfp::call::Direction;
+use bt_hfp::codec_id::CodecId;
+use bt_hfp::{a2dp, audio, sco};
 use fuchsia_bluetooth::types::{Channel, PeerId};
+use fuchsia_sync::Mutex;
 use futures::{select, StreamExt};
 use log::{debug, error, info, warn};
+use std::sync::Arc;
+use vigil::{DropWatch, Vigil};
 use {at_commands as at, fidl_fuchsia_bluetooth_hfp as fidl_hfp, fuchsia_async as fasync};
 
 use crate::config::HandsFreeFeatureSupport;
@@ -16,6 +21,8 @@ use crate::peer::calls::Calls;
 use crate::peer::procedure::{CommandFromHf, CommandToHf, ProcedureInput, ProcedureOutput};
 use crate::peer::procedure_manager::ProcedureManager;
 
+const DEFAULT_CODEC: CodecId = CodecId::CVSD;
+
 pub struct PeerTask {
     peer_id: PeerId,
     procedure_manager: ProcedureManager<ProcedureInput, ProcedureOutput>,
@@ -23,6 +30,10 @@ pub struct PeerTask {
     at_connection: AtConnection,
     ag_indicator_translator: AgIndicatorTranslator,
     calls: Calls,
+    sco_connector: sco::Connector,
+    sco_state: sco::InspectableState,
+    a2dp_control: a2dp::Control,
+    audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
 }
 
 impl PeerTask {
@@ -31,20 +42,31 @@ impl PeerTask {
         config: HandsFreeFeatureSupport,
         peer_handler_request_stream: fidl_hfp::PeerHandlerRequestStream,
         rfcomm: Channel,
+        sco_connector: sco::Connector,
+        audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
     ) -> fasync::Task<()> {
         let procedure_manager = ProcedureManager::new(peer_id, config);
         let at_connection = AtConnection::new(peer_id, rfcomm);
         let calls = Calls::new(peer_id);
         let ag_indicator_translator = AgIndicatorTranslator::new();
+        let sco_state = sco::InspectableState::default();
+        let a2dp_control = a2dp::Control::connect();
 
-        let peer_task = Self {
+        let mut peer_task = Self {
             peer_id,
             procedure_manager,
             peer_handler_request_stream,
             at_connection,
             ag_indicator_translator,
             calls,
+            sco_connector,
+            sco_state,
+            a2dp_control,
+            audio_control,
         };
+
+        // Set SCO state to AwaitingRemote
+        peer_task.await_remote_sco();
 
         let fasync_task = fasync::Task::local(peer_task.run());
         fasync_task
@@ -60,20 +82,33 @@ impl PeerTask {
     }
 
     async fn run_inner(&mut self) -> Result<()> {
+        // Since IOwned doesn't implement DerefMut, we need to get a mutable reference to the
+        // underlying SCO state value to call mutable methods on it.  As this invalidates
+        // the enclosing struct, we need to drop this reference explicitiy in every match arm so
+        // we can can call method on self.
+        let mut sco_state = self.sco_state.as_mut();
+        let mut on_sco_closed = sco_state.on_closed();
+
         select! {
             peer_handler_request_result_option = self.peer_handler_request_stream.next() => {
                 debug!("Received FIDL PeerHandler protocol request {:?} from peer {}",
                    peer_handler_request_result_option, self.peer_id);
-               let peer_handler_request_result = peer_handler_request_result_option
-                   .ok_or_else(|| format_err!("FIDL Peer protocol request stream closed for peer {}", self.peer_id))?;
-               let peer_handler_request = peer_handler_request_result?;
-               self.handle_peer_handler_request(peer_handler_request);
 
+                drop(sco_state);
+
+                let peer_handler_request_result = peer_handler_request_result_option
+                    .ok_or_else(||format_err!("FIDL Peer protocol request stream closed for peer {}", self.peer_id))?;
+                let peer_handler_request = peer_handler_request_result?;
+
+                self.handle_peer_handler_request(peer_handler_request);
             }
             at_response_result_option = self.at_connection.next() => {
                 // TODO(https://fxbug.dev/127362) Filter unsolicited AT messages.
                 debug!("Received AT response {:?} from peer {}",
                     at_response_result_option, self.peer_id);
+
+                drop(sco_state);
+
                 let at_response_result =
                     at_response_result_option
                         .ok_or_else(|| format_err!("AT connection stream closed for peer {}", self.peer_id))?;
@@ -84,6 +119,8 @@ impl PeerTask {
             procedure_outputs_result_option = self.procedure_manager.next() => {
                 debug!("Received procedure outputs {:?} for peer {:?}",
                     procedure_outputs_result_option, self.peer_id);
+
+                drop(sco_state);
 
                 let procedure_outputs_result =
                     procedure_outputs_result_option
@@ -97,15 +134,35 @@ impl PeerTask {
             call_procedure_input_result_option = self.calls.next() => {
                 info!("Received call procedure input {:?} for peer {:}", call_procedure_input_result_option, self.peer_id);
 
+                drop(sco_state);
+
                 let call_procedure_input_result =
                     call_procedure_input_result_option
                         .ok_or_else(|| format_err!("Calls stream closed for peer {:}", self.peer_id))?;
                 let call_procedure_input = call_procedure_input_result?;
 
                 self.procedure_manager.enqueue(call_procedure_input)
-
+            }
+            sco_connection_result = sco_state.on_connected() => {
+                info!("Received SCO connection for peer {:}", self.peer_id);
+                drop(sco_state);
+                match sco_connection_result {
+                    Ok(sco_connection) if !sco_connection.is_closed() => self.handle_sco_connection(sco_connection).await?,
+                    // This can occur if the AG opens and closes a SCO connection immediately.
+                    Ok(_closed_sco_connection) => info!("Got closed SCO connection from peer {}", self.peer_id),
+                    Err(err) => {
+                        warn!("Got error receiving SCO connection for peer {}.", self.peer_id);
+                        Err(err)?;
+                    }
+                }
+            }
+            _ = on_sco_closed => {
+                info!("SCO connection closed for peer {:}", self.peer_id);
+                drop(sco_state);
+                self.await_remote_sco();
             }
         }
+
         Ok(())
     }
 
@@ -213,6 +270,10 @@ impl PeerTask {
             ProcedureOutput::CommandToHf(CommandToHf::SetAgIndicatorIndex { indicator, index }) => {
                 self.ag_indicator_translator.set_index(indicator, index)?
             }
+            ProcedureOutput::CommandToHf(CommandToHf::AwaitRemoteSco) => {
+                // We've renegotiated the codec, so wait for a SCO connection with the new codec.
+                self.await_remote_sco()
+            }
             // TODO(https://fxbug.dev/131814) Set initial NetworkInformation indicator value from
             // SetInitialIndicatorValues procedure output.
             // TODO(https://fxbug.dev/131815) Set initial BatteryCharge indicator value from
@@ -223,10 +284,77 @@ impl PeerTask {
         Ok(())
     }
 
+    async fn handle_sco_connection(&mut self, sco_connection: sco::Connection) -> Result<()> {
+        let pause_token = self.pause_a2dp_audio().await?;
+        let vigil = self.watch_active_sco(&sco_connection, pause_token);
+        self.start_hfp_audio(sco_connection)?;
+
+        self.sco_state.iset(sco::State::Active(vigil));
+
+        Ok(())
+    }
+
+    async fn pause_a2dp_audio(&mut self) -> Result<a2dp::PauseToken> {
+        let res = self.a2dp_control.pause(Some(self.peer_id.clone())).await;
+        let pause_token = match res {
+            Err(err) => {
+                Err(format_err!("Couldn't pause A2DP Audio for peer {}: {:?}", self.peer_id, err))
+            }
+            Ok(token) => {
+                info!("Successfully paused A2DP audio for peer {}", self.peer_id);
+                Ok(token)
+            }
+        };
+
+        pause_token
+    }
+
+    fn start_hfp_audio(&self, sco_connection: sco::Connection) -> Result<()> {
+        let mut audio = self.audio_control.lock();
+        let codec_id = CodecId::from_parameter_set(&sco_connection.params.parameter_set);
+        if let Err(err) = audio.start(self.peer_id.clone(), sco_connection, codec_id) {
+            Err(format_err!("Couldn't start HFP audio for peer {}: {:?}", self.peer_id, err))?;
+        } else {
+            info!("Successfully started HFP audio for peer {}", self.peer_id);
+        }
+
+        Ok(())
+    }
+
+    fn watch_active_sco(
+        &self,
+        sco_connection: &sco::Connection,
+        pause_token: a2dp::PauseToken,
+    ) -> Vigil<sco::Active> {
+        let vigil = Vigil::new(sco::Active::new(sco_connection, pause_token));
+        let peer_id = self.peer_id.clone();
+        let audio_control = self.audio_control.clone();
+
+        Vigil::watch(&vigil, {
+            move |_| match audio_control.lock().stop(peer_id) {
+                Err(err) => warn!("Couldn't stop HFP audio for peer {}: {:?}", peer_id, err),
+                Ok(()) => info!("Succesfully stopped HFP audio, for peer {}", peer_id),
+            }
+        });
+
+        vigil
+    }
+
     // TODO(https://fxbug.dev/134161) Implement call setup and call transfers.
     #[allow(unused)]
     fn start_audio_connection(&mut self) {
         self.procedure_manager
             .enqueue(ProcedureInput::CommandFromHf(CommandFromHf::StartAudioConnection))
+    }
+
+    fn get_selected_codec(&self) -> CodecId {
+        let codec_option = self.procedure_manager.procedure_manipulated_state.selected_codec;
+        codec_option.unwrap_or(DEFAULT_CODEC)
+    }
+
+    fn await_remote_sco(&mut self) {
+        let codecs = vec![self.get_selected_codec()];
+        let fut = self.sco_connector.accept(self.peer_id.clone(), codecs);
+        self.sco_state.iset(sco::State::AwaitingRemote(Box::pin(fut)));
     }
 }

@@ -4,9 +4,11 @@
 
 use anyhow::{format_err, Result};
 use async_helpers::maybe_stream::MaybeStream;
+use bt_hfp::{audio, sco};
 use fidl::endpoints::{ControlHandle, RequestStream, Responder};
 use fuchsia_bluetooth::profile::ProtocolDescriptor;
 use fuchsia_bluetooth::types::PeerId;
+use fuchsia_sync::Mutex;
 use futures::stream::{FusedStream, FuturesUnordered};
 use futures::{select, FutureExt, StreamExt};
 use log::{debug, info, warn};
@@ -14,9 +16,10 @@ use profile_client::{ProfileClient, ProfileEvent};
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use {
     fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp as fidl_hfp,
-    fuchsia_async as fasync,
+    fuchsia_async as fasync, zx,
 };
 
 use crate::config::HandsFreeFeatureSupport;
@@ -59,6 +62,10 @@ where
     // TODO(fxb/127364) Update HangingGet with peer, and delete this which just keeps the proxy
     // around to make tests pass.
     peer_handler_proxies: Vec<fidl_hfp::PeerHandlerProxy>,
+    // Struct for creating SCO connections
+    sco_connector: sco::Connector,
+    // Audio control for HFP aufio
+    audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
 }
 
 impl<S> Hfp<S>
@@ -69,11 +76,14 @@ where
         features: HandsFreeFeatureSupport,
         profile_client: ProfileClient,
         profile_proxy: bredr::ProfileProxy,
+        sco_connector: sco::Connector,
+        audio_control: Box<dyn audio::Control>,
         hands_free_connection_stream: S,
     ) -> Self {
         let search_result_timers = FuturesUnordered::new();
         let hands_free_connection_stream = hands_free_connection_stream;
         let hands_free_request_maybe_stream = MaybeStream::default();
+        let audio_control = Arc::new(Mutex::new(audio_control));
         let peers = HashMap::new();
         Self {
             features,
@@ -84,6 +94,8 @@ where
             peers,
             search_result_timers,
             peer_handler_proxies: Vec::new(),
+            sco_connector,
+            audio_control,
         }
     }
 
@@ -133,10 +145,15 @@ where
     fn handle_profile_event(&mut self, event: ProfileEvent) -> Result<()> {
         let peer_id = event.peer_id();
 
-        let peer = self
-            .peers
-            .entry(peer_id)
-            .or_insert_with(|| Peer::new(peer_id, self.features, self.profile_proxy.clone()));
+        let peer = self.peers.entry(peer_id).or_insert_with(|| {
+            Peer::new(
+                peer_id,
+                self.features,
+                self.profile_proxy.clone(),
+                self.sco_connector.clone(),
+                self.audio_control.clone(),
+            )
+        });
 
         match event {
             ProfileEvent::PeerConnected { channel, .. } => {

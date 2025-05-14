@@ -3,13 +3,20 @@
 // found in the LICENSE file.
 
 use anyhow::format_err;
-use fidl_fuchsia_media as media;
+use thiserror::Error;
+use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_media as media};
 
 use crate::audio;
 
 /// Codec IDs. See HFP 1.8, Section 10 / Appendix B.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct CodecId(u8);
+
+#[derive(Clone, Copy, Debug, Error, Eq, Hash, PartialEq)]
+#[error("Codec ID {id:?} was not an 8 bit value")]
+pub struct CodecOutOfRangeError {
+    id: i64,
+}
 
 impl CodecId {
     pub const CVSD: CodecId = CodecId(0x01);
@@ -19,6 +26,18 @@ impl CodecId {
 impl From<u8> for CodecId {
     fn from(x: u8) -> Self {
         Self(x)
+    }
+}
+
+impl TryFrom<i64> for CodecId {
+    type Error = CodecOutOfRangeError;
+
+    fn try_from(x: i64) -> Result<Self, CodecOutOfRangeError> {
+        if x > 255 || x < 0 {
+            return Err(CodecOutOfRangeError { id: x });
+        } else {
+            Ok((x as u8).into())
+        }
     }
 }
 
@@ -179,6 +198,14 @@ impl CodecId {
             &CodecId::MSBC => Ok("audio/msbc"),
             &CodecId::CVSD => Ok("audio/cvsd"),
             _ => Err(audio::Error::UnsupportedParameters { source: format_err!("codec {self}") }),
+        }
+    }
+
+    pub fn from_parameter_set(param_set: &bredr::HfpParameterSet) -> CodecId {
+        use bredr::HfpParameterSet::*;
+        match param_set {
+            T2 | T1 => CodecId::MSBC,
+            _ => CodecId::CVSD,
         }
     }
 }

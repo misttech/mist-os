@@ -7,10 +7,6 @@ use bitflags::bitflags;
 
 use crate::config::HandsFreeFeatureSupport;
 
-/// Codec IDs. See HFP 1.8, Section 10 / Appendix B.
-pub const CVSD: u8 = 0x01;
-pub const MSBC: u8 = 0x02;
-
 pub type CallIdx = usize;
 
 /// Action to perform a call related supplementary services. During a call, the following procedures

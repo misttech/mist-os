@@ -7,7 +7,7 @@ use at_commands as at;
 
 use super::{at_cmd, at_ok, at_resp, CommandToHf, Procedure, ProcedureInput, ProcedureOutput};
 
-use crate::features::{extract_features_from_command, AgFeatures, CVSD, MSBC};
+use crate::features::{extract_features_from_command, AgFeatures};
 use crate::peer::ag_indicators::AgIndicatorIndex;
 use crate::peer::hf_indicators::{BATTERY_LEVEL, ENHANCED_SAFETY, INDICATOR_REPORTING_MODE};
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
@@ -66,10 +66,8 @@ impl SlcInitProcedure {
         state: &mut ProcedureManipulatedState,
     ) -> Vec<ProcedureOutput> {
         self.state = State::SentAvailableCodecs;
-        state.supported_codecs.push(MSBC);
-        // TODO(https://fxbug.dev/42081215) Make this configurable.
-        // By default, we support the CVSD and MSBC codecs.
-        vec![at_cmd!(Bac { codecs: vec![CVSD.into(), MSBC.into()] })]
+        let codecs: Vec<i64> = state.supported_codecs.iter().map(|&c| c.into()).collect();
+        vec![at_cmd!(Bac { codecs })]
     }
 
     fn test_supported_ag_indicators(&mut self) -> Vec<ProcedureOutput> {
@@ -330,10 +328,11 @@ fn convert_cind_to_hf_command(cind: at::Success) -> ProcedureOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::config::HandsFreeFeatureSupport;
     use crate::features::{CallHoldAction, HfFeatures};
+
     use assert_matches::assert_matches;
+    use bt_hfp::codec_id::CodecId;
 
     fn supported_indicator_indices_output(
         service_available: i64,
@@ -575,7 +574,8 @@ mod tests {
 
         let response1 = at_resp!(Brsf { features: ag_features.bits() });
         let response1_ok = at_ok!();
-        let expected_command1 = vec![at_cmd!(Bac { codecs: vec![CVSD.into(), MSBC.into()] })];
+        let expected_command1 =
+            vec![at_cmd!(Bac { codecs: vec![CodecId::CVSD.into(), CodecId::MSBC.into()] })];
 
         assert_eq!(procedure.transition(&mut state, response1).unwrap(), vec![]);
         assert_eq!(procedure.transition(&mut state, response1_ok).unwrap(), expected_command1);

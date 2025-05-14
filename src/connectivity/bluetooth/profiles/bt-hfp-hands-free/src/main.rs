@@ -3,10 +3,14 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Error};
+use bt_hfp::codec_id::CodecId;
+use bt_hfp::{audio, sco};
 use fidl_fuchsia_bluetooth_hfp as fidl_hfp;
+use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use futures::StreamExt;
 use log::{debug, error, info};
+use std::collections::HashSet;
 
 use crate::config::HandsFreeFeatureSupport;
 use crate::hfp::Hfp;
@@ -32,9 +36,17 @@ async fn main() -> Result<(), Error> {
     let feature_support = HandsFreeFeatureSupport::load()?;
     let (profile_client, profile_proxy) = profile::register_hands_free(feature_support)?;
 
+    let controller_codecs = controller_codecs();
+    let sco_connector = sco::Connector::build(profile_proxy.clone(), controller_codecs.clone());
+
+    let provider_proxy = connect_to_protocol::<fidl_fuchsia_audio_device::ProviderMarker>()?;
+    // TODO(b/416737099) Support other audio connection types.
+    let audio = Box::new(audio::CodecControl::new(provider_proxy));
+
     serve_fidl(&mut fs)?;
 
-    let hfp = Hfp::new(feature_support, profile_client, profile_proxy, fs.fuse());
+    let hfp =
+        Hfp::new(feature_support, profile_client, profile_proxy, sco_connector, audio, fs.fuse());
     let result = hfp.run().await;
 
     match result {
@@ -60,4 +72,14 @@ fn serve_fidl(fs: &mut HandsFreeFidlService) -> Result<(), Error> {
     let _ = fs.take_and_serve_directory_handle().context("Failed to serve ServiceFs directory")?;
 
     Ok(())
+}
+
+fn controller_codecs() -> HashSet<CodecId> {
+    let mut controller_codecs = HashSet::new();
+
+    // TODO(b/323584284) Read support for these codecs from config.
+    let _ = controller_codecs.insert(CodecId::CVSD);
+    let _ = controller_codecs.insert(CodecId::MSBC);
+
+    controller_codecs
 }

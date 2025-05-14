@@ -60,7 +60,7 @@ pub enum State {
     TearingDown,
     /// A call is transferred to the AG and we are waiting for the HF to initiate a SCO connection.
     AwaitingRemote(BoxFuture<'static, Result<Connection, ConnectError>>),
-    /// A call is active an dso is the SCO connection.
+    /// A call is active and so is the SCO connection.
     Active(Vigil<Active>),
 }
 
@@ -77,6 +77,13 @@ impl State {
     ) -> impl Future<Output = Result<Connection, ConnectError>> + FusedFuture + 'a {
         match self {
             Self::AwaitingRemote(ref mut fut) => fut.fuse(),
+            _ => Fuse::terminated(),
+        }
+    }
+
+    pub fn on_closed<'a>(&'a self) -> impl Future<Output = ()> + FusedFuture + 'static {
+        match self {
+            Self::Active(ref connection) => connection.on_closed().fuse(),
             _ => Fuse::terminated(),
         }
     }

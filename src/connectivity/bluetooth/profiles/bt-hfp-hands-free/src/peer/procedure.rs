@@ -50,7 +50,7 @@ macro_rules! at_cmd {
 }
 pub(crate) use at_cmd;
 
-// For use below
+#[macro_export]
 macro_rules! make_from {
     ($source: path, $destination: ident, $destination_variant: ident) => {
         impl From<$source> for $destination {
@@ -83,6 +83,7 @@ make_from!(CommandFromHf, ProcedureInput, CommandFromHf);
 pub enum CommandToHf {
     SetInitialAgIndicatorValues { values: Vec<i64> },
     SetAgIndicatorIndex { indicator: AgIndicatorIndex, index: i64 },
+    AwaitRemoteSco,
 }
 
 #[derive(Clone, Debug, PartialEq)]
