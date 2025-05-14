@@ -1260,7 +1260,16 @@ impl Component {
             let volume_scope = volume.scope.clone();
             self.mounted.lock().insert(partition_index, volume);
 
-            // Unmount when the last connection is closed (i.e. when `scope` terminates).
+            vfs::directory::serve_on(
+                outgoing_dir,
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE,
+                volume_scope,
+                server_end,
+            );
+
+            // Unmount when the last connection is closed (i.e. when `scope` terminates). This
+            // needs to happen after we set up a connection on the scope or it might shut down the
+            // volume before we connect anything to it.
             let this = self.clone();
             fasync::Task::spawn(async move {
                 volume_clone.scope.wait().await;
@@ -1269,13 +1278,6 @@ impl Component {
                 }
             })
             .detach();
-
-            vfs::directory::serve_on(
-                outgoing_dir,
-                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE,
-                volume_scope,
-                server_end,
-            );
         }
 
         Ok(())
