@@ -279,7 +279,7 @@ zx_status_t Devnode::TryAddService(std::string_view class_name, Target target,
          zx_status_get_string(result.status_value()));
     return result.status_value();
   }
-  LOGF(INFO, "Added service entry '%s' for class '%.*s'",
+  LOGF(DEBUG, "Added service entry '%s' for class '%.*s'",
        (path + "/" + std::string(service.member_name)).c_str(), static_cast<int>(class_name.size()),
        class_name.data());
   // set the service name so we know that we need to remove the service if the devnode is
