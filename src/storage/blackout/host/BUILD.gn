@@ -50,9 +50,14 @@ group("blackout_workbench_vim3_stable") {
 group("blackout_workbench_vim3_unstable") {
   testonly = true
   deps = [
+    # Fxfs tests
     "tests:blackout_fxfs_allocate_hard_reboot($host_toolchain)",
     "tests:blackout_fxfs_allocate_soft_reboot($host_toolchain)",
     "//src/storage/blackout/target/fxfs-allocate:blackout-fxfs-allocate($target_toolchain)",
+
+    # Minfs tests
+    "tests:blackout_minfs_tree_soft_reboot($host_toolchain)",
+    "//src/storage/blackout/target/fs-tree:blackout-minfs-tree($target_toolchain)",
   ]
 }
 
