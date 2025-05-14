@@ -320,19 +320,9 @@ impl CgroupChildren {
 
         child_state.update_processes();
         if !child_state.processes.is_empty() {
-            // TODO(https://fxbug.dev/384194637): Remove warning log
-            log_warn!(
-                "Cannot remove due to active processes: {:?}",
-                child_state.processes.keys().copied().collect::<Vec<_>>()
-            );
             return error!(EBUSY);
         }
         if !child_state.children.is_empty() {
-            // TODO(https://fxbug.dev/384194637): Remove warning log
-            log_warn!(
-                "Cannot remove due to sub-cgroups: {:?}",
-                child_state.children.keys().cloned().collect::<Vec<FsString>>()
-            );
             return error!(EBUSY);
         }
 
