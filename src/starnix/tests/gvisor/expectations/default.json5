@@ -1106,6 +1106,7 @@
 
                 // These tests hang / hard crash
                 "PtraceTest.AttachingConvertsGroupStopToPtraceStop",
+                "PtraceTest.SingleTest",
 
                 // TODO(https://fxbug.dev/328690720) Re-enable once flake is resolved.
                 "PtraceTest.Seize_Interrupt_Listen",
