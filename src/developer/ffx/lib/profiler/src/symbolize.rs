@@ -10,7 +10,13 @@ use ffx_symbolize::{ResolvedLocation, Symbolizer};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
+
+// It defines how many processes a symbolizer will handle.
+// We create a symbolizer for every thread.
+// More threads => more symbolizers => more latency, but higher throughput.
+// NUM_PROCESS_PER_THREAD is a hard coded number considering the trade off above.
+static NUM_PROCESS_PER_THREAD: usize = 4;
+
 /// A resolved address.
 #[derive(Clone, PartialEq)]
 pub struct ResolvedAddress {
@@ -32,7 +38,7 @@ impl std::fmt::Debug for ResolvedAddress {
 /// Symbolized record hash map. key: pid, value: all of the records belong to this pid.
 #[derive(Clone, Debug, Default)]
 pub struct SymbolizedRecords {
-    pub records: HashMap<Pid, Vec<SymbolizedRecord>>,
+    pub records: Vec<(Pid, Vec<SymbolizedRecord>)>,
 }
 
 /// Symbolized bt list for a single tid.
@@ -76,11 +82,11 @@ impl UnsymbolizedSamples {
         pprof_conversion: bool,
         context: &ffx_config::EnvironmentContext,
     ) -> Result<SymbolizedRecords, SymbolizeError> {
-        let context_arc = Arc::new(context.clone());
-        let res: HashMap<Pid, Vec<SymbolizedRecord>> = self.handlers.par_iter().map(|(pid, handler):(&Pid, &ProfilingRecordHandler)| -> Result<(Pid, Vec<SymbolizedRecord>), SymbolizeError> {
-            let context_clone_for_thread = Arc::clone(&context_arc);
-            let mut res_per_pid = vec![];
-                    let mut symbolizer = Symbolizer::with_context(&*context_clone_for_thread)?;
+        let handlers: Vec<(Pid, ProfilingRecordHandler)> = self.handlers.into_iter().collect();
+        let symbolized_samples = handlers.par_iter().chunks(NUM_PROCESS_PER_THREAD).map(|chunk| -> Result<Vec<(Pid, Vec<SymbolizedRecord>)>, SymbolizeError> {
+        let mut symbolizer = Symbolizer::with_context(context)?;
+        let symbolized_samples_per_thread: Result<Vec<(Pid, Vec<SymbolizedRecord>)>, SymbolizeError> = chunk.into_iter().map(|(pid, handler):&(Pid, ProfilingRecordHandler)| -> Result<(Pid, Vec<SymbolizedRecord>), SymbolizeError> {
+                    let mut res_per_pid = vec![];
                     // We use a hashmap to store the seen backtrace, to avoid symbolize the same backtrace multiple times.
                     let mut seen_bt: HashMap<BacktraceDetails, ResolvedAddress> = HashMap::new();
                     for ModuleWithMmapDetails { module, mmaps } in
@@ -111,12 +117,16 @@ impl UnsymbolizedSamples {
                         }
                         res_per_pid.push(symbolized_record);
                     }
+                    symbolizer.reset();
                     Ok((*pid, res_per_pid))
         })
-        .collect::<Result<HashMap<Pid, Vec<SymbolizedRecord>>, SymbolizeError>>()?;
+        .collect::<Result<Vec<(Pid, Vec<SymbolizedRecord>)>, SymbolizeError>>();
+        symbolized_samples_per_thread
+        }).collect::<Result<Vec<Vec<(Pid, Vec<SymbolizedRecord>)>>, SymbolizeError>>()?;
+        let symbolized_samples = symbolized_samples.into_iter().flatten().collect();
         if !pprof_conversion {
-            std::fs::write(output, format!("{res:#?}\n"))?;
+            std::fs::write(output, format!("{symbolized_samples:#?}\n"))?;
         }
-        Ok(SymbolizedRecords { records: res })
+        Ok(SymbolizedRecords { records: symbolized_samples })
     }
 }

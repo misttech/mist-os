@@ -309,7 +309,6 @@ mod tests {
         profiler_record.flush().expect("Failed to flush");
         let profiler_record_path: PathBuf = profiler_record.path().to_path_buf();
         let handlers = UnsymbolizedSamples::new(&profiler_record_path).unwrap();
-        let mut expected_handlers = HashMap::new();
         let first_handler = ProfilingRecordHandler {
             module_with_mmap_records: vec![ModuleWithMmapDetails {
                 module: ModuleDetails {
@@ -333,11 +332,11 @@ mod tests {
             }],
             backtrace_records: HashMap::from([
                 (
-                    Tid(0x2616),
+                    Tid(2616),
                     vec![BacktraceDetails(0x43dc387f8e10), BacktraceDetails(0x2b069ffa16c)],
                 ),
                 (
-                    Tid(0x1226),
+                    Tid(1226),
                     vec![BacktraceDetails(0x43dc387f8e10), BacktraceDetails(0x3a656c4c85e)],
                 ),
             ]),
@@ -371,7 +370,7 @@ mod tests {
                 },
             ],
             backtrace_records: HashMap::from([(
-                Tid(0x4209),
+                Tid(4209),
                 vec![
                     BacktraceDetails(0x401c0cd1dcea),
                     BacktraceDetails(0x3bfd834db94),
@@ -381,8 +380,9 @@ mod tests {
                 ],
             )]),
         };
-        expected_handlers.insert(Pid(0x4207), second_handler);
-        expected_handlers.insert(Pid(0x1104), first_handler);
+        let mut expected_handlers = HashMap::new();
+        expected_handlers.insert(Pid(4207), second_handler);
+        expected_handlers.insert(Pid(1104), first_handler);
         assert_eq!(UnsymbolizedSamples { handlers: expected_handlers }, handlers);
     }
 }
