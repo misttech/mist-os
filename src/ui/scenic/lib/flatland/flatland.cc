@@ -184,7 +184,7 @@ Flatland::Flatland(std::shared_ptr<utils::DispatcherHolder> dispatcher_holder,
       register_mouse_source_(std::move(register_mouse_source)) {
   FX_DCHECK(flatland_presenter_);
 
-  FLATLAND_VERBOSE_LOG << "Flatland NEW session_id=" << session_id_ << "  this=" << this;
+  FX_LOGS(INFO) << "Flatland NEW session_id=" << session_id_;
 }
 
 void Flatland::Bind(fidl::ServerEnd<fuchsia_ui_composition::Flatland> server_end,
@@ -296,7 +296,7 @@ Flatland::~Flatland() {
   // above to succeed.
   flatland_presenter_->RemoveSession(session_id_, std::move(image_release_fence));
 
-  FLATLAND_VERBOSE_LOG << "Flatland DESTROYED session_id=" << session_id_;
+  FX_LOGS(INFO) << "Flatland DESTROYED session_id=" << session_id_;
 }
 
 void Flatland::Present(PresentRequest& request, PresentCompleter::Sync& completer) {
@@ -2042,8 +2042,7 @@ void Flatland::SetDebugName(std::string name) {
   if (!name.empty())
     stream << "Flatland client(" << name << "): ";
 
-  FLATLAND_VERBOSE_LOG << "Flatland::SetDebugName() session_id=" << session_id_
-                       << "  name: " << name;
+  FX_LOGS(INFO) << "Flatland::SetDebugName() session_id=" << session_id_ << "  name: " << name;
 
   error_reporter_->SetPrefix(stream.str());
   debug_name_ = std::move(name);
@@ -2139,8 +2138,8 @@ void Flatland::ReportLinkProtocolError(const std::string& error_log) {
 
 void Flatland::CloseConnection(FlatlandError error) {
   if (binding_data_) {
-    FLATLAND_VERBOSE_LOG << "Flatland::CloseConnection() session_id=" << session_id_
-                         << "  error: " << error;
+    FX_LOGS(INFO) << "Flatland::CloseConnection() session_id=" << session_id_
+                  << "  error: " << error;
 
     binding_data_->CloseConnection(error);
     binding_data_.reset();
