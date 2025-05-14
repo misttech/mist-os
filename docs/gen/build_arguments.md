@@ -1051,7 +1051,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   tsan = {
@@ -3233,7 +3233,7 @@ Fuchsia, it can take a long time from an ICU commit to a fix rolling into
 Fuchsia. This flag allows us to define the flag ahead of time in
 //build/icu.gni, and remove the rollout issues.
 
-**Current value (from the default):** `["-Wno-newline-eof"]`
+**Current value (from the default):** `["-Wno-newline-eof", "-Wno-unnecessary-virtual-specifier"]`
 
 From //build/icu.gni:38
 
@@ -3243,7 +3243,7 @@ Similar to above, except it allows adding an entire `config` target.
 
 **Current value (from the default):** `[]`
 
-From //build/icu.gni:41
+From //build/icu.gni:47
 
 ### icu_fuchsia_override_data_dir
 
@@ -3262,7 +3262,7 @@ it exists.
 
 **Current value (from the default):** `[]`
 
-From //build/icu.gni:45
+From //build/icu.gni:51
 
 ### icu_major_version_number
 
