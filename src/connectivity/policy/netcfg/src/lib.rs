@@ -3412,6 +3412,9 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
         enable_socket_proxy,
     } = Config::load(config_data)?;
 
+    info!("using naming policy: {interface_naming_policy:?}");
+    info!("using provisioning policy: {interface_provisioning_policy:?}");
+
     let mut netcfg = NetCfg::new(
         filter_enabled_interface_types,
         interface_metrics,
