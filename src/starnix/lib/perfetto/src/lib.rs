@@ -12,7 +12,7 @@ use prost::Message;
 use starnix_core::task::{CurrentTask, EventHandler, Waiter};
 use starnix_core::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
 use starnix_core::vfs::socket::{
-    new_socket_file, resolve_unix_socket_address, Socket, SocketDomain, SocketPeer, SocketProtocol,
+    resolve_unix_socket_address, Socket, SocketDomain, SocketFile, SocketPeer, SocketProtocol,
     SocketType,
 };
 use starnix_core::vfs::{FileHandle, FsStr};
@@ -258,7 +258,7 @@ impl Consumer {
         current_task: &CurrentTask,
         socket_path: &FsStr,
     ) -> Result<Self, anyhow::Error> {
-        let conn_file = new_socket_file(
+        let conn_file = SocketFile::new_socket(
             locked,
             current_task,
             SocketDomain::Unix,

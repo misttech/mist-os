@@ -336,6 +336,7 @@ mod tests {
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
     use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+    use crate::vfs::socket::SocketFile;
     use crate::vfs::EpollFileObject;
 
     use starnix_uapi::vfs::EpollEvent;
@@ -413,7 +414,7 @@ mod tests {
         let remote =
             create_fuchsia_pipe(&current_task, fs2, OpenFlags::RDWR | OpenFlags::NONBLOCK).unwrap();
         downcast_socket_to_vsock(&socket).lock().state = VsockSocketState::Connected(remote);
-        let socket_file = Socket::new_file(
+        let socket_file = SocketFile::from_socket(
             &mut locked,
             &current_task,
             socket,
@@ -461,7 +462,7 @@ mod tests {
         )
         .expect("Failed to create socket.");
         downcast_socket_to_vsock(&socket_object).lock().state = VsockSocketState::Connected(pipe);
-        let socket = Socket::new_file(
+        let socket = SocketFile::from_socket(
             &mut locked,
             &current_task,
             socket_object,

@@ -10,7 +10,7 @@ use crate::vfs::buffers::{
     AncillaryData, ControlMsg, UserBuffersInputBuffer, UserBuffersOutputBuffer,
 };
 use crate::vfs::socket::{
-    new_socket_file, resolve_unix_socket_address, Socket, SocketAddress, SocketDomain, SocketFile,
+    resolve_unix_socket_address, Socket, SocketAddress, SocketDomain, SocketFile,
     SocketMessageFlags, SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType, UnixSocket,
     SA_FAMILY_SIZE, SA_STORAGE_SIZE,
 };
@@ -89,7 +89,7 @@ pub fn sys_socket(
     // Should we use parse_socket_protocol here?
     let protocol = SocketProtocol::from_raw(protocol);
     let open_flags = socket_flags_to_open_flags(flags);
-    let socket_file = new_socket_file(
+    let socket_file = SocketFile::new_socket(
         locked,
         current_task,
         domain,
@@ -328,7 +328,7 @@ pub fn sys_accept4(
     }
 
     let open_flags = socket_flags_to_open_flags(flags);
-    let accepted_socket_file = Socket::new_file(
+    let accepted_socket_file = SocketFile::from_socket(
         locked,
         current_task,
         accepted_socket,

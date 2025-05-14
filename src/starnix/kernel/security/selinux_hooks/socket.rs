@@ -483,7 +483,7 @@ mod tests {
     use super::super::get_cached_sid;
     use super::*;
     use crate::security::selinux_hooks::testing::spawn_kernel_with_selinux_hooks_test_policy_and_run;
-    use crate::vfs::socket::new_socket_file;
+    use crate::vfs::socket::SocketFile;
     use assert_matches::assert_matches;
     use starnix_uapi::errors::EACCES;
     use starnix_uapi::open_flags::OpenFlags;
@@ -497,7 +497,7 @@ mod tests {
                     .expect("invalid security context");
                 current_task.security_state.lock().effective_sid = task_sid;
 
-                let socket_node = new_socket_file(
+                let socket_node = SocketFile::new_socket(
                     locked,
                     current_task,
                     SocketDomain::Unix,
@@ -526,7 +526,7 @@ mod tests {
                 current_task.security_state.lock().effective_sid = task_sid;
 
                 assert_matches!(
-                    new_socket_file(
+                    SocketFile::new_socket(
                         locked,
                         current_task,
                         SocketDomain::Unix,
@@ -550,7 +550,7 @@ mod tests {
                     .expect("invalid security context");
                 current_task.security_state.lock().effective_sid = task_sid;
 
-                assert_matches!(new_socket_file(
+                assert_matches!(SocketFile::new_socket(
                     locked,
                     current_task,
                     SocketDomain::Unix,

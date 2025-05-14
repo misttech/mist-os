@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use super::{
-    new_netlink_socket, new_socket_file, socket_fs, NetlinkFamily, SocketAddress, SocketDomain,
-    SocketFile, SocketMessageFlags, SocketProtocol, SocketType, UnixSocket, VsockSocket,
-    ZxioBackedSocket,
+    new_netlink_socket, NetlinkFamily, SocketAddress, SocketDomain, SocketFile, SocketMessageFlags,
+    SocketProtocol, SocketType, UnixSocket, VsockSocket, ZxioBackedSocket,
 };
 use crate::mm::MemoryAccessorExt;
 use crate::security;
@@ -15,7 +14,7 @@ use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer, VecInputBuffer, VecOutputBuffer,
 };
 use crate::vfs::socket::SocketShutdownFlags;
-use crate::vfs::{default_ioctl, Anon, FileHandle, FileObject, FsNodeHandle, FsNodeInfo};
+use crate::vfs::{default_ioctl, FileHandle, FileObject, FsNodeHandle};
 use byteorder::{ByteOrder as _, NativeEndian};
 use starnix_uapi::user_address::ArchSpecific;
 use starnix_uapi::{arch_struct_with_union, AF_INET};
@@ -33,7 +32,6 @@ use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::{CAP_NET_ADMIN, CAP_NET_RAW};
 use starnix_uapi::errors::{Errno, ErrnoCode};
-use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::union::struct_with_union_into_bytes;
 use starnix_uapi::user_address::UserAddress;
@@ -480,50 +478,10 @@ impl Socket {
         })
     }
 
-    /// Creates a `FileHandle` where the associated `FsNode` contains a socket.
-    ///
-    /// # Parameters
-    /// - `current_task`: The task that is used to fetch `SocketFs`, to store the created socket
-    ///   node.
-    /// - `socket`: The socket to store in the `FsNode`.
-    /// - `open_flags`: The `OpenFlags` which are used to create the `FileObject`.
-    /// - `kernel_private`: `true` if the socket will be used internally by the kernel, and should
-    ///   therefore not be security labeled nor access-checked.
-    pub fn new_file<L>(
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-        socket: SocketHandle,
-        open_flags: OpenFlags,
-        kernel_private: bool,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-    {
-        let fs = socket_fs(current_task.kernel());
-        // Ensure sockfs gets labeled if mounted after the SELinux policy has been loaded.
-        security::file_system_resolve_security(locked, &current_task, &fs)
-            .expect("resolve fs security");
-        security::check_socket_create_access(
-            current_task,
-            socket.domain,
-            socket.socket_type,
-            socket.protocol,
-            &fs,
-            kernel_private,
-        )?;
-        let mode = mode!(IFSOCK, 0o777);
-        let node = fs.create_node(
-            current_task,
-            Anon::new_for_socket(kernel_private),
-            FsNodeInfo::new_factory(mode, current_task.as_fscred()),
-        );
-        {
-            let mut locked_state = socket.state.lock();
-            assert!(locked_state.fs_node.is_none());
-            locked_state.fs_node = Some(node.clone());
-        }
-        security::socket_post_create(&socket);
-        Ok(FileObject::new_anonymous(current_task, SocketFile::new(socket), node, open_flags))
+    pub(super) fn set_fs_node(&self, node: &FsNodeHandle) {
+        let mut locked_state = self.state.lock();
+        assert!(locked_state.fs_node.is_none());
+        locked_state.fs_node = Some(node.clone());
     }
 
     /// Returns the Socket that this FileHandle refers to. If this file is not a socket file,
@@ -1257,7 +1215,7 @@ where
     L: LockBefore<FileOpsCore>,
 {
     let iface_name = in_ifreq.name_as_str()?;
-    let socket = new_socket_file(
+    let socket = SocketFile::new_socket(
         locked,
         current_task,
         SocketDomain::Netlink,
@@ -1385,7 +1343,7 @@ where
     //   - no loss in precision when upcasting 16 bits to 32 bits.
     let flags: u32 = flags as u32;
 
-    let socket = new_socket_file(
+    let socket = SocketFile::new_socket(
         locked,
         current_task,
         SocketDomain::Netlink,
