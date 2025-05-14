@@ -17,12 +17,7 @@ pub struct StubBytesFile {
 impl StubBytesFile {
     #[track_caller]
     pub fn new_node(message: &'static str, bug: starnix_logging::BugRef) -> impl FsNodeOps {
-        let location = std::panic::Location::caller();
-        let file = BytesFile::new(Self::default());
-        SimpleFileNode::new(move || {
-            starnix_logging::__track_stub_inner(bug, message, None, location);
-            Ok(file.clone())
-        })
+        Self::new_node_with_data(message, bug, vec![])
     }
 
     #[track_caller]
