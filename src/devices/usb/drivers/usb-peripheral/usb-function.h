@@ -11,42 +11,30 @@
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/ddk/debug.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <threads.h>
 
-#include <ddktl/device.h>
-#include <ddktl/metadata_server.h>
 #include <fbl/array.h>
-#include <fbl/ref_counted.h>
 #include <usb/usb.h>
 
 namespace usb_peripheral {
 
 class UsbPeripheral;
-class UsbFunction;
-using UsbFunctionType = ddk::Device<UsbFunction>;
 
 // This class represents a USB function in the peripheral role configurations.
 // USB function drivers bind to this.
-class UsbFunction : public UsbFunctionType,
-                    public ddk::UsbFunctionProtocol<UsbFunction, ddk::base_protocol>,
-                    public fbl::RefCounted<UsbFunction>,
+class UsbFunction : public ddk::UsbFunctionProtocol<UsbFunction>,
                     public fidl::Server<fuchsia_hardware_usb_function::UsbFunction> {
  public:
-  UsbFunction(zx_device_t* parent, UsbPeripheral* peripheral,
+  UsbFunction(size_t index, UsbPeripheral* peripheral,
               fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor desc, uint8_t configuration,
               async_dispatcher_t* dispatcher)
-      : UsbFunctionType(parent),
+      : index_(index),
         configuration_(configuration),
         peripheral_(peripheral),
         function_descriptor_(desc),
-        dispatcher_(dispatcher),
-        outgoing_(dispatcher) {}
-
-  zx::result<> Init();
-
-  // Device protocol implementation.
-  void DdkRelease();
+        dispatcher_(dispatcher) {}
 
   // UsbFunctionProtocol implementation.
   zx_status_t UsbFunctionSetInterface(const usb_function_interface_protocol_t* interface);
@@ -82,36 +70,20 @@ class UsbFunction : public UsbFunctionType,
 
   zx_status_t UsbFunctionCancelAll(uint8_t ep_address);
 
-  zx_status_t AddService(fidl::ServerEnd<fuchsia_io::Directory> server) {
-    zx::result result = outgoing_.AddService<fuchsia_hardware_usb_function::UsbFunctionService>(
-        fuchsia_hardware_usb_function::UsbFunctionService::InstanceHandler({
-            .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
-        }));
-    if (result.is_error()) {
-      zxlogf(ERROR, "Failed to add service");
-      return result.status_value();
-    }
-    result = outgoing_.Serve(std::move(server));
-    if (result.is_error()) {
-      zxlogf(ERROR, "Failed to service the outgoing directory");
-      return result.status_value();
-    }
-
-    return ZX_OK;
-  }
-
   // fuchsia_hardware_usb_function.UsbFunction protocol implementation.
   void ConnectToEndpoint(ConnectToEndpointRequest& request,
                          ConnectToEndpointCompleter::Sync& completer) override;
 
-  zx_status_t AddDevice(const std::string& name);
+  zx::result<> AddChild(fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent,
+                        const std::string& child_node_name,
+                        const std::shared_ptr<fdf::Namespace>& incoming,
+                        const std::shared_ptr<fdf::OutgoingDirectory>& outgoing);
   bool registered() const { return function_intf_.is_valid(); }
 
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbFunction);
 
-  // |dev_added_|: true if device has already been published
-  bool dev_added_ = false;
+  const size_t index_;
   uint8_t configuration_;
   UsbPeripheral* peripheral_;
   ddk::UsbFunctionInterfaceProtocolClient function_intf_;
@@ -123,10 +95,14 @@ class UsbFunction : public UsbFunctionType,
   fbl::Array<uint8_t> descriptors_;
 
   async_dispatcher_t* dispatcher_;
-  component::OutgoingDirectory outgoing_;
   fidl::ServerBindingGroup<fuchsia_hardware_usb_function::UsbFunction> bindings_;
-  ddk::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata> mac_address_metadata_server_;
-  ddk::MetadataServer<fuchsia_boot_metadata::SerialNumberMetadata> serial_number_metadata_server_;
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_;
+  compat::SyncInitializedDeviceServer compat_server_;
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_USB_FUNCTION, this, &usb_function_protocol_ops_};
+  std::optional<fdf_metadata::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>>
+      mac_address_metadata_server_;
+  std::optional<fdf_metadata::MetadataServer<fuchsia_boot_metadata::SerialNumberMetadata>>
+      serial_number_metadata_server_;
 };
 
 }  // namespace usb_peripheral

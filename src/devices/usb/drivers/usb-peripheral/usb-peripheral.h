@@ -9,19 +9,14 @@
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <lib/zx/channel.h>
 #include <zircon/errors.h>
 
 #include <utility>
 
-#include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
-#include <fbl/array.h>
 #include <fbl/mutex.h>
-#include <fbl/ref_counted.h>
-#include <fbl/ref_ptr.h>
-#include <fbl/string.h>
-#include <fbl/vector.h>
 #include <usb-monitor-util/usb-monitor-util.h>
 #include <usb/request-cpp.h>
 
@@ -76,41 +71,38 @@ using ConfigurationDescriptor =
 using fuchsia_hardware_usb_peripheral::wire::DeviceDescriptor;
 using fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor;
 
-class UsbPeripheral;
-using UsbPeripheralType =
-    ddk::Device<UsbPeripheral, ddk::Unbindable, ddk::ChildPreReleaseable,
-                ddk::Messageable<fuchsia_hardware_usb_peripheral::Device>::Mixin>;
-
-struct UsbConfiguration : fbl::RefCounted<UsbConfiguration> {
+struct UsbConfiguration {
   explicit UsbConfiguration(uint8_t index) : index(index) {}
 
   static constexpr uint8_t MAX_INTERFACES = 32;
-  // Functions associated with this configuration
-  fbl::Vector<fbl::RefPtr<UsbFunction>> functions;
+  // Indices of the functions associated with this configuration
+  std::vector<size_t> functions;
   // USB configuration descriptor, synthesized from our functions' descriptors.
   std::vector<uint8_t> config_desc;
 
-  // Map from interface number to function.
-  fbl::RefPtr<UsbFunction> interface_map[MAX_INTERFACES];
+  // Map from interface number to function index.
+  std::optional<size_t> interface_map[MAX_INTERFACES];
   const uint8_t index;
 };
 
 // This is the main class for the USB peripheral role driver.
 // It binds against the USB DCI driver device and manages a list of UsbFunction devices,
 // one for each USB function in the peripheral role configuration.
-class UsbPeripheral : public UsbPeripheralType,
-                      public ddk::EmptyProtocol<ZX_PROTOCOL_USB_PERIPHERAL>,
+class UsbPeripheral : public fdf::DriverBase,
+                      public fidl::WireServer<fuchsia_hardware_usb_peripheral::Device>,
                       public ddk::UsbDciInterfaceProtocol<UsbPeripheral> {
  public:
-  explicit UsbPeripheral(zx_device_t* parent, usb_peripheral_config::Config config)
-      : UsbPeripheralType(parent), dci_(parent), config_(std::move(config)) {}
+  static constexpr std::string_view kDriverName = "usb_device";
+  static constexpr std::string_view kChildNodeName = "usb-peripheral";
 
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
+  UsbPeripheral(fdf::DriverStartArgs start_args,
+                fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
 
-  // Device protocol implementation.
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkChildPreRelease(void* child_ctx);
-  void DdkRelease();
+  // fdf::DriverBase implementation.
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
+  void Stop() override;
 
   // UsbDciInterface implementation.
   zx_status_t UsbDciInterfaceControl(const usb_setup_t* setup, const uint8_t* write_buffer,
@@ -128,13 +120,10 @@ class UsbPeripheral : public UsbPeripheralType,
                               SetStateChangeListenerCompleter::Sync& completer) override;
 
   zx_status_t SetDeviceDescriptor(DeviceDescriptor desc);
-  zx_status_t SetFunctionInterface(fbl::RefPtr<UsbFunction> function,
-                                   const usb_function_interface_protocol_t* interface);
-  zx_status_t AllocInterface(fbl::RefPtr<UsbFunction> function, uint8_t* out_intf_num);
-  zx_status_t AllocEndpoint(fbl::RefPtr<UsbFunction> function, uint8_t direction,
-                            uint8_t* out_address);
+  zx_status_t AllocInterface(size_t function_index, uint8_t* out_intf_num);
+  zx_status_t AllocEndpoint(size_t function_index, uint8_t direction, uint8_t* out_address);
   zx_status_t AllocStringDesc(std::string desc, uint8_t* out_index);
-  zx_status_t ValidateFunction(fbl::RefPtr<UsbFunction> function, void* descriptors, size_t length,
+  zx_status_t ValidateFunction(size_t function_index, void* descriptors, size_t length,
                                uint8_t* out_num_interfaces);
   zx_status_t FunctionRegistered();
   void FunctionCleared();
@@ -197,13 +186,10 @@ class UsbPeripheral : public UsbPeripheralType,
     return static_cast<uint8_t>(((index) & 0xF) | (((index) & 0x10) << 3));
   }
 
-  zx_status_t Init();
-  zx::result<fbl::RefPtr<UsbFunction>> AddFunction(UsbConfiguration& config,
-                                                   FunctionDescriptor desc);
+  // Returns the index of the function that was added.
+  zx::result<size_t> AddFunction(UsbConfiguration& config, FunctionDescriptor desc);
   // Begins the process of clearing the functions.
   void ClearFunctions();
-  // Updates the internal state after all functions have finished being removed.
-  void ClearFunctionsComplete() __TA_REQUIRES(lock_);
   zx::result<std::string> GetSerialNumber();
   zx_status_t DeviceStateChangedLocked() __TA_REQUIRES(lock_);
   zx_status_t AddFunctionDevices() __TA_REQUIRES(lock_);
@@ -215,20 +201,30 @@ class UsbPeripheral : public UsbPeripheralType,
   int ListenerCleanupThread();
   void RequestComplete(usb_request_t* req);
 
-  bool AllFunctionsRegistered();
+  bool AllFunctionsRegistered() const;
+  UsbFunction& GetFunction(size_t index);
+  const UsbFunction& GetFunction(size_t index) const;
+
+  void Connect(fidl::ServerEnd<fuchsia_hardware_usb_peripheral::Device> request) {
+    bindings_.AddBinding(dispatcher(), std::move(request), this, fidl::kIgnoreBindingClosure);
+  }
+
+  // `UsbFunction` wrapped in `unique_ptr` because `UsbFunction` instance may be bound as a FIDL
+  // server which requires that the instance always be at the same memory address.
+  std::vector<std::unique_ptr<UsbFunction>> functions_;
 
   // Our parent's DCI protocol.
-  const ddk::UsbDciProtocolClient dci_;
+  ddk::UsbDciProtocolClient dci_;
   bool dci_new_valid_ = false;
   fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDci> dci_new_;
   // USB device descriptor set via ioctl_usb_peripheral_set_device_desc()
   usb_device_descriptor_t device_desc_ = {};
-  // Map from endpoint index to function.
-  fbl::RefPtr<UsbFunction> endpoint_map_[USB_MAX_EPS];
+  // Map from endpoint index to function index.
+  std::optional<size_t> endpoint_map_[USB_MAX_EPS];
   // Strings for USB string descriptors.
   std::vector<std::string> strings_ __TA_GUARDED(lock_);
   // List of usb_function_t.
-  fbl::Vector<fbl::RefPtr<UsbConfiguration>> configurations_;
+  std::vector<UsbConfiguration> configurations_;
   // mutex for protecting our state
   fbl::Mutex lock_;
   // Current USB mode set via ioctl_usb_peripheral_set_mode()
@@ -270,11 +266,13 @@ class UsbPeripheral : public UsbPeripheralType,
   fbl::Mutex pending_requests_lock_;
   usb::BorrowedRequestList<void> pending_requests_ __TA_GUARDED(pending_requests_lock_);
 
-  usb_peripheral_config::Config config_;
-
   UsbDciInterfaceServer intf_srv_{this};
 
   fidl::ServerBindingGroup<fuchsia_hardware_usb_peripheral::Device> bindings_;
+  fdf::OwnedChildNode child_;
+  driver_devfs::Connector<fuchsia_hardware_usb_peripheral::Device> devfs_connector_{
+      fit::bind_member<&UsbPeripheral::Connect>(this)};
+  std::optional<fdf::PrepareStopCompleter> prepare_stop_completer_;
 };
 
 }  // namespace usb_peripheral

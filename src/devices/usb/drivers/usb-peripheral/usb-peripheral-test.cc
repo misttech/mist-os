@@ -10,10 +10,8 @@
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
-#include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/interrupt.h>
 #include <zircon/errors.h>
@@ -26,15 +24,15 @@
 #include <gtest/gtest.h>
 #include <usb/usb.h>
 
-#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/usb-peripheral/usb-function.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace fdci = fuchsia_hardware_usb_dci;
 namespace fdescriptor = fuchsia_hardware_usb_descriptor;
 
-class FakeDevice : public ddk::UsbDciProtocol<FakeDevice, ddk::base_protocol>,
-                   public fidl::WireServer<fdci::UsbDci> {
+namespace usb_peripheral::test {
+
+class FakeDevice : public ddk::UsbDciProtocol<FakeDevice>, public fidl::WireServer<fdci::UsbDci> {
  public:
   FakeDevice() : proto_({&usb_dci_protocol_ops_, this}) {}
 
@@ -117,87 +115,88 @@ class FakeDevice : public ddk::UsbDciProtocol<FakeDevice, ddk::base_protocol>,
     return std::move(client.value());
   }
 
+  compat::DeviceServer::BanjoConfig GetBanjoConfig() {
+    compat::DeviceServer::BanjoConfig config{ZX_PROTOCOL_USB_DCI};
+    config.callbacks[ZX_PROTOCOL_USB_DCI] = banjo_server_.callback();
+    return config;
+  }
+
  private:
   usb_dci_protocol_t proto_;
   sync_completion_t set_interface_called_;
   fidl::ServerBindingGroup<fdci::UsbDci> bindings_;
   std::optional<fidl::ClientEnd<fdci::UsbDciInterface>> client_;
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_USB_DCI, this, &usb_dci_protocol_ops_};
 };
 
-class UsbPeripheralTestEnvironment {
+class UsbPeripheralTestEnvironment : public fdf_testing::Environment {
  public:
-  void Init(std::string_view serial_number, fidl::ServerEnd<fuchsia_io::Directory> dci_service,
-            fidl::ServerEnd<fuchsia_io::Directory> serial_number_service) {
+  void Init(std::string_view serial_number) {
     fuchsia_boot_metadata::SerialNumberMetadata metadata{{.serial_number{serial_number}}};
     ASSERT_OK(serial_number_metadata_server_.SetMetadata(metadata));
-    ASSERT_OK(serial_number_metadata_server_.Serve(outgoing_, dispatcher_));
-    ASSERT_OK(outgoing_.Serve(std::move(serial_number_service)));
 
-    ASSERT_OK(outgoing_.AddService<fdci::UsbDciService>(dci_.GetHandler()));
-    ASSERT_OK(outgoing_.Serve(std::move(dci_service)));
+    device_server_.Initialize("default", std::nullopt, dci_.GetBanjoConfig());
+  }
+
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    if (zx_status_t status =
+            device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    if (zx::result result = serial_number_metadata_server_.Serve(
+            to_driver_vfs, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+        result.is_error()) {
+      return result.take_error();
+    }
+
+    if (zx::result result = to_driver_vfs.AddService<fdci::UsbDciService>(dci_.GetHandler());
+        result.is_error()) {
+      return result.take_error();
+    }
+
+    return zx::ok();
   }
 
   fidl::ClientEnd<fdci::UsbDciInterface> TakeDciClient() { return dci_.TakeClient(); }
 
  private:
-  async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  component::OutgoingDirectory outgoing_{dispatcher_};
   FakeDevice dci_;
-  ddk::MetadataServer<fuchsia_boot_metadata::SerialNumberMetadata> serial_number_metadata_server_;
+  fdf_metadata::MetadataServer<fuchsia_boot_metadata::SerialNumberMetadata>
+      serial_number_metadata_server_;
+  compat::DeviceServer device_server_;
+};
+
+class UsbPeripheralTestConfig {
+ public:
+  using DriverType = UsbPeripheral;
+  using EnvironmentType = UsbPeripheralTestEnvironment;
 };
 
 class UsbPeripheralHarness : public ::testing::Test {
  public:
   void SetUp() override {
-    dci_ = std::make_unique<FakeDevice>();
-    root_device_->AddProtocol(ZX_PROTOCOL_USB_DCI, dci_->proto()->ops, dci_->proto()->ctx);
+    driver_test_.RunInEnvironmentTypeContext([&](auto& env) { env.Init(kSerialNumber); });
 
-    auto [dci_service_client, dci_service_server] =
-        fidl::Endpoints<fuchsia_io::Directory>::Create();
-    auto [serial_number_service_client, serial_number_service_server] =
-        fidl::Endpoints<fuchsia_io::Directory>::Create();
-    environment_.SyncCall(&UsbPeripheralTestEnvironment::Init, kSerialNumber,
-                          std::move(dci_service_server), std::move(serial_number_service_server));
-    root_device_->AddFidlService(fdci::UsbDciService::Name, std::move(dci_service_client));
-    root_device_->AddFidlService(
-        ddk::MetadataServer<fuchsia_boot_metadata::SerialNumberMetadata>::kFidlServiceName,
-        std::move(serial_number_service_client), "default");
+    ASSERT_OK(driver_test_.StartDriverWithCustomStartArgs([](auto& start_args) {
+      start_args.config().emplace(usb_peripheral_config::Config{}.ToVmo());
+    }));
 
-    usb_peripheral_config::Config fake_config;
-    fake_config.functions() = {};
-    root_device_->SetConfigVmo(fake_config.ToVmo());
-
-    ASSERT_OK(usb_peripheral::UsbPeripheral::Create(nullptr, root_device_.get()));
-    ASSERT_EQ(1u, root_device_->child_count());
-    mock_dev_ = root_device_->GetLatestChild();
-
-    client_.Bind(environment_.SyncCall(&UsbPeripheralTestEnvironment::TakeDciClient));
-    ASSERT_TRUE(client_.is_valid());
+    dci_.Bind(driver_test_.RunInEnvironmentTypeContext<fidl::ClientEnd<fdci::UsbDciInterface>>(
+        [](auto& env) { return env.TakeDciClient(); }));
   }
 
-  // Because this test is using a fidl::WireSyncClient, we need to run any ops on the client on
-  // their own thread because the testing thread is shared with the client end.
-  static void RunSyncClientTask(fit::closure task) {
-    async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
-    loop.StartThread();
-    zx::result result = fdf::RunOnDispatcherSync(loop.dispatcher(), std::move(task));
-    ASSERT_OK(result);
-  }
+  void TearDown() override { ASSERT_OK(driver_test_.StopDriver()); }
 
  protected:
-  std::unique_ptr<FakeDevice> dci_;
-  std::shared_ptr<MockDevice> root_device_{MockDevice::FakeRootParent()};
-  MockDevice* mock_dev_;
-
-  fdf::UnownedSynchronizedDispatcher dispatcher_{
-      fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher()};
-
-  async_patterns::TestDispatcherBound<UsbPeripheralTestEnvironment> environment_{
-      dispatcher_->async_dispatcher(), std::in_place};
-
   static constexpr std::string_view kSerialNumber = "Test serial number";
 
-  fidl::WireSyncClient<fdci::UsbDciInterface> client_;
+  fidl::WireSyncClient<fdci::UsbDciInterface>& dci() { return dci_; }
+
+ private:
+  fidl::WireSyncClient<fdci::UsbDciInterface> dci_;
+  fdf_testing::BackgroundDriverTest<UsbPeripheralTestConfig> driver_test_;
 };
 
 TEST_F(UsbPeripheralHarness, AddsCorrectSerialNumberMetadata) {
@@ -208,21 +207,19 @@ TEST_F(UsbPeripheralHarness, AddsCorrectSerialNumberMetadata) {
   setup.b_request = USB_REQ_GET_DESCRIPTOR;
 
   fidl::Arena arena;
-  RunSyncClientTask([&]() {
-    std::vector<uint8_t> unused;
-    auto result =
-        client_.buffer(arena)->Control(setup, fidl::VectorView<uint8_t>::FromExternal(unused));
+  std::vector<uint8_t> unused;
+  auto result =
+      dci().buffer(arena)->Control(setup, fidl::VectorView<uint8_t>::FromExternal(unused));
 
-    ASSERT_TRUE(result->is_ok());
+  ASSERT_TRUE(result->is_ok());
 
-    auto& serial = result.value()->read;
+  auto& serial = result.value()->read;
 
-    EXPECT_EQ(serial[0], (kSerialNumber.size() +1) * 2);
-    EXPECT_EQ(serial[1], USB_DT_STRING);
-    for (size_t i = 0; i < sizeof(kSerialNumber) - 1; i++) {
-      EXPECT_EQ(serial[2 + (i * 2)], kSerialNumber[i]);
-    }
-  });
+  EXPECT_EQ(serial[0], (kSerialNumber.size() + 1) * 2);
+  EXPECT_EQ(serial[1], USB_DT_STRING);
+  for (size_t i = 0; i < sizeof(kSerialNumber) - 1; i++) {
+    EXPECT_EQ(serial[2 + (i * 2)], kSerialNumber[i]);
+  }
 }
 
 TEST_F(UsbPeripheralHarness, WorksWithVendorSpecificCommandWhenConfigurationIsZero) {
@@ -233,11 +230,11 @@ TEST_F(UsbPeripheralHarness, WorksWithVendorSpecificCommandWhenConfigurationIsZe
   setup.b_request = USB_REQ_GET_DESCRIPTOR;
 
   fidl::Arena arena;
-  RunSyncClientTask([&]() {
-    std::vector<uint8_t> unused;
-    auto result =
-        client_.buffer(arena)->Control(setup, fidl::VectorView<uint8_t>::FromExternal(unused));
-    ASSERT_TRUE(result->is_error());
-    ASSERT_EQ(ZX_ERR_BAD_STATE, result->error_value());
-  });
+  std::vector<uint8_t> unused;
+  auto result =
+      dci().buffer(arena)->Control(setup, fidl::VectorView<uint8_t>::FromExternal(unused));
+  ASSERT_TRUE(result->is_error());
+  ASSERT_EQ(ZX_ERR_BAD_STATE, result->error_value());
 }
+
+}  // namespace usb_peripheral::test

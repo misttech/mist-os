@@ -4,7 +4,7 @@
 
 #include "src/devices/usb/drivers/usb-peripheral/config-parser.h"
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
@@ -72,7 +72,7 @@ const std::map<std::string_view, FunctionDefinition> all_functions = {
 
 zx_status_t PeripheralConfigParser::AddFunctions(const std::vector<std::string>& functions) {
   if (functions.empty()) {
-    zxlogf(INFO, "No functions found");
+    fdf::info("No functions found");
     return ZX_OK;
   }
 
@@ -85,7 +85,7 @@ zx_status_t PeripheralConfigParser::AddFunctions(const std::vector<std::string>&
       function_defs.push_back(function_def->second);
 
     } else {
-      zxlogf(ERROR, "Function not supported: %s", function.c_str());
+      fdf::error("Function not supported: {}", function.c_str());
       return ZX_ERR_INVALID_ARGS;
     }
   }
@@ -98,7 +98,7 @@ zx_status_t PeripheralConfigParser::AddFunctions(const std::vector<std::string>&
     status = SetCompositeProductDescription(function.product_id, function.description);
 
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to set product description for 0x%x", function.product_id);
+      fdf::error("Failed to set product description for {:#x}", function.product_id);
       return status;
     }
   }
@@ -125,7 +125,7 @@ zx_status_t PeripheralConfigParser::SetCompositeProductDescription(uint16_t pid,
     } else if (pid_ == GOOGLE_USB_FASTBOOT_PID && pid == GOOGLE_USB_CDC_PID) {
       pid_ = GOOGLE_USB_CDC_AND_FASTBOOT_PID;
     } else {
-      zxlogf(ERROR, "No matching pid for this combination: 0x%x + 0x%x", pid_, pid);
+      fdf::error("No matching pid for this combination: {:#x} + {:#x}", pid_, pid);
       return ZX_ERR_WRONG_TYPE;
     }
     product_desc_ += kCompositeDeviceConnector;

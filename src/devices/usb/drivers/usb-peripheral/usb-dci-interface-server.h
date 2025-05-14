@@ -21,16 +21,6 @@ class UsbDciInterfaceServer : public fidl::WireServer<fuchsia_hardware_usb_dci::
     ZX_ASSERT(result.is_ok());
     dispatcher_ = std::move(*result);
   }
-  ~UsbDciInterfaceServer() {
-    libsync::Completion wait;
-    async::PostTask(dispatcher_.async_dispatcher(), [this, &wait]() {
-      bindings_.RemoveAll();
-      wait.Signal();
-    });
-    wait.Wait();
-    dispatcher_.ShutdownAsync();
-    dispatcher_shutdown_.Wait();
-  }
 
   // fuchsia_hardware_usb_dci::UsbDciInterface protocol implementation.
   void Control(ControlRequestView req, ControlCompleter::Sync& completer) override;

@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire_types.h>
-#include <lib/ddk/device.h>
 #include <stdint.h>
 
 #include <cstdint>

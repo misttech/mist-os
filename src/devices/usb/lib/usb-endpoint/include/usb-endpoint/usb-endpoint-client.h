@@ -181,7 +181,9 @@ zx_status_t EndpointClient<DeviceType>::Init(uint8_t ep_addr, fidl::ClientEnd<Pr
   if (result.is_error()) {
     zxlogf(ERROR, "ConnectToEndpoint failed =: %s",
            result.error_value().FormatDescription().c_str());
-    return result.error_value().domain_error();
+    return result.error_value().is_framework_error()
+               ? result.error_value().framework_error().status()
+               : ZX_ERR_INTERNAL;
   }
   client_.Bind(std::move(endpoints->client), dispatcher, this);
   if (!client_.is_valid()) {

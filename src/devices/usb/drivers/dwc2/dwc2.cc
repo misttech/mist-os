@@ -1337,7 +1337,8 @@ void Dwc2::DciIntfWrapSetConnected(bool connected) {
 
   fidl::Arena arena;
   auto result = std::get<DciInterfaceFidlClient>(*dci_intf_).buffer(arena)->SetConnected(connected);
-  ZX_ASSERT(result.ok());  // Never expected to fail.
+  ZX_ASSERT_MSG(result.ok(), "SetConnected failed: %s",
+                result.status_string());  // Never expected to fail.
 }
 
 zx_status_t Dwc2::DciIntfWrapControl(const usb_setup_t* setup, const uint8_t* write_buffer,
