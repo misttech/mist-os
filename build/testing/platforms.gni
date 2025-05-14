@@ -295,6 +295,12 @@ test_platforms = [
     pool = "fuchsia.tests.connectivity"
   },
   {
+    access_points = "1"
+    device_type = "Sorrel"
+    iperf_servers = "1"
+    pool = "fuchsia.tests.connectivity"
+  },
+  {
     device_type = "Sherlock"
     pool = "fuchsia.tests.bluetooth"
     sherlocks = "2"
