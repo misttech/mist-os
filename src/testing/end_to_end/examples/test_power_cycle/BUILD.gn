@@ -21,6 +21,7 @@ python_mobly_test("power_cycle_test") {
     vim3_env,
     nuc11_env,
     nelson_env,
+    sherlock_env,
   ]
 }
 

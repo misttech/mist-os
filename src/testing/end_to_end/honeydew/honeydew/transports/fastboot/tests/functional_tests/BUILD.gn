@@ -20,6 +20,7 @@ if (is_host) {
       # Note - Infra does not support putting the NUCs into Fastboot mode
       vim3_env,
       nelson_env,
+      sherlock_env,
     ]
   }
 
@@ -33,6 +34,7 @@ if (is_host) {
       # Note - Infra does not support putting the NUCs into Fastboot mode
       vim3_env,
       nelson_env,
+      sherlock_env,
     ]
   }
 }

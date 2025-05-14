@@ -25,6 +25,7 @@ if (is_host) {
       nuc11_env,
       vim3_env,
       nelson_env,
+      sherlock_env,
     ]
     deps = [ ":tracing_runtime_deps" ]
   }
