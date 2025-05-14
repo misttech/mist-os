@@ -363,13 +363,15 @@ enum ServeWatcherError {
     PreviousPendingWatch,
     #[error("the client was canceled")]
     Canceled,
+    #[error("the service scope was canceled")]
+    ScopeCanceled,
 }
 
 impl ErrorLogExt for ServeWatcherError {
     fn log_level(&self) -> log::Level {
         match self {
             Self::ErrorInStream(fidl) | Self::FailedToRespond(fidl) => fidl.log_level(),
-            Self::Canceled | Self::PreviousPendingWatch => log::Level::Warn,
+            Self::Canceled | Self::ScopeCanceled | Self::PreviousPendingWatch => log::Level::Warn,
         }
     }
 }
@@ -378,6 +380,8 @@ async fn serve_watcher(
     stream: fnet_filter::WatcherRequestStream,
     dispatcher: UpdateDispatcher,
 ) -> Result<(), ServeWatcherError> {
+    let scope_guard =
+        fasync::Scope::current().active_guard().ok_or(ServeWatcherError::ScopeCanceled)?;
     let UpdateDispatcher(dispatcher) = &dispatcher;
     let mut watcher = dispatcher.lock().await.connect_new_client();
     let canceled_fut = watcher.canceled.wait();
@@ -385,6 +389,7 @@ async fn serve_watcher(
     let result = {
         let mut request_stream = stream.map_err(ServeWatcherError::ErrorInStream).fuse();
         let mut canceled_fut = pin!(canceled_fut);
+        let mut scope_canceled_fut = pin!(scope_guard.on_cancel().fuse());
         let mut hanging_get = futures::future::OptionFuture::default();
         loop {
             hanging_get = futures::select! {
@@ -415,11 +420,15 @@ async fn serve_watcher(
                     }
                 },
                 () = canceled_fut => break Err(ServeWatcherError::Canceled),
+                () = scope_canceled_fut => break Err(ServeWatcherError::ScopeCanceled),
             };
         }
     };
 
     dispatcher.lock().await.disconnect_client(watcher);
+    // Only drop the scope guard after we've disconnected from the dispatcher,
+    // so that we ensure the watcher sink always has a valid sender.
+    drop(scope_guard);
 
     result
 }
