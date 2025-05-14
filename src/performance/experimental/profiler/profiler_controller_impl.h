@@ -15,6 +15,7 @@
 
 #include "component.h"
 #include "sampler.h"
+#include "src/lib/fxl/memory/ref_ptr.h"
 #include "targets.h"
 
 namespace profiler {
@@ -40,7 +41,7 @@ class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session
     Stopped,
   };
   async_dispatcher_t* dispatcher_;
-  std::unique_ptr<Sampler> sampler_;
+  fxl::RefPtr<Sampler> sampler_;
   ProfilingState state_ = ProfilingState::Unconfigured;
 
   TargetTree targets_;

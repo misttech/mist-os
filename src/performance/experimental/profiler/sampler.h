@@ -28,6 +28,8 @@
 
 #include "job_watcher.h"
 #include "process_watcher.h"
+#include "src/lib/fxl/memory/ref_counted.h"
+#include "src/lib/fxl/memory/weak_ptr.h"
 #include "symbolization_context.h"
 #include "targets.h"
 
@@ -38,19 +40,21 @@ struct Sample {
   std::vector<uint64_t> stack;
 };
 
-class Sampler {
+class Sampler : public fxl::RefCountedThreadSafe<Sampler> {
  public:
   Sampler(async_dispatcher_t* dispatcher, TargetTree targets,
           std::vector<fuchsia_cpu_profiler::SamplingConfig> sample_specs)
       : dispatcher_(dispatcher),
         targets_(std::move(targets)),
-        sample_specs_(std::move(sample_specs)) {}
+        sample_specs_(std::move(sample_specs)),
+        weak_factory_(this) {}
 
   virtual zx::result<> Start(size_t buffer_size_mb);
   virtual zx::result<> Stop();
 
   // Return the information needed to symbolize the samples
   zx::result<profiler::SymbolizationContext> GetContexts();
+  fxl::WeakPtr<Sampler> GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
 
   std::unordered_map<zx_koid_t, std::vector<Sample>> GetSamples() { return samples_; }
   std::vector<zx::ticks> SamplingDurations() { return inspecting_durations_; }
@@ -76,6 +80,7 @@ class Sampler {
   std::unordered_map<zx_koid_t, std::unique_ptr<JobWatcher>> job_watchers_;
 
  private:
+  fxl::WeakPtrFactory<Sampler> weak_factory_;
   async::TaskMethod<profiler::Sampler, &profiler::Sampler::CollectSamples> sample_task_{this};
   elf_search::Searcher searcher_;
 };

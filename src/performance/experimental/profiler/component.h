@@ -13,6 +13,8 @@
 #include <string>
 
 #include "component_watcher.h"
+#include "sampler.h"
+#include "src/lib/fxl/memory/weak_ptr.h"
 
 namespace profiler {
 
@@ -38,6 +40,9 @@ struct Moniker {
   static zx::result<Moniker> Parse(std::string_view moniker);
 };
 
+profiler::ComponentWatcher::ComponentEventHandler MakeOnStartHandler(
+    fxl::WeakPtr<profiler::Sampler> sampler);
+
 // Given a moniker `moniker` and function `f`, call `f` on `moniker` and each child of `moniker`.
 //
 // The results are `and`ed together, short circuiting and returning early on any failure.
@@ -46,9 +51,9 @@ zx::result<> TraverseRealm(const std::string& moniker,
 
 class ComponentTarget {
  public:
-  // Do any required initialization for the component, and begin watching the component. Call
-  // on_start when the component (and any of its children) are ready to be profiled.
-  virtual zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start) = 0;
+  // Do any required initialization for the component, and begin watching the component. Add the
+  // component to `notify` when the component (and any of its children) are ready to be profiled.
+  virtual zx::result<> Start(fxl::WeakPtr<Sampler> notify) = 0;
   // Detach from the component -- stop emitting calls to on start.
   virtual zx::result<> Stop() = 0;
   // Tear down and clean up this component if needed.
@@ -68,7 +73,7 @@ class ControlledComponent : public ComponentTarget {
                                                                  const std::string& url,
                                                                  const std::string& moniker);
 
-  zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start) override;
+  zx::result<> Start(fxl::WeakPtr<Sampler> notify) override;
   zx::result<> Stop() override;
   zx::result<> Destroy() override;
 

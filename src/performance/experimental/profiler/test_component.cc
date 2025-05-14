@@ -31,16 +31,12 @@ zx::result<std::unique_ptr<profiler::TestComponent>> profiler::TestComponent::Cr
   return zx::ok(std::move(test));
 }
 
-zx::result<> profiler::TestComponent::Start(ComponentWatcher::ComponentEventHandler on_start) {
-  if (on_start == nullptr) {
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
+zx::result<> profiler::TestComponent::Start(fxl::WeakPtr<Sampler> notify) {
   if (!suite_runner_.is_valid()) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  on_start_ = std::move(on_start);
+  on_start_ = profiler::MakeOnStartHandler(std::move(notify));
 
   // Since we don't know the pid or tid or moniker, the only way to deterministically know what to
   // attach to would be to url, since we specify that. Normally, a moniker is preferred to a url

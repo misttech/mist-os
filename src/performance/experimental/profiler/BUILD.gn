@@ -32,6 +32,7 @@ source_set("lib") {
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/syslog/cpp",
+    "//src/lib/fxl",
     "//src/lib/symbolizer-markup",
     "//src/lib/unwinder",
     "//src/lib/zxdump",

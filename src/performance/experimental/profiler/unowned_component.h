@@ -25,7 +25,7 @@ class UnownedComponent : public ComponentTarget {
   static zx::result<std::unique_ptr<UnownedComponent>> Create(
       async_dispatcher_t* dispatcher, const std::optional<std::string>& moniker,
       const std::optional<std::string>& url);
-  zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start) override;
+  zx::result<> Start(fxl::WeakPtr<Sampler> notify) override;
   zx::result<> Stop() override;
   zx::result<> Destroy() override;
 
