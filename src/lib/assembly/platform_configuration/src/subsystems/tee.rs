@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
+use crate::util;
 use anyhow::{anyhow, bail, Context as _};
 use assembly_config_schema::assembly_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
+use assembly_config_schema::platform_config::session_config::PlatformSessionConfig;
 use assembly_config_schema::product_config::{
     GlobalPlatformTee, GlobalPlatformTeeClient, ProprietaryTee, Tee,
 };
@@ -16,15 +18,17 @@ use fuchsia_url::AbsoluteComponentUrl;
 use std::io::Write as _;
 
 pub(crate) struct TeeConfig;
-impl DefineSubsystemConfiguration<(&Tee, &Vec<GlobalPlatformTeeClient>)> for TeeConfig {
+impl DefineSubsystemConfiguration<(&Tee, &Vec<GlobalPlatformTeeClient>, &PlatformSessionConfig)>
+    for TeeConfig
+{
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        product_config: &(&Tee, &Vec<GlobalPlatformTeeClient>),
+        product_config: &(&Tee, &Vec<GlobalPlatformTeeClient>, &PlatformSessionConfig),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         let global_platform_trusted_app_guids =
             get_global_platform_tee_trusted_app_guids(context.board_info)?;
-        let (tee, transitional_tee_clients) = *product_config;
+        let (tee, transitional_tee_clients, session) = *product_config;
         if tee != &Tee::Undefined && !transitional_tee_clients.is_empty() {
             bail!("Conflicting TEE configuration: product configuration may contain `tee` or `tee_clients`, but not both");
         }
@@ -37,16 +41,16 @@ impl DefineSubsystemConfiguration<(&Tee, &Vec<GlobalPlatformTeeClient>)> for Tee
                 global_platform_trusted_app_guids,
                 builder,
             ),
-            Tee::GlobalPlatform(GlobalPlatformTee { clients: tee_clients }) => {
+            Tee::GlobalPlatform(GlobalPlatformTee { clients }) => {
                 define_global_platform_tee_configuration(
                     context,
-                    tee_clients,
+                    clients,
                     global_platform_trusted_app_guids,
                     builder,
                 )
             }
             Tee::Proprietary(proprietary_tee) => {
-                define_proprietary_tee_configuration(context, proprietary_tee, builder)
+                define_proprietary_tee_configuration(context, proprietary_tee, session, builder)
             }
         }
     }
@@ -370,22 +374,35 @@ fn get_global_platform_tee_trusted_app_guids(
 }
 
 fn define_proprietary_tee_configuration(
-    _context: &ConfigurationContext<'_>,
-    _proprietary_tee: &ProprietaryTee,
-    _builder: &mut dyn ConfigurationBuilder,
+    context: &ConfigurationContext<'_>,
+    proprietary_tee: &ProprietaryTee,
+    session: &PlatformSessionConfig,
+    builder: &mut dyn ConfigurationBuilder,
 ) -> anyhow::Result<()> {
-    bail!("NOT IMPLEMENTED: Proprietary TEE assembly strategy");
+    let core_shard_template = if session.enabled {
+        "proprietary_tee_manager.session.core_shard.cml.template"
+    } else {
+        "proprietary_tee_manager.no_session.core_shard.cml.template"
+    };
+    util::add_platform_declared_product_provided_component(
+        proprietary_tee.tee_manager_url.as_str(),
+        core_shard_template,
+        context,
+        builder,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::subsystems::ConfigurationBuilderImpl;
+    use crate::CompletedConfiguration;
     use assembly_config_schema::product_config::{TeeClientConfigData, TeeClientFeatures};
     use assembly_config_schema::BoardInformation;
     use assembly_images_config::BoardFilesystemConfig;
-    use camino::Utf8PathBuf;
+    use camino::{Utf8Path, Utf8PathBuf};
     use std::collections::BTreeMap;
+    use std::path::Path;
     use std::sync::LazyLock;
 
     static BOARD_INFO_WITH_GLOBAL_PLATFORM_TEE_TRUSTED_APP_GUIDS: LazyLock<BoardInformation> =
@@ -435,7 +452,9 @@ mod tests {
     // in this type of code, which is dynamically generating CML for
     // components which might have security implications.
     fn test_tee_clients() {
-        let (context, tee_client_config, tee_trusted_app_guids, mut builder) = setup_test();
+        let resource_dir = tempfile::TempDir::new().unwrap();
+        let (context, tee_client_config, tee_trusted_app_guids, mut builder) =
+            setup_test(resource_dir.path());
 
         define_global_platform_tee_configuration(
             &context,
@@ -565,7 +584,9 @@ mod tests {
 
     #[test]
     fn test_tee_manager() {
-        let (context, tee_client_config, tee_trusted_app_guids, mut builder) = setup_test();
+        let resource_dir = tempfile::TempDir::new().unwrap();
+        let (context, tee_client_config, tee_trusted_app_guids, mut builder) =
+            setup_test(resource_dir.path());
         define_global_platform_tee_configuration(
             &context,
             &tee_client_config,
@@ -670,13 +691,19 @@ mod tests {
         );
     }
 
-    fn setup_test() -> (
+    fn setup_test(
+        resource_dir: &Path,
+    ) -> (
         ConfigurationContext<'static>,
         Vec<GlobalPlatformTeeClient>,
         Vec<uuid::Uuid>,
         ConfigurationBuilderImpl,
     ) {
-        let context = ConfigurationContext::default_for_tests();
+        populate_resource_dir(resource_dir);
+
+        let mut context = ConfigurationContext::default_for_tests();
+        context.resource_dir = Utf8Path::from_path(resource_dir).unwrap().to_path_buf();
+        let context = context;
 
         let tee_client_config = vec![GlobalPlatformTeeClient {
             component_url: "fuchsia-pkg://fuchsia.com/tee-clients/test-app#meta/test-app.cm"
@@ -708,14 +735,16 @@ mod tests {
 
     #[test]
     fn valid_transitional_config() {
+        let resource_dir = tempfile::TempDir::new().unwrap();
         let tee_clients = non_empty_tee_clients();
-        for context in
-            [context_with_global_platform_trusted_app_guids(), context_with_tee_trusted_app_guids()]
-        {
+        for context in [
+            context_with_global_platform_trusted_app_guids(resource_dir.path()),
+            context_with_tee_trusted_app_guids(resource_dir.path()),
+        ] {
             let mut builder = ConfigurationBuilderImpl::default();
             TeeConfig::define_configuration(
                 &context,
-                &(&Default::default(), &tee_clients),
+                &(&Default::default(), &tee_clients, &Default::default()),
                 &mut builder,
             )
             .expect("default (undefined) `tee` and `tee_clients` together is valid");
@@ -724,6 +753,7 @@ mod tests {
 
     #[test]
     fn invalid_transitional_config() {
+        let resource_dir = tempfile::TempDir::new().unwrap();
         let tee_clients = non_empty_tee_clients();
         for tee_config in [
             Tee::NoTee,
@@ -731,13 +761,13 @@ mod tests {
             Tee::Proprietary(proprietary_tee()),
         ] {
             for context in [
-                context_with_global_platform_trusted_app_guids(),
-                context_with_tee_trusted_app_guids(),
+                context_with_global_platform_trusted_app_guids(resource_dir.path()),
+                context_with_tee_trusted_app_guids(resource_dir.path()),
             ] {
                 let mut builder = ConfigurationBuilderImpl::default();
                 TeeConfig::define_configuration(
                     &context,
-                    &(&tee_config, &tee_clients),
+                    &(&tee_config, &tee_clients, &Default::default()),
                     &mut builder,
                 )
                 .expect_err("`tee` and `tee_clients` together is invalid");
@@ -746,8 +776,10 @@ mod tests {
 
         let mut builder = ConfigurationBuilderImpl::default();
         TeeConfig::define_configuration(
-            &context_with_global_platform_trusted_app_guids_and_tee_trusted_app_guids(),
-            &(&Default::default(), &Default::default()),
+            &context_with_global_platform_trusted_app_guids_and_tee_trusted_app_guids(
+                resource_dir.path(),
+            ),
+            &(&Default::default(), &Default::default(), &Default::default()),
             &mut builder,
         )
         .expect_err(
@@ -757,20 +789,20 @@ mod tests {
 
     #[test]
     fn valid_strategy_config() {
+        let resource_dir = tempfile::TempDir::new().unwrap();
         for tee_config in [
             Tee::NoTee,
             Tee::GlobalPlatform(Default::default()),
-            // Not yet implemented:
-            // Tee::Proprietary(proprietary_tee()),
+            Tee::Proprietary(proprietary_tee()),
         ] {
             for context in [
-                context_with_global_platform_trusted_app_guids(),
-                context_with_tee_trusted_app_guids(),
+                context_with_global_platform_trusted_app_guids(resource_dir.path()),
+                context_with_tee_trusted_app_guids(resource_dir.path()),
             ] {
                 let mut builder = ConfigurationBuilderImpl::default();
                 TeeConfig::define_configuration(
                     &context,
-                    &(&tee_config, &Default::default()),
+                    &(&tee_config, &Default::default(), &Default::default()),
                     &mut builder,
                 )
                 .expect("defined `tee` and empty `tee_clients` together is valid");
@@ -779,17 +811,48 @@ mod tests {
     }
 
     #[test]
-    fn proprietary_strategy_not_yet_implemented() {
-        for context in
-            [context_with_global_platform_trusted_app_guids(), context_with_tee_trusted_app_guids()]
-        {
-            let mut builder = ConfigurationBuilderImpl::default();
-            TeeConfig::define_configuration(
-                &context,
-                &(&Tee::Proprietary(proprietary_tee()), &Default::default()),
-                &mut builder,
-            )
-            .expect_err("proprietary TEE strategy not yet implemented");
+    fn proprietary_session_dependency() {
+        let resource_dir = tempfile::TempDir::new().unwrap();
+        let tee_config = Tee::Proprietary(proprietary_tee());
+        for context in [
+            context_with_global_platform_trusted_app_guids(resource_dir.path()),
+            context_with_tee_trusted_app_guids(resource_dir.path()),
+        ] {
+            let build = |session| {
+                let mut builder = ConfigurationBuilderImpl::default();
+                TeeConfig::define_configuration(
+                    &context,
+                    &(&tee_config, &Default::default(), &session),
+                    &mut builder,
+                )
+                .expect("defined `tee` and empty `tee_clients` together is valid");
+                builder.build()
+            };
+            let contains_core_shard = |config: &CompletedConfiguration, path_fragment| {
+                config.core_shards.iter().any(|path| path.as_str().contains(path_fragment))
+            };
+
+            let session_config =
+                build(PlatformSessionConfig { enabled: true, ..Default::default() });
+            assert!(contains_core_shard(
+                &session_config,
+                "proprietary_tee_manager.session.core_shard.cml.template"
+            ));
+            assert!(!contains_core_shard(
+                &session_config,
+                "proprietary_tee_manager.no_session.core_shard.cml.template"
+            ));
+
+            let no_session_config =
+                build(PlatformSessionConfig { enabled: false, ..Default::default() });
+            assert!(contains_core_shard(
+                &no_session_config,
+                "proprietary_tee_manager.no_session.core_shard.cml.template"
+            ));
+            assert!(!contains_core_shard(
+                &no_session_config,
+                "proprietary_tee_manager.session.core_shard.cml.template"
+            ));
         }
     }
 
@@ -820,23 +883,47 @@ mod tests {
         }]
     }
 
-    fn context_with_global_platform_trusted_app_guids() -> ConfigurationContext<'static> {
+    fn context_with_global_platform_trusted_app_guids(
+        resource_dir: &Path,
+    ) -> ConfigurationContext<'static> {
+        populate_resource_dir(resource_dir);
+
         let mut context = ConfigurationContext::default_for_tests();
         context.board_info = &*BOARD_INFO_WITH_GLOBAL_PLATFORM_TEE_TRUSTED_APP_GUIDS;
+        context.resource_dir = Utf8Path::from_path(resource_dir).unwrap().to_path_buf();
         context
     }
 
-    fn context_with_tee_trusted_app_guids() -> ConfigurationContext<'static> {
+    fn context_with_tee_trusted_app_guids(resource_dir: &Path) -> ConfigurationContext<'static> {
+        populate_resource_dir(resource_dir);
+
         let mut context = ConfigurationContext::default_for_tests();
         context.board_info = &*BOARD_INFO_WITH_TEE_TRUSTED_APP_GUIDS;
+        context.resource_dir = Utf8Path::from_path(resource_dir).unwrap().to_path_buf();
         context
     }
 
     fn context_with_global_platform_trusted_app_guids_and_tee_trusted_app_guids(
+        resource_dir: &Path,
     ) -> ConfigurationContext<'static> {
+        populate_resource_dir(resource_dir);
+
         let mut context = ConfigurationContext::default_for_tests();
         context.board_info =
             &*BOARD_INFO_WITH_GLOBAL_PLATFORM_TEE_TRUSTED_APP_GUIDS_AND_TEE_TRUSTED_APP_GUIDS;
+        context.resource_dir = Utf8Path::from_path(resource_dir).unwrap().to_path_buf();
         context
+    }
+
+    fn populate_resource_dir(resource_dir: &Path) {
+        std::fs::File::create(resource_dir.join("tee_manager.core_shard.cml")).unwrap();
+        std::fs::File::create(
+            resource_dir.join("proprietary_tee_manager.session.core_shard.cml.template"),
+        )
+        .unwrap();
+        std::fs::File::create(
+            resource_dir.join("proprietary_tee_manager.no_session.core_shard.cml.template"),
+        )
+        .unwrap();
     }
 }

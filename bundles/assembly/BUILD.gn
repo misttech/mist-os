@@ -4907,6 +4907,9 @@ assembly_resources_directory("resources") {
     "//src/lib/assembly/platform_configuration/src/subsystems/meta/tee-clients.core_shard.cml",
     "//src/media/audio/meta/multizone_leader.core_shard.cml.template",
     "//src/media/audio/meta/multizone_leader.core_shard_eng.cml",
+    "//src/security/bin/tee_manager/meta/proprietary_tee_manager.no_session.core_shard.cml.template",
+    "//src/security/bin/tee_manager/meta/proprietary_tee_manager.session.core_shard.cml.template",
+    "//src/security/bin/tee_manager/meta/tee_manager.core_shard.cml",
 
     # Default recovery logo
     "//src/recovery/system/res/fuchsia-logo.riv",

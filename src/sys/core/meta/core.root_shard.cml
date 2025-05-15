@@ -409,6 +409,19 @@
             from: "#bootstrap",
             to: "#core",
         },
+        {
+            service: "fuchsia.hardware.tee.proprietary.Service",
+            from: "#bootstrap",
+            to: "#core",
+            availability: "same_as_target",
+        },
+        {
+            dictionary: "tee_key_management",
+            from: "#core",
+            to: "#bootstrap",
+            dependency: "weak",
+            availability: "optional",
+        },
     ],
     expose: [
         {

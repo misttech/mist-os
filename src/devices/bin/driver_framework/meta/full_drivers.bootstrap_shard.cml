@@ -178,6 +178,7 @@
                 "fuchsia.hardware.serial.Service",
                 "fuchsia.hardware.skipblock.Service",
                 "fuchsia.hardware.spi.ControllerService",
+                "fuchsia.hardware.tee.proprietary.Service",
                 "fuchsia.hardware.tee.Service",
                 "fuchsia.hardware.temperature.Service",
                 "fuchsia.hardware.thermal.Service",
