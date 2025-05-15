@@ -42,7 +42,6 @@ cc_library(
         "_ALL_SOURCE",
     ],
     deps = [
-        "//sdk/lib/driver/compat/cpp",
         "//src/devices/lib/dma-buffer",
         "//src/devices/usb/lib/usb:descriptors",
         "//src/devices/usb/lib/usb:usb-fidl",

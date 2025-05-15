@@ -50,15 +50,6 @@ zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t 
 }
 
 zx::result<> Dwc3::Start() {
-  {  // Compat server initialization.
-    auto result = compat_.Initialize(incoming(), outgoing(), node_name(), name(),
-                                     compat::ForwardMetadata::None());
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "compat_.Initalize(): %s", result.status_string());
-      return result.take_error();
-    }
-  }
-
   if (zx_status_t status = AcquirePDevResources(); status != ZX_OK) {
     FDF_LOG(ERROR, "AcquirePDevResources: %s", zx_status_get_string(status));
     return zx::error(status);
@@ -87,11 +78,12 @@ zx::result<> Dwc3::Start() {
                         bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_DWC3),
   };
 
-  auto offers = compat_.CreateOffers2();
-  offers.push_back(fdf::MakeOffer2<fdci::UsbDciService>());
-  offers.push_back(mac_address_metadata_server_.MakeOffer());
-  offers.push_back(serial_number_metadata_server_.MakeOffer());
-  offers.push_back(usb_phy_metadata_server_.MakeOffer());
+  std::vector offers = {
+      fdf::MakeOffer2<fdci::UsbDciService>(),
+      mac_address_metadata_server_.MakeOffer(),
+      serial_number_metadata_server_.MakeOffer(),
+      usb_phy_metadata_server_.MakeOffer(),
+  };
 
   auto child = AddChild(name(), props, offers);
   if (child.is_error()) {

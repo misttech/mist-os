@@ -12,7 +12,6 @@
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.phy/cpp/fidl.h>
 #include <lib/dma-buffer/buffer.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/metadata/cpp/metadata_server.h>
@@ -526,8 +525,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
   fidl::ServerBindingGroup<fuchsia_hardware_usb_dci::UsbDci> bindings_;
   fidl::SyncClient<fuchsia_driver_framework::NodeController> child_;
-
-  compat::SyncInitializedDeviceServer compat_;
 
   fdf_metadata::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>
       mac_address_metadata_server_;
