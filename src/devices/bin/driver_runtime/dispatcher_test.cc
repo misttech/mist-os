@@ -1533,6 +1533,46 @@ TEST_F(DispatcherTest, AsyncWaitOnce) {
   ASSERT_OK(sync_completion_wait(&completion, ZX_TIME_INFINITE));
 }
 
+TEST_F(DispatcherTest, AsyncWaitEdgeOnce) {
+  fdf_dispatcher_t* dispatcher;
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
+
+  async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
+  ASSERT_NOT_NULL(async_dispatcher);
+
+  zx::event event;
+  ASSERT_OK(zx::event::create(0, &event));
+  // Set the signal on the event before waiting.
+  ASSERT_OK(event.signal(0, ZX_USER_SIGNAL_0));
+
+  sync_completion_t completion;
+  async::WaitOnce wait(event.get(), ZX_USER_SIGNAL_0, ZX_WAIT_ASYNC_EDGE);
+
+  ASSERT_OK(wait.Begin(async_dispatcher, [&completion, &async_dispatcher](
+                                             async_dispatcher_t* dispatcher, async::WaitOnce* wait,
+                                             zx_status_t status, const zx_packet_signal_t* signal) {
+    ASSERT_EQ(async_dispatcher, dispatcher);
+    ASSERT_OK(status);
+    sync_completion_signal(&completion);
+  }));
+
+  async::PostTask(async_dispatcher, [&] {
+    // The wait shouldn't have completed here due to ZX_WAIT_ASYNC_EDGE. Clear the signal and
+    // continue.
+    EXPECT_FALSE(sync_completion_signaled(&completion));
+    ASSERT_OK(event.signal(ZX_USER_SIGNAL_0, 0));
+
+    async::PostTask(async_dispatcher, [&] {
+      // The wait still shouldn't have completed here. Now set the signal again, and wait for the
+      // handler to run.
+      EXPECT_FALSE(sync_completion_signaled(&completion));
+      ASSERT_OK(event.signal(0, ZX_USER_SIGNAL_0));
+    });
+  });
+
+  ASSERT_OK(sync_completion_wait(&completion, ZX_TIME_INFINITE));
+}
+
 TEST_F(DispatcherTest, CancelWait) {
   fdf_dispatcher_t* dispatcher;
   ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
