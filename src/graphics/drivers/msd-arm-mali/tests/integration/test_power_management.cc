@@ -4,7 +4,6 @@
 
 #define MAGMA_DLOG_ENABLE 1
 
-#include <fidl/fuchsia.hardware.gpu.mali/cpp/wire.h>
 #include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/magma/magma.h>
 #include <lib/magma/util/dlog.h>
@@ -60,13 +59,13 @@ class TestConnection : public magma::TestDeviceBase {
 };
 
 TEST(PowerManagement, SuspendResume) {
-  component::SyncServiceMemberWatcher<fuchsia_hardware_gpu_mali::UtilsService::Device> watcher;
+  component::SyncServiceMemberWatcher<fuchsia_gpu_magma::TrustedService::DebugUtils> watcher;
   zx::result client_end = watcher.GetNextInstance(false);
   ASSERT_FALSE(client_end.is_error()) << client_end.status_string();
 
   auto client = fidl::WireSyncClient(std::move(*client_end));
 
-  EXPECT_TRUE(client->SetPowerState(false).ok());
+  EXPECT_TRUE(client->SetPowerState(0).ok());
 
   std::unique_ptr<TestConnection> test;
   test.reset(new TestConnection());
@@ -75,7 +74,7 @@ TEST(PowerManagement, SuspendResume) {
     // SubmitCommandBuffer waits 1 second, so delay less than that.
     zx::nanosleep(zx::deadline_after(zx::msec(500)));
     EXPECT_FALSE(submit_returned);
-    EXPECT_TRUE(client->SetPowerState(true).ok());
+    EXPECT_TRUE(client->SetPowerState(1).ok());
   });
   test->SubmitCommandBuffer(mali_utils::AtomHelper::NORMAL, 1, 0, false);
   submit_returned = true;
@@ -84,7 +83,7 @@ TEST(PowerManagement, SuspendResume) {
 
 // Repeatedly attempt to suspend/resume to GPU to attempt to trigger a soft stop.
 TEST(PowerManagement, RepeatedSuspendResume) {
-  component::SyncServiceMemberWatcher<fuchsia_hardware_gpu_mali::UtilsService::Device> watcher;
+  component::SyncServiceMemberWatcher<fuchsia_gpu_magma::TrustedService::DebugUtils> watcher;
   zx::result client_end = watcher.GetNextInstance(false);
   ASSERT_FALSE(client_end.is_error()) << client_end.status_string();
 
@@ -97,9 +96,9 @@ TEST(PowerManagement, RepeatedSuspendResume) {
     for (uint32_t i = 0; i < 20; i++) {
       constexpr uint32_t kMaxTimeToDelayMs = 10;
       zx::nanosleep(zx::deadline_after(zx::msec(rand() % kMaxTimeToDelayMs)));
-      EXPECT_TRUE(client->SetPowerState(false).ok());
+      EXPECT_TRUE(client->SetPowerState(0).ok());
       zx::nanosleep(zx::deadline_after(zx::msec(1)));
-      EXPECT_TRUE(client->SetPowerState(true).ok());
+      EXPECT_TRUE(client->SetPowerState(1).ok());
     }
     finished_test = true;
   });

@@ -27,8 +27,7 @@ zx_status_t magma_indriver_test(ParentDevice* device);
 constexpr char kDriverName[] = "mali";
 #endif
 
-class MaliDriver : public msd::MagmaDriverBase,
-                   public fidl::WireServer<fuchsia_hardware_gpu_mali::MaliUtils> {
+class MaliDriver : public msd::MagmaDriverBase {
  public:
   MaliDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : msd::MagmaDriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
@@ -74,37 +73,10 @@ class MaliDriver : public msd::MagmaDriverBase,
 
     return zx::ok();
   }
-  zx::result<> CreateAdditionalDevNodes() override {
-    fuchsia_hardware_gpu_mali::UtilsService::InstanceHandler handler({
-        .device =
-            mali_utils_bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
-    });
-
-    return outgoing()->AddService<fuchsia_hardware_gpu_mali::UtilsService>(std::move(handler));
-  }
 
   void Stop() override {
     msd::MagmaDriverBase::Stop();
     magma::PlatformBusMapper::SetInfoResource(zx::resource{});
-  }
-
-  void BindUtilsConnector(fidl::ServerEnd<fuchsia_hardware_gpu_mali::MaliUtils> server) {
-    fidl::BindServer(dispatcher(), std::move(server), this);
-  }
-
-  void SetPowerState(fuchsia_hardware_gpu_mali::wire::MaliUtilsSetPowerStateRequest* request,
-                     SetPowerStateCompleter::Sync& completer) override {
-    std::lock_guard lock(magma_mutex());
-
-    int64_t power_state = request->enabled ? 1 : 0;
-    magma_system_device()->SetPowerState(
-        power_state, [completer = completer.ToAsync()](magma_status_t status) mutable {
-          if (status == MAGMA_STATUS_OK) {
-            completer.ReplySuccess();
-          } else {
-            completer.ReplyError(ZX_ERR_INTERNAL);
-          }
-        });
   }
 
   void GetPowerGoals(GetPowerGoalsCompleter::Sync& completer) override {
@@ -136,8 +108,6 @@ class MaliDriver : public msd::MagmaDriverBase,
 #if MAGMA_TEST_DRIVER
   msd::MagmaTestServer test_server_;
 #endif
-
-  fidl::ServerBindingGroup<fuchsia_hardware_gpu_mali::MaliUtils> mali_utils_bindings_;
 };
 
 FUCHSIA_DRIVER_EXPORT(MaliDriver);

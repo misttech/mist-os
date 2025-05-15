@@ -32,7 +32,10 @@
         },
         {
             // Needed for graphics tests.
-            service: [ "fuchsia.gpu.magma.TestService" ],
+            service: [
+                "fuchsia.gpu.magma.TestService",
+                "fuchsia.gpu.magma.TrustedService",
+            ],
             from: "#bootstrap",
             to: "#core",
         },

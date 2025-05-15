@@ -61,6 +61,7 @@ class MagmaCombinedDeviceServer : public fidl::WireServer<fuchsia_gpu_magma::Com
 
 class MagmaDriverBase : public fdf::DriverBase,
                         public fidl::WireServer<fuchsia_gpu_magma::PowerElementProvider>,
+                        public fidl::WireServer<fuchsia_gpu_magma::DebugUtils>,
                         internal::DependencyInjectionServer::Owner {
  public:
   MagmaDriverBase(std::string_view name, fdf::DriverStartArgs start_args,
@@ -111,6 +112,11 @@ class MagmaDriverBase : public fdf::DriverBase,
   MagmaSystemDevice* magma_system_device() FIT_REQUIRES(magma_->magma_mutex);
 
   zx::result<> CreateTestService(MagmaTestServer& test_server);
+
+  void SetPowerState(
+      fuchsia_gpu_magma::wire::DebugUtilsSetPowerStateRequest* request,
+      fidl::WireServer<::fuchsia_gpu_magma::DebugUtils>::SetPowerStateCompleter::Sync& completer)
+      override;
 
  private:
   zx::result<> CreateDevfsNode();

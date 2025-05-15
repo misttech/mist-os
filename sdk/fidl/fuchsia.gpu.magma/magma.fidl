@@ -587,6 +587,15 @@ open protocol PowerElementProvider {
     }) error zx.Status;
 };
 
+/// Low-level protocol exposed by the GPU driver used mainly for testing and debugging the driver.
+@available(added=HEAD)
+closed protocol DebugUtils {
+    /// Set the GPU power state. Returns after the transition is complete.
+    strict SetPowerState(struct {
+        power_state int64;
+    }) -> () error zx.Status;
+};
+
 @available(added=HEAD)
 service Service {
     device client_end:CombinedDevice;
@@ -598,6 +607,7 @@ service Service {
 service TrustedService {
     device client_end:CombinedDevice;
     power_element_provider client_end:PowerElementProvider;
+    debug_utils client_end:DebugUtils;
 };
 
 /// Additional methods for reporting tests run in the MSD.

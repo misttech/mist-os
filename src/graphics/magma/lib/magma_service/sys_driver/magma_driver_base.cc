@@ -187,14 +187,19 @@ zx::result<> MagmaDriverBase::CreateDevfsNode() {
         [this](fidl::ServerEnd<fuchsia_gpu_magma::PowerElementProvider> server_end) mutable {
           fidl::BindServer(dispatcher(), std::move(server_end), this);
         };
+    auto debug_utils_protocol =
+        [this](fidl::ServerEnd<fuchsia_gpu_magma::DebugUtils> server_end) mutable {
+          fidl::BindServer(dispatcher(), std::move(server_end), this);
+        };
     auto device_protocol =
         [this](fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server_end) mutable {
           fidl::BindServer(dispatcher(), std::move(server_end), &trusted_combined_device_server_);
         };
 
-    fuchsia_gpu_magma::Service::InstanceHandler handler(
+    fuchsia_gpu_magma::TrustedService::InstanceHandler handler(
         {.device = std::move(device_protocol),
-         .power_element_provider = std::move(power_protocol)});
+         .power_element_provider = std::move(power_protocol),
+         .debug_utils = std::move(debug_utils_protocol)});
     {
       auto status =
           outgoing()->template AddService<fuchsia_gpu_magma::TrustedService>(std::move(handler));
@@ -314,6 +319,21 @@ void MagmaCombinedDeviceServer::GetIcdList(GetIcdListCompleter::Sync& completer)
   }
 
   completer.Reply(fidl::VectorView<fuchsia_gpu_magma::wire::IcdInfo>::FromExternal(icd_infos));
+}
+
+void MagmaDriverBase::SetPowerState(
+    fuchsia_gpu_magma::wire::DebugUtilsSetPowerStateRequest* request,
+    fidl::WireServer<::fuchsia_gpu_magma::DebugUtils>::SetPowerStateCompleter::Sync& completer) {
+  std::lock_guard lock(magma_mutex());
+
+  magma_system_device()->SetPowerState(
+      request->power_state, [completer = completer.ToAsync()](magma_status_t status) mutable {
+        if (status == MAGMA_STATUS_OK) {
+          completer.ReplySuccess();
+        } else {
+          completer.ReplyError(ZX_ERR_INTERNAL);
+        }
+      });
 }
 
 }  // namespace msd

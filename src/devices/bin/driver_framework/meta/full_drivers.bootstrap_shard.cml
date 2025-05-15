@@ -117,6 +117,7 @@
         {
             service: [
                 "fuchsia.gpu.magma.TestService",
+                "fuchsia.gpu.magma.TrustedService",
                 "fuchsia.hardware.google.nanohub.Service",
                 "fuchsia.hardware.haptics.Service",
                 "fuchsia.hardware.qcom.hvdcpopti.Service",

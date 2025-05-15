@@ -393,6 +393,11 @@
             to: "#testing",
         },
         {
+            service: "fuchsia.gpu.magma.TrustedService",
+            from: "parent",
+            to: "#testing",
+        },
+        {
             service: "fuchsia.hardware.serial.Service",
             from: "parent",
             to: "#testing",

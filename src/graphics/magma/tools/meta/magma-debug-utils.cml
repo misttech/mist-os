@@ -7,9 +7,9 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/mali-util",
+        binary: "bin/magma-debug-utils",
     },
     use: [
-        { service: "fuchsia.hardware.gpu.mali.UtilsService" },
+        { service: "fuchsia.gpu.magma.TrustedService" },
     ],
 }
