@@ -833,9 +833,12 @@ void KTraceImpl<BufferMode::kPerCpu>::Init(uint32_t bufsize, uint32_t initial_gr
   // Allocate the KOIDs used to annotate CPU trace records.
   cpu_context_map_.Init();
 
-  // Compute the per-CPU buffer size, ensuring that the resulting value is page aligned.
+  // Compute the per-CPU buffer size, ensuring that the resulting value is a power of two.
   num_buffers_ = arch_max_num_cpus();
-  buffer_size_ = PAGE_ALIGN(bufsize / num_buffers_);
+  const uint32_t raw_percpu_bufsize = bufsize / num_buffers_;
+  DEBUG_ASSERT(raw_percpu_bufsize > 0);
+  const int leading_zeros = __builtin_clz(raw_percpu_bufsize);
+  buffer_size_ = 1u << (31 - leading_zeros);
 
   // If the initial_grpmask was zero, then we can delay allocation of the KTrace buffer.
   if (initial_grpmask == 0) {

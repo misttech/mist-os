@@ -111,6 +111,27 @@ class KTraceTests {
     END_TEST;
   }
 
+  // Test that calling Init works when the provided total buffer size does not
+  // result in a power-of-two sized buffer for each CPU.
+  static bool TestInitWithUnevenBufferSize() {
+    BEGIN_TEST;
+
+    TestKTrace ktrace;
+    // 1723 is a prime number, and therefore will not divide evenly per-CPU, nor will
+    // the resulting per-CPU buffer size be a power of two.
+    const uint32_t total_bufsize = (PAGE_SIZE + 1723) * arch_max_num_cpus();
+    // Init should correctly round the buffer size per-CPU down to PAGE_SIZE.
+    ktrace.Init(total_bufsize, 0xff1u);
+    ASSERT_NONNULL(ktrace.percpu_buffers_);
+    ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
+    ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
+    ASSERT_TRUE(ktrace.WritesEnabled());
+    ASSERT_EQ(0xff1u, ktrace.categories_bitmask());
+    ASSERT_EQ(1u, ktrace.report_metadata_count());
+
+    END_TEST;
+  }
+
   // Test the case where tracing is started by Start and stopped by Stop.
   static bool TestStartStop() {
     BEGIN_TEST;
@@ -422,15 +443,13 @@ class KTraceTests {
       // Write record size is the number of bytes to write if the action is kWrite.
       const uint32_t write_record_size = static_cast<uint32_t>(rand()) % PAGE_SIZE;
 
-      // Initialize an instance of ktrace with a single per-CPU buffer for simplicity and start
-      // tracing.
+      // Initialize an instance of ktrace and start tracing.
       TestKTrace ktrace;
-      const uint32_t num_cpus = 1;
-      const uint32_t total_bufsize = PAGE_SIZE * num_cpus;
+      const uint32_t total_bufsize = PAGE_SIZE * arch_max_num_cpus();
       ktrace.Init(total_bufsize, 0xffff);
-      TestKTrace::PerCpuBuffer& pcb = ktrace.percpu_buffers_[0];
 
-      // Fill the buffer up.
+      // Fill the buffer on the first CPU up.
+      TestKTrace::PerCpuBuffer& pcb = ktrace.percpu_buffers_[0];
       zx::result<TestKTrace::PerCpuBuffer::Reservation> res = pcb.Reserve(PAGE_SIZE);
       ASSERT_OK(res.status_value());
       res->Write(ktl::span<ktl::byte>(src, PAGE_SIZE));
@@ -562,6 +581,7 @@ class KTraceTests {
 UNITTEST_START_TESTCASE(ktrace_tests)
 UNITTEST("legacy_categories", KTraceTests::TestLegacyCategories)
 UNITTEST("init_stop", KTraceTests::TestInitStop)
+UNITTEST("init_with_uneven_buffer_size", KTraceTests::TestInitWithUnevenBufferSize)
 UNITTEST("start_stop", KTraceTests::TestStartStop)
 UNITTEST("write", KTraceTests::TestWrite)
 UNITTEST("rewind", KTraceTests::TestRewind)
