@@ -23,8 +23,9 @@ constexpr char kUsageSummary[] = R"""(
 SPMI driver control.
 
 Usage:
-  spmi-ctl [-c|--controller <controller>] -t|--target <id> -a|--address <address> -r|--read <read_bytes>
-  spmi-ctl [-c|--controller <controller>] -t|--target <id> -a|--address <address> -w|--write <hex_byte0> <hex_byte1>...
+  spmi-ctl [-c|--controller <controller>] -t|--target <id> -a|--address <hex_address> -r|--read <hex_bytes_to_read>
+  spmi-ctl [-c|--controller <controller>] -t|--target <id> -a|--address <hex_address> -w|--write <hex_byte_0> <hex_byte_1>...
+  spmi-ctl [-c|--controller <controller>] -t|--target <id> -a|--address <hex_address> -d|--dump <hex_bytes_to_dump>
   spmi-ctl [-c|--controller <controller>] -t|--target <id> -p|--properties
   spmi-ctl -l|--list
   spmi-ctl -h|--help
@@ -39,6 +40,8 @@ Options:
   -a, --address     Address to read or write. Must be listed before --read or --write.
   -r, --read        Reads <read_bytes> from the device.
   -w, --write       Writes <hex_byte0>, <hex_byte1>, etc to the device.
+  -d, --dump        Dumps <dump_bytes> from the device, reading one byte at the time.
+                    If there is an error, continue with the next register.
   -p, --properties  Retrieves device properties.
   -l, --list        Lists all devices available.
   -h, --help        Show list of command-line options.
@@ -210,18 +213,14 @@ int SpmiCtl::Execute(int argc, char** argv) {
 
   while (true) {
     static struct option long_options[] = {
-        {"help", no_argument, 0, 'h'},
-        {"controller", required_argument, 0, 'c'},
-        {"target", required_argument, 0, 't'},
-        {"address", required_argument, 0, 'a'},
-        {"read", required_argument, 0, 'r'},
-        {"write", required_argument, 0, 'w'},
-        {"properties", no_argument, 0, 'p'},
-        {"list", no_argument, 0, 'l'},
-        {0, 0, 0, 0},
+        {"help", no_argument, 0, 'h'},         {"controller", required_argument, 0, 'c'},
+        {"target", required_argument, 0, 't'}, {"address", required_argument, 0, 'a'},
+        {"read", required_argument, 0, 'r'},   {"write", required_argument, 0, 'w'},
+        {"dump", required_argument, 0, 'd'},   {"properties", no_argument, 0, 'p'},
+        {"list", no_argument, 0, 'l'},         {0, 0, 0, 0},
     };
 
-    int c = getopt_long(argc, argv, "hc:t:a:r:w:pl", long_options, 0);
+    int c = getopt_long(argc, argv, "hc:t:a:r:w:d:pl", long_options, 0);
     if (c == -1)
       break;
 
@@ -267,7 +266,7 @@ int SpmiCtl::Execute(int argc, char** argv) {
         }
 
         int32_t read_bytes = 0;
-        if (sscanf(optarg, "%d", &read_bytes) != 1) {
+        if (sscanf(optarg, "%x", &read_bytes) != 1) {
           ShowUsage(false);
           return -1;
         }
@@ -308,6 +307,47 @@ int SpmiCtl::Execute(int argc, char** argv) {
         }
         return 0;
       } break;
+
+      case 'd': {
+        if (!target || !address) {
+          break;
+        }
+
+        size_t dump_bytes = 0;
+        if (sscanf(optarg, "%zx", &dump_bytes) != 1) {
+          ShowUsage(false);
+          return -1;
+        }
+        if (dump_bytes < 1) {
+          std::cerr << "Dump failed: must dump at least 1 byte" << std::endl;
+          return -1;
+        }
+
+        auto client = GetSpmiClient(controller, *target);
+        if (!client.is_valid()) {
+          return -1;
+        }
+        fuchsia_hardware_spmi::DeviceExtendedRegisterReadLongRequest request;
+        // Read 1 byte at the time. If there is an error, continue with the next register.
+        for (size_t j = 0; j < dump_bytes; ++j) {
+          if (static_cast<size_t>(*address) + j > std::numeric_limits<uint16_t>::max()) {
+            std::cerr << "Dump terminated: address out of 16 bits range" << std::endl;
+            return 0;
+          }
+          const uint16_t local_address = *address + static_cast<uint16_t>(j);
+          request.address(local_address);
+          request.size_bytes(1);
+          auto result = client->ExtendedRegisterReadLong(request);
+          if (result.is_error()) {
+            printf("Register: 0x%04x  %s\n", local_address,
+                   result.error_value().FormatDescription().c_str());
+            continue;
+          }
+          printf("Register: 0x%04x  value: 0x%02x (%u)\n", local_address, result->data()[0],
+                 result->data()[0]);
+        }
+        return 0;
+      }
 
       case 'w': {
         if (!target || !address) {
