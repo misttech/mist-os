@@ -187,8 +187,7 @@ impl Digest {
             // claimed by any VMO (anymore).
             Bucket {
                 name: ORPHANED.to_string(),
-                size: (kmem_stats.vmo_bytes.unwrap_or(0) - vmo_size)
-                    .clamp(0, kmem_stats.vmo_bytes.unwrap_or(0)),
+                size: kmem_stats.vmo_bytes.unwrap_or(0).saturating_sub(vmo_size),
             },
             // This bucket aggregates overall kernel memory usage.
             Bucket {
