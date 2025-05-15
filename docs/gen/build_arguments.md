@@ -1024,7 +1024,7 @@ This should never be set as a build argument.
 }
   armv7_unknown_linux_gnueabihf = {
   libclang_rt_profile_a = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.profile.a"
-  libunwind_so = "../../../../out/not-default/libunwind.so"
+  libunwind_so = ""
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -1041,7 +1041,7 @@ This should never be set as a build argument.
   clang_rt = "../../../../out/not-default/libclang_rt.hwasan.so"
 }
   static = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.hwasan.a"
   clang_rt_cxx = "../../../../out/not-default/libclang_rt.hwasan_cxx.a"
 }
 }
@@ -1750,7 +1750,7 @@ This should never be set as a build argument.
 }
   x86_64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = "../../../../out/not-default/libunwind.so"
+  libunwind_so = ""
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -2713,7 +2713,7 @@ From //build/config/fuchsia_cxx_version.gni:26
 
 Support streaming ktrace data out of the kernel.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //zircon/kernel/params.gni:127
 
