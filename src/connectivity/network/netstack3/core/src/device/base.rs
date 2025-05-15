@@ -344,10 +344,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         let mut state = ip_device_state(self, device_id);
         let addr_id = state
             .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
-            // TODO(https://fxbug.dev/42077260): Once DAD is supported, start
-            // with Uninitialized state. For now, setting the state to Assigned
-            // skips DAD.
-            .add(IpAddressEntry::new(addr, DadState::Assigned, config));
+            .add(IpAddressEntry::new(addr, DadState::Uninitialized, config));
         addr_id
     }
 

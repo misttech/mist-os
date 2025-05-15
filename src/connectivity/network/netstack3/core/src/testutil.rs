@@ -1460,6 +1460,7 @@ pub struct PureIpDeviceAndIpVersion<BT: DeviceLayerTypes> {
 }
 
 /// A frame that's been dispatched to Bindings to be sent out the device driver.
+#[derive(Debug)]
 pub enum DispatchedFrame {
     /// A frame that's been dispatched to an Ethernet device.
     Ethernet(EthernetWeakDeviceId<FakeBindingsCtx>),

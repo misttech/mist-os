@@ -10,12 +10,14 @@
 use alloc::vec::Vec;
 use core::num::NonZeroU16;
 use core::ops::Range;
+use zerocopy::SplitByteSlice;
 
 use log::debug;
 use net_types::ethernet::Mac;
 use net_types::ip::{Ipv4Addr, Ipv6Addr};
 use packet::{ParsablePacket, ParseBuffer, SliceBufViewMut};
 
+use crate::arp::{ArpOp, ArpPacket};
 use crate::error::{IpParseResult, ParseError, ParseResult};
 use crate::ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck};
 use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpParseArgs, Icmpv6PacketRaw};
@@ -175,6 +177,47 @@ pub fn parse_ethernet_frame(
     let dst_mac = frame.dst_mac();
     let ethertype = frame.ethertype();
     Ok((buf, src_mac, dst_mac, ethertype))
+}
+
+/// Information about an [`ArpPacket`].
+#[allow(missing_docs)]
+pub struct ArpPacketInfo {
+    pub sender_hardware_address: Mac,
+    pub sender_protocol_address: Ipv4Addr,
+    pub target_hardware_address: Mac,
+    pub target_protocol_address: Ipv4Addr,
+    pub operation: ArpOp,
+}
+
+impl<B: SplitByteSlice> From<ArpPacket<B, Mac, Ipv4Addr>> for ArpPacketInfo {
+    fn from(packet: ArpPacket<B, Mac, Ipv4Addr>) -> ArpPacketInfo {
+        ArpPacketInfo {
+            sender_hardware_address: packet.sender_hardware_address(),
+            sender_protocol_address: packet.sender_protocol_address(),
+            target_hardware_address: packet.target_hardware_address(),
+            target_protocol_address: packet.target_protocol_address(),
+            operation: packet.operation(),
+        }
+    }
+}
+
+/// Parse an ARP packet.
+pub fn parse_arp_packet(mut buf: &[u8]) -> ParseResult<ArpPacketInfo> {
+    (&mut buf).parse::<ArpPacket<_, Mac, Ipv4Addr>>().map(ArpPacketInfo::from)
+}
+
+/// Parse an ARP packet in an Ethernet frame.
+pub fn parse_arp_packet_in_ethernet_frame(
+    buf: &[u8],
+    ethernet_length_check: EthernetFrameLengthCheck,
+) -> ParseResult<ArpPacketInfo> {
+    let (body, _src_mac, _dst_mac, ethertype) = parse_ethernet_frame(buf, ethernet_length_check)?;
+    if ethertype != Some(EtherType::Arp) {
+        debug!("unexpected ethertype: {:?}", ethertype);
+        return Err(ParseError::NotExpected.into());
+    }
+
+    parse_arp_packet(body)
 }
 
 /// Parse an IP packet.

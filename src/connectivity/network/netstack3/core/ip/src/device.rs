@@ -640,6 +640,7 @@ pub trait WithIpDeviceConfigurationMutInner<I: IpDeviceIpExt, BT: IpDeviceStateB
     type IpDeviceStateCtx<'s>: IpDeviceStateContext<I, BT, DeviceId = Self::DeviceId>
         + GmpHandler<I, BT>
         + NudIpHandler<I, BT>
+        + DadHandler<I, BT>
         + 's
     where
         Self: 's;
@@ -1287,7 +1288,7 @@ fn disable_ipv6_device_with_config<
 
 fn enable_ipv4_device_with_config<
     BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
-    CC: IpDeviceStateContext<Ipv4, BC> + GmpHandler<Ipv4, BC>,
+    CC: IpDeviceStateContext<Ipv4, BC> + GmpHandler<Ipv4, BC> + DadHandler<Ipv4, BC>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1303,16 +1304,26 @@ fn enable_ipv4_device_with_config<
         config,
     );
     GmpHandler::gmp_handle_maybe_enabled(core_ctx, bindings_ctx, device_id);
-    core_ctx.with_address_ids(device_id, |addrs, _core_ctx| {
-        addrs.for_each(|addr| {
-            // TODO(https://fxbug.dev/42077260): Start DAD, if enabled.
+    core_ctx
+        .with_address_ids(device_id, |addrs, _core_ctx| addrs.collect::<Vec<_>>())
+        .into_iter()
+        .for_each(|addr_id| {
+            let (state, start_dad) = DadHandler::initialize_duplicate_address_detection(
+                core_ctx,
+                bindings_ctx,
+                device_id,
+                &addr_id,
+            )
+            .into_address_state_and_start_dad();
             bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
                 device: device_id.clone(),
-                addr: addr.addr().into(),
-                state: IpAddressState::Assigned,
+                addr: addr_id.addr().into(),
+                state,
             });
+            if let Some(token) = start_dad {
+                core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+            }
         })
-    })
 }
 
 fn disable_ipv4_device_with_config<

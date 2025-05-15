@@ -605,6 +605,9 @@ fn do_duplicate_address_detection<
 
             match remaining {
                 None => {
+                    // TODO(https://fxbug.dev/42077260): For IPv4 addresses,
+                    // perform the announcement procedure specified in RFC 5227
+                    // section 2.3 before assigning the address.
                     *dad_state = DadState::Assigned;
                     core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = true);
                     CC::on_event(
@@ -617,6 +620,8 @@ fn do_duplicate_address_detection<
                     None
                 }
                 Some(non_zero_remaining) => {
+                    // TODO(https://fxbug.dev/42077260): Support IPv4 PROBE_WAIT
+                    // as specified in RFC 5227 section 2.1.1.
                     *remaining = NonZeroU16::new(non_zero_remaining.get() - 1);
 
                     // Delay sending subsequent DAD probes.
@@ -746,30 +751,46 @@ fn handle_incoming_packet<
     )
 }
 
-// TODO(https://fxbug.dev/42077260): Actually support DAD for IPv4.
 impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<Ipv4, BC>> DadHandler<Ipv4, BC> for CC {
     fn initialize_duplicate_address_detection<'a>(
         &mut self,
-        _bindings_ctx: &mut BC,
-        _device_id: &'a Self::DeviceId,
-        _addr: &'a Self::AddressId,
+        bindings_ctx: &mut BC,
+        device_id: &'a Self::DeviceId,
+        addr: &'a Self::AddressId,
     ) -> NeedsDad<'a, Self::AddressId, Self::DeviceId> {
-        NeedsDad::No
+        initialize_duplicate_address_detection(
+            self,
+            bindings_ctx,
+            device_id,
+            addr,
+            // on_initialized_cb
+            |_core_ctx, _bindings_ctx, _device_id, _addr| {},
+        )
     }
 
     fn start_duplicate_address_detection<'a>(
         &mut self,
-        _bindings_ctx: &mut BC,
-        _start_dad: StartDad<'_, Self::AddressId, Self::DeviceId>,
+        bindings_ctx: &mut BC,
+        start_dad: StartDad<'_, Self::AddressId, Self::DeviceId>,
     ) {
+        let StartDad { device_id, address_id } = start_dad;
+        do_duplicate_address_detection(self, bindings_ctx, device_id, address_id)
     }
 
     fn stop_duplicate_address_detection(
         &mut self,
-        _bindings_ctx: &mut BC,
-        _device_id: &Self::DeviceId,
-        _addr: &Self::AddressId,
+        bindings_ctx: &mut BC,
+        device_id: &Self::DeviceId,
+        addr: &Self::AddressId,
     ) {
+        stop_duplicate_address_detection(
+            self,
+            bindings_ctx,
+            device_id,
+            addr,
+            // on_stopped_cb
+            |_core_ctx, _bindings_ctx, _device_id, _addr| {},
+        )
     }
 
     /// Handles an incoming ARP packet.
@@ -799,7 +820,7 @@ where
             bindings_ctx,
             device_id,
             addr,
-            /*on_initialized_cb */
+            // on_initialized_cb
             |core_ctx, bindings_ctx, device_id, addr| {
                 // As per RFC 4862 section 5.4.2,
                 //
@@ -845,7 +866,7 @@ where
             bindings_ctx,
             device_id,
             addr,
-            /*on_stopped_cb */
+            // on_stopped_cb
             |core_ctx, bindings_ctx, device_id, addr| {
                 // Undo the steps taken when DAD was initialized and leave the
                 // solicited node multicast group. Note that we leave the
@@ -913,7 +934,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
-    use net_types::ip::{AddrSubnet, IpAddress as _, Ipv4Addr};
+    use net_types::ip::{AddrSubnet, GenericOverIp, IpAddress as _, IpVersion, Ipv4Addr};
     use net_types::{NonMappedAddr, NonMulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
     use netstack3_base::testutil::{
         FakeBindingsCtx, FakeCoreCtx, FakeCryptoRng, FakeDeviceId, FakeInstant,
@@ -924,7 +945,6 @@ mod tests {
         SendFrameContext as _, TimerHandler,
     };
     use packet::EmptyBuf;
-    use packet_formats::icmp::ndp::Options;
     use test_case::test_case;
 
     use super::*;
@@ -945,6 +965,22 @@ mod tests {
         // Returns the range of `FakeInstant` that a timer is expected
         // to be installed within.
         fn expected_timer_range(now: FakeInstant) -> impl RangeBounds<FakeInstant> + Debug;
+
+        type DadHandlerCtx: DadHandler<
+            Self,
+            FakeBindingsCtxImpl<Self>,
+            DeviceId = FakeDeviceId,
+            AddressId = AddrSubnet<Self::Addr, Self::AssignedWitness>,
+        >;
+
+        // A trampoline method to get access to `DadHandler<I, _>`.
+        //
+        // Because the base implementation for DadHandler exists only for IPv4
+        // and IPv6, we need this helper to access a DadHandler for any `I`.
+        fn with_dad_handler<O, F: FnOnce(&mut Self::DadHandlerCtx) -> O>(
+            core_ctx: &mut FakeCoreCtxImpl<Self>,
+            cb: F,
+        ) -> O;
     }
 
     impl TestDadIpExt for Ipv4 {
@@ -960,6 +996,15 @@ mod tests {
             let FakeInstant { offset } = now;
             FakeInstant::from(offset + *IPV4_PROBE_RANGE.start())
                 ..=FakeInstant::from(offset + *IPV4_PROBE_RANGE.end())
+        }
+
+        type DadHandlerCtx = FakeCoreCtxImpl<Ipv4>;
+
+        fn with_dad_handler<O, F: FnOnce(&mut FakeCoreCtxImpl<Ipv4>) -> O>(
+            core_ctx: &mut FakeCoreCtxImpl<Ipv4>,
+            cb: F,
+        ) -> O {
+            cb(core_ctx)
         }
     }
 
@@ -977,6 +1022,15 @@ mod tests {
             let FakeInstant { offset } = now;
             let expected_timer = FakeInstant::from(offset + Self::DEFAULT_RETRANS_TIMER_DATA.get());
             expected_timer..=expected_timer
+        }
+
+        type DadHandlerCtx = FakeCoreCtxImpl<Ipv6>;
+
+        fn with_dad_handler<O, F: FnOnce(&mut FakeCoreCtxImpl<Ipv6>) -> O>(
+            core_ctx: &mut FakeCoreCtxImpl<Ipv6>,
+            cb: F,
+        ) -> O {
+            cb(core_ctx)
         }
     }
 
@@ -1141,10 +1195,9 @@ mod tests {
         );
     }
 
-    // TODO(https://fxbug.dev/42077260): Run this test against IPv4.
-    #[test]
-    fn dad_disabled() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+    #[ip_test(I)]
+    fn dad_disabled<I: TestDadIpExt>() {
+        let FakeCtx::<I> { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
                 FakeCoreCtxImpl::with_state(FakeDadContext {
                     state: DadState::Tentative {
@@ -1156,19 +1209,20 @@ mod tests {
                     address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
                 })
             });
-        let address_id = get_address_id::<Ipv6>(Ipv6::DAD_ADDRESS);
-        let start_dad = DadHandler::<Ipv6, _>::initialize_duplicate_address_detection(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &FakeDeviceId,
-            &address_id,
-        );
+        let address_id = get_address_id::<I>(I::DAD_ADDRESS);
+        let start_dad = I::with_dad_handler(&mut core_ctx, |core_ctx| {
+            core_ctx.initialize_duplicate_address_detection(
+                &mut bindings_ctx,
+                &FakeDeviceId,
+                &address_id,
+            )
+        });
         assert_matches!(start_dad, NeedsDad::No);
         let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
         assert_matches!(*state, DadState::Assigned);
         let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(*assigned);
-        assert_eq!(groups, &HashMap::from([(Ipv6::DAD_ADDRESS.to_solicited_node_address(), 1)]));
+        check_multicast_groups(I::VERSION, groups);
         assert_eq!(bindings_ctx.take_events(), &[][..]);
     }
 
@@ -1180,52 +1234,88 @@ mod tests {
         }
     }
 
-    fn check_dad(
-        core_ctx: &FakeCoreCtxImpl<Ipv6>,
-        bindings_ctx: &FakeBindingsCtxImpl<Ipv6>,
+    #[track_caller]
+    fn check_multicast_groups(
+        ip_version: IpVersion,
+        groups: &HashMap<MulticastAddr<Ipv6Addr>, usize>,
+    ) {
+        match ip_version {
+            // IPv4 should not join any multicast groups.
+            IpVersion::V4 => assert_eq!(groups, &HashMap::new()),
+            // IPv6 should join the solicited node multicast group.
+            IpVersion::V6 => {
+                assert_eq!(
+                    groups,
+                    &HashMap::from([(Ipv6::DAD_ADDRESS.to_solicited_node_address(), 1)])
+                )
+            }
+        }
+    }
+
+    fn check_dad<I: TestDadIpExt>(
+        core_ctx: &FakeCoreCtxImpl<I>,
+        bindings_ctx: &FakeBindingsCtxImpl<I>,
         frames_len: usize,
         dad_transmits_remaining: Option<NonZeroU16>,
     ) {
         let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
-        let nonces = assert_matches!(state, DadState::Tentative {
+        let ip_specific_state = assert_matches!(state, DadState::Tentative {
             dad_transmits_remaining: got,
             timer: _,
-            ip_specific_state: Ipv6TentativeDadState {
-                nonces,
-                added_extra_transmits_after_detecting_looped_back_ns: _,
-            },
+            ip_specific_state,
         } => {
             assert_eq!(
                 *got,
                 dad_transmits_remaining,
                 "got dad_transmits_remaining = {got:?}, \
                  want dad_transmits_remaining = {dad_transmits_remaining:?}");
-            nonces
+            ip_specific_state
         });
         let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(!*assigned);
-        assert_eq!(groups, &HashMap::from([(Ipv6::DAD_ADDRESS.to_solicited_node_address(), 1)]));
+        check_multicast_groups(I::VERSION, groups);
 
         let frames = core_ctx.frames();
         assert_eq!(frames.len(), frames_len, "frames = {:?}", frames);
-        let (Ipv6DadSentProbeData { dst_ip, message, nonce }, frame) =
-            frames.last().expect("should have transmitted a frame");
-        assert_eq!(*dst_ip, Ipv6::DAD_ADDRESS.to_solicited_node_address());
-        assert_eq!(*message, NeighborSolicitation::new(Ipv6::DAD_ADDRESS.get()));
-        assert!(nonces.contains(nonce), "should have stored nonce");
 
-        let options = Options::parse(&frame[..]).expect("parse NDP options");
-        assert_eq!(options.iter().count(), 0);
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Wrap<'a, I: TestDadIpExt> {
+            meta: &'a I::SentProbeData,
+            ip_specific_state: &'a I::TentativeState,
+        }
+
+        let (meta, frame) = frames.last().expect("should have transmitted a frame");
+        assert_eq!(&frame[..], EmptyBuf.as_ref());
+
+        // Perform IP specific validation of the sent probe.
+        I::map_ip::<_, ()>(
+            Wrap { meta, ip_specific_state },
+            |Wrap { meta: Ipv4DadSentProbeData { target_ip }, ip_specific_state: () }| {
+                assert_eq!(*target_ip, Ipv4::DAD_ADDRESS.get());
+            },
+            |Wrap {
+                 meta: Ipv6DadSentProbeData { dst_ip, message, nonce },
+                 ip_specific_state:
+                     Ipv6TentativeDadState {
+                         nonces,
+                         added_extra_transmits_after_detecting_looped_back_ns: _,
+                     },
+             }| {
+                assert_eq!(*dst_ip, Ipv6::DAD_ADDRESS.to_solicited_node_address());
+                assert_eq!(*message, NeighborSolicitation::new(Ipv6::DAD_ADDRESS.get()));
+                assert!(nonces.contains(nonce), "should have stored nonce");
+            },
+        );
 
         bindings_ctx.timers.assert_timers_installed_range([(
             dad_timer_id(),
-            Ipv6::expected_timer_range(bindings_ctx.now()),
+            I::expected_timer_range(bindings_ctx.now()),
         )]);
     }
 
-    // TODO(https://fxbug.dev/42077260): Run this test against IPv4.
-    #[test]
-    fn perform_dad() {
+    #[ip_test(I)]
+    fn perform_dad<I: TestDadIpExt>() {
         const DAD_TRANSMITS_REQUIRED: u16 = 5;
 
         let mut ctx = FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
@@ -1240,15 +1330,16 @@ mod tests {
             })
         });
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        let address_id = get_address_id::<Ipv6>(Ipv6::DAD_ADDRESS);
-        let start_dad = DadHandler::<Ipv6, _>::initialize_duplicate_address_detection(
-            core_ctx,
-            bindings_ctx,
-            &FakeDeviceId,
-            &address_id,
-        );
-        let token = assert_matches!(start_dad, NeedsDad::Yes(token) => token);
-        DadHandler::<Ipv6, _>::start_duplicate_address_detection(core_ctx, bindings_ctx, token);
+        let address_id = get_address_id::<I>(I::DAD_ADDRESS);
+        I::with_dad_handler(core_ctx, |core_ctx| {
+            let start_dad = core_ctx.initialize_duplicate_address_detection(
+                bindings_ctx,
+                &FakeDeviceId,
+                &address_id,
+            );
+            let token = assert_matches!(start_dad, NeedsDad::Yes(token) => token);
+            core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+        });
 
         for count in 0..=(DAD_TRANSMITS_REQUIRED - 1) {
             check_dad(
@@ -1263,16 +1354,15 @@ mod tests {
         assert_matches!(*state, DadState::Assigned);
         let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(*assigned);
-        assert_eq!(groups, &HashMap::from([(Ipv6::DAD_ADDRESS.to_solicited_node_address(), 1)]));
+        check_multicast_groups(I::VERSION, groups);
         assert_eq!(
             bindings_ctx.take_events(),
-            &[DadEvent::AddressAssigned { device: FakeDeviceId, addr: Ipv6::DAD_ADDRESS }][..]
+            &[DadEvent::AddressAssigned { device: FakeDeviceId, addr: I::DAD_ADDRESS }][..]
         );
     }
 
-    // TODO(https://fxbug.dev/42077260): Run this test against IPv4.
-    #[test]
-    fn stop_dad() {
+    #[ip_test(I)]
+    fn stop_dad<I: TestDadIpExt>() {
         const DAD_TRANSMITS_REQUIRED: u16 = 2;
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
@@ -1287,28 +1377,27 @@ mod tests {
                     address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
                 })
             });
-        let address_id = get_address_id::<Ipv6>(Ipv6::DAD_ADDRESS);
-        let start_dad = DadHandler::<Ipv6, _>::initialize_duplicate_address_detection(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &FakeDeviceId,
-            &address_id,
-        );
-        let token = assert_matches!(start_dad, NeedsDad::Yes(token) => token);
-        DadHandler::<Ipv6, _>::start_duplicate_address_detection(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            token,
-        );
+        let address_id = get_address_id::<I>(I::DAD_ADDRESS);
+        I::with_dad_handler(&mut core_ctx, |core_ctx| {
+            let start_dad = core_ctx.initialize_duplicate_address_detection(
+                &mut bindings_ctx,
+                &FakeDeviceId,
+                &address_id,
+            );
+            let token = assert_matches!(start_dad, NeedsDad::Yes(token) => token);
+            core_ctx.start_duplicate_address_detection(&mut bindings_ctx, token);
+        });
 
         check_dad(&core_ctx, &bindings_ctx, 1, NonZeroU16::new(DAD_TRANSMITS_REQUIRED - 1));
 
-        DadHandler::<Ipv6, _>::stop_duplicate_address_detection(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &FakeDeviceId,
-            &get_address_id::<Ipv6>(Ipv6::DAD_ADDRESS),
-        );
+        I::with_dad_handler(&mut core_ctx, |core_ctx| {
+            core_ctx.stop_duplicate_address_detection(
+                &mut bindings_ctx,
+                &FakeDeviceId,
+                &address_id,
+            );
+        });
+
         bindings_ctx.timers.assert_no_timers_installed();
         let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
         assert_matches!(*state, DadState::Uninitialized);
@@ -1317,7 +1406,48 @@ mod tests {
         assert_eq!(groups, &HashMap::new());
     }
 
-    // TODO(https://fxbug.dev/42077260): Ensure similar test coverage for IPv4.
+    #[test_case(IpAddressState::Unavailable; "uninitialized")]
+    #[test_case(IpAddressState::Tentative; "tentative")]
+    #[test_case(IpAddressState::Assigned; "assigned")]
+    fn handle_incoming_arp_packet(state: IpAddressState) {
+        let mut ctx = FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
+            let dad_state = match state {
+                IpAddressState::Unavailable => DadState::Uninitialized,
+                IpAddressState::Assigned => DadState::Assigned,
+                IpAddressState::Tentative => DadState::Tentative {
+                    dad_transmits_remaining: NonZeroU16::new(1),
+                    timer: bindings_ctx.new_timer(dad_timer_id()),
+                    ip_specific_state: Default::default(),
+                },
+            };
+
+            FakeCoreCtxImpl::with_state(FakeDadContext {
+                state: dad_state,
+                max_dad_transmits: NonZeroU16::new(1),
+                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
+            })
+        });
+
+        let want_lookup_result = match state {
+            IpAddressState::Unavailable => DadIncomingPacketResult::Uninitialized,
+            IpAddressState::Tentative => DadIncomingPacketResult::Tentative { meta: () },
+            IpAddressState::Assigned => DadIncomingPacketResult::Assigned,
+        };
+
+        let addr = get_address_id::<Ipv4>(Ipv4::DAD_ADDRESS);
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        assert_eq!(
+            DadHandler::<Ipv4, _>::handle_incoming_packet(
+                core_ctx,
+                bindings_ctx,
+                &FakeDeviceId,
+                &addr,
+                (),
+            ),
+            want_lookup_result
+        );
+    }
+
     #[test_case(true, None ; "assigned with no incoming nonce")]
     #[test_case(true, Some([1u8; MIN_NONCE_LENGTH]) ; "assigned with incoming nonce")]
     #[test_case(false, None ; "uninitialized with no incoming nonce")]
@@ -1355,7 +1485,6 @@ mod tests {
         );
     }
 
-    // TODO(https://fxbug.dev/42077260): Ensure similar test coverage for IPv4.
     #[test_case(true ; "discards looped back NS")]
     #[test_case(false ; "acts on non-looped-back NS")]
     fn handle_incoming_dad_neighbor_solicitation_during_tentative(looped_back: bool) {

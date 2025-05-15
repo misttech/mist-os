@@ -15,9 +15,9 @@ use fuchsia_async::net::{DatagramSocket, UdpSocket};
 use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _, Timer};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{
-    fidl_ip, fidl_mac, fidl_subnet, net_ip_v6, net_subnet_v6, std_ip, std_ip_v6, std_socket_addr,
+    fidl_ip, fidl_mac, fidl_subnet, net_ip, net_subnet_v6, std_ip, std_ip_v6, std_socket_addr,
 };
-use net_types::ip::{Ip, IpAddress as _, IpVersion, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpAddr, IpAddress as _, IpVersion, Ipv4, Ipv6};
 use netemul::{InterfaceConfig, RealmUdpSocket as _, TestFakeEndpoint};
 use netstack_testing_common::constants::ipv6 as ipv6_consts;
 use netstack_testing_common::devices::{
@@ -36,6 +36,7 @@ use netstack_testing_macros::netstack_test;
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
 use packet_formats::icmp::ndp::NeighborSolicitation;
+use packet_formats::testutil::ArpPacketInfo;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto as _;
 use std::ops::Not as _;
@@ -3989,33 +3990,45 @@ async fn interface_authorization_root_access<N: Netstack>(name: &str) {
 // Verify that the `perform_dad` AddressParameter correctly influences the DAD
 // behavior when installing the address.
 #[netstack_test]
+#[variant(I, Ip)]
 #[test_case(true, 1, true; "enabled")]
 #[test_case(false, 1, false; "disabled")]
 #[test_case(true, 0, false; "interface_disabled")]
 #[test_case(false, 0, false; "both_disabled")]
-async fn perform_dad_parameter(
+async fn perform_dad_parameter<I: Ip>(
     name: &str,
     perform_dad: bool,
     dad_transmits: u16,
     expect_probe: bool,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+
+    let config = match I::VERSION {
+        IpVersion::V4 => {
+            InterfaceConfig { ipv4_dad_transmits: Some(dad_transmits), ..Default::default() }
+        }
+        IpVersion::V6 => {
+            InterfaceConfig { ipv6_dad_transmits: Some(dad_transmits), ..Default::default() }
+        }
+    };
     // NB: The `perform_dad` AddressParameter is only supported by Netstack3.
     let (_network, _realm, interface, endpoint) =
         netstack_testing_common::setup_network_with::<Netstack3, _>(
             &sandbox,
             name,
-            InterfaceConfig { ipv6_dad_transmits: Some(dad_transmits), ..Default::default() },
+            config,
             std::iter::empty::<fnetemul::ChildDef>(),
         )
         .await
         .expect("error setting up network");
-    // TODO(https://fxbug.dev/42077260): Test against IPv4.
-    const FIDL_ADDR: fidl_fuchsia_net::Subnet = fidl_subnet!("2001:0db8::1/64");
-    const ADDR: net_types::ip::Ipv6Addr = net_ip_v6!("2001:0db8::1");
+
+    let (fidl_addr, addr) = match I::VERSION {
+        IpVersion::V4 => (fidl_subnet!("192.0.2.1/24"), net_ip!("192.0.2.1")),
+        IpVersion::V6 => (fidl_subnet!("2001:0db8::1/64"), net_ip!("2001:0db8::1")),
+    };
     let _addr_state_provider = interfaces::add_address_wait_assigned(
         interface.control(),
-        FIDL_ADDR,
+        fidl_addr,
         fidl_fuchsia_net_interfaces_admin::AddressParameters {
             perform_dad: Some(perform_dad),
             ..Default::default()
@@ -4030,15 +4043,24 @@ async fn perform_dad_parameter(
     } else {
         ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT
     };
-    let sent_probe = endpoint
-        .frame_stream()
-        .take_until(Timer::new(timeout.after_now()))
-        .any(|frame| {
-            let (data, _dropped) = frame.expect("error in fake endpoint frame stream");
 
-            // Try to parse the data as a neighbor solicitation. Ignore errors
-            // or neighbor solicitations with the wrong target address.
-            let found =
+    /// Returns whether the given data is a correctly formatted DAD probe.
+    fn is_probe(data: Vec<u8>, addr: IpAddr) -> bool {
+        match addr {
+            IpAddr::V4(addr) => {
+                // Try to parse the data as an ARP probe. Ignore errors or ARP
+                // packets with the wrong target address.
+                match packet_formats::testutil::parse_arp_packet_in_ethernet_frame(
+                    &data,
+                    EthernetFrameLengthCheck::NoCheck,
+                ) {
+                    Ok(ArpPacketInfo { target_protocol_address: dst_ip, .. }) => dst_ip == addr,
+                    Err(_) => false,
+                }
+            }
+            IpAddr::V6(addr) => {
+                // Try to parse the data as a neighbor solicitation. Ignore errors
+                // or neighbor solicitations with the wrong target address.
                 match packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
                     Ipv6,
                     _,
@@ -4047,11 +4069,20 @@ async fn perform_dad_parameter(
                 >(&data, EthernetFrameLengthCheck::NoCheck, |_| {})
                 {
                     Ok((_src_mac, _dst_mac, _src_ip, _dst_ip, _ttl, ns, _code)) => {
-                        *ns.target_address() == ADDR
+                        *ns.target_address() == addr
                     }
                     Err(_) => false,
-                };
-            futures::future::ready(found)
+                }
+            }
+        }
+    }
+
+    let sent_probe = endpoint
+        .frame_stream()
+        .take_until(Timer::new(timeout.after_now()))
+        .any(|frame| {
+            let (data, _dropped) = frame.expect("error in fake endpoint frame stream");
+            futures::future::ready(is_probe(data, addr))
         })
         .await;
 

@@ -4,6 +4,7 @@
 
 use alloc::collections::HashSet;
 use alloc::vec;
+use alloc::vec::Vec;
 use core::num::{NonZeroU16, NonZeroU8};
 use core::time::Duration;
 
@@ -14,29 +15,34 @@ use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
 use net_types::{LinkLocalAddr, SpecifiedAddr, UnicastAddr, Witness};
 use test_case::test_case;
 
-use netstack3_base::testutil::{assert_empty, FakeInstant, TestIpExt};
-use netstack3_base::{InstantContext as _, IpAddressId as _, TimerContext};
+use netstack3_base::testutil::{
+    assert_empty, FakeInstant, FakeTimerCtxExt, TestIpExt, WithFakeFrameContext,
+};
+use netstack3_base::{InstantContext as _, IpAddressId as _};
 use netstack3_core::device::{
     DeviceId, EthernetCreationProperties, EthernetLinkDevice, LoopbackCreationProperties,
     LoopbackDevice, MaxEthernetFrameSize,
 };
 use netstack3_core::testutil::{
-    CtxPairExt as _, DispatchedEvent, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
+    CtxPairExt as _, DispatchedEvent, DispatchedFrame, FakeBindingsCtx, FakeCtx,
+    DEFAULT_INTERFACE_METRIC,
 };
 use netstack3_core::{IpExt, StackStateBuilder, TimerId};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+use netstack3_device::WeakDeviceId;
 use netstack3_ip::device::{
-    AddIpAddrSubnetError, AddressRemovedReason, CommonAddressProperties, DadAddressStateRef,
-    DadContext, DadState, DadStateRef, DadTimerId, IpAddressState, IpDeviceConfiguration,
-    IpDeviceConfigurationContext, IpDeviceConfigurationUpdate, IpDeviceEvent, IpDeviceFlags,
-    IpDeviceHandler, IpDeviceStateContext, IpDeviceTimerId, Ipv4DeviceConfigurationUpdate,
-    Ipv4DeviceTimerId, Ipv6DeviceConfigurationUpdate, Ipv6DeviceContext, Ipv6DeviceHandler,
-    Ipv6DeviceTimerId, Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, RsTimerId,
-    SetIpAddressPropertiesError, SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
-    TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
+    AddIpAddrSubnetError, AddressRemovedReason, CommonAddressConfig, CommonAddressProperties,
+    DadTimerId, IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
+    IpDeviceFlags, IpDeviceHandler, IpDeviceStateContext, Ipv4AddrConfig,
+    Ipv4DeviceConfigurationUpdate, Ipv4DeviceTimerId, Ipv6DeviceConfigurationUpdate,
+    Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId, Ipv6NetworkLearnedParameters,
+    Lifetime, PreferredLifetime, RsTimerId, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
+    StableSlaacAddressConfiguration, TemporarySlaacAddressConfiguration,
+    UpdateIpConfigurationError,
 };
 use netstack3_ip::gmp::{IgmpConfigMode, MldConfigMode, MldTimerId};
 use netstack3_ip::nud::{self, LinkResolutionResult};
+use packet_formats::testutil::ArpPacketInfo;
 use packet_formats::utils::NonZeroDuration;
 
 #[test]
@@ -653,6 +659,166 @@ fn enable_ipv6_dev_with_dad_disabled() {
     );
 }
 
+enum Ipv4DadTestOrder {
+    // Enable the device, then add the address.
+    EnableThenAdd,
+    // Add the address, then enable the device.
+    AddThenEnable,
+}
+
+#[test_case(Ipv4DadTestOrder::EnableThenAdd; "enable_then_add")]
+#[test_case(Ipv4DadTestOrder::AddThenEnable; "add_then_enable")]
+fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
+    let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+
+    // Install a device.
+    let local_mac = Ipv4::TEST_ADDRS.local_mac;
+    let device_id = ctx
+        .core_api()
+        .device::<EthernetLinkDevice>()
+        .add_device_with_default_state(
+            EthernetCreationProperties {
+                mac: local_mac,
+                max_frame_size: MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
+            },
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+    let _: Ipv4DeviceConfigurationUpdate = ctx
+        .core_api()
+        .device_ip::<Ipv4>()
+        .update_configuration(
+            &device_id,
+            Ipv4DeviceConfigurationUpdate {
+                ip_config: IpDeviceConfigurationUpdate {
+                    dad_transmits: Some(NonZeroU16::new(1)),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        )
+        .expect("should successfully update config");
+
+    // Enable the device and return any extra events that were emitted.
+    fn enable_device(
+        ctx: &mut FakeCtx,
+        device_id: &DeviceId<FakeBindingsCtx>,
+    ) -> Vec<DispatchedEvent> {
+        assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, true), false);
+        let mut events = ctx.bindings_ctx.take_events();
+        assert_eq!(
+            events.pop(),
+            Some(DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
+                device: device_id.downgrade(),
+                ip_enabled: true,
+            }))
+        );
+        events
+    }
+
+    // Add the address, and assert that it has the expected state.
+    fn add_address(
+        ctx: &mut FakeCtx,
+        device_id: &DeviceId<FakeBindingsCtx>,
+        addr: &AddrSubnet<Ipv4Addr>,
+        expected_state: IpAddressState,
+    ) {
+        let addr_config = Ipv4AddrConfig {
+            config: CommonAddressConfig { should_perform_dad: Some(true) },
+            ..Default::default()
+        };
+        ctx.core_api()
+            .device_ip::<Ipv4>()
+            .add_ip_addr_subnet_with_config(&device_id, addr.clone(), addr_config)
+            .expect("failed to add IPv4 Address");
+        assert_eq!(
+            ctx.bindings_ctx.take_events()[..],
+            [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressAdded {
+                device: device_id.downgrade(),
+                addr: addr.clone(),
+                state: expected_state,
+                valid_until: Lifetime::Infinite,
+                preferred_lifetime: PreferredLifetime::preferred_forever(),
+            })]
+        );
+    }
+
+    let ipv4_addr_subnet = AddrSubnet::new(Ipv4Addr::new([192, 168, 0, 1]), 24).unwrap();
+
+    match order {
+        Ipv4DadTestOrder::EnableThenAdd => {
+            // Enable the device and then add the address. When the address
+            // is added it should immediately progress to "tentative" and start
+            // DAD.
+            let address_events = enable_device(&mut ctx, &device_id);
+            assert_eq!(&address_events[..], []);
+            ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+            add_address(&mut ctx, &device_id, &ipv4_addr_subnet, IpAddressState::Tentative);
+        }
+        Ipv4DadTestOrder::AddThenEnable => {
+            // Add the address before enabling the device. It should be
+            // "unavailable" without DAD having started. Then, once the device
+            // is enabled, it should become "tentative" and start DAD.
+            add_address(&mut ctx, &device_id, &ipv4_addr_subnet, IpAddressState::Unavailable);
+            ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+            let address_events = enable_device(&mut ctx, &device_id);
+            assert_eq!(
+                &address_events[..],
+                [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
+                    device: device_id.downgrade(),
+                    addr: ipv4_addr_subnet.addr(),
+                    state: IpAddressState::Tentative,
+                })]
+            );
+        }
+    }
+
+    // The stack should have installed a DAD timer and sent an ARP probe.
+    let expected_timer_id = TimerId::from(
+        Ipv4DeviceTimerId::Dad(DadTimerId::new(
+            device_id.downgrade(),
+            IpDeviceStateContext::<Ipv4, _>::get_address_id(
+                &mut ctx.core_ctx(),
+                &device_id,
+                ipv4_addr_subnet.addr(),
+            )
+            .unwrap()
+            .downgrade(),
+        ))
+        .into_common(),
+    );
+    ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(expected_timer_id.clone(), ..)]);
+    ctx.bindings_ctx.with_fake_frame_ctx_mut(|ctx| {
+        let frames = ctx.take_frames();
+        let (dev, buf) = assert_matches!(&frames[..], [frame] => frame);
+        let dev = assert_matches!(dev, DispatchedFrame::Ethernet(device_id) => device_id);
+        assert_eq!(WeakDeviceId::Ethernet(dev.clone()), device_id.downgrade());
+        let ArpPacketInfo { target_protocol_address, .. } =
+            packet_formats::testutil::parse_arp_packet_in_ethernet_frame(
+                buf,
+                packet_formats::ethernet::EthernetFrameLengthCheck::NoCheck,
+            )
+            .expect("should successfully parse ARP packet");
+        assert_eq!(target_protocol_address, ipv4_addr_subnet.addr().get());
+    });
+
+    // Trigger the DadTimer and verify the address became assigned.
+    let (mut core_ctx, bindings_ctx) = ctx.contexts();
+    assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(expected_timer_id));
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
+            device: device_id.downgrade(),
+            addr: ipv4_addr_subnet.addr(),
+            state: IpAddressState::Assigned,
+        })]
+    );
+
+    // Disable device and take all events to cleanup references.
+    assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, false), true);
+    let _ = ctx.bindings_ctx.take_events();
+}
+
 #[test]
 fn notify_on_dad_failure_ipv4() {
     let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
@@ -670,6 +836,20 @@ fn notify_on_dad_failure_ipv4() {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
+    let _: Ipv4DeviceConfigurationUpdate = ctx
+        .core_api()
+        .device_ip::<Ipv4>()
+        .update_configuration(
+            &device_id,
+            Ipv4DeviceConfigurationUpdate {
+                ip_config: IpDeviceConfigurationUpdate {
+                    dad_transmits: Some(NonZeroU16::new(1)),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        )
+        .expect("should successfully update config");
 
     // Enable the device.
     assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, true), false);
@@ -681,66 +861,28 @@ fn notify_on_dad_failure_ipv4() {
         })]
     );
 
-    // Add an IPv4 Address.
+    // Add an IPv4 Address, requesting that DAD be performed.
     let ipv4_addr_subnet = AddrSubnet::new(Ipv4Addr::new([192, 168, 0, 1]), 24).unwrap();
+    let config = Ipv4AddrConfig {
+        config: CommonAddressConfig { should_perform_dad: Some(true) },
+        ..Default::default()
+    };
     ctx.core_api()
         .device_ip::<Ipv4>()
-        .add_ip_addr_subnet(&device_id, ipv4_addr_subnet.clone())
+        .add_ip_addr_subnet_with_config(&device_id, ipv4_addr_subnet.clone(), config)
         .expect("failed to add IPv4 Address");
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
         [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressAdded {
             device: device_id.downgrade(),
             addr: ipv4_addr_subnet.clone(),
-            state: IpAddressState::Assigned,
+            state: IpAddressState::Tentative,
             valid_until: Lifetime::Infinite,
             preferred_lifetime: PreferredLifetime::preferred_forever(),
         })]
     );
 
     let (mut core_ctx, bindings_ctx) = ctx.contexts();
-
-    // TODO(https://fxbug.dev/42077260): Artificially put the address into
-    // "tentative" state. This can be removed in the future, once DAD is fully
-    // supported & enabled.
-    {
-        let address_id = IpDeviceStateContext::<Ipv4, _>::get_address_id(
-            &mut core_ctx,
-            &device_id,
-            ipv4_addr_subnet.addr(),
-        )
-        .expect("addr should be installed");
-        IpDeviceConfigurationContext::<Ipv4, _>::with_ip_device_configuration(
-            &mut core_ctx,
-            &device_id,
-            |_config, mut core_ctx| {
-                DadContext::with_dad_state(
-                    &mut core_ctx,
-                    &device_id,
-                    &address_id,
-                    |DadStateRef { state, retrans_timer_data: _, max_dad_transmits: _ }| {
-                        let DadAddressStateRef { dad_state, core_ctx: _ } = state;
-                        assert_matches!(dad_state, DadState::Assigned);
-                        *dad_state = DadState::Tentative {
-                            dad_transmits_remaining: None,
-                            timer: bindings_ctx.new_timer(
-                                IpDeviceTimerId::from(Ipv4DeviceTimerId::from(DadTimerId::<
-                                    Ipv4,
-                                    _,
-                                    _,
-                                >::new(
-                                    device_id.downgrade(),
-                                    address_id.downgrade(),
-                                )))
-                                .into(),
-                            ),
-                            ip_specific_state: (),
-                        };
-                    },
-                )
-            },
-        );
-    }
 
     // Simulate a conflicting ARP probe, and expect the address is removed.
     assert_eq!(
