@@ -20,7 +20,6 @@ pub fn serve(
     source: WeakComponentInstance,
 ) -> BoxFuture<'static, Result<(), Error>> {
     async move {
-        log::info!("new connection to retriever");
         let mut stream =
             ServerEnd::<finternal::ComponentSandboxRetrieverMarker>::new(chan).into_stream();
         while let Some(Ok(request)) = stream.next().await {
@@ -81,7 +80,6 @@ pub fn serve(
 }
 
 async fn is_builtin_runner(program_input: &ProgramInput) -> bool {
-    log::info!("checking runner...");
     let Some(runner_router) = program_input.runner() else {
         return false;
     };
@@ -90,7 +88,6 @@ async fn is_builtin_runner(program_input: &ProgramInput) -> bool {
     };
     let source: ::routing::capability_source::CapabilitySource =
         source_data.try_into().expect("failed to convert into capability source");
-    log::info!("runner is: {:?}", source);
     let CapabilitySource::Builtin(_) = source else {
         return false;
     };

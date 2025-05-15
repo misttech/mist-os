@@ -93,10 +93,7 @@ fn add_protocol<P: DiscoverableProtocolMarker>(
             component.nonblocking_task_group().as_weak(),
             format!("framework dispatcher for {}", P::PROTOCOL_NAME),
             Some(component.context.policy().clone()),
-            Arc::new(move |chan, target| {
-                log::info!("launching task for {}", P::PROTOCOL_NAME);
-                task_to_launch(chan, target, source.clone())
-            }),
+            Arc::new(move |chan, target| task_to_launch(chan, target, source.clone())),
         )
         .into_router()
         .into(),
