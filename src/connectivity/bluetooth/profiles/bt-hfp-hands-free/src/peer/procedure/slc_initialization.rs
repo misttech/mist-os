@@ -101,9 +101,9 @@ impl SlcInitProcedure {
         vec![at_cmd!(CindRead {})]
     }
 
-    fn receive_ag_indicator_statuses(&mut self, cmd: at::Success) -> Vec<ProcedureOutput> {
+    fn receive_ag_indicator_statuses(&mut self, ordered_values: Vec<i64>) -> Vec<ProcedureOutput> {
         self.state = State::ReceivedAgIndicatorStatuses;
-        let output = convert_cind_to_hf_command(cmd);
+        let output = CommandToHf::SetInitialAgIndicatorValues { ordered_values }.into();
         vec![output]
     }
 
@@ -218,12 +218,9 @@ impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
             (State::ReceivedSupportedAgIndicators, at_ok!()) => self.read_ag_indicator_statuses(),
 
             // Sent AT+CIND?, waiting for +CIND: ///////////////////////////////////////////////////
-            (
-                State::ReadAgIndicatorStatuses,
-                ProcedureInput::AtResponseFromAg(AtResponse::Recognized(at::Response::Success(
-                    cmd @ at::Success::Cind { .. },
-                ))),
-            ) => self.receive_ag_indicator_statuses(cmd),
+            (State::ReadAgIndicatorStatuses, at_resp!(CindRead { ordered_values })) => {
+                self.receive_ag_indicator_statuses(ordered_values)
+            }
 
             // Received +CIND:, waiting for OK /////////////////////////////////////////////////////
             (State::ReceivedAgIndicatorStatuses, at_ok!()) => {
@@ -293,28 +290,6 @@ impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
     fn is_terminated(&self) -> bool {
         self.state == State::Terminated
     }
-}
-
-// Must be called with CIND.
-fn convert_cind_to_hf_command(cind: at::Success) -> ProcedureOutput {
-    let at::Success::Cind { service, call, callsetup, callheld, signal, roam, battchg } = cind
-    else {
-        panic!("convert_cind_to_hf_command called with non-CIND: {cind:?}");
-    };
-    // TODO(fxb/137097) We won't necessarily get the fields in this order, so we need to hand
-    // parse this +CIND.
-    CommandToHf::SetInitialAgIndicatorValues {
-        values: vec![
-            service as i64, // This should be fixed as part of hand-parsing the +CIND
-            call as i64,    // This should be fixed as part of hand-parsing the +CIND
-            callsetup,
-            callheld,
-            signal,
-            roam as i64, // This should be fixed as part of hand-parsing the +CIND
-            battchg,
-        ],
-    }
-    .into()
 }
 
 #[cfg(test)]
@@ -415,25 +390,27 @@ mod tests {
 
         assert_eq!(procedure.transition(&mut state, response2_ok).unwrap(), expected_command2);
 
-        let response3 = at_resp!(Cind {
-            service: false,
-            call: false,
-            callsetup: 0,
-            callheld: 0,
-            signal: 0,
-            roam: false,
-            battchg: 0,
+        let response3 = at_resp!(CindRead {
+            ordered_values: vec![
+                6, // service
+                5, // call
+                4, // callsetup
+                3, // callheld
+                2, // signal
+                1, // roam
+                7, // battchg
+            ]
         });
         let update3 =
             vec![ProcedureOutput::CommandToHf(CommandToHf::SetInitialAgIndicatorValues {
-                values: vec![
-                    0, // service
-                    0, // call
-                    0, // callsetup
-                    0, // callheld
-                    0, // signal
-                    0, // roam
-                    0, // battchg
+                ordered_values: vec![
+                    6, // service
+                    5, // call
+                    4, // callsetup
+                    3, // callheld
+                    2, // signal
+                    1, // roam
+                    7, // battchg
                 ],
             })];
         let response3_ok = at_ok!();
@@ -498,25 +475,27 @@ mod tests {
         assert_eq!(procedure.transition(&mut state, response2).unwrap(), expected_output2);
         assert_eq!(procedure.transition(&mut state, response2_ok).unwrap(), expected_command2);
 
-        let response3 = at_resp!(Cind {
-            service: false,
-            call: false,
-            callsetup: 0,
-            callheld: 0,
-            signal: 0,
-            roam: false,
-            battchg: 0,
+        let response3 = at_resp!(CindRead {
+            ordered_values: vec![
+                6, // service
+                5, // call
+                4, // callsetup
+                3, // callheld
+                2, // signal
+                1, // roam
+                7, // battchg
+            ]
         });
         let expected_command3 =
             vec![ProcedureOutput::CommandToHf(CommandToHf::SetInitialAgIndicatorValues {
-                values: vec![
-                    0, // service
-                    0, // call
-                    0, // callsetup
-                    0, // callheld
-                    0, // signal
-                    0, // roam
-                    0, // battchg
+                ordered_values: vec![
+                    6, // service
+                    5, // call
+                    4, // callsetup
+                    3, // callheld
+                    2, // signal
+                    1, // roam
+                    7, // battchg
                 ],
             })];
         let response3_ok = at_ok!();
@@ -633,25 +612,27 @@ mod tests {
         assert_eq!(procedure.transition(&mut state, response2).unwrap(), expected_output2);
         assert_eq!(procedure.transition(&mut state, response2_ok).unwrap(), expected_command2);
 
-        let response3 = at_resp!(Cind {
-            service: false,
-            call: false,
-            callsetup: 0,
-            callheld: 0,
-            signal: 0,
-            roam: false,
-            battchg: 0,
+        let response3 = at_resp!(CindRead {
+            ordered_values: vec![
+                6, // service
+                5, // call
+                4, // callsetup
+                3, // callheld
+                2, // signal
+                1, // roam
+                7, // battchg
+            ]
         });
         let update3 =
             vec![ProcedureOutput::CommandToHf(CommandToHf::SetInitialAgIndicatorValues {
-                values: vec![
-                    0, // service
-                    0, // call
-                    0, // callsetup
-                    0, // callheld
-                    0, // signal
-                    0, // roam
-                    0, // battchg
+                ordered_values: vec![
+                    6, // service
+                    5, // call
+                    4, // callsetup
+                    3, // callheld
+                    2, // signal
+                    1, // roam
+                    7, // battchg
                 ],
             })];
         let response3_ok = at_ok!();

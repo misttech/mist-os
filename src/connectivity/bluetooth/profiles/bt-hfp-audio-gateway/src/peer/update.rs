@@ -112,14 +112,17 @@ impl From<AgUpdate> for ProcedureRequest {
                 vec![at::success(at::Success::Chld { commands }), at::Response::Ok]
             }
             AgUpdate::IndicatorStatus(status) => vec![
-                at::success(at::Success::Cind {
-                    service: status.service,
-                    call: (&status.call).into(),
-                    callsetup: (&status.callsetup).into(),
-                    callheld: (&status.callheld).into(),
-                    signal: status.signal as i64,
-                    roam: status.roam,
-                    battchg: status.battchg.into(),
+                at::success(at::Success::CindRead {
+                    ordered_values: vec![
+                        // The order here must match the order we specified in in the +CIND test response.
+                        status.service.into(),
+                        (&status.call).into(),
+                        (&status.callsetup).into(),
+                        (&status.callheld).into(),
+                        status.signal.into(),
+                        status.roam.into(),
+                        status.battchg.into(),
+                    ],
                 }),
                 at::Response::Ok,
             ],

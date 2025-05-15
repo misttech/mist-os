@@ -90,14 +90,8 @@ impl_from_to_variant!(CommandFromHf, ProcedureInput, CommandFromHf);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommandToHf {
-    SetInitialAgIndicatorValues {
-        values: Vec<i64>,
-    },
-    #[allow(unused)]
-    SetAgIndicatorIndex {
-        indicator: AgIndicatorIndex,
-        index: i64,
-    },
+    SetInitialAgIndicatorValues { ordered_values: Vec<i64> },
+    SetAgIndicatorIndex { indicator: AgIndicatorIndex, index: i64 },
     AwaitRemoteSco,
 }
 

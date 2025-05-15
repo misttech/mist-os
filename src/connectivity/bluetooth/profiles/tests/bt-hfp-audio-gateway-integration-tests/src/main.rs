@@ -491,14 +491,16 @@ async fn test_hfp_full_slc_init_procedure(tf: HfpAgIntegrationTest) {
     .await;
 
     let indicator_read_cmd = at::Command::CindRead {};
-    let expected4 = at::success(at::Success::Cind {
-        service: false,
-        call: false,
-        callsetup: 0,
-        callheld: 0,
-        roam: false,
-        signal: 0,
-        battchg: 5,
+    let expected4 = at::success(at::Success::CindRead {
+        ordered_values: vec![
+            0, // service
+            0, // call
+            0, // callsetup
+            0, // callheld
+            0, // roam
+            0, // signal
+            5, // battchg
+        ],
     });
     send_command_and_expect_response(
         &mut remote,

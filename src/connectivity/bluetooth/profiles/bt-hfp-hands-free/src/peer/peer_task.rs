@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Result};
-use bt_hfp::call::Direction;
+use bt_hfp::call::{indicators as call_indicators, Direction};
 use bt_hfp::codec_id::CodecId;
 use bt_hfp::{a2dp, audio, sco};
 use fuchsia_bluetooth::types::{Channel, PeerId};
@@ -15,7 +15,7 @@ use vigil::{DropWatch, Vigil};
 use {at_commands as at, fidl_fuchsia_bluetooth_hfp as fidl_hfp, fuchsia_async as fasync};
 
 use crate::config::HandsFreeFeatureSupport;
-use crate::peer::ag_indicators::{AgIndicator, AgIndicatorTranslator};
+use crate::peer::ag_indicators::{AgIndicator, AgIndicatorTranslator, CallIndicator};
 use crate::peer::at_connection::{self, Response as AtResponse};
 use crate::peer::calls::Calls;
 use crate::peer::procedure::{CommandFromHf, CommandToHf, ProcedureInput, ProcedureOutput};
@@ -279,6 +279,9 @@ impl PeerTask {
             ProcedureOutput::AtCommandToAg(command) => {
                 self.at_connection.write_commands(&[command]).await?
             }
+            ProcedureOutput::CommandToHf(CommandToHf::SetInitialAgIndicatorValues {
+                ordered_values,
+            }) => self.set_initial_ag_indicator_values(ordered_values)?,
             ProcedureOutput::CommandToHf(CommandToHf::SetAgIndicatorIndex { indicator, index }) => {
                 self.ag_indicator_translator.set_index(indicator, index)?
             }
@@ -286,13 +289,58 @@ impl PeerTask {
                 // We've renegotiated the codec, so wait for a SCO connection with the new codec.
                 self.await_remote_sco()
             }
-            // TODO(https://fxbug.dev/131814) Set initial NetworkInformation indicator value from
-            // SetInitialIndicatorValues procedure output.
-            // TODO(https://fxbug.dev/131815) Set initial BatteryCharge indicator value from
-            // SetInitialIndicatorValues procedure output.
-            _ => return Err(format_err!("Unimplemented ProcedureOutput")),
         };
 
+        Ok(())
+    }
+
+    fn set_initial_ag_indicator_values(&self, ordered_values: Vec<i64>) -> Result<()> {
+        // Indices are 1-indexed.
+        let indices_and_values = std::iter::zip(1i64.., ordered_values.into_iter());
+
+        for (index, value) in indices_and_values {
+            let index: i64 = index.try_into().expect("Failed to fit AG indicator index into i64?");
+            let ag_indicator = self.ag_indicator_translator.translate_indicator(index, value)?;
+            match ag_indicator {
+                AgIndicator::Call(CallIndicator::Call(call))
+                    if call != call_indicators::Call::None =>
+                {
+                    Err(format_err!(
+                        "Got unexpected initial call indicator value {:?} for peer {:}",
+                        call,
+                        self.peer_id
+                    ))?;
+                }
+                AgIndicator::Call(CallIndicator::CallSetup(call_setup))
+                    if call_setup != call_indicators::CallSetup::None =>
+                {
+                    Err(format_err!(
+                        "Got unexpected initial callsetup indicator value {:?} for peer {:}",
+                        call_setup,
+                        self.peer_id
+                    ))?;
+                }
+                AgIndicator::Call(CallIndicator::CallHeld(call_held))
+                    if call_held != call_indicators::CallHeld::None =>
+                {
+                    Err(format_err!(
+                        "Got unexpected initial callheld indicator value {:?} for peer {:}",
+                        call_held,
+                        self.peer_id
+                    ))?;
+                }
+                AgIndicator::Call(_) => { // Nothing to do
+                }
+                AgIndicator::NetworkInformation(_) => {
+                    // TODO(https://fxbug.dev/131814) Set initial NetworkInformation indicator value from
+                    // SetInitialIndicatorValues procedure output.
+                }
+                AgIndicator::BatteryCharge(_) => {
+                    // TODO(https://fxbug.dev/131815) Set initial BatteryCharge indicator value from
+                    // SetInitialIndicatorValues procedure output.
+                }
+            }
+        }
         Ok(())
     }
 
