@@ -39,13 +39,13 @@ pub struct PeerTask {
 impl PeerTask {
     pub fn spawn(
         peer_id: PeerId,
-        config: HandsFreeFeatureSupport,
+        hf_features: HandsFreeFeatureSupport,
         peer_handler_request_stream: fidl_hfp::PeerHandlerRequestStream,
         rfcomm: Channel,
         sco_connector: sco::Connector,
         audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
     ) -> fasync::Task<()> {
-        let procedure_manager = ProcedureManager::new(peer_id, config);
+        let procedure_manager = ProcedureManager::new(peer_id, hf_features);
         let at_connection = at_connection::Connection::new(peer_id, rfcomm);
         let calls = Calls::new(peer_id);
         let ag_indicator_translator = AgIndicatorTranslator::new();
@@ -82,88 +82,92 @@ impl PeerTask {
     }
 
     async fn run_inner(&mut self) -> Result<()> {
-        // Since IOwned doesn't implement DerefMut, we need to get a mutable reference to the
-        // underlying SCO state value to call mutable methods on it.  As this invalidates
-        // the enclosing struct, we need to drop this reference explicitiy in every match arm so
-        // we can can call method on self.
-        let mut sco_state = self.sco_state.as_mut();
-        let mut on_sco_closed = sco_state.on_closed();
+        self.procedure_manager.enqueue(ProcedureInput::CommandFromHf(CommandFromHf::StartSlci {
+            hf_features: self.procedure_manager.procedure_manipulated_state.hf_features,
+        }));
 
-        select! {
-            peer_handler_request_result_option = self.peer_handler_request_stream.next() => {
-                debug!("Received FIDL PeerHandler protocol request {:?} from peer {}",
-                   peer_handler_request_result_option, self.peer_id);
+        loop {
+            // Since IOwned doesn't implement DerefMut, we need to get a mutable reference to the
+            // underlying SCO state value to call mutable methods on it.  As this invalidates
+            // the enclosing struct, we need to drop this reference explicitiy in every match arm so
+            // we can call method on self.
+            let mut sco_state = self.sco_state.as_mut();
+            let mut on_sco_closed = sco_state.on_closed();
 
-                drop(sco_state);
+            select! {
+                peer_handler_request_result_option = self.peer_handler_request_stream.next() => {
+                    debug!("Received FIDL PeerHandler protocol request {:?} from peer {}",
+                       peer_handler_request_result_option, self.peer_id);
 
-                let peer_handler_request_result = peer_handler_request_result_option
-                    .ok_or_else(||format_err!("FIDL Peer protocol request stream closed for peer {}", self.peer_id))?;
-                let peer_handler_request = peer_handler_request_result?;
+                    drop(sco_state);
 
-                self.handle_peer_handler_request(peer_handler_request)?;
-            }
-            at_response_result_option = self.at_connection.next() => {
-                // TODO(https://fxbug.dev/127362) Filter unsolicited AT messages.
-                debug!("Received AT response {:?} from peer {}",
-                    at_response_result_option, self.peer_id);
+                    let peer_handler_request_result = peer_handler_request_result_option
+                        .ok_or_else(||format_err!("FIDL Peer protocol request stream closed for peer {}", self.peer_id))?;
+                    let peer_handler_request = peer_handler_request_result?;
 
-                drop(sco_state);
-
-                let at_response_result =
-                    at_response_result_option
-                        .ok_or_else(|| format_err!("AT connection stream closed for peer {}", self.peer_id))?;
-                let at_response = at_response_result?;
-
-                self.handle_at_response(at_response);
-            }
-            procedure_outputs_result_option = self.procedure_manager.next() => {
-                debug!("Received procedure outputs {:?} for peer {:?}",
-                    procedure_outputs_result_option, self.peer_id);
-
-                drop(sco_state);
-
-                let procedure_outputs_result =
-                    procedure_outputs_result_option
-                        .ok_or_else(|| format_err!("Procedure manager stream closed for peer {}", self.peer_id))?;
-                let procedure_outputs = procedure_outputs_result?;
-
-                for procedure_output in procedure_outputs {
-                    self.handle_procedure_output(procedure_output).await?;
+                    self.handle_peer_handler_request(peer_handler_request)?;
                 }
-            }
-            call_procedure_input_result_option = self.calls.next() => {
-                info!("Received call procedure input {:?} for peer {:}", call_procedure_input_result_option, self.peer_id);
+                at_response_result_option = self.at_connection.next() => {
+                // TODO(https://fxbug.dev/127362) Filter unsolicited AT messages.
+                    debug!("Received AT response {:?} from peer {}",
+                        at_response_result_option, self.peer_id);
 
-                drop(sco_state);
+                    drop(sco_state);
 
-                let call_procedure_input_result =
-                    call_procedure_input_result_option
-                        .ok_or_else(|| format_err!("Calls stream closed for peer {:}", self.peer_id))?;
-                let call_procedure_input = call_procedure_input_result?;
+                    let at_response_result =
+                        at_response_result_option
+                            .ok_or_else(|| format_err!("AT connection stream closed for peer {}", self.peer_id))?;
+                    let at_response = at_response_result?;
 
-                self.procedure_manager.enqueue(call_procedure_input)
-            }
-            sco_connection_result = sco_state.on_connected() => {
-                info!("Received SCO connection for peer {:}", self.peer_id);
-                drop(sco_state);
-                match sco_connection_result {
-                    Ok(sco_connection) if !sco_connection.is_closed() => self.handle_sco_connection(sco_connection).await?,
-                    // This can occur if the AG opens and closes a SCO connection immediately.
-                    Ok(_closed_sco_connection) => info!("Got closed SCO connection from peer {}", self.peer_id),
-                    Err(err) => {
-                        warn!("Got error receiving SCO connection for peer {}.", self.peer_id);
-                        Err(err)?;
+                    self.handle_at_response(at_response);
+                }
+                procedure_outputs_result_option = self.procedure_manager.next() => {
+                    debug!("Received procedure outputs {:?} for peer {:?}",
+                        procedure_outputs_result_option, self.peer_id);
+
+                    drop(sco_state);
+
+                    let procedure_outputs_result =
+                        procedure_outputs_result_option
+                            .ok_or_else(|| format_err!("Procedure manager stream closed for peer {}", self.peer_id))?;
+                    let procedure_outputs = procedure_outputs_result?;
+
+                    for procedure_output in procedure_outputs {
+                        self.handle_procedure_output(procedure_output).await?;
                     }
                 }
-            }
-            _ = on_sco_closed => {
-                info!("SCO connection closed for peer {:}", self.peer_id);
-                drop(sco_state);
-                self.await_remote_sco();
+                call_procedure_input_result_option = self.calls.next() => {
+                    info!("Received call procedure input {:?} for peer {:}", call_procedure_input_result_option, self.peer_id);
+
+                    drop(sco_state);
+
+                    let call_procedure_input_result =
+                        call_procedure_input_result_option
+                            .ok_or_else(|| format_err!("Calls stream closed for peer {:}", self.peer_id))?;
+                    let call_procedure_input = call_procedure_input_result?;
+
+                    self.procedure_manager.enqueue(call_procedure_input)
+                }
+                sco_connection_result = sco_state.on_connected() => {
+                    info!("Received SCO connection for peer {:}", self.peer_id);
+                    drop(sco_state);
+                    match sco_connection_result {
+                        Ok(sco_connection) if !sco_connection.is_closed() => self.handle_sco_connection(sco_connection).await?,
+                        // This can occur if the AG opens and closes a SCO connection immediately.
+                        Ok(_closed_sco_connection) => info!("Got closed SCO connection from peer {}", self.peer_id),
+                        Err(err) => {
+                            warn!("Got error receiving SCO connection for peer {}.", self.peer_id);
+                            Err(err)?;
+                        }
+                    }
+                }
+                _ = on_sco_closed => {
+                    info!("SCO connection closed for peer {:}", self.peer_id);
+                    drop(sco_state);
+                    self.await_remote_sco();
+                }
             }
         }
-
-        Ok(())
     }
 
     fn handle_peer_handler_request(

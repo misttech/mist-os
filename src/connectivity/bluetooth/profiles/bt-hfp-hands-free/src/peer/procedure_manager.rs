@@ -60,8 +60,8 @@ pub struct ProcedureManager<I: ProcedureInputT<O>, O: ProcedureOutputT> {
 }
 
 impl<I: ProcedureInputT<O>, O: ProcedureOutputT> ProcedureManager<I, O> {
-    pub fn new(peer_id: PeerId, config: HandsFreeFeatureSupport) -> Self {
-        let procedure_manipulated_state = ProcedureManipulatedState::new(config);
+    pub fn new(peer_id: PeerId, hf_features: HandsFreeFeatureSupport) -> Self {
+        let procedure_manipulated_state = ProcedureManipulatedState::new(hf_features);
         Self {
             peer_id,
             current_procedure: None,

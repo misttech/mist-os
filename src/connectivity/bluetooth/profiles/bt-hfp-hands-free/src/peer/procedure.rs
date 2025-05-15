@@ -7,6 +7,7 @@ use at_commands as at;
 use std::fmt;
 use std::fmt::Debug;
 
+use crate::features::HfFeatures;
 use crate::peer::ag_indicators::AgIndicatorIndex;
 use crate::peer::at_connection;
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
@@ -72,6 +73,7 @@ macro_rules! impl_from_to_variant {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommandFromHf {
+    StartSlci { hf_features: HfFeatures },
     CallActionDialFromNumber { number: String },
     CallActionDialFromMemory { memory: String },
     CallActionRedialLast,
@@ -114,8 +116,9 @@ impl ProcedureInputT<ProcedureOutput> for ProcedureInput {
     /// Matches a specific input to procedure
     fn to_initialized_procedure(&self) -> Option<Box<dyn Procedure<Self, ProcedureOutput>>> {
         match self {
-            // TODO(https://fxbug.dev/42081254) This is wrong--we need to start SLCI ourselves, not wait for an AT command.
-            at_resp!(Brsf) => Some(Box::new(SlcInitProcedure::new())),
+            ProcedureInput::CommandFromHf(CommandFromHf::StartSlci { .. }) => {
+                Some(Box::new(SlcInitProcedure::new()))
+            }
 
             at_resp!(Bcs) => Some(Box::new(CodecConnectionSetupProcedure::new())),
 
@@ -131,7 +134,7 @@ impl ProcedureInputT<ProcedureOutput> for ProcedureInput {
 
     fn can_start_procedure(&self) -> bool {
         match self {
-            at_resp!(Brsf)
+            ProcedureInput::CommandFromHf(CommandFromHf::StartSlci { .. })
             | at_resp!(Ciev)
             | at_resp!(Bcs)
             | ProcedureInput::CommandFromHf(CommandFromHf::CallActionDialFromNumber { .. })

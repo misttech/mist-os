@@ -44,7 +44,7 @@ where
     S: FusedStream<Item = fidl_hfp::HandsFreeRequestStream> + Unpin + 'static,
 {
     /// Configuration for which HF features we support.
-    features: HandsFreeFeatureSupport,
+    hf_features: HandsFreeFeatureSupport,
     /// Provides Hfp with a means to drive the `fuchsia.bluetooth.bredr` related APIs.
     profile_client: ProfileClient,
     /// The client connection to the `fuchsia.bluetooth.bredr.Profile` protocol.
@@ -73,7 +73,7 @@ where
     S: FusedStream<Item = fidl_hfp::HandsFreeRequestStream> + Unpin + 'static,
 {
     pub fn new(
-        features: HandsFreeFeatureSupport,
+        hf_features: HandsFreeFeatureSupport,
         profile_client: ProfileClient,
         profile_proxy: bredr::ProfileProxy,
         sco_connector: sco::Connector,
@@ -86,7 +86,7 @@ where
         let audio_control = Arc::new(Mutex::new(audio_control));
         let peers = HashMap::new();
         Self {
-            features,
+            hf_features,
             profile_client,
             profile_proxy,
             hands_free_connection_stream,
@@ -148,7 +148,7 @@ where
         let peer = self.peers.entry(peer_id).or_insert_with(|| {
             Peer::new(
                 peer_id,
-                self.features,
+                self.hf_features,
                 self.profile_proxy.clone(),
                 self.sco_connector.clone(),
                 self.audio_control.clone(),

@@ -5,9 +5,11 @@
 use anyhow::{format_err, Result};
 use at_commands as at;
 
-use super::{at_cmd, at_ok, at_resp, CommandToHf, Procedure, ProcedureInput, ProcedureOutput};
+use super::{
+    at_cmd, at_ok, at_resp, CommandFromHf, CommandToHf, Procedure, ProcedureInput, ProcedureOutput,
+};
 
-use crate::features::{extract_features_from_command, AgFeatures};
+use crate::features::{extract_features_from_command, AgFeatures, HfFeatures};
 use crate::peer::ag_indicators::AgIndicatorIndex;
 use crate::peer::at_connection::Response as AtResponse;
 use crate::peer::hf_indicators::{BATTERY_LEVEL, ENHANCED_SAFETY, INDICATOR_REPORTING_MODE};
@@ -15,6 +17,7 @@ use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 
 #[derive(Debug, PartialEq)]
 pub enum State {
+    Starting,
     SentSupportedFeatures,         // Sent AT+BRSF, waiting for +BRSF.
     ReceivedSupportedFeatures,     // Received +BRSF, waiting for OK.
     SentAvailableCodecs,           // Sent AT+BAC, waiting for OK.
@@ -38,10 +41,6 @@ pub struct SlcInitProcedure {
 }
 
 impl SlcInitProcedure {
-    pub fn new() -> Self {
-        Self { state: State::SentSupportedFeatures }
-    }
-
     #[cfg(test)]
     pub fn start_at_state(state: State) -> Self {
         Self { state, ..SlcInitProcedure::new() }
@@ -50,6 +49,13 @@ impl SlcInitProcedure {
     #[cfg(test)]
     pub fn start_terminated() -> Self {
         Self { state: State::Terminated }
+    }
+
+    pub fn send_supported_hf_features(&mut self, hf_features: HfFeatures) -> Vec<ProcedureOutput> {
+        self.state = State::SentSupportedFeatures;
+        vec![ProcedureOutput::AtCommandToAg(at::Command::Brsf {
+            features: hf_features.bits() as i64,
+        })]
     }
 
     fn receive_supported_features(
@@ -169,7 +175,7 @@ impl SlcInitProcedure {
 
 impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
     fn new() -> Self {
-        Self { state: State::SentSupportedFeatures }
+        Self { state: State::Starting }
     }
 
     fn name(&self) -> &str {
@@ -191,6 +197,12 @@ impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
             ));
         }
         let outputs = match (&self.state, input) {
+            // Start by sending AT+BRSF ///////////////////////////////////////////////////////////
+            (
+                State::Starting,
+                ProcedureInput::CommandFromHf(CommandFromHf::StartSlci { hf_features }),
+            ) => self.send_supported_hf_features(hf_features),
+
             // Sent AT+BRSF, waiting for +BRSF /////////////////////////////////////////////////////
             (State::SentSupportedFeatures, at_resp!(Brsf { features })) => {
                 self.receive_supported_features(state, features)
@@ -295,6 +307,7 @@ impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::config::HandsFreeFeatureSupport;
     use crate::features::{CallHoldAction, HfFeatures};
 
@@ -351,10 +364,18 @@ mod tests {
     /// our state and sends the expected responses until our procedure it marked complete.
     fn slci_mandatory_exchanges_and_termination() {
         let mut procedure = SlcInitProcedure::new();
-        let config = HandsFreeFeatureSupport::default();
-        let mut state = ProcedureManipulatedState::new(config);
+        let hf_feature_support = HandsFreeFeatureSupport::default();
+        let mut state = ProcedureManipulatedState::new(hf_feature_support);
 
         assert!(!procedure.is_terminated());
+
+        let start_input = ProcedureInput::CommandFromHf(CommandFromHf::StartSlci {
+            hf_features: hf_feature_support.into(),
+        });
+        let hf_features_bitfield = state.hf_features.bits();
+        let expected_command0 = vec![at_cmd!(Brsf { features: hf_features_bitfield })];
+
+        assert_eq!(procedure.transition(&mut state, start_input).unwrap(), expected_command0);
 
         let response1 = at_resp!(Brsf { features: AgFeatures::default().bits() });
         let response1_ok = at_ok!();
@@ -440,6 +461,12 @@ mod tests {
         assert!(!state.hf_indicators.enhanced_safety.0.enabled);
         assert!(!state.hf_indicators.battery_level.0.enabled);
         assert!(!procedure.is_terminated());
+
+        let start_input = ProcedureInput::CommandFromHf(CommandFromHf::StartSlci { hf_features });
+        let hf_features_bitfield = state.hf_features.bits();
+        let expected_command0 = vec![at_cmd!(Brsf { features: hf_features_bitfield })];
+
+        assert_eq!(procedure.transition(&mut state, start_input).unwrap(), expected_command0);
 
         let response1 = at_resp!(Brsf { features: ag_features.bits() });
         let response1_ok = at_ok!();
@@ -552,6 +579,12 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
+        let start_input = ProcedureInput::CommandFromHf(CommandFromHf::StartSlci { hf_features });
+        let hf_features_bitfield = state.hf_features.bits();
+        let expected_command0 = vec![at_cmd!(Brsf { features: hf_features_bitfield })];
+
+        assert_eq!(procedure.transition(&mut state, start_input).unwrap(), expected_command0);
+
         let response1 = at_resp!(Brsf { features: ag_features.bits() });
         let response1_ok = at_ok!();
         let expected_command1 =
@@ -578,6 +611,12 @@ mod tests {
         let mut state = ProcedureManipulatedState::load_with_set_features(hf_features, ag_features);
 
         assert!(!procedure.is_terminated());
+
+        let start_input = ProcedureInput::CommandFromHf(CommandFromHf::StartSlci { hf_features });
+        let hf_features_bitfield = state.hf_features.bits();
+        let expected_command0 = vec![at_cmd!(Brsf { features: hf_features_bitfield })];
+
+        assert_eq!(procedure.transition(&mut state, start_input).unwrap(), expected_command0);
 
         let response1 = at_resp!(Brsf { features: ag_features.bits() });
         let response1_ok = at_ok!();

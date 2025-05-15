@@ -34,7 +34,7 @@ mod procedure_manipulated_state;
 /// Level Connection, Audio Connection, and FIDL APIs.
 pub struct Peer {
     peer_id: PeerId,
-    config: HandsFreeFeatureSupport,
+    hf_features: HandsFreeFeatureSupport,
     profile_proxy: bredr::ProfileProxy,
     sco_connector: sco::Connector,
     audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
@@ -48,12 +48,12 @@ pub struct Peer {
 impl Peer {
     pub fn new(
         peer_id: PeerId,
-        config: HandsFreeFeatureSupport,
+        hf_features: HandsFreeFeatureSupport,
         profile_proxy: bredr::ProfileProxy,
         sco_connector: sco::Connector,
         audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
     ) -> Self {
-        Self { peer_id, config, profile_proxy, sco_connector, audio_control, task: None }
+        Self { peer_id, hf_features, profile_proxy, sco_connector, audio_control, task: None }
     }
 
     /// Handle a PeerConnected ProfileEvent.  This creates a new peer task, so return the
@@ -68,7 +68,7 @@ impl Peer {
 
         let task = PeerTask::spawn(
             self.peer_id,
-            self.config,
+            self.hf_features,
             peer_handler_request_stream,
             rfcomm,
             self.sco_connector.clone(),
@@ -106,7 +106,7 @@ impl Peer {
 
         let task = PeerTask::spawn(
             self.peer_id,
-            self.config,
+            self.hf_features,
             peer_handler_request_stream,
             rfcomm,
             self.sco_connector.clone(),

@@ -32,6 +32,7 @@ pub enum CallHoldAction {
     ExplicitCallTransfer,
 }
 
+// TODO(b/324927277) The AG has an identical series of bitfields. Move this to bt-hfp.
 bitflags! {
     /// Bitmap defined in HFP v1.8, Section 4.35.1 for use with the "+BRSF" AT result code.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
