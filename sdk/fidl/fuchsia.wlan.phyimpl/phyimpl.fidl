@@ -91,6 +91,41 @@ open protocol WlanPhyImpl {
         /// This field is required.
         1: ps_mode fuchsia.wlan.common.PowerSaveType;
     }) error zx.Status;
+
+    /// Power up/down/reset the wlan chip.
+    /// If supported, PowerDown will power down the wlan chip if it is currently powered on.
+    /// Any existing interfaces should have already been deleted before making this call or else the
+    /// driver will fail the call with error code ZX_ERR_INTERNAL.
+    /// Other possible error codes are: \
+    /// ZX_ERR_NOT_SUPPORTED: the feature is not supported by the driver.
+    /// ZX_ERR_BAD_STATE: the wlan chip is already powered down.
+    @available(added=HEAD)
+    flexible PowerDown() -> () error zx.Status;
+
+    /// If supported, PowerUp will power up the wlan chip if it is currently powered down.
+    /// Possible error codes are: \
+    /// ZX_ERR_NOT_SUPPORTED: the feature is not supported by the driver.
+    /// ZX_ERR_BAD_STATE: the wlan chip is already powered up.
+    @available(added=HEAD)
+    flexible PowerUp() -> () error zx.Status;
+
+    /// If supported, Reset functionality implements PowerDown then PowerUp in an attempt to
+    /// recover from an error state. For example, if an interface gets into a bad state or if
+    /// firmware crashes, the firmware/chip may be unable to perform some actions and Reset
+    /// may be able to clear the bad state.
+    /// Possible error codes are: \
+    /// ZX_ERR_NOT_SUPPORTED: the feature is not supported by the driver.
+    @available(added=HEAD)
+    flexible Reset() -> () error zx.Status;
+
+    /// Returns the current power state of the wlan chip. After successful initialization
+    /// of the wlan driver, the state is set to true (power on) by default. power_on set to
+    /// true indicates that the wlan chip is powered on and false indicates the wlan chip
+    /// is powered off.
+    @available(added=HEAD)
+    flexible GetPowerState() -> (table {
+        1: power_on bool;
+    }) error zx.Status;
 };
 
 service Service {

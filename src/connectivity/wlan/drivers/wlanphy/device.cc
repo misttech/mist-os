@@ -384,5 +384,98 @@ void Device::GetPowerSaveMode(GetPowerSaveModeCompleter::Sync& completer) {
         completer.ReplySuccess(result->value()->ps_mode());
       });
 }
+
+void Device::PowerDown(PowerDownCompleter::Sync& completer) {
+  ltrace_fn();
+  fdf::Arena fdf_arena(0u);
+
+  client_.buffer(fdf_arena)->PowerDown().ThenExactlyOnce(
+      [completer = completer.ToAsync()](
+          fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::PowerDown>& result) mutable {
+        if (!result.ok()) {
+          lerror("PowerDown failed with FIDL error %s", result.FormatDescription().c_str());
+          completer.ReplyError(result.status());
+          return;
+        }
+        if (result->is_error()) {
+          lerror("PowerDown failed with error %s", zx_status_get_string(result->error_value()));
+          completer.ReplyError(result->error_value());
+          return;
+        }
+
+        completer.ReplySuccess();
+      });
+}
+
+void Device::PowerUp(PowerUpCompleter::Sync& completer) {
+  ltrace_fn();
+  fdf::Arena fdf_arena(0u);
+
+  client_.buffer(fdf_arena)->PowerUp().ThenExactlyOnce(
+      [completer = completer.ToAsync()](
+          fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::PowerUp>& result) mutable {
+        if (!result.ok()) {
+          lerror("PowerUp failed with FIDL error %s", result.FormatDescription().c_str());
+          completer.ReplyError(result.status());
+          return;
+        }
+        if (result->is_error()) {
+          lerror("PowerUp failed with error %s", zx_status_get_string(result->error_value()));
+          completer.ReplyError(result->error_value());
+          return;
+        }
+
+        completer.ReplySuccess();
+      });
+}
+
+void Device::Reset(ResetCompleter::Sync& completer) {
+  ltrace_fn();
+  fdf::Arena fdf_arena(0u);
+
+  client_.buffer(fdf_arena)->Reset().ThenExactlyOnce(
+      [completer = completer.ToAsync()](
+          fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::Reset>& result) mutable {
+        if (!result.ok()) {
+          lerror("Reset failed with FIDL error %s", result.FormatDescription().c_str());
+          completer.ReplyError(result.status());
+          return;
+        }
+        if (result->is_error()) {
+          lerror("Reset failed with error %s", zx_status_get_string(result->error_value()));
+          completer.ReplyError(result->error_value());
+          return;
+        }
+
+        completer.ReplySuccess();
+      });
+}
+
+void Device::GetPowerState(GetPowerStateCompleter::Sync& completer) {
+  ltrace_fn();
+  fdf::Arena fdf_arena(0u);
+
+  client_.buffer(fdf_arena)->GetPowerState().ThenExactlyOnce(
+      [completer = completer.ToAsync()](
+          fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::GetPowerState>&
+              result) mutable {
+        if (!result.ok()) {
+          lerror("GetPowerState failed with FIDL error %s", result.FormatDescription().c_str());
+          completer.ReplyError(result.status());
+          return;
+        }
+        if (result->is_error()) {
+          lerror("GetPowerState failed with error %s", zx_status_get_string(result->error_value()));
+          completer.ReplyError(result.status());
+          return;
+        }
+        if (!result->value()->has_power_on()) {
+          lerror("GetPowerState failed. power_on value not found");
+          completer.ReplyError(ZX_ERR_BAD_STATE);
+          return;
+        }
+        completer.ReplySuccess(result->value()->power_on());
+      });
+}
 }  // namespace wlanphy
 FUCHSIA_DRIVER_EXPORT(::wlanphy::Device);

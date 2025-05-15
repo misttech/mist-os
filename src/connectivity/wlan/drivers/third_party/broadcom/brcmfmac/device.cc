@@ -519,6 +519,22 @@ void Device::GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync
   completer.buffer(arena).ReplySuccess(builder.Build());
 }
 
+void Device::PowerDown(fdf::Arena& arena, PowerDownCompleter::Sync& completer) {
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Device::PowerUp(fdf::Arena& arena, PowerUpCompleter::Sync& completer) {
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Device::Reset(fdf::Arena& arena, ResetCompleter::Sync& completer) {
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Device::GetPowerState(fdf::Arena& arena, GetPowerStateCompleter::Sync& completer) {
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 void Device::ServiceConnectHandler(fdf_dispatcher_t* dispatcher,
                                    fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end) {
   bindings_.AddBinding(dispatcher, std::move(server_end), this, [](fidl::UnbindInfo info) {

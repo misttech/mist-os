@@ -473,6 +473,20 @@ cc_test_executable("phy_mac_roles_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
+cc_test_executable("phy_power_test") {
+  output_name = "phy_power_test"
+  testonly = true
+  sources = [ "phy_power_test.cc" ]
+  deps = [
+    ":sim_test",
+    "//src/connectivity/wlan/drivers/testing/lib/sim-env",
+    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
+  ]
+
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-conversion" ]
+}
+
 cc_test_executable("scan_dwell_time_test") {
   output_name = "scan_dwell_time_test"
   testonly = true

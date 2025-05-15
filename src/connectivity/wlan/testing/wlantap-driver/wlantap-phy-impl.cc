@@ -39,7 +39,7 @@ void WlanPhyImplDevice::Init(
       std::move(user_channel), phy_config_,
       [self = shared_from_this(),
        name = name_](WlantapPhy::ShutdownCompleter::Async wlantap_phy_shutdown_completer) mutable
-      -> fit::result<zx_status_t> {
+          -> fit::result<zx_status_t> {
         // Return an error if |self| has already been reset(). This function
         // should only be called once, and |self| is reset() upon completion
         // to drop its reference.
@@ -228,6 +228,24 @@ void WlanPhyImplDevice::SetPowerSaveMode(SetPowerSaveModeRequestView request, fd
 void WlanPhyImplDevice::GetPowerSaveMode(fdf::Arena& arena,
                                          GetPowerSaveModeCompleter::Sync& completer) {
   FDF_LOG(WARNING, "%s: GetPowerSaveMode() not supported", name_.c_str());
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void WlanPhyImplDevice::PowerDown(fdf::Arena& arena, PowerDownCompleter::Sync& completer) {
+  FDF_LOG(WARNING, "%s: PowerDown() not supported", name_.c_str());
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+void WlanPhyImplDevice::PowerUp(fdf::Arena& arena, PowerUpCompleter::Sync& completer) {
+  FDF_LOG(WARNING, "%s: PowerUp() not supported", name_.c_str());
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void WlanPhyImplDevice::Reset(fdf::Arena& arena, ResetCompleter::Sync& completer) {
+  FDF_LOG(WARNING, "%s: Reset() not supported", name_.c_str());
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+void WlanPhyImplDevice::GetPowerState(fdf::Arena& arena, GetPowerStateCompleter::Sync& completer) {
+  FDF_LOG(WARNING, "%s: GetPowerState() not supported", name_.c_str());
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 

@@ -91,6 +91,16 @@ closed protocol Phy {
     strict GetPowerSaveMode() -> (struct {
         resp fuchsia.wlan.common.PowerSaveType;
     }) error int32;
+
+    strict PowerDown() -> () error zx.Status;
+
+    strict PowerUp() -> () error zx.Status;
+
+    strict Reset() -> () error zx.Status;
+
+    strict GetPowerState() -> (struct {
+        power_on bool;
+    }) error zx.Status;
 };
 
 // Temporary interface for bridging between the devhost-owned channel model and
