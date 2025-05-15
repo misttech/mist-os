@@ -956,7 +956,7 @@ impl MemoryManagerState {
                     original_mapping.flags(),
                     original_mapping.max_access(),
                     false,
-                    original_mapping.name().clone(),
+                    original_mapping.name(),
                     original_mapping.file_write_guard().clone(),
                     released_mappings,
                 )?))
@@ -1139,7 +1139,7 @@ impl MemoryManagerState {
             src_mapping.flags(),
             src_mapping.max_access(),
             false,
-            src_mapping.name().clone(),
+            src_mapping.name(),
             src_mapping.file_write_guard().clone(),
             released_mappings,
         )?;
@@ -1161,7 +1161,7 @@ impl MemoryManagerState {
                 src_length,
                 src_mapping.flags().access_flags(),
                 MappingOptions::ANONYMOUS,
-                src_mapping.name().clone(),
+                src_mapping.name(),
                 released_mappings,
             )?;
         }
@@ -3322,7 +3322,7 @@ impl MemoryManager {
             let existing = if old_end > brk_base {
                 match old_end - *PAGE_SIZE {
                     Ok(addr) => {
-                        state.mappings.get(addr).filter(|(_, m)| m.name() == &MappingName::Heap)
+                        state.mappings.get(addr).filter(|(_, m)| m.name() == MappingName::Heap)
                     }
                     Err(_) => None,
                 }
@@ -3511,7 +3511,7 @@ impl MemoryManager {
                     let length = range.end - range.start;
 
                     let target_memory = if mapping.flags().contains(MappingFlags::SHARED)
-                        || mapping.name() == &MappingName::Vvar
+                        || mapping.name() == MappingName::Vvar
                     {
                         // Note that the Vvar is a special mapping that behaves like a shared mapping but
                         // is private to each process.
@@ -4121,11 +4121,14 @@ impl MemoryManager {
     }
 
     #[cfg(test)]
-    pub fn get_mapping_name(&self, addr: UserAddress) -> Result<Option<FsString>, Errno> {
+    pub fn get_mapping_name(
+        &self,
+        addr: UserAddress,
+    ) -> Result<Option<flyweights::FlyByteStr>, Errno> {
         let state = self.state.read();
         let (_, mapping) = state.mappings.get(addr).ok_or_else(|| errno!(EFAULT))?;
         if let MappingName::Vma(name) = mapping.name() {
-            Ok(Some(name.as_bstr().to_owned()))
+            Ok(Some(name.clone()))
         } else {
             Ok(None)
         }
@@ -5903,7 +5906,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            current_task.mm().unwrap().get_mapping_name(mapping_addr).unwrap().unwrap(),
+            *current_task.mm().unwrap().get_mapping_name(mapping_addr).unwrap().unwrap(),
             vma_name
         );
     }
@@ -5945,10 +5948,10 @@ mod tests {
 
             // The name should apply to both mappings.
             let (_, mapping) = state.mappings.get(first_mapping_addr).unwrap();
-            assert_eq!(mapping.name(), &MappingName::Vma("foo".into()));
+            assert_eq!(mapping.name(), MappingName::Vma("foo".into()));
 
             let (_, mapping) = state.mappings.get(second_mapping_addr).unwrap();
-            assert_eq!(mapping.name(), &MappingName::Vma("foo".into()));
+            assert_eq!(mapping.name(), MappingName::Vma("foo".into()));
         }
     }
 
@@ -5986,7 +5989,7 @@ mod tests {
             let state = current_task.mm().unwrap().state.read();
 
             let (_, mapping) = state.mappings.get(mapping_addr).unwrap();
-            assert_eq!(mapping.name(), &MappingName::Vma("foo".into()));
+            assert_eq!(mapping.name(), MappingName::Vma("foo".into()));
         }
     }
 
@@ -6025,7 +6028,7 @@ mod tests {
             let state = current_task.mm().unwrap().state.read();
 
             let (_, mapping) = state.mappings.get(second_page).unwrap();
-            assert_eq!(mapping.name(), &MappingName::None);
+            assert_eq!(mapping.name(), MappingName::None);
         }
     }
 
@@ -6059,14 +6062,14 @@ mod tests {
             let state = current_task.mm().unwrap().state.read();
 
             let (_, mapping) = state.mappings.get(mapping_addr).unwrap();
-            assert_eq!(mapping.name(), &MappingName::None);
+            assert_eq!(mapping.name(), MappingName::None);
 
             let (_, mapping) = state.mappings.get((mapping_addr + *PAGE_SIZE).unwrap()).unwrap();
-            assert_eq!(mapping.name(), &MappingName::Vma("foo".into()));
+            assert_eq!(mapping.name(), MappingName::Vma("foo".into()));
 
             let (_, mapping) =
                 state.mappings.get((mapping_addr + (2 * *PAGE_SIZE)).unwrap()).unwrap();
-            assert_eq!(mapping.name(), &MappingName::None);
+            assert_eq!(mapping.name(), MappingName::None);
         }
     }
 
@@ -6106,7 +6109,7 @@ mod tests {
             let state = target.mm().unwrap().state.read();
 
             let (_, mapping) = state.mappings.get(mapping_addr).unwrap();
-            assert_eq!(mapping.name(), &MappingName::Vma("foo".into()));
+            assert_eq!(mapping.name(), MappingName::Vma("foo".into()));
         }
     }
 }

@@ -2036,12 +2036,14 @@ mod tests {
         )
         .expect("failed to set name");
         assert_eq!(
-            Some("test-name".into()),
+            "test-name",
             current_task
                 .mm()
                 .unwrap()
                 .get_mapping_name((mapped_address + 24u64).unwrap())
                 .expect("failed to get address")
+                .unwrap()
+                .to_string(),
         );
 
         sys_munmap(&mut locked, &current_task, mapped_address, *PAGE_SIZE as usize)

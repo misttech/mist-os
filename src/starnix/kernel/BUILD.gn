@@ -395,6 +395,7 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/linux_uapi",
     "//src/starnix/lib/range_map",
     "//src/starnix/lib/selinux",
+    "//src/starnix/lib/split_enum_storage",
     "//src/starnix/lib/starnix_lifecycle",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_syscalls",
