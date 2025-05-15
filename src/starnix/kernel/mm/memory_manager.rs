@@ -1112,14 +1112,14 @@ impl MemoryManagerState {
                         growth_length,
                         src_mapping.flags().access_flags(),
                         src_mapping.flags().options(),
-                        src_mapping.name().clone(),
+                        src_mapping.name(),
                         released_mappings,
                     )?;
                 }
 
                 self.mappings.insert(
                     dst_addr..dst_end,
-                    Mapping::new_private_anonymous(src_mapping.flags(), src_mapping.name().clone()),
+                    Mapping::new_private_anonymous(src_mapping.flags(), src_mapping.name()),
                 );
 
                 if dst_addr != src_addr && src_length != 0 {
