@@ -12470,7 +12470,7 @@ rust_library("rand-v0_6_5") {
   deps += [ ":rand_isaac-v0_1_1" ]
   deps += [ ":rand_jitter-v0_1_3" ]
   deps += [ ":rand_os-v0_1_3" ]
-  deps += [ ":rand_pcg-v0_1_1" ]
+  deps += [ ":rand_pcg-v0_1_2" ]
   deps += [ ":rand_xorshift-v0_1_1" ]
   if (true) {
     deps += [ ":libc-v0_2_171" ]
@@ -12869,34 +12869,34 @@ rust_library("rand_os-v0_1_3") {
   applicable_licenses = [ ":rand_os-v0_1_3.license" ]
 }
 
-license("rand_pcg-v0_1_1.license") {
+license("rand_pcg-v0_1_2.license") {
   public_package_name = "rand_pcg"
   license_files =
-      [ "//third_party/rust_crates/vendor/rand_pcg-0.1.1/LICENSE-APACHE" ]
+      [ "//third_party/rust_crates/vendor/rand_pcg-0.1.2/LICENSE-APACHE" ]
 }
 
-rust_library("rand_pcg-v0_1_1") {
+rust_library("rand_pcg-v0_1_2") {
   crate_name = "rand_pcg"
-  crate_root = "//third_party/rust_crates/vendor/rand_pcg-0.1.1/src/lib.rs"
-  output_name = "rand_pcg-acb26d14eb85350b"
+  crate_root = "//third_party/rust_crates/vendor/rand_pcg-0.1.2/src/lib.rs"
+  output_name = "rand_pcg-12c7d64a8a2d95b1"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":rand_core-v0_3_1" ]
+  deps += [ ":rand_core-v0_4_2" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=acb26d14eb85350b",
-    "-Cextra-filename=-acb26d14eb85350b",
-    "--cfg=rust_1_26",
+    "-Cmetadata=12c7d64a8a2d95b1",
+    "-Cextra-filename=-12c7d64a8a2d95b1",
+    "--cfg=rustc_1_26",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":rand_pcg-v0_1_1.license" ]
+  applicable_licenses = [ ":rand_pcg-v0_1_2.license" ]
 }
 
 license("rand_xorshift-v0_1_1.license") {

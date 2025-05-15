@@ -7,13 +7,13 @@
 // except according to those terms.
 
 //! The PCG random number generators.
-//! 
+//!
 //! This is a native Rust implementation of a small selection of PCG generators.
 //! The primary goal of this crate is simple, minimal, well-tested code; in
 //! other words it is explicitly not a goal to re-implement all of PCG.
-//! 
+//!
 //! This crate provides:
-//! 
+//!
 //! -   `Pcg32` aka `Lcg64Xsh32`, officially known as `pcg32`, a general
 //!     purpose RNG. This is a good choice on both 32-bit and 64-bit CPUs
 //!     (for 32-bit output).
@@ -29,25 +29,20 @@
 
 #![doc(html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk.png",
        html_favicon_url = "https://www.rust-lang.org/favicon.ico",
-       html_root_url = "https://docs.rs/rand_pcg/0.1.1")]
+       html_root_url = "https://rust-random.github.io/rand/")]
 
 #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
-#![doc(test(attr(allow(unused_variables), deny(warnings))))]
 
-#![cfg_attr(not(all(feature="serde1", test)), no_std)]
+#![no_std]
 
-extern crate rand_core;
+pub extern crate rand_core;
 
 #[cfg(feature="serde1")] extern crate serde;
 #[cfg(feature="serde1")] #[macro_use] extern crate serde_derive;
 
-// To test serialization we need bincode and the standard library
-#[cfg(all(feature="serde1", test))] extern crate bincode;
-#[cfg(all(feature="serde1", test))] extern crate std as core;
-
 mod pcg64;
-#[cfg(rust_1_26)] mod pcg128;
+#[cfg(all(rustc_1_26, not(target_os = "emscripten")))] mod pcg128;
 
 pub use self::pcg64::{Pcg32, Lcg64Xsh32};
-#[cfg(rust_1_26)] pub use self::pcg128::{Pcg64Mcg, Mcg128Xsl64};
+#[cfg(all(rustc_1_26, not(target_os = "emscripten")))] pub use self::pcg128::{Pcg64Mcg, Mcg128Xsl64};

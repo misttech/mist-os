@@ -6,6 +6,7 @@
 #     fx update-rustc-third-party
 ###############################################################################
 
+load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library")
 load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
@@ -20,9 +21,9 @@ package(
 
 package_info(
     name = "package_info",
-    package_name = "semver-parser",
-    package_url = "https://github.com/steveklabnik/semver-parser",
-    package_version = "0.7.0",
+    package_name = "rand_pcg",
+    package_url = "https://github.com/rust-random/rand",
+    package_version = "0.1.2",
 )
 
 license(
@@ -35,7 +36,7 @@ license(
 )
 
 rust_library(
-    name = "semver_parser",
+    name = "rand_pcg",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -59,7 +60,7 @@ rust_library(
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=semver-parser",
+        "crate-name=rand_pcg",
         "manual",
         "noclippy",
         "norustfmt",
@@ -70,5 +71,67 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.7.0",
+    version = "0.1.2",
+    deps = [
+        "//third_party/rust_crates/vendor/rand_core-0.4.2:rand_core",
+        "//third_party/rust_crates/vendor/rand_pcg-0.1.2:build_script_build",
+    ],
+)
+
+cargo_build_script(
+    name = "_bs",
+    srcs = glob(
+        include = ["**/*.rs"],
+        allow_empty = False,
+    ),
+    compile_data = glob(
+        include = ["**"],
+        allow_empty = True,
+        exclude = [
+            "**/* *",
+            "**/*.rs",
+            ".tmp_git_root/**/*",
+            "BUILD",
+            "BUILD.bazel",
+            "WORKSPACE",
+            "WORKSPACE.bazel",
+        ],
+    ),
+    crate_name = "build_script_build",
+    crate_root = "build.rs",
+    data = glob(
+        include = ["**"],
+        allow_empty = True,
+        exclude = [
+            "**/* *",
+            ".tmp_git_root/**/*",
+            "BUILD",
+            "BUILD.bazel",
+            "WORKSPACE",
+            "WORKSPACE.bazel",
+        ],
+    ),
+    edition = "2015",
+    pkg_name = "rand_pcg",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-bazel",
+        "crate-name=rand_pcg",
+        "manual",
+        "noclippy",
+        "norustfmt",
+    ],
+    version = "0.1.2",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//third_party/rust_crates/vendor/autocfg-0.1.7:autocfg",
+    ],
+)
+
+alias(
+    name = "build_script_build",
+    actual = ":_bs",
+    tags = ["manual"],
 )
