@@ -185,7 +185,7 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             Config::new(ConfigValueType::Uint64, {
                 match context.build_type {
                     BuildType::Eng => 5000,
-                    BuildType::UserDebug | BuildType::User => 100,
+                    BuildType::UserDebug | BuildType::User => 5000,
                 }
                 .into()
             }),
