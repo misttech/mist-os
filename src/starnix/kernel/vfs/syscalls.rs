@@ -3657,6 +3657,7 @@ mod arch32 {
         sys_io_destroy as sys_arch32_io_destroy, sys_io_getevents as sys_arch32_io_getevents,
         sys_io_setup as sys_arch32_io_setup, sys_io_submit as sys_arch32_io_submit,
         sys_lgetxattr as sys_arch32_lgetxattr, sys_linkat as sys_arch32_linkat,
+        sys_listxattr as sys_arch32_listxattr, sys_llistxattr as sys_arch32_llistxattr,
         sys_lsetxattr as sys_arch32_lsetxattr, sys_mkdirat as sys_arch32_mkdirat,
         sys_mknodat as sys_arch32_mknodat, sys_pidfd_getfd as sys_arch32_pidfd_getfd,
         sys_pidfd_open as sys_arch32_pidfd_open, sys_ppoll as sys_arch32_ppoll,
