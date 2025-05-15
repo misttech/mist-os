@@ -236,9 +236,6 @@ impl InflatedResource {
             fplugin::ResourceType::Job(job) => {
                 let mut r: Vec<u64> = job.child_jobs.iter().flatten().map(|k| *k).collect();
                 r.extend(job.processes.iter().flatten().map(|k| *k));
-                if r.len() == 0 {
-                    eprintln!("{} has no processes", self.resource.koid);
-                }
                 r
             }
             fplugin::ResourceType::Process(process) => {
@@ -587,7 +584,6 @@ pub fn attribute_vmos(attribution_data: AttributionData) -> ProcessedAttribution
                     // This can happen if a resource is created or disappears while we were
                     // collecting information about all the resources in the system. This should
                     // remain a rare event.
-                    println!("Resource {} not found", child);
                     continue;
                 }
             };
