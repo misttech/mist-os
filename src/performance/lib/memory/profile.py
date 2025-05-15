@@ -32,20 +32,20 @@ class MemoryProfileMetrics(trace_metrics.ConstantMetricsProcessor):
 
 
 def capture_and_compute_metrics(
-    process_groups: Mapping[str, str] | None,
     dut: FuchsiaDevice,
     principal_groups: Mapping[str, str] | None = None,
+    process_groups: Mapping[str, str] | None = None,
 ) -> trace_metrics.ConstantMetricsProcessor:
     """Captures kernel and user space memory metrics using `ffx profile memory`.
 
     Args:
-      process_groups: The process groupings for which to report total memory
-        usage metrics that will be tracked for regressions.
       dut: A FuchsiaDevice instance connected to the device to profile.
       principal_groups: mapping from group name to a `fnmatch` pattern
         that selects the principals by name. A metric labelled
         "Memory/Principal/{group_name}/PrivatePopulated" is returned for each
         item.
+      process_groups: The process groupings for which to report total memory
+        usage metrics that will be tracked for regressions.
 
     Returns:
       MemoryProfileMetrics instance containing two sets of memory
