@@ -207,10 +207,10 @@ async fn add_del_route(ip_version: IpVersion) {
     };
 
     let route_record = serde_json::json!({
-        "destination": serde_json::json!({
+        "destination": {
             "addr": destination,
             "prefix_len": prefix_len,
-        }),
+        },
         "gateway": gateway,
         "metric": metric,
         "nicid": nicid,
