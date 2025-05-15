@@ -800,6 +800,19 @@ of the waiting paths without needing to put the system into a low memory state. 
 enable this option if the kernel is not built with debugging assertions enabled.
 )""")
 
+DEFINE_OPTION("kernel.stack.canary-percent-free", uint64_t, stack_canary_percent_free, {0},
+              R"""(
+This controls the offset at which a canary will be placed on the kernel stacks. If the canary is
+corrupted this indicates that the stack reached at least that depth during usage, and this can be
+used as an early warning for stack usage nearing the limit. The offset is defined using a
+percentage to account for the variability of kernel stack sizes. e.g. a value of 0 will place the
+canary at the very end of the stack, meaning it will get corrupted at the same time as the stack
+overflows.
+
+Canary detection is performed on stack free, i.e. thread termination, and will generate a kernel
+OOPS if the canary is corrupted.
+)""")
+
 DEFINE_OPTION("kernel.portobserver.reserve-pages", uint64_t, port_observer_reserve_pages, {8},
               R"""(
 Specifies the number of pages per CPU to reserve for port observer (async

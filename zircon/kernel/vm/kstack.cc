@@ -32,19 +32,45 @@ namespace {
 struct StackType {
   const char* name;
   size_t size;
+  enum class Grow : bool {
+    Up,
+    Down,
+  } dir;
 };
 
 KCOUNTER(vm_kernel_stack_bytes, "vm.kstack.allocated_bytes")
 
-constexpr StackType kSafe = {"kernel-safe-stack", DEFAULT_STACK_SIZE};
+constexpr StackType kSafe = {"kernel-safe-stack", DEFAULT_STACK_SIZE, StackType::Grow::Down};
 #if __has_feature(safe_stack)
-constexpr StackType kUnsafe = {"kernel-unsafe-stack", DEFAULT_STACK_SIZE};
+constexpr StackType kUnsafe = {"kernel-unsafe-stack", DEFAULT_STACK_SIZE, StackType::Grow::Down};
 #endif
 #if __has_feature(shadow_call_stack)
-constexpr StackType kShadowCall = {"kernel-shadow-call-stack", ZX_PAGE_SIZE};
+constexpr StackType kShadowCall = {"kernel-shadow-call-stack", ZX_PAGE_SIZE, StackType::Grow::Up};
 #endif
 
 constexpr size_t kStackPaddingSize = PAGE_SIZE;
+
+// Choose a pattern for the stack canary that hopefully doesn't collide with other patterns that
+// might get used on the stack. Explicitly avoid 0xAA, for example, as it is used for filling
+// uninitialized stack variables.
+constexpr unsigned char kStackCanary = 0xBB;
+
+size_t stack_canary_offset(const StackType& type) {
+  const size_t off = type.size / 100 * ktl::min(100ul, gBootOptions->stack_canary_percent_free);
+  return type.dir == StackType::Grow::Down ? off : type.size - off - 1;
+}
+
+void stack_canary_write(const StackType& type, void* base) {
+  static_cast<unsigned char*>(base)[stack_canary_offset(type)] = kStackCanary;
+}
+
+void stack_canary_check(const StackType& type, void* base) {
+  const size_t off = stack_canary_offset(type);
+  if (static_cast<unsigned char*>(base)[off] != kStackCanary) {
+    KERNEL_OOPS("Canary at offset %zu in stack %s as base %p of size %zu was corrupted.", off,
+                type.name, base, type.size);
+  }
+}
 
 // Takes a portion of the VMO and maps a kernel stack with one page of padding before and after the
 // mapping.
@@ -90,6 +116,9 @@ zx_status_t map(const StackType& type, fbl::RefPtr<VmObjectPaged>& vmo, uint64_t
   if (status != ZX_OK) {
     return status;
   }
+
+  stack_canary_write(type, reinterpret_cast<void*>(mapping_result->base));
+
   vm_kernel_stack_bytes.Add(type.size);
 
   // Cancel the cleanup handler on the vmar since we're about to save a
@@ -110,6 +139,8 @@ zx_status_t unmap(const StackType& type, KernelStack::Mapping& map) {
     return ZX_OK;
   }
   LTRACEF("removing vmar at at %#" PRIxPTR "\n", map.vmar_->base());
+
+  stack_canary_check(type, reinterpret_cast<void*>(map.base()));
 
   zx_status_t status = map.vmar_->Destroy();
   if (status != ZX_OK) {
