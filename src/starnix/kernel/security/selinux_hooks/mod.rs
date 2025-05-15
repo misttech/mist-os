@@ -526,7 +526,7 @@ pub(super) struct TaskAttrs {
 
     /// Effective SID for the task. This is usually equal to |current_sid|, but this may be changed
     /// internally for the current task. This should only be accessed for the running task.
-    effective_sid: SecurityId,
+    pub effective_sid: SecurityId,
 
     /// SID for the task upon the next execve call.
     pub exec_sid: Option<SecurityId>,
@@ -589,6 +589,86 @@ pub(in crate::security) fn task_consistent_attrs(
     let task_attrs = current_task.security_state.lock();
     assert_eq!(task_attrs.effective_sid, task_attrs.current_sid);
     task_attrs
+}
+
+/// Structure defining a patch for task attributes that can be temporarily applied. The current
+/// SID cannot be modified, since it is observable by other tasks performing access checks.
+#[derive(Clone, Debug, PartialEq)]
+struct TaskAttrsOverride {
+    effective_sid: Option<SecurityId>,
+    exec_sid: Option<Option<SecurityId>>,
+    fscreate_sid: Option<Option<SecurityId>>,
+    keycreate_sid: Option<Option<SecurityId>>,
+    sockcreate_sid: Option<Option<SecurityId>>,
+}
+
+impl Default for TaskAttrsOverride {
+    fn default() -> TaskAttrsOverride {
+        TaskAttrsOverride {
+            effective_sid: None,
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            sockcreate_sid: None,
+        }
+    }
+}
+
+impl TaskAttrsOverride {
+    /// Creates a default patch.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Returns a modified patch that changes the effective SID to match `effective_sid`.
+    /// All temporary SIDs are cleared.
+    pub fn effective_sid(&self, effective_sid: SecurityId) -> Self {
+        Self {
+            effective_sid: Some(effective_sid),
+            exec_sid: Some(None),
+            fscreate_sid: Some(None),
+            keycreate_sid: Some(None),
+            sockcreate_sid: Some(None),
+        }
+    }
+
+    /// Returns a modified patch that sets the fscreate SID to create nodes with the same security
+    /// state as `fs_node`.
+    pub fn fscreate_sid(&self, fscreate_sid: SecurityId) -> Self {
+        Self { fscreate_sid: Some(Some(fscreate_sid)), ..*self }
+    }
+
+    /// Runs `f` in `current_task`, with its security attributes modified by the patch. The
+    /// security state of `current_task` is restored after the call.
+    pub fn run<R>(&self, current_task: &CurrentTask, f: impl FnOnce() -> R) -> R {
+        let saved_state;
+        {
+            let mut task_state = current_task.security_state.lock();
+            saved_state = task_state.clone();
+            self.apply(&mut *task_state);
+        }
+        let ret = f();
+        *current_task.security_state.lock() = saved_state;
+        ret
+    }
+
+    fn apply(&self, task_attrs: &mut TaskAttrs) {
+        if let Some(effective_sid) = self.effective_sid {
+            task_attrs.effective_sid = effective_sid;
+        }
+        if let Some(exec_sid) = self.exec_sid {
+            task_attrs.exec_sid = exec_sid;
+        }
+        if let Some(fscreate_sid) = self.fscreate_sid {
+            task_attrs.fscreate_sid = fscreate_sid;
+        }
+        if let Some(keycreate_sid) = self.keycreate_sid {
+            task_attrs.keycreate_sid = keycreate_sid;
+        }
+        if let Some(sockcreate_sid) = self.sockcreate_sid {
+            task_attrs.sockcreate_sid = sockcreate_sid;
+        }
+    }
 }
 
 /// Security state for a [`crate::vfs::FileObject`] instance. This currently just holds the SID
@@ -817,29 +897,6 @@ fn get_cached_sid_and_class(fs_node: &FsNode) -> Option<FsNodeSidAndClass> {
         FsNodeLabel::Uninitialized => None,
     }
     .map(|sid| FsNodeSidAndClass { sid, class: state.class })
-}
-
-/// Encapsulates a temporary override of the SID with which file nodes will be created.
-/// Restores the previously used file creation SID when dropped.
-pub struct ScopedFsCreate<'a> {
-    task: &'a CurrentTask,
-    old_fscreate_sid: Option<SecurityId>,
-}
-
-pub(super) fn scoped_fs_create<'a>(
-    task: &'a CurrentTask,
-    fscreate_sid: SecurityId,
-) -> ScopedFsCreate<'a> {
-    let mut task_attrs = task.security_state.lock();
-    let old_fscreate_sid = std::mem::replace(&mut task_attrs.fscreate_sid, Some(fscreate_sid));
-    ScopedFsCreate { task, old_fscreate_sid }
-}
-
-impl Drop for ScopedFsCreate<'_> {
-    fn drop(&mut self) {
-        let mut task_attrs = self.task.security_state.lock();
-        task_attrs.fscreate_sid = self.old_fscreate_sid;
-    }
 }
 
 #[cfg(test)]

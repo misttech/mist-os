@@ -45,6 +45,10 @@ impl TaskState {
     }
 }
 
+/// Opaque structure encapsulating the effective security state saved from a task.
+#[derive(Clone, Debug)]
+pub struct SavedEffectiveState(SecurityId);
+
 /// Opaque structure holding security state associated with a `ResolvedElf` instance.
 #[derive(Debug, PartialEq)]
 pub struct ResolvedElfState {

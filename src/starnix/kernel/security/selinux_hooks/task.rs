@@ -6,6 +6,7 @@ use crate::security::selinux_hooks::{
     check_permission, check_self_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
     fs_node_set_label_with_task, has_file_permissions, task_consistent_attrs, task_effective_sid,
     todo_check_permission, KernelPermission, PermissionCheck, ProcessPermission, TaskAttrs,
+    TaskAttrsOverride,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
@@ -788,6 +789,15 @@ pub(in crate::security) fn set_procattr(
 pub(in crate::security) fn fs_node_init_with_task(task: &TempRef<'_, Task>, fs_node: &FsNode) {
     fs_node_ensure_class(fs_node).unwrap();
     fs_node_set_label_with_task(fs_node, task.into());
+}
+
+/// Temporarily sets the effective sid to `effective_sid` and runs `f`.
+pub(in crate::security) fn run_with_effective_sid<R>(
+    current_task: &CurrentTask,
+    effective_sid: SecurityId,
+    f: impl FnOnce() -> R,
+) -> R {
+    TaskAttrsOverride::new().effective_sid(effective_sid).run(current_task, f)
 }
 
 #[cfg(test)]

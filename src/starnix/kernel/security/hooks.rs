@@ -4,7 +4,7 @@
 
 use super::{
     selinux_hooks, BpfMapState, BpfProgState, FileObjectState, FileSystemState, ResolvedElfState,
-    TaskState,
+    SavedEffectiveState, TaskState,
 };
 use crate::bpf::program::Program;
 use crate::bpf::BpfMap;
@@ -664,21 +664,23 @@ pub fn check_file_ioctl_access(
 }
 
 /// Sets the security context of `CurrentTask` to be appropriate for a copy up operation
-/// on `fs_node`.
-///
-/// The task's security context will be reset when the `ScopedFsCreate` is dropped.
-///
-/// Returns `None` if SELinux is not enabled.
+/// on `fs_node`, then call `do_copy_up`.
+/// The task's security context will be reset before returning.
 ///
 /// Corresponds to the `security_inode_copy_up()` LSM hook.
-pub fn fs_node_copy_up<'a>(
-    current_task: &'a CurrentTask,
+pub fn fs_node_copy_up<R>(
+    current_task: &CurrentTask,
     fs_node: &FsNode,
-) -> Result<Option<selinux_hooks::ScopedFsCreate<'a>>, Errno> {
-    track_hook_duration!(c"security.hooks.fs_node_copy_up");
-    if_selinux_else_default_ok(current_task, |_security_server| {
-        Ok(Some(selinux_hooks::fs_node::fs_node_copy_up(current_task, fs_node)))
-    })
+    do_copy_up: impl FnOnce() -> R,
+) -> R {
+    if_selinux_else_with_context(
+        do_copy_up,
+        current_task,
+        |do_copy_up, _security_server| {
+            selinux_hooks::fs_node::fs_node_copy_up(current_task, fs_node, do_copy_up)
+        },
+        |do_copy_up| do_copy_up(),
+    )
 }
 
 /// This hook is called by the `flock` syscall. Returns whether `current_task` can perform
@@ -777,6 +779,28 @@ pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno
         }?
         .into(),
     ))
+}
+
+/// Saves the effective SID of `current_task` for later use.
+pub fn task_save_effective_state(current_task: &CurrentTask) -> SavedEffectiveState {
+    track_hook_duration!(c"security.hooks.task_save_effective_state");
+    SavedEffectiveState(current_task.security_state.lock().effective_sid)
+}
+
+/// Temporarily switches to the saved `effective_state`, calls `f`, then restores the previous state.
+pub fn run_with_effective_state<R>(
+    current_task: &CurrentTask,
+    effective_state: &SavedEffectiveState,
+    f: impl FnOnce() -> R,
+) -> R {
+    if_selinux_else_with_context(
+        f,
+        current_task,
+        |f, _security_server| {
+            selinux_hooks::task::run_with_effective_sid(current_task, effective_state.0, f)
+        },
+        |f| f(),
+    )
 }
 
 /// Returns the serialized Security Context associated with the specified task.
@@ -1686,6 +1710,7 @@ pub mod testing {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::security::selinux_hooks::get_cached_sid;
     use crate::security::selinux_hooks::testing::{
         self, spawn_kernel_with_selinux_hooks_test_policy_and_run,
     };
@@ -2527,5 +2552,73 @@ mod tests {
                 error!(EINVAL)
             );
         })
+    }
+
+    #[fuchsia::test]
+    async fn create_file_with_fscreate_sid() {
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |locked, current_task, security_server| {
+                let sid =
+                    security_server.security_context_to_sid(VALID_SECURITY_CONTEXT.into()).unwrap();
+                let source_node = &testing::create_test_file(locked, current_task).entry.node;
+
+                fs_node_setsecurity(
+                    locked,
+                    current_task,
+                    &source_node,
+                    XATTR_NAME_SELINUX.to_bytes().into(),
+                    VALID_SECURITY_CONTEXT.into(),
+                    XattrOp::Set,
+                )
+                .expect("set_xattr(security.selinux) failed");
+
+                let dir_entry = fs_node_copy_up(current_task, source_node, || {
+                    current_task
+                        .fs()
+                        .root()
+                        .create_node(
+                            locked,
+                            &current_task,
+                            "test_file2".into(),
+                            FileMode::IFREG,
+                            DeviceType::NONE,
+                        )
+                        .unwrap()
+                })
+                .entry;
+
+                assert_eq!(get_cached_sid(&dir_entry.node), Some(sid));
+            },
+        );
+    }
+
+    #[fuchsia::test]
+    async fn save_and_reuse_effective_sid() {
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |_locked, current_task, security_server| {
+                let sid =
+                    security_server.security_context_to_sid(VALID_SECURITY_CONTEXT.into()).unwrap();
+
+                let saved_state =
+                    selinux_hooks::task::run_with_effective_sid(current_task, sid, || {
+                        task_save_effective_state(current_task)
+                    });
+
+                let current_sid = current_task.security_state.lock().current_sid;
+                assert_ne!(sid, current_sid);
+                // Set an fscreate SID and check that it is overridden.
+                current_task.security_state.lock().fscreate_sid = Some(sid);
+                run_with_effective_state(current_task, &saved_state, || {
+                    assert_eq!(current_task.security_state.lock().current_sid, current_sid);
+                    assert_eq!(current_task.security_state.lock().effective_sid, sid);
+                    assert_eq!(current_task.security_state.lock().fscreate_sid, None);
+                });
+
+                // The modified state is restored.
+                assert_eq!(current_task.security_state.lock().current_sid, current_sid);
+                assert_eq!(current_task.security_state.lock().effective_sid, current_sid);
+                assert_eq!(current_task.security_state.lock().fscreate_sid, Some(sid));
+            },
+        )
     }
 }

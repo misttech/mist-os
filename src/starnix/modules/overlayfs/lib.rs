@@ -338,67 +338,67 @@ impl OverlayNode {
             };
             let cred = info.cred();
 
-            let _scoped_fs_create = security::fs_node_copy_up(current_task, &lower.entry.node);
-
-            let res = if info.mode.is_lnk() {
-                let link_target = lower.entry().node.readlink(locked, current_task)?;
-                let link_path = match &link_target {
-                    SymlinkTarget::Node(_) => return error!(EIO),
-                    SymlinkTarget::Path(path) => path,
-                };
-                parent_upper.create_entry(
-                    locked,
-                    current_task,
-                    name.as_ref(),
-                    |locked, dir, mount, name| {
-                        dir.create_symlink(
-                            locked,
-                            current_task,
-                            mount,
-                            name,
-                            link_path.as_ref(),
-                            info.cred(),
-                        )
-                    },
-                )
-            } else if info.mode.is_reg() && copy_mode == UpperCopyMode::CopyAll {
-                // Regular files need to be copied from lower FS to upper FS.
-                self.stack.create_upper_entry(
-                    locked,
-                    current_task,
-                    parent_upper,
-                    name.as_ref(),
-                    |locked, dir, name| {
-                        dir.create_entry(
-                            locked,
-                            current_task,
-                            name,
-                            |locked, dir_node, mount, name| {
-                                dir_node.mknod(
-                                    locked,
-                                    current_task,
-                                    mount,
-                                    name,
-                                    info.mode,
-                                    DeviceType::NONE,
-                                    cred,
-                                )
-                            },
-                        )
-                    },
-                    |locked, entry| copy_file_content(locked, current_task, lower, &entry),
-                )
-            } else {
-                // TODO(sergeyu): create_node() checks access, but we don't need that here.
-                parent_upper.create_entry(
-                    locked,
-                    current_task,
-                    name.as_ref(),
-                    |locked, dir, mount, name| {
-                        dir.mknod(locked, current_task, mount, name, info.mode, info.rdev, cred)
-                    },
-                )
-            };
+            let res = security::fs_node_copy_up(current_task, &lower.entry.node, || {
+                if info.mode.is_lnk() {
+                    let link_target = lower.entry().node.readlink(locked, current_task)?;
+                    let link_path = match &link_target {
+                        SymlinkTarget::Node(_) => return error!(EIO),
+                        SymlinkTarget::Path(path) => path,
+                    };
+                    parent_upper.create_entry(
+                        locked,
+                        current_task,
+                        name.as_ref(),
+                        |locked, dir, mount, name| {
+                            dir.create_symlink(
+                                locked,
+                                current_task,
+                                mount,
+                                name,
+                                link_path.as_ref(),
+                                info.cred(),
+                            )
+                        },
+                    )
+                } else if info.mode.is_reg() && copy_mode == UpperCopyMode::CopyAll {
+                    // Regular files need to be copied from lower FS to upper FS.
+                    self.stack.create_upper_entry(
+                        locked,
+                        current_task,
+                        parent_upper,
+                        name.as_ref(),
+                        |locked, dir, name| {
+                            dir.create_entry(
+                                locked,
+                                current_task,
+                                name,
+                                |locked, dir_node, mount, name| {
+                                    dir_node.mknod(
+                                        locked,
+                                        current_task,
+                                        mount,
+                                        name,
+                                        info.mode,
+                                        DeviceType::NONE,
+                                        cred,
+                                    )
+                                },
+                            )
+                        },
+                        |locked, entry| copy_file_content(locked, current_task, lower, &entry),
+                    )
+                } else {
+                    // TODO(sergeyu): create_node() checks access, but we don't need that here.
+                    parent_upper.create_entry(
+                        locked,
+                        current_task,
+                        name.as_ref(),
+                        |locked, dir, mount, name| {
+                            dir.mknod(locked, current_task, mount, name, info.mode, info.rdev, cred)
+                        },
+                    )
+                }
+            });
 
             track_stub!(TODO("https://fxbug.dev/322874151"), "overlayfs copy xattrs");
             res

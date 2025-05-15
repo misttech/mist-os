@@ -7,10 +7,9 @@
 
 use super::{
     check_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
-    fs_node_set_label_with_task, has_fs_node_permissions, permissions_from_flags, scoped_fs_create,
-    set_cached_sid, task_effective_sid, todo_has_fs_node_permissions, Auditable,
-    FileSystemLabelState, FsNodeLabel, FsNodeSecurityXattr, FsNodeSidAndClass, PermissionFlags,
-    ScopedFsCreate, TaskAttrs,
+    fs_node_set_label_with_task, has_fs_node_permissions, permissions_from_flags, set_cached_sid,
+    task_effective_sid, todo_has_fs_node_permissions, Auditable, FileSystemLabelState, FsNodeLabel,
+    FsNodeSecurityXattr, FsNodeSidAndClass, PermissionFlags, TaskAttrs, TaskAttrsOverride,
 };
 
 use crate::task::CurrentTask;
@@ -1075,16 +1074,6 @@ pub(in crate::security) fn check_fs_node_removexattr_access(
     )
 }
 
-pub(in crate::security) fn fs_node_copy_up<'a>(
-    current_task: &'a CurrentTask,
-    fs_node: &FsNode,
-) -> ScopedFsCreate<'a> {
-    assert!(!Anon::is_private(fs_node));
-
-    let file_sid = fs_node_effective_sid_and_class(fs_node).sid;
-    scoped_fs_create(current_task, file_sid)
-}
-
 /// If `fs_node` is in a filesystem without xattr support, returns the xattr name for the security
 /// label (i.e. "security.selinux"). Otherwise returns None.
 pub(in crate::security) fn fs_node_listsecurity(fs_node: &FsNode) -> Option<FsString> {
@@ -1255,12 +1244,23 @@ where
     result
 }
 
+/// Temporarily sets the fscreate sid to match `fs_node` and runs `do_copy_up`.
+pub(in crate::security) fn fs_node_copy_up<R>(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    do_copy_up: impl FnOnce() -> R,
+) -> R {
+    TaskAttrsOverride::new()
+        .fscreate_sid(fs_node_effective_sid_and_class(fs_node).sid)
+        .run(current_task, do_copy_up)
+}
+
 #[cfg(test)]
 mod tests {
+    use super::super::get_cached_sid;
     use super::super::testing::{
         self, spawn_kernel_with_selinux_hooks_test_policy_and_run, TEST_FILE_NAME,
     };
-    use super::super::{get_cached_sid, scoped_fs_create};
     use super::*;
 
     use crate::testing::spawn_kernel_and_run;
@@ -1504,21 +1504,5 @@ mod tests {
 
             assert_eq!(BStr::new(b"/foo/bar"), get_fs_relative_path(&dir_entry));
         });
-    }
-
-    #[fuchsia::test]
-    async fn create_file_with_fscreate_sid() {
-        spawn_kernel_with_selinux_hooks_test_policy_and_run(
-            |locked, current_task, security_server| {
-                let sid =
-                    security_server.security_context_to_sid(VALID_SECURITY_CONTEXT.into()).unwrap();
-                let scoped_fs_create = scoped_fs_create(current_task, sid);
-                let dir_entry = &testing::create_test_file(locked, current_task).entry;
-                std::mem::drop(scoped_fs_create);
-
-                let effective_sid = fs_node_effective_sid_and_class(&dir_entry.node).sid;
-                assert_eq!(sid, effective_sid);
-            },
-        );
     }
 }
