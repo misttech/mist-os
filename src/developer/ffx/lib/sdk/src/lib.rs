@@ -146,7 +146,7 @@ impl SdkRoot {
                     Ok(Some(root)) => root,
                     Ok(None) => {
                         log::error!(
-                            "Could not find an SDK manifest in any parent of ffx's directory.\
+                            "Could not find an SDK manifest in any parent of ffx's directory. \
                              Using {:?} as HostTools root",
                             exe_path.parent().unwrap()
                         );
@@ -481,8 +481,8 @@ impl Sdk {
             log::info!("Path {full_path:?} found for {name}");
             Ok(full_path)
         } else {
-            log::info!("No path  found for {name}");
-            Err(anyhow!("No path  found for {name}"))
+            log::info!("No path found for {name}");
+            Err(anyhow!("No path found for {name}"))
         }
     }
 
