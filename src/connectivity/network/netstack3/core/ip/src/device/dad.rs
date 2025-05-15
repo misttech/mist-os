@@ -1198,17 +1198,11 @@ mod tests {
     #[ip_test(I)]
     fn dad_disabled<I: TestDadIpExt>() {
         let FakeCtx::<I> { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
-                FakeCoreCtxImpl::with_state(FakeDadContext {
-                    state: DadState::Tentative {
-                        dad_transmits_remaining: None,
-                        timer: bindings_ctx.new_timer(dad_timer_id()),
-                        ip_specific_state: Default::default(),
-                    },
-                    max_dad_transmits: None,
-                    address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
-                })
-            });
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
+                state: DadState::Uninitialized,
+                max_dad_transmits: None,
+                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
+            }));
         let address_id = get_address_id::<I>(I::DAD_ADDRESS);
         let start_dad = I::with_dad_handler(&mut core_ctx, |core_ctx| {
             core_ctx.initialize_duplicate_address_detection(
@@ -1318,17 +1312,11 @@ mod tests {
     fn perform_dad<I: TestDadIpExt>() {
         const DAD_TRANSMITS_REQUIRED: u16 = 5;
 
-        let mut ctx = FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
-            FakeCoreCtxImpl::with_state(FakeDadContext {
-                state: DadState::Tentative {
-                    dad_transmits_remaining: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
-                    timer: bindings_ctx.new_timer(dad_timer_id()),
-                    ip_specific_state: Default::default(),
-                },
-                max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
-                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
-            })
-        });
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
+            state: DadState::Uninitialized,
+            max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
+            address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
+        }));
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         let address_id = get_address_id::<I>(I::DAD_ADDRESS);
         I::with_dad_handler(core_ctx, |core_ctx| {
@@ -1366,17 +1354,11 @@ mod tests {
         const DAD_TRANSMITS_REQUIRED: u16 = 2;
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
-                FakeCoreCtxImpl::with_state(FakeDadContext {
-                    state: DadState::Tentative {
-                        dad_transmits_remaining: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
-                        timer: bindings_ctx.new_timer(dad_timer_id()),
-                        ip_specific_state: Default::default(),
-                    },
-                    max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
-                    address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
-                })
-            });
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
+                state: DadState::Uninitialized,
+                max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
+                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
+            }));
         let address_id = get_address_id::<I>(I::DAD_ADDRESS);
         I::with_dad_handler(&mut core_ctx, |core_ctx| {
             let start_dad = core_ctx.initialize_duplicate_address_detection(
@@ -1490,17 +1472,11 @@ mod tests {
     fn handle_incoming_dad_neighbor_solicitation_during_tentative(looped_back: bool) {
         const DAD_TRANSMITS_REQUIRED: u16 = 1;
 
-        let mut ctx = FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
-            FakeCoreCtxImpl::with_state(FakeDadContext {
-                state: DadState::Tentative {
-                    dad_transmits_remaining: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
-                    timer: bindings_ctx.new_timer(dad_timer_id()),
-                    ip_specific_state: Default::default(),
-                },
-                max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
-                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
-            })
-        });
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
+            state: DadState::Uninitialized,
+            max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
+            address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
+        }));
         let addr = get_address_id::<Ipv6>(Ipv6::DAD_ADDRESS);
 
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
