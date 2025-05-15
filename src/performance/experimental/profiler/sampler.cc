@@ -313,10 +313,11 @@ void profiler::Sampler::AddThread(std::vector<zx_koid_t> job_path, zx_koid_t pid
   // Before we start sampling the thread, make sure we've recorded information about its process
   if (!contexts_.contains(pid)) {
     zx::result<ProcessTarget*> target = targets_.GetProcess(job_path, pid);
-    if (target.is_error()) {
+    if (target.is_ok()) {
+      CacheModules(**target);
+    } else {
       FX_PLOGS(ERROR, target.status_value()) << "Failed to search up process: " << pid;
     }
-    CacheModules(**target);
   }
   zx::result res =
       targets_.AddThread(job_path, pid, ThreadTarget{.handle = std::move(t), .tid = tid});
