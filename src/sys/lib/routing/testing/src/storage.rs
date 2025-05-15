@@ -72,10 +72,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
 
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["b"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["b"]).unwrap()),
                     from_cm_namespace: true,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -129,10 +129,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["b"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["b"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
@@ -187,10 +187,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["b"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["b"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -239,7 +239,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
                     storage_relation: None,
@@ -311,10 +311,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["c"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["c"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
@@ -387,10 +387,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         model.add_subdir_to_data_directory("subdir_1");
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["c"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["c"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: Some("subdir_1/subdir_2".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -467,10 +467,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["c"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["c"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: Some("bar".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -538,10 +538,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["b", "c"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["b", "c"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
@@ -607,10 +607,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["c"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["c"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
@@ -680,10 +680,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         model.add_subdir_to_data_directory("subdir_1");
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["c"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["c"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: Some("subdir_1/subdir_2".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -793,10 +793,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["c"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["c"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: Some("data".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -805,10 +805,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/cache".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["c"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["c"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -817,10 +817,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .await;
         model
             .check_use(
-                vec!["c", "d"].try_into().unwrap(),
+                ["c", "d"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["c", "d"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["c", "d"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: Some("data".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -829,10 +829,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .await;
         model
             .check_use(
-                vec!["c", "d"].try_into().unwrap(),
+                ["c", "d"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/cache".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["c", "d"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["c", "d"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -885,7 +885,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
                     storage_relation: None,
@@ -934,7 +934,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
                     storage_relation: None,
@@ -983,7 +983,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
                     storage_relation: None,
@@ -1055,7 +1055,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
                     storage_relation: None,
@@ -1125,10 +1125,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
 
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["b"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["b"]).unwrap()),
                     from_cm_namespace: true,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Err(zx_status::Status::ACCESS_DENIED),
@@ -1209,10 +1209,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         // instance `b` uses instance-id based paths.
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["b"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["b"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
@@ -1222,10 +1222,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         model.check_test_subdir_contains(".", b_instance_id.to_string()).await;
 
         // instance `c` uses moniker-based paths.
-        let storage_relation = Moniker::try_from(vec!["b", "c"]).unwrap();
+        let storage_relation = Moniker::try_from(["b", "c"]).unwrap();
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
                     storage_relation: Some(storage_relation.clone()),

@@ -72,10 +72,10 @@ pub fn destroy_child<'a>(
             .collect();
 
         if let Some(moniker) = instances.choose(&mut rng) {
-            let mut moniker = Moniker::parse_str(moniker).unwrap();
-            let child_moniker = moniker.path_mut().pop().unwrap();
-            let child_name = child_moniker.name().to_string();
-            let parent_moniker = moniker.to_string();
+            let moniker = Moniker::parse_str(moniker).unwrap();
+            let (parent_moniker, child_name) = moniker.split_leaf().unwrap();
+            let child_name = child_name.name().to_string();
+            let parent_moniker = parent_moniker.to_string();
 
             let result = stressor
                 .destroy_child(&parent_moniker, COLLECTION_NAME.to_string(), child_name)

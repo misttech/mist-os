@@ -493,7 +493,7 @@ mod tests {
                 // Eagerly launched so it needs a definition
                 ("b", ComponentDeclBuilder::new().build()),
             ],
-            vec!["system"].try_into().unwrap(),
+            ["system"].try_into().unwrap(),
         )
         .await;
 
@@ -580,7 +580,7 @@ mod tests {
                         .build(),
                 ),
             ],
-            vec!["system"].try_into().unwrap(),
+            ["system"].try_into().unwrap(),
         )
         .await;
 
@@ -907,7 +907,7 @@ mod tests {
                 ("root", ComponentDeclBuilder::new().child_default("system").build()),
                 ("system", ComponentDeclBuilder::new().collection_default("coll").build()),
             ],
-            vec!["system"].try_into().unwrap(),
+            ["system"].try_into().unwrap(),
         )
         .await;
         let collection_ref = fdecl::CollectionRef { name: "coll".into() };
@@ -932,7 +932,7 @@ mod tests {
                 ("a", component_decl_with_exposed_binder()),
                 ("b", component_decl_with_exposed_binder()),
             ],
-            vec!["system"].try_into().unwrap(),
+            ["system"].try_into().unwrap(),
         )
         .await;
 
@@ -1034,7 +1034,7 @@ mod tests {
                 ("root", ComponentDeclBuilder::new().child_default("system").build()),
                 ("system", ComponentDeclBuilder::new().collection_default("coll").build()),
             ],
-            vec!["system"].try_into().unwrap(),
+            ["system"].try_into().unwrap(),
         )
         .await;
 
@@ -1090,7 +1090,7 @@ mod tests {
                 ),
                 ("a", component_decl_with_test_runner()),
             ],
-            vec!["system"].try_into().unwrap(),
+            ["system"].try_into().unwrap(),
         )
         .await;
 

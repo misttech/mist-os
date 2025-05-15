@@ -849,7 +849,7 @@ mod tests {
         test.model.start().await;
 
         // `my_child` should not be resolved right now
-        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         // Validate the root
@@ -891,7 +891,7 @@ mod tests {
         );
 
         // This validation should have caused `my_child` to be resolved
-        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&["my_child"].try_into().unwrap()).await;
         assert!(instance.is_some());
 
         // Validate `my_child`
@@ -939,7 +939,7 @@ mod tests {
         test.model.start().await;
 
         // `my_child` should not be resolved right now
-        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         // Validate the root
@@ -978,7 +978,7 @@ mod tests {
         );
 
         // This validation should have caused `my_child` to be resolved
-        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&["my_child"].try_into().unwrap()).await;
         assert!(instance.is_some());
     }
 
@@ -1668,7 +1668,7 @@ mod tests {
         test.model.start().await;
 
         // `my_child` should not be resolved right now
-        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         let targets = &[

@@ -1243,7 +1243,7 @@ mod tests {
         let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(policy),
-            Moniker::try_from(vec!["foo"]).unwrap(),
+            Moniker::try_from(["foo"]).unwrap(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>();
         runner.start(start_info, server_controller).await;
@@ -1585,7 +1585,7 @@ mod tests {
         );
         let policy_checker = ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
-            Moniker::try_from(vec!["foo"]).unwrap(),
+            Moniker::try_from(["foo"]).unwrap(),
         );
 
         // Create a clock and pass it to the component as the UTC clock through numbered_handles.

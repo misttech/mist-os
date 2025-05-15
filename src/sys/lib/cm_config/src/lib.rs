@@ -217,8 +217,8 @@ impl AllowlistEntryBuilder {
     }
 
     pub fn exact_from_moniker(mut self, m: &Moniker) -> Self {
-        let mut parts = m.path().clone().into_iter().map(|c| AllowlistMatcher::Exact(c)).collect();
-        self.parts.append(&mut parts);
+        let parts = m.path().iter().map(|c| AllowlistMatcher::Exact(c.clone()));
+        self.parts.extend(parts);
         self
     }
 
@@ -1599,18 +1599,18 @@ mod tests {
     #[test]
     fn allowlist_entry_matches() {
         let root = Moniker::root();
-        let allowed = Moniker::try_from(vec!["foo", "bar"]).unwrap();
-        let disallowed_child_of_allowed = Moniker::try_from(vec!["foo", "bar", "baz"]).unwrap();
-        let disallowed = Moniker::try_from(vec!["baz", "fiz"]).unwrap();
+        let allowed = Moniker::try_from(["foo", "bar"]).unwrap();
+        let disallowed_child_of_allowed = Moniker::try_from(["foo", "bar", "baz"]).unwrap();
+        let disallowed = Moniker::try_from(["baz", "fiz"]).unwrap();
         let allowlist_exact = AllowlistEntryBuilder::new().exact_from_moniker(&allowed).build();
         assert!(allowlist_exact.matches(&allowed));
         assert!(!allowlist_exact.matches(&root));
         assert!(!allowlist_exact.matches(&disallowed));
         assert!(!allowlist_exact.matches(&disallowed_child_of_allowed));
 
-        let allowed_realm_root = Moniker::try_from(vec!["qux"]).unwrap();
-        let allowed_child_of_realm = Moniker::try_from(vec!["qux", "quux"]).unwrap();
-        let allowed_nested_child_of_realm = Moniker::try_from(vec!["qux", "quux", "foo"]).unwrap();
+        let allowed_realm_root = Moniker::try_from(["qux"]).unwrap();
+        let allowed_child_of_realm = Moniker::try_from(["qux", "quux"]).unwrap();
+        let allowed_nested_child_of_realm = Moniker::try_from(["qux", "quux", "foo"]).unwrap();
         let allowlist_realm =
             AllowlistEntryBuilder::new().exact_from_moniker(&allowed_realm_root).any_descendant();
         assert!(!allowlist_realm.matches(&allowed_realm_root));
@@ -1619,11 +1619,11 @@ mod tests {
         assert!(!allowlist_realm.matches(&disallowed));
         assert!(!allowlist_realm.matches(&root));
 
-        let collection_holder = Moniker::try_from(vec!["corge"]).unwrap();
-        let collection_child = Moniker::try_from(vec!["corge", "collection:child"]).unwrap();
+        let collection_holder = Moniker::try_from(["corge"]).unwrap();
+        let collection_child = Moniker::try_from(["corge", "collection:child"]).unwrap();
         let collection_nested_child =
-            Moniker::try_from(vec!["corge", "collection:child", "inner-child"]).unwrap();
-        let non_collection_child = Moniker::try_from(vec!["corge", "grault"]).unwrap();
+            Moniker::try_from(["corge", "collection:child", "inner-child"]).unwrap();
+        let non_collection_child = Moniker::try_from(["corge", "grault"]).unwrap();
         let allowlist_collection = AllowlistEntryBuilder::new()
             .exact_from_moniker(&collection_holder)
             .any_descendant_in_collection("collection");
@@ -1634,12 +1634,12 @@ mod tests {
         assert!(!allowlist_collection.matches(&disallowed));
         assert!(!allowlist_collection.matches(&root));
 
-        let collection_a = Moniker::try_from(vec!["foo", "bar:a", "baz", "qux"]).unwrap();
-        let collection_b = Moniker::try_from(vec!["foo", "bar:b", "baz", "qux"]).unwrap();
-        let parent_not_allowed = Moniker::try_from(vec!["foo", "bar:b", "baz"]).unwrap();
-        let collection_not_allowed = Moniker::try_from(vec!["foo", "bar:b", "baz"]).unwrap();
+        let collection_a = Moniker::try_from(["foo", "bar:a", "baz", "qux"]).unwrap();
+        let collection_b = Moniker::try_from(["foo", "bar:b", "baz", "qux"]).unwrap();
+        let parent_not_allowed = Moniker::try_from(["foo", "bar:b", "baz"]).unwrap();
+        let collection_not_allowed = Moniker::try_from(["foo", "bar:b", "baz"]).unwrap();
         let different_collection_not_allowed =
-            Moniker::try_from(vec!["foo", "test:b", "baz", "qux"]).unwrap();
+            Moniker::try_from(["foo", "test:b", "baz", "qux"]).unwrap();
         let allowlist_exact_in_collection = AllowlistEntryBuilder::new()
             .exact("foo")
             .any_child_in_collection("bar")
@@ -1653,9 +1653,9 @@ mod tests {
         assert!(!allowlist_exact_in_collection.matches(&different_collection_not_allowed));
 
         let any_child_allowlist = AllowlistEntryBuilder::new().exact("core").any_child().build();
-        let allowed = Moniker::try_from(vec!["core", "abc"]).unwrap();
-        let disallowed_1 = Moniker::try_from(vec!["not_core", "abc"]).unwrap();
-        let disallowed_2 = Moniker::try_from(vec!["core", "abc", "def"]).unwrap();
+        let allowed = Moniker::try_from(["core", "abc"]).unwrap();
+        let disallowed_1 = Moniker::try_from(["not_core", "abc"]).unwrap();
+        let disallowed_2 = Moniker::try_from(["core", "abc", "def"]).unwrap();
         assert!(any_child_allowlist.matches(&allowed));
         assert!(!any_child_allowlist.matches(&disallowed_1));
         assert!(!any_child_allowlist.matches(&disallowed_2));
@@ -1665,10 +1665,10 @@ mod tests {
             .any_child()
             .any_child_in_collection("foo")
             .any_descendant();
-        let allowed = Moniker::try_from(vec!["core", "abc", "foo:def", "ghi"]).unwrap();
-        let disallowed_1 = Moniker::try_from(vec!["not_core", "abc", "foo:def", "ghi"]).unwrap();
-        let disallowed_2 = Moniker::try_from(vec!["core", "abc", "not_foo:def", "ghi"]).unwrap();
-        let disallowed_3 = Moniker::try_from(vec!["core", "abc", "foo:def"]).unwrap();
+        let allowed = Moniker::try_from(["core", "abc", "foo:def", "ghi"]).unwrap();
+        let disallowed_1 = Moniker::try_from(["not_core", "abc", "foo:def", "ghi"]).unwrap();
+        let disallowed_2 = Moniker::try_from(["core", "abc", "not_foo:def", "ghi"]).unwrap();
+        let disallowed_3 = Moniker::try_from(["core", "abc", "foo:def"]).unwrap();
         assert!(multiwildcard_allowlist.matches(&allowed));
         assert!(!multiwildcard_allowlist.matches(&disallowed_1));
         assert!(!multiwildcard_allowlist.matches(&disallowed_2));

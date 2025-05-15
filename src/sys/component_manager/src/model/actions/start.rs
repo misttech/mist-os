@@ -732,8 +732,8 @@ mod tests {
         assert_eq!(
             events,
             vec![
-                Lifecycle::Start(vec![format!("{}", TEST_CHILD_NAME).as_str()].try_into().unwrap()),
-                Lifecycle::Stop(vec![format!("{}", TEST_CHILD_NAME).as_str()].try_into().unwrap())
+                Lifecycle::Start([TEST_CHILD_NAME].try_into().unwrap()),
+                Lifecycle::Stop([TEST_CHILD_NAME].try_into().unwrap())
             ]
         );
     }
@@ -796,8 +796,8 @@ mod tests {
         assert_eq!(
             events,
             vec![
-                Lifecycle::Start(vec![format!("{}", TEST_CHILD_NAME).as_str()].try_into().unwrap()),
-                Lifecycle::Stop(vec![format!("{}", TEST_CHILD_NAME).as_str()].try_into().unwrap())
+                Lifecycle::Start([TEST_CHILD_NAME].try_into().unwrap()),
+                Lifecycle::Stop([TEST_CHILD_NAME].try_into().unwrap())
             ]
         );
     }
@@ -915,7 +915,7 @@ mod tests {
         ];
 
         let test_topology = ActionsTest::new(components[0].0, components, None).await;
-        let child = test_topology.look_up(vec![TEST_CHILD_NAME].try_into().unwrap()).await;
+        let child = test_topology.look_up([TEST_CHILD_NAME].try_into().unwrap()).await;
 
         assert_matches!(
             ActionsManager::register(
@@ -1040,7 +1040,7 @@ mod tests {
         ];
         let test_topology = ActionsTest::new(components[0].0, components, None).await;
 
-        let child = test_topology.look_up(vec![child_name].try_into().unwrap()).await;
+        let child = test_topology.look_up([child_name].try_into().unwrap()).await;
 
         (test_topology, child)
     }
@@ -1052,7 +1052,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn check_should_return_early() {
-        let m = Moniker::try_from(vec!["foo"]).unwrap();
+        let m = Moniker::try_from(["foo"]).unwrap();
 
         // Checks based on InstanceState:
         assert!(should_return_early(
@@ -1130,7 +1130,7 @@ mod tests {
         .await
         .expect("failed to start child");
 
-        let m = Moniker::try_from(vec!["TEST_CHILD_NAME"]).unwrap();
+        let m = Moniker::try_from(["TEST_CHILD_NAME"]).unwrap();
         assert_matches!(should_return_early(&*child.lock_state().await, &m), Some(Ok(())));
     }
 }

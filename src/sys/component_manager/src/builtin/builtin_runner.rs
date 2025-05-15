@@ -666,7 +666,7 @@ mod tests {
     }
 
     fn make_scoped_policy_checker() -> ScopedPolicyChecker {
-        ScopedPolicyChecker::new(make_security_policy(), Moniker::new(vec![]))
+        ScopedPolicyChecker::new(make_security_policy(), Moniker::root())
     }
 
     fn make_elf_runner_resources() -> Arc<ElfRunnerResources> {
@@ -1056,7 +1056,7 @@ mod tests {
             )
             .unwrap();
 
-        let moniker = Moniker::try_from(vec!["signal_then_hang"]).unwrap();
+        let moniker = Moniker::try_from(["signal_then_hang"]).unwrap();
         let token = elf_runner_resources.instance_registry.add_for_tests(moniker);
         let start_info = StartInfo {
             resolved_url: "fuchsia://signal-then-hang.cm".to_string(),

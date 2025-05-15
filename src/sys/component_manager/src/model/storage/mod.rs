@@ -469,11 +469,11 @@ mod tests {
         let b_component = test
             .model
             .root()
-            .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
+            .find_and_maybe_resolve(&["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
-        let moniker = Moniker::try_from(vec!["c", "coll:d"]).unwrap();
+        let moniker = Moniker::try_from(["c", "coll:d"]).unwrap();
 
         // Open.
         let dir = open_isolated_storage(
@@ -510,7 +510,7 @@ mod tests {
         assert_eq!(test_helpers::list_directory(&dir).await, vec!["file".to_string()]);
 
         // Open another component's storage.
-        let moniker = Moniker::try_from(vec!["c", "coll:d", "e"]).unwrap();
+        let moniker = Moniker::try_from(["c", "coll:d", "e"]).unwrap();
         let dir = open_isolated_storage(
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
@@ -555,11 +555,11 @@ mod tests {
         let b_component = test
             .model
             .root()
-            .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
+            .find_and_maybe_resolve(&["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
-        let moniker = Moniker::try_from(vec!["c", "coll:d"]).unwrap();
+        let moniker = Moniker::try_from(["c", "coll:d"]).unwrap();
 
         // open the storage directory using instance ID.
         let instance_id = InstanceId::new_random(&mut rand::thread_rng());
@@ -630,7 +630,7 @@ mod tests {
         test.start_instance_and_wait_start(&Moniker::root()).await.unwrap();
 
         // Try to open the storage. We expect an error.
-        let moniker = Moniker::try_from(vec!["c", "coll:d"]).unwrap();
+        let moniker = Moniker::try_from(["c", "coll:d"]).unwrap();
         let res = open_isolated_storage(
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&test.model.root())),
@@ -672,13 +672,13 @@ mod tests {
         let b_component = test
             .model
             .root()
-            .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
+            .find_and_maybe_resolve(&["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
-        let storage_moniker = Moniker::try_from(vec!["c"]).unwrap();
-        let parent_moniker = Moniker::try_from(vec!["c"]).unwrap();
-        let child_moniker = Moniker::try_from(vec!["c", "coll:d"]).unwrap();
+        let storage_moniker = Moniker::try_from(["c"]).unwrap();
+        let parent_moniker = Moniker::try_from(["c"]).unwrap();
+        let child_moniker = Moniker::try_from(["c", "coll:d"]).unwrap();
 
         // Open and write to the storage for child.
         let dir = open_isolated_storage(
@@ -801,12 +801,12 @@ mod tests {
         let b_component = test
             .model
             .root()
-            .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
+            .find_and_maybe_resolve(&["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
-        let parent_moniker = Moniker::try_from(vec!["c"]).unwrap();
-        let child_moniker = Moniker::try_from(vec!["c", "coll:d"]).unwrap();
+        let parent_moniker = Moniker::try_from(["c"]).unwrap();
+        let child_moniker = Moniker::try_from(["c", "coll:d"]).unwrap();
         let instance_id = InstanceId::new_random(&mut rand::thread_rng());
         // Open and write to the storage for child.
         let dir = open_isolated_storage(
@@ -880,9 +880,9 @@ mod tests {
     #[fuchsia::test]
     fn generate_moniker_based_storage_path_test() {
         for (moniker, expected_output) in vec![
-            (vec!["a"].try_into().unwrap(), "a:0/data"),
-            (vec!["a", "b"].try_into().unwrap(), "a:0/children/b:0/data"),
-            (vec!["a", "b", "c"].try_into().unwrap(), "a:0/children/b:0/children/c:0/data"),
+            (["a"].try_into().unwrap(), "a:0/data"),
+            (["a", "b"].try_into().unwrap(), "a:0/children/b:0/data"),
+            (["a", "b", "c"].try_into().unwrap(), "a:0/children/b:0/children/c:0/data"),
         ] {
             assert_eq!(
                 generate_moniker_based_storage_path(&moniker),

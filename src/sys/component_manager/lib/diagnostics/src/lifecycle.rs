@@ -122,7 +122,7 @@ mod tests {
 
         for i in 0..2 * MAX_NUMBER_OF_LIFECYCLE_EVENTS {
             stats.on_component_started(
-                &Moniker::new(vec![ChildName::parse(format!("{}", i)).unwrap()]),
+                &Moniker::new(&[ChildName::parse(format!("{}", i)).unwrap()]),
                 zx::BootInstant::from_nanos(i as i64),
             );
         }
@@ -145,7 +145,7 @@ mod tests {
 
         for i in 0..MAX_NUMBER_OF_LIFECYCLE_EVENTS + 1 {
             stats.on_component_started(
-                &Moniker::new(vec![ChildName::parse(format!("{}", i)).unwrap()]),
+                &Moniker::new(&[ChildName::parse(format!("{}", i)).unwrap()]),
                 zx::BootInstant::from_nanos(i as i64),
             );
         }
@@ -176,7 +176,7 @@ mod tests {
 
         for i in 0..4 * MAX_NUMBER_OF_LIFECYCLE_EVENTS {
             stats.on_component_started(
-                &Moniker::new(vec![ChildName::parse(format!("{}", i)).unwrap()]),
+                &Moniker::new(&[ChildName::parse(format!("{}", i)).unwrap()]),
                 zx::BootInstant::from_nanos(i as i64),
             );
         }

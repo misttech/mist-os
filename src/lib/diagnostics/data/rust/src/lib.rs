@@ -991,7 +991,7 @@ impl Data<Logs> {
                 if moniker.is_root() {
                     Cow::Borrowed(ROOT_MONIKER_REPR)
                 } else {
-                    Cow::Owned(moniker.path().iter().last().unwrap().to_string())
+                    Cow::Owned(moniker.leaf().unwrap().to_string())
                 }
             }
         }

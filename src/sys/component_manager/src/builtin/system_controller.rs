@@ -152,10 +152,10 @@ mod tests {
 
         // Start each component.
         test.start(Moniker::root()).await;
-        let component_a = test.start(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.start(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.start(vec!["a", "b", "c"].try_into().unwrap()).await;
-        let component_d = test.start(vec!["a", "b", "d"].try_into().unwrap()).await;
+        let component_a = test.start(["a"].try_into().unwrap()).await;
+        let component_b = test.start(["a", "b"].try_into().unwrap()).await;
+        let component_c = test.start(["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.start(["a", "b", "d"].try_into().unwrap()).await;
 
         // Wire up connections to SystemController
         let sys_controller = SystemController::new(
@@ -239,7 +239,7 @@ mod tests {
 
             // Start root and `a`.
             test.start(Moniker::root()).await;
-            let component_a = test.start(vec!["a"].try_into().unwrap()).await;
+            let component_a = test.start(["a"].try_into().unwrap()).await;
 
             // Wire up connections to SystemController
             let sys_controller = SystemController::new(

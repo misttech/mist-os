@@ -154,12 +154,10 @@ impl FrameworkCapability for IntrospectorFrameworkCapability {
         // `/core/testing/starnix-tests`.
         //
         // All other cases are disallowed.
-        let is_starnix_test_realm = |moniker: &Moniker| match moniker.strip_prefix(&*TEST_REALMS) {
-            Ok(mut rest) => match rest.next() {
-                Some(realm) => realm.collection() == Some(&*STARNIX_TESTS),
-                None => false,
-            },
-            Err(_) => false,
+        let is_starnix_test_realm = |moniker: &Moniker| {
+            moniker.path().len() > TEST_REALMS.path().len()
+                && moniker.has_prefix(&TEST_REALMS)
+                && moniker.path()[TEST_REALMS.path().len()].collection() == Some(&*STARNIX_TESTS)
         };
         if target.moniker != *MEMORY_MONITOR
             && target.moniker != *RECEIVER

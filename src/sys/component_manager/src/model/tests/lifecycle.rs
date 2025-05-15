@@ -78,10 +78,10 @@ async fn bind_root() {
 async fn bind_non_existent_root_child() {
     let (model, _builtin_environment, _mock_runner) =
         new_model(vec![("root", component_decl_with_test_runner())]).await;
-    let m: Moniker = vec!["no-such-instance"].try_into().unwrap();
+    let m: Moniker = ["no-such-instance"].try_into().unwrap();
     let res = model.root().start_instance(&m, &StartReason::Root).await;
     let expected_res: Result<Arc<ComponentInstance>, ModelError> =
-        Err(ModelError::instance_not_found(vec!["no-such-instance"].try_into().unwrap()));
+        Err(ModelError::instance_not_found(["no-such-instance"].try_into().unwrap()));
     assert_eq!(format!("{:?}", res), format!("{:?}", expected_res));
 }
 
@@ -105,7 +105,7 @@ impl Hook for StartBlocker {
             .target_moniker
             .unwrap_instance_moniker_or(ModelError::UnexpectedComponentManagerMoniker)
             .unwrap();
-        let expected_moniker: Moniker = vec!["system"].try_into().unwrap();
+        let expected_moniker: Moniker = ["system"].try_into().unwrap();
         if moniker == &expected_moniker {
             let mut rx = self.rx.lock().await;
             rx.next().await.unwrap();
@@ -136,7 +136,7 @@ async fn bind_concurrent() {
     model.start().await;
 
     // Attempt to start the "system" component
-    let system_component = model.root().find(&vec!["system"].try_into().unwrap()).await.unwrap();
+    let system_component = model.root().find(&["system"].try_into().unwrap()).await.unwrap();
     let first_start = system_component
         .actions()
         .register_no_wait(StartAction::new(
@@ -186,7 +186,7 @@ async fn bind_parent_then_child() {
     let root = model.root();
 
     // Start the system.
-    let m: Moniker = vec!["system"].try_into().unwrap();
+    let m: Moniker = ["system"].try_into().unwrap();
     assert!(root.start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner.wait_for_urls(&["test:///system_resolved"]).await;
 
@@ -203,7 +203,7 @@ async fn bind_parent_then_child() {
     assert!(actual_children.is_empty());
     assert_matches!(*echo_component.lock_state().await, InstanceState::Unresolved(_));
     // Start echo.
-    let m: Moniker = vec!["echo"].try_into().unwrap();
+    let m: Moniker = ["echo"].try_into().unwrap();
     assert!(root.start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner.wait_for_urls(&["test:///system_resolved", "test:///echo_resolved"]).await;
 
@@ -238,17 +238,17 @@ async fn bind_child_doesnt_bind_parent() {
     let root = model.root();
 
     // Start logger (before ever starting system).
-    let m: Moniker = vec!["system", "logger"].try_into().unwrap();
+    let m: Moniker = ["system", "logger"].try_into().unwrap();
     assert!(root.start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner.wait_for_urls(&["test:///logger_resolved"]).await;
 
     // Start netstack.
-    let m: Moniker = vec!["system", "netstack"].try_into().unwrap();
+    let m: Moniker = ["system", "netstack"].try_into().unwrap();
     assert!(root.start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner.wait_for_urls(&["test:///logger_resolved", "test:///netstack_resolved"]).await;
 
     // Finally, start the system.
-    let m: Moniker = vec!["system"].try_into().unwrap();
+    let m: Moniker = ["system"].try_into().unwrap();
     assert!(root.start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner
         .wait_for_urls(&[
@@ -272,12 +272,12 @@ async fn bind_child_non_existent() {
     let root = model.root();
 
     // Start the system.
-    let m: Moniker = vec!["system"].try_into().unwrap();
+    let m: Moniker = ["system"].try_into().unwrap();
     assert!(root.start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner.wait_for_urls(&["test:///system_resolved"]).await;
 
     // Can't start the logger. It does not exist.
-    let m: Moniker = vec!["system", "logger"].try_into().unwrap();
+    let m: Moniker = ["system", "logger"].try_into().unwrap();
     let res = root.start_instance(&m, &StartReason::Root).await;
     let expected_res: Result<(), ModelError> = Err(ModelError::instance_not_found(m));
     assert_eq!(format!("{:?}", res), format!("{:?}", expected_res));
@@ -416,7 +416,7 @@ async fn bind_no_execute() {
 
     // Start the parent component. The child should be started. However, the parent component
     // is non-executable so it is not run.
-    let m: Moniker = vec!["a"].try_into().unwrap();
+    let m: Moniker = ["a"].try_into().unwrap();
     assert!(model.root().start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner.wait_for_urls(&["test:///b_resolved"]).await;
 }
@@ -472,9 +472,9 @@ async fn reboot_on_terminate_disallowed() {
     let res = test
         .model
         .root()
-        .start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug)
+        .start_instance(&["system"].try_into().unwrap(), &StartReason::Debug)
         .await;
-    let expected_moniker = Moniker::try_from(vec!["system"]).unwrap();
+    let expected_moniker = Moniker::try_from(["system"]).unwrap();
     assert_matches!(res, Err(ModelError::ActionError {
         err: ActionError::StartError {
             err: StartActionError::RebootOnTerminateForbidden {
@@ -528,8 +528,8 @@ async fn on_terminate_stop_triggers_reboot() {
             exit_code: Some(0),
         }),
     );
-    root.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
-    let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
+    root.start_instance(&["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
+    let component = root.find_and_maybe_resolve(&["system"].try_into().unwrap()).await.unwrap();
     ActionsManager::register(component.clone(), StopAction::new(false)).await.unwrap();
     assert!(!test.model.top_instance().has_reboot_task());
 
@@ -543,8 +543,8 @@ async fn on_terminate_stop_triggers_reboot() {
             exit_code: Some(1),
         }),
     );
-    root.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
-    let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
+    root.start_instance(&["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
+    let component = root.find_and_maybe_resolve(&["system"].try_into().unwrap()).await.unwrap();
     let stop = async move {
         ActionsManager::register(component.clone(), StopAction::new(false)).await.unwrap();
     };
@@ -592,8 +592,8 @@ async fn on_terminate_exit_triggers_reboot() {
 
     // Start the critical component and cause it to 'exit' by making the runner close its end
     // of the controller channel. This should cause the Admin protocol to receive a reboot request.
-    test.start_instance_and_wait_start(&vec!["system"].try_into().unwrap()).await.unwrap();
-    let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
+    test.start_instance_and_wait_start(&["system"].try_into().unwrap()).await.unwrap();
+    let component = root.find_and_maybe_resolve(&["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
     test.mock_runner.wait_for_url("test:///system_resolved").await;
     test.mock_runner.abort_controller(&info.channel_id);
@@ -639,8 +639,8 @@ async fn reboot_shutdown_does_not_trigger_reboot() {
 
     // Start the critical component and make it stop. This should cause the Admin protocol to
     // receive a reboot request.
-    root.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
-    let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
+    root.start_instance(&["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
+    let component = root.find_and_maybe_resolve(&["system"].try_into().unwrap()).await.unwrap();
     ActionsManager::register(component.clone(), ShutdownAction::new(ShutdownType::Instance))
         .await
         .unwrap();
@@ -673,8 +673,8 @@ async fn on_terminate_with_missing_reboot_protocol_panics() {
     // the controller channel. component_manager should attempt to send a reboot request, which
     // should fail because the reboot protocol isn't exposed to it -- expect component_manager to
     // respond by crashing.
-    test.start_instance_and_wait_start(&vec!["system"].try_into().unwrap()).await.unwrap();
-    let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
+    test.start_instance_and_wait_start(&["system"].try_into().unwrap()).await.unwrap();
+    let component = root.find_and_maybe_resolve(&["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
     test.mock_runner.wait_for_url("test:///system_resolved").await;
     test.mock_runner.abort_controller(&info.channel_id);
@@ -721,8 +721,8 @@ async fn on_terminate_with_failed_reboot_panics() {
     // Start the critical component and cause it to 'exit' by making the runner close its end
     // of the controller channel. Admin protocol should receive a reboot request -- make it fail
     // and expect component_manager to respond by crashing.
-    test.start_instance_and_wait_start(&vec!["system"].try_into().unwrap()).await.unwrap();
-    let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
+    test.start_instance_and_wait_start(&["system"].try_into().unwrap()).await.unwrap();
+    let component = root.find_and_maybe_resolve(&["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
     test.mock_runner.wait_for_url("test:///system_resolved").await;
     test.mock_runner.abort_controller(&info.channel_id);
@@ -799,9 +799,9 @@ async fn open_then_stop_with_escrow() {
     assert_eq!(
         events,
         vec![
-            Lifecycle::Start(vec![].try_into().unwrap()),
-            Lifecycle::Stop(vec![].try_into().unwrap()),
-            Lifecycle::Start(vec![].try_into().unwrap()),
+            Lifecycle::Start([].try_into().unwrap()),
+            Lifecycle::Stop([].try_into().unwrap()),
+            Lifecycle::Start([].try_into().unwrap()),
         ]
     );
 

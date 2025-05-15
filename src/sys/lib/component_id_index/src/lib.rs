@@ -258,7 +258,7 @@ mod tests {
         let mut ctx = MergeContext::default();
 
         let mut index = Index::default();
-        let moniker = vec!["foo"].try_into().unwrap();
+        let moniker = ["foo"].try_into().unwrap();
         let instance_id = InstanceId::new_random(&mut rand::thread_rng());
         index.insert(moniker, instance_id).unwrap();
 
@@ -275,13 +275,13 @@ mod tests {
         let id = InstanceId::new_random(&mut rand::thread_rng());
         let index1 = {
             let mut index = Index::default();
-            let moniker = vec!["foo"].try_into().unwrap();
+            let moniker = ["foo"].try_into().unwrap();
             index.insert(moniker, id.clone()).unwrap();
             index
         };
         let index2 = {
             let mut index = Index::default();
-            let moniker = vec!["bar"].try_into().unwrap();
+            let moniker = ["bar"].try_into().unwrap();
             index.insert(moniker, id.clone()).unwrap();
             index
         };
@@ -307,7 +307,7 @@ mod tests {
         let source1 = Utf8Path::new("/a/b/c");
         let source2 = Utf8Path::new("/d/e/f");
 
-        let moniker: Moniker = vec!["foo"].try_into().unwrap();
+        let moniker: Moniker = ["foo"].try_into().unwrap();
         let index1 = {
             let mut index = Index::default();
             let id = InstanceId::new_random(&mut rand::thread_rng());
@@ -409,7 +409,7 @@ mod tests {
         let expected_index = {
             let mut index = Index::default();
             for i in 0..5 {
-                let moniker: Moniker = vec![i.to_string().as_str()].try_into().unwrap();
+                let moniker: Moniker = [i.to_string().as_str()].try_into().unwrap();
                 let instance_id = InstanceId::new_random(&mut rand::thread_rng());
                 index.insert(moniker, instance_id).unwrap();
             }

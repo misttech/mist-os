@@ -431,21 +431,18 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
         let model = T::new("a", components).build().await;
         model
-            .check_use(
-                vec!["b"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Ok),
-            )
+            .check_use(["b"].try_into().unwrap(), CheckUse::default_directory(ExpectedResult::Ok))
             .await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
                 },
             )
             .await;
-        model.check_open_node(vec!["b"].try_into().unwrap(), "/svc/device".parse().unwrap()).await;
+        model.check_open_node(["b"].try_into().unwrap(), "/svc/device".parse().unwrap()).await;
     }
 
     ///   a
@@ -685,13 +682,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Ok),
             )
             .await;
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -753,7 +750,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -827,13 +824,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Ok),
             )
             .await;
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -903,14 +900,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
         let model = T::new("a", components).build().await;
         model
-            .check_use(
-                vec!["c"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Ok),
-            )
+            .check_use(["c"].try_into().unwrap(), CheckUse::default_directory(ExpectedResult::Ok))
             .await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -1002,14 +996,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
         let model = T::new("a", components).build().await;
         model
-            .check_use(
-                vec!["c"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Ok),
-            )
+            .check_use(["c"].try_into().unwrap(), CheckUse::default_directory(ExpectedResult::Ok))
             .await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -1152,13 +1143,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b", "e"].try_into().unwrap(),
+                ["b", "e"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Ok),
             )
             .await;
         model
             .check_use(
-                vec!["b", "e"].try_into().unwrap(),
+                ["b", "e"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -1167,13 +1158,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .await;
         model
             .check_use(
-                vec!["c", "f"].try_into().unwrap(),
+                ["c", "f"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Ok),
             )
             .await;
         model
             .check_use(
-                vec!["c", "f"].try_into().unwrap(),
+                ["c", "f"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -1280,14 +1271,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         model.install_namespace_directory("/offer_from_cm_namespace");
         model
-            .check_use(
-                vec!["b"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Ok),
-            )
+            .check_use(["b"].try_into().unwrap(), CheckUse::default_directory(ExpectedResult::Ok))
             .await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -1316,13 +1304,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
             )
             .await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
@@ -1373,13 +1361,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
             )
             .await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
@@ -1430,12 +1418,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
         let test = T::new("a", components).build().await;
         test.check_use(
-            vec!["b", "c"].try_into().unwrap(),
+            ["b", "c"].try_into().unwrap(),
             CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
         )
         .await;
         test.check_use(
-            vec!["b", "c"].try_into().unwrap(),
+            ["b", "c"].try_into().unwrap(),
             CheckUse::Protocol {
                 path: default_service_capability(),
                 expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
@@ -1483,13 +1471,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
             )
             .await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
@@ -1610,13 +1598,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
             )
             .await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
@@ -1667,13 +1655,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
             )
             .await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
@@ -1735,7 +1723,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
 
         let d_component =
-            model.look_up_instance(&vec!["d"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["d"].try_into().unwrap()).await.expect("b instance");
 
         let source = route_capability(
             RouteRequest::UseService(UseServiceDecl {
@@ -1927,7 +1915,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .expect("failed to create file");
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Directory {
                     path: default_directory_capability(),
                     file: PathBuf::from("inner"),
@@ -1989,7 +1977,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .expect("failed to create file");
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::Directory {
                     path: default_directory_capability(),
                     file: PathBuf::from("inner"),
@@ -2112,7 +2100,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use_exposed_dir(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Directory {
                     path: "/hippo_bar_data".parse().unwrap(),
                     file: PathBuf::from("hippo"),
@@ -2122,7 +2110,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .await;
         model
             .check_use_exposed_dir(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: "/hippo_bar".parse().unwrap(),
                     expected_res: ExpectedResult::Ok,
@@ -2131,7 +2119,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .await;
         model
             .check_use_exposed_dir(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Directory {
                     path: "/hippo_data".parse().unwrap(),
                     file: PathBuf::from("hippo"),
@@ -2141,7 +2129,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .await;
         model
             .check_use_exposed_dir(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: "/hippo".parse().unwrap(),
                     expected_res: ExpectedResult::Ok,
@@ -2182,7 +2170,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         // exposed dir, so no routing takes place.
         model
             .check_use_exposed_dir(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Directory {
                     path: "/hippo_data".parse().unwrap(),
                     file: PathBuf::from("hippo"),
@@ -2192,7 +2180,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .await;
         model
             .check_use_exposed_dir(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: "/hippo".parse().unwrap(),
                     expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
@@ -2201,7 +2189,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .await;
         model
             .check_use_exposed_dir(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Directory {
                     path: "/hippo_data".parse().unwrap(),
                     file: PathBuf::from("hippo"),
@@ -2211,7 +2199,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .await;
         model
             .check_use_exposed_dir(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: "/hippo".parse().unwrap(),
                     expected_res: ExpectedResult::Ok,
@@ -2306,7 +2294,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_exposed_to_framework(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: "/hippo".parse().unwrap(),
                     expected_res: ExpectedResult::Ok,
@@ -2315,7 +2303,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .await;
         model
             .check_use_exposed_dir(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: "/hippo".parse().unwrap(),
                     expected_res: ExpectedResult::Ok,
@@ -2380,7 +2368,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: "/svc/valid".parse().unwrap(),
                     expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
@@ -2569,7 +2557,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = builder.build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
                     path: "/event/stream".parse().unwrap(),
@@ -2583,7 +2571,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
                     path: "/event/stream".parse().unwrap(),
@@ -2598,7 +2586,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         model
             .check_use(
-                vec!["d"].try_into().unwrap(),
+                ["d"].try_into().unwrap(),
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
                     path: "/event/stream".parse().unwrap(),
@@ -2743,7 +2731,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = builder.build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
                     path: "/event/stream".parse().unwrap(),
@@ -2757,7 +2745,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
                     path: "/event/stream".parse().unwrap(),
@@ -2771,7 +2759,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .await;
         model
             .check_use(
-                vec!["c", "d"].try_into().unwrap(), // Should get e's event from parent
+                ["c", "d"].try_into().unwrap(), // Should get e's event from parent
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
                     path: "/event/stream".parse().unwrap(),
@@ -2827,7 +2815,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
                     path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
@@ -2875,7 +2863,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = builder.build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Err(zx::Status::ACCESS_DENIED),
@@ -2927,7 +2915,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = builder.build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Err(zx::Status::ACCESS_DENIED)),
             )
             .await;
@@ -2990,7 +2978,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -3000,7 +2988,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Err(zx::Status::ACCESS_DENIED),
@@ -3074,7 +3062,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         model
             .check_use(
-                vec!["b", "c"].try_into().unwrap(),
+                ["b", "c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -3084,7 +3072,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         model
             .check_use(
-                vec!["b", "d"].try_into().unwrap(),
+                ["b", "d"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Err(zx::Status::ACCESS_DENIED),
@@ -3160,7 +3148,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
         let model = T::new("a", components).build().await;
         let b_component =
-            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let a_component = model.look_up_instance(&Moniker::root()).await.expect("root instance");
         let UseDecl::Service(use_decl) = use_decl else { unreachable!() };
         let source = route_capability(
@@ -3211,7 +3199,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let a_component = model.look_up_instance(&Moniker::root()).await.expect("root instance");
         let b_component =
-            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let UseDecl::Service(use_decl) = use_decl else { unreachable!() };
         let source = route_capability(
             RouteRequest::UseService(use_decl),
@@ -3274,9 +3262,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
         let model = T::new("a", components).build().await;
         let b_component =
-            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let c_component =
-            model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
+            model.look_up_instance(&["c"].try_into().unwrap()).await.expect("c instance");
         let UseDecl::Service(use_decl) = use_decl else { unreachable!() };
         let source = route_capability(
             RouteRequest::UseService(use_decl),
@@ -3343,7 +3331,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
         let model = T::new("a", components).build().await;
         let b_component =
-            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let UseDecl::Service(use_decl) = use_decl else { unreachable!() };
         let source = route_capability(
             RouteRequest::UseService(use_decl),
@@ -3398,7 +3386,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
         let model = T::new("a", components).build().await;
         let b_component =
-            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let UseDecl::Service(use_decl) = use_decl else { unreachable!() };
         let source = route_capability(
             RouteRequest::UseService(use_decl),
@@ -3445,7 +3433,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let b_component =
-            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let source = route_capability(
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
@@ -3524,7 +3512,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let c_component =
-            model.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
+            model.look_up_instance(&["b", "c"].try_into().unwrap()).await.expect("c instance");
         let source = route_capability(
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
@@ -3598,9 +3586,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let model = T::new("a", components).build().await;
         let b_component =
-            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let c_component =
-            model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
+            model.look_up_instance(&["c"].try_into().unwrap()).await.expect("c instance");
         let source = route_capability(
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
@@ -3673,7 +3661,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let c_component =
-            model.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
+            model.look_up_instance(&["b", "c"].try_into().unwrap()).await.expect("c instance");
         let source = route_capability(
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
@@ -3735,7 +3723,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let model = T::new("a", components).build().await;
         let b_component =
-            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let route_result = route_capability(
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
@@ -3792,7 +3780,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = builder.build().await;
 
         let b_component =
-            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let source = route_capability(
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
@@ -3896,7 +3884,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let model = builder.build().await;
         let b_component =
-            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let route_result = route_capability(
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
@@ -3995,7 +3983,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let b_component =
-            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let source = route_capability(
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Child("b".parse().unwrap()),
@@ -4064,7 +4052,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let b_component =
-            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let source = route_capability(
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Parent,
@@ -4132,7 +4120,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let b_component =
-            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            model.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let source = route_capability(
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
@@ -4207,7 +4195,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
 
         let model = T::new("a", components).build().await;
-        let child_component = model.look_up_instance(&vec!["b"].try_into().unwrap()).await.unwrap();
+        let child_component = model.look_up_instance(&["b"].try_into().unwrap()).await.unwrap();
 
         let cm_rust::UseDecl::Config(use_config) = use_config else { panic!() };
         let value =
@@ -4268,7 +4256,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
 
         let model = T::new("a", components).build().await;
-        let child_component = model.look_up_instance(&vec!["b"].try_into().unwrap()).await.unwrap();
+        let child_component = model.look_up_instance(&["b"].try_into().unwrap()).await.unwrap();
 
         let cm_rust::UseDecl::Config(use_config) = use_config else { panic!() };
         let value =
@@ -4332,7 +4320,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
 
         let model = T::new("a", components).build().await;
-        let child_component = model.look_up_instance(&vec!["b"].try_into().unwrap()).await.unwrap();
+        let child_component = model.look_up_instance(&["b"].try_into().unwrap()).await.unwrap();
 
         let cm_rust::UseDecl::Config(use_config) = use_config else { panic!() };
         let value =
@@ -4424,7 +4412,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let model = T::new("root", components).build().await;
         let leaf_component = model
-            .look_up_instance(&vec!["intermediate", "leaf"].try_into().unwrap())
+            .look_up_instance(&["intermediate", "leaf"].try_into().unwrap())
             .await
             .expect("leaf instance");
 

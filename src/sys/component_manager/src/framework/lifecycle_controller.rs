@@ -380,10 +380,9 @@ mod tests {
         let lifecycle_proxy = lifecycle_controller(&test_model_result).await;
 
         lifecycle_proxy.resolve_instance(".").await.unwrap().unwrap();
-        let component_a =
-            root.find_and_maybe_resolve(&vec!["a"].try_into().unwrap()).await.unwrap();
+        let component_a = root.find_and_maybe_resolve(&["a"].try_into().unwrap()).await.unwrap();
         let component_b =
-            root.find_and_maybe_resolve(&vec!["a", "b"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&["a", "b"].try_into().unwrap()).await.unwrap();
         assert!(is_resolved(&component_a).await);
         assert!(is_resolved(&component_b).await);
 

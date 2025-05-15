@@ -185,13 +185,13 @@ mod tests {
         let event_stream =
             fixture.new_event_stream(vec![EventType::Resolved, EventType::Started]).await;
         let (_client_end, server_end) = zx::Channel::create();
-        let moniker: Moniker = vec!["source"].try_into().unwrap();
+        let moniker: Moniker = ["source"].try_into().unwrap();
 
         let task_group = TaskGroup::new();
         let scope = ExecutionScope::new();
         let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
         fixture
-            .provider(moniker.clone(), vec!["target"].try_into().unwrap())
+            .provider(moniker.clone(), ["target"].try_into().unwrap())
             .await
             .open(
                 task_group.clone(),
@@ -226,7 +226,7 @@ mod tests {
         )])
         .await;
         let (client_end, server_end) = zx::Channel::create();
-        let moniker: Moniker = vec!["foo"].try_into().unwrap();
+        let moniker: Moniker = ["foo"].try_into().unwrap();
 
         let task_group = TaskGroup::new();
         let scope = ExecutionScope::new();

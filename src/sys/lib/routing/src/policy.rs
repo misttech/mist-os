@@ -200,9 +200,8 @@ impl GlobalPolicyChecker {
             Some(entries) => {
                 let parts = target_moniker
                     .path()
-                    .clone()
-                    .into_iter()
-                    .map(|c| AllowlistMatcher::Exact(c))
+                    .iter()
+                    .map(|c| AllowlistMatcher::Exact(c.clone()))
                     .collect();
                 let entry = AllowlistEntry { matchers: parts };
 
@@ -366,10 +365,10 @@ mod tests {
         }
         let policy = Arc::new(SecurityPolicy::default());
         assert_vmex_disallowed!(policy, Moniker::root());
-        assert_vmex_disallowed!(policy, Moniker::try_from(vec!["foo"]).unwrap());
+        assert_vmex_disallowed!(policy, Moniker::try_from(["foo"]).unwrap());
 
-        let allowed1 = Moniker::try_from(vec!["foo", "bar"]).unwrap();
-        let allowed2 = Moniker::try_from(vec!["baz", "fiz"]).unwrap();
+        let allowed1 = Moniker::try_from(["foo", "bar"]).unwrap();
+        let allowed2 = Moniker::try_from(["baz", "fiz"]).unwrap();
         let policy = Arc::new(SecurityPolicy {
             job_policy: JobPolicyAllowlists {
                 ambient_mark_vmo_exec: vec![
@@ -421,10 +420,10 @@ mod tests {
         }
         let policy = Arc::new(SecurityPolicy::default());
         assert_create_raw_processes_disallowed!(policy, Moniker::root());
-        assert_create_raw_processes_disallowed!(policy, Moniker::try_from(vec!["foo"]).unwrap());
+        assert_create_raw_processes_disallowed!(policy, Moniker::try_from(["foo"]).unwrap());
 
-        let allowed1 = Moniker::try_from(vec!["foo", "bar"]).unwrap();
-        let allowed2 = Moniker::try_from(vec!["baz", "fiz"]).unwrap();
+        let allowed1 = Moniker::try_from(["foo", "bar"]).unwrap();
+        let allowed2 = Moniker::try_from(["baz", "fiz"]).unwrap();
         let policy = Arc::new(SecurityPolicy {
             job_policy: JobPolicyAllowlists {
                 ambient_mark_vmo_exec: vec![],
@@ -468,10 +467,10 @@ mod tests {
         }
         let policy = Arc::new(SecurityPolicy::default());
         assert_critical_disallowed!(policy, Moniker::root());
-        assert_critical_disallowed!(policy, Moniker::try_from(vec!["foo"]).unwrap());
+        assert_critical_disallowed!(policy, Moniker::try_from(["foo"]).unwrap());
 
-        let allowed1 = Moniker::try_from(vec!["foo", "bar"]).unwrap();
-        let allowed2 = Moniker::try_from(vec!["baz", "fiz"]).unwrap();
+        let allowed1 = Moniker::try_from(["foo", "bar"]).unwrap();
+        let allowed2 = Moniker::try_from(["baz", "fiz"]).unwrap();
         let policy = Arc::new(SecurityPolicy {
             job_policy: JobPolicyAllowlists {
                 ambient_mark_vmo_exec: vec![
@@ -520,11 +519,11 @@ mod tests {
         // Empty policy and enabled.
         let policy = Arc::new(SecurityPolicy::default());
         assert_reboot_disallowed!(policy, Moniker::root());
-        assert_reboot_disallowed!(policy, Moniker::try_from(vec!["foo"]).unwrap());
+        assert_reboot_disallowed!(policy, Moniker::try_from(["foo"]).unwrap());
 
         // Nonempty policy.
-        let allowed1 = Moniker::try_from(vec!["foo", "bar"]).unwrap();
-        let allowed2 = Moniker::try_from(vec!["baz", "fiz"]).unwrap();
+        let allowed1 = Moniker::try_from(["foo", "bar"]).unwrap();
+        let allowed2 = Moniker::try_from(["baz", "fiz"]).unwrap();
         let policy = Arc::new(SecurityPolicy {
             job_policy: JobPolicyAllowlists {
                 ambient_mark_vmo_exec: vec![],

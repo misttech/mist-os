@@ -2478,7 +2478,7 @@ mod tests {
         let root = test.model.root();
 
         // Start the component. This should cause the component to have an `Execution`.
-        let component = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component = test.look_up(["a"].try_into().unwrap()).await;
         root.start_instance(&component.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
@@ -2523,7 +2523,7 @@ mod tests {
             ("c", component_decl_with_test_runner()),
         ];
         let test =
-            ActionsTest::new("root", components, Some(vec!["container"].try_into().unwrap())).await;
+            ActionsTest::new("root", components, Some(["container"].try_into().unwrap())).await;
         let root = test.model.root();
 
         // Create dynamic instances in "coll".
@@ -2531,10 +2531,10 @@ mod tests {
         test.create_dynamic_child("coll", "b").await;
 
         // Start the components. This should cause them to have an `Execution`.
-        let component_container = test.look_up(vec!["container"].try_into().unwrap()).await;
-        let component_a = test.look_up(vec!["container", "coll:a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["container", "coll:b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["container", "c"].try_into().unwrap()).await;
+        let component_container = test.look_up(["container"].try_into().unwrap()).await;
+        let component_a = test.look_up(["container", "coll:a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["container", "coll:b"].try_into().unwrap()).await;
+        let component_c = test.look_up(["container", "c"].try_into().unwrap()).await;
         root.start_instance(&component_container.moniker, &StartReason::Eager)
             .await
             .expect("could not start container");
@@ -2589,9 +2589,9 @@ mod tests {
             let mut next: Vec<_> = events.drain(0..3).collect();
             next.sort_unstable();
             let expected: Vec<_> = vec![
-                Lifecycle::Stop(vec!["container", "c"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["container", "coll:a"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["container", "coll:b"].try_into().unwrap()),
+                Lifecycle::Stop(["container", "c"].try_into().unwrap()),
+                Lifecycle::Stop(["container", "coll:a"].try_into().unwrap()),
+                Lifecycle::Stop(["container", "coll:b"].try_into().unwrap()),
             ];
             assert_eq!(next, expected);
 
@@ -2599,8 +2599,8 @@ mod tests {
             let mut next: Vec<_> = events.drain(0..2).collect();
             next.sort_unstable();
             let expected: Vec<_> = vec![
-                Lifecycle::Destroy(vec!["container", "coll:a"].try_into().unwrap()),
-                Lifecycle::Destroy(vec!["container", "coll:b"].try_into().unwrap()),
+                Lifecycle::Destroy(["container", "coll:a"].try_into().unwrap()),
+                Lifecycle::Destroy(["container", "coll:b"].try_into().unwrap()),
             ];
             assert_eq!(next, expected);
         }
@@ -2636,7 +2636,7 @@ mod tests {
             ("c", component_decl_with_test_runner()),
         ];
         let test =
-            ActionsTest::new("root", components, Some(vec!["container"].try_into().unwrap())).await;
+            ActionsTest::new("root", components, Some(["container"].try_into().unwrap())).await;
         let root = test.model.root();
 
         // Create dynamic instances in "coll".
@@ -2662,10 +2662,10 @@ mod tests {
         .expect("failed to create child");
 
         // Start the components. This should cause them to have an `Execution`.
-        let component_container = test.look_up(vec!["container"].try_into().unwrap()).await;
-        let component_a = test.look_up(vec!["container", "coll:a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["container", "coll:b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["container", "c"].try_into().unwrap()).await;
+        let component_container = test.look_up(["container"].try_into().unwrap()).await;
+        let component_a = test.look_up(["container", "coll:a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["container", "coll:b"].try_into().unwrap()).await;
+        let component_c = test.look_up(["container", "c"].try_into().unwrap()).await;
         root.start_instance(&component_container.moniker, &StartReason::Eager)
             .await
             .expect("could not start container");
@@ -2719,9 +2719,9 @@ mod tests {
 
             pretty_assertions::assert_eq!(
                 vec![
-                    Lifecycle::Stop(vec!["container", "coll:b"].try_into().unwrap()),
-                    Lifecycle::Stop(vec!["container", "coll:a"].try_into().unwrap()),
-                    Lifecycle::Stop(vec!["container", "c"].try_into().unwrap()),
+                    Lifecycle::Stop(["container", "coll:b"].try_into().unwrap()),
+                    Lifecycle::Stop(["container", "coll:a"].try_into().unwrap()),
+                    Lifecycle::Stop(["container", "c"].try_into().unwrap()),
                 ],
                 events.drain(0..3).collect::<Vec<_>>()
             );
@@ -2729,13 +2729,13 @@ mod tests {
             // The order here is nondeterministic.
             pretty_assertions::assert_eq!(
                 btreeset![
-                    Lifecycle::Destroy(vec!["container", "coll:b"].try_into().unwrap()),
-                    Lifecycle::Destroy(vec!["container", "coll:a"].try_into().unwrap()),
+                    Lifecycle::Destroy(["container", "coll:b"].try_into().unwrap()),
+                    Lifecycle::Destroy(["container", "coll:a"].try_into().unwrap()),
                 ],
                 events.drain(0..2).collect::<BTreeSet<_>>()
             );
             pretty_assertions::assert_eq!(
-                vec![Lifecycle::Stop(vec!["container"].try_into().unwrap()),],
+                vec![Lifecycle::Stop(["container"].try_into().unwrap()),],
                 events
             );
         }
@@ -2749,8 +2749,8 @@ mod tests {
             ("b", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
         assert!(!component_a.is_started().await);
         assert!(!component_b.is_started().await);
 
@@ -2792,7 +2792,7 @@ mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         let root = test.model.root();
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
         root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
@@ -2827,7 +2827,7 @@ mod tests {
                     _ => false,
                 })
                 .collect();
-            assert_eq!(events, vec![Lifecycle::Stop(vec!["a"].try_into().unwrap())]);
+            assert_eq!(events, vec![Lifecycle::Stop(["a"].try_into().unwrap())]);
         }
     }
 
@@ -2854,10 +2854,10 @@ mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         let root = test.model.root();
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.look_up(["a", "b", "d"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
         root.start_instance(&component_a.moniker, &StartReason::Eager)
@@ -2898,15 +2898,15 @@ mod tests {
             let mut first: Vec<_> = events.drain(0..2).collect();
             first.sort_unstable();
             let expected: Vec<_> = vec![
-                Lifecycle::Stop(vec!["a", "b", "c"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a", "b", "d"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b", "c"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b", "d"].try_into().unwrap()),
             ];
             assert_eq!(first, expected);
             assert_eq!(
                 events,
                 vec![
-                    Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
-                    Lifecycle::Stop(vec!["a"].try_into().unwrap())
+                    Lifecycle::Stop(["a", "b"].try_into().unwrap()),
+                    Lifecycle::Stop(["a"].try_into().unwrap())
                 ]
             );
         }
@@ -2962,11 +2962,11 @@ mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         let root = test.model.root();
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
-        let component_e = test.look_up(vec!["a", "b", "e"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.look_up(["a", "b", "d"].try_into().unwrap()).await;
+        let component_e = test.look_up(["a", "b", "e"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
         root.start_instance(&component_a.moniker, &StartReason::Eager)
@@ -3011,20 +3011,20 @@ mod tests {
             let mut first: Vec<_> = events.drain(0..2).collect();
             first.sort_unstable();
             let mut expected: Vec<_> = vec![
-                Lifecycle::Stop(vec!["a", "b", "c"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a", "b", "e"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b", "c"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b", "e"].try_into().unwrap()),
             ];
             assert_eq!(first, expected);
 
             let next: Vec<_> = events.drain(0..1).collect();
-            expected = vec![Lifecycle::Stop(vec!["a", "b", "d"].try_into().unwrap())];
+            expected = vec![Lifecycle::Stop(["a", "b", "d"].try_into().unwrap())];
             assert_eq!(next, expected);
 
             assert_eq!(
                 events,
                 vec![
-                    Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
-                    Lifecycle::Stop(vec!["a"].try_into().unwrap())
+                    Lifecycle::Stop(["a", "b"].try_into().unwrap()),
+                    Lifecycle::Stop(["a"].try_into().unwrap())
                 ]
             );
         }
@@ -3097,12 +3097,12 @@ mod tests {
                 ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("serviceE")).build(),
             ),
         ];
-        let moniker_a: Moniker = vec!["a"].try_into().unwrap();
-        let moniker_b: Moniker = vec!["a", "b"].try_into().unwrap();
-        let moniker_c: Moniker = vec!["a", "b", "c"].try_into().unwrap();
-        let moniker_d: Moniker = vec!["a", "b", "d"].try_into().unwrap();
-        let moniker_e: Moniker = vec!["a", "b", "e"].try_into().unwrap();
-        let moniker_f: Moniker = vec!["a", "b", "f"].try_into().unwrap();
+        let moniker_a: Moniker = ["a"].try_into().unwrap();
+        let moniker_b: Moniker = ["a", "b"].try_into().unwrap();
+        let moniker_c: Moniker = ["a", "b", "c"].try_into().unwrap();
+        let moniker_d: Moniker = ["a", "b", "d"].try_into().unwrap();
+        let moniker_e: Moniker = ["a", "b", "e"].try_into().unwrap();
+        let moniker_f: Moniker = ["a", "b", "f"].try_into().unwrap();
         let test = ActionsTest::new("root", components, None).await;
         let root = test.model.root();
         let component_a = test.look_up(moniker_a.clone()).await;
@@ -3272,12 +3272,12 @@ mod tests {
                     .build(),
             ),
         ];
-        let moniker_a: Moniker = vec!["a"].try_into().unwrap();
-        let moniker_b: Moniker = vec!["a", "b"].try_into().unwrap();
-        let moniker_c: Moniker = vec!["a", "b", "c"].try_into().unwrap();
-        let moniker_d: Moniker = vec!["a", "b", "d"].try_into().unwrap();
-        let moniker_e: Moniker = vec!["a", "b", "e"].try_into().unwrap();
-        let moniker_f: Moniker = vec!["a", "b", "f"].try_into().unwrap();
+        let moniker_a: Moniker = ["a"].try_into().unwrap();
+        let moniker_b: Moniker = ["a", "b"].try_into().unwrap();
+        let moniker_c: Moniker = ["a", "b", "c"].try_into().unwrap();
+        let moniker_d: Moniker = ["a", "b", "d"].try_into().unwrap();
+        let moniker_e: Moniker = ["a", "b", "e"].try_into().unwrap();
+        let moniker_f: Moniker = ["a", "b", "f"].try_into().unwrap();
         let test = ActionsTest::new("root", components, None).await;
         let root = test.model.root();
         let component_a = test.look_up(moniker_a.clone()).await;
@@ -3406,10 +3406,10 @@ mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         let root = test.model.root();
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.look_up(["a", "b", "d"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
         root.start_instance(&component_a.moniker, &StartReason::Eager)
@@ -3445,10 +3445,10 @@ mod tests {
                 })
                 .collect();
             let expected: Vec<_> = vec![
-                Lifecycle::Stop(vec!["a", "b", "d"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a", "b", "c"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b", "d"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b", "c"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b"].try_into().unwrap()),
+                Lifecycle::Stop(["a"].try_into().unwrap()),
             ];
             assert_eq!(events, expected);
         }
@@ -3501,10 +3501,10 @@ mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         let root = test.model.root();
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.look_up(["a", "b", "d"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
         root.start_instance(&component_a.moniker, &StartReason::Eager)
@@ -3540,10 +3540,10 @@ mod tests {
                 })
                 .collect();
             let expected: Vec<_> = vec![
-                Lifecycle::Stop(vec!["a", "b", "d"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a", "b", "c"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b", "d"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b", "c"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b"].try_into().unwrap()),
+                Lifecycle::Stop(["a"].try_into().unwrap()),
             ];
             assert_eq!(events, expected);
         }
@@ -3577,9 +3577,9 @@ mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         let root = test.model.root();
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "c"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(["a", "c"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
         root.start_instance(&component_a.moniker, &StartReason::Eager)
@@ -3613,9 +3613,9 @@ mod tests {
                 })
                 .collect();
             let expected: Vec<_> = vec![
-                Lifecycle::Stop(vec!["a", "c"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "c"].try_into().unwrap()),
+                Lifecycle::Stop(["a"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b"].try_into().unwrap()),
             ];
             assert_eq!(events, expected);
         }
@@ -3671,9 +3671,9 @@ mod tests {
         test.runner.add_host_fn("test:///b_resolved", test_runner_out_dir.host_fn());
 
         let root = test.model.root();
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "c"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(["a", "c"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
         root.start_instance(&component_a.moniker, &StartReason::Eager)
@@ -3707,9 +3707,9 @@ mod tests {
                 })
                 .collect();
             let expected: Vec<_> = vec![
-                Lifecycle::Stop(vec!["a", "c"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "c"].try_into().unwrap()),
+                Lifecycle::Stop(["a"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b"].try_into().unwrap()),
             ];
             assert_eq!(events, expected);
         }
@@ -3757,9 +3757,9 @@ mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         let root = test.model.root();
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "c"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(["a", "c"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
         root.start_instance(&component_a.moniker, &StartReason::Eager)
@@ -3793,9 +3793,9 @@ mod tests {
                 })
                 .collect();
             let expected: Vec<_> = vec![
-                Lifecycle::Stop(vec!["a"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a", "c"].try_into().unwrap()),
+                Lifecycle::Stop(["a"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "c"].try_into().unwrap()),
             ];
             assert_eq!(events, expected);
         }
@@ -3834,9 +3834,9 @@ mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         let root = test.model.root();
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "c"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(["a", "c"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
         root.start_instance(&component_a.moniker, &StartReason::Eager)
@@ -3870,14 +3870,14 @@ mod tests {
                 })
                 .collect();
             let expected1: Vec<_> = vec![
-                Lifecycle::Stop(vec!["a", "c"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "c"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b"].try_into().unwrap()),
+                Lifecycle::Stop(["a"].try_into().unwrap()),
             ];
             let expected2: Vec<_> = vec![
-                Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a", "c"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "b"].try_into().unwrap()),
+                Lifecycle::Stop(["a", "c"].try_into().unwrap()),
+                Lifecycle::Stop(["a"].try_into().unwrap()),
             ];
             assert!(events == expected1 || events == expected2);
         }
@@ -3902,9 +3902,9 @@ mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         let root = test.model.root();
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_b2 = test.look_up(vec!["a", "b", "b"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+        let component_b2 = test.look_up(["a", "b", "b"].try_into().unwrap()).await;
 
         // Start second `b`.
         root.start_instance(&component_a.moniker, &StartReason::Eager)
@@ -3948,9 +3948,9 @@ mod tests {
             assert_eq!(
                 events,
                 vec![
-                    Lifecycle::Stop(vec!["a", "b", "b"].try_into().unwrap()),
-                    Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
-                    Lifecycle::Stop(vec!["a"].try_into().unwrap())
+                    Lifecycle::Stop(["a", "b", "b"].try_into().unwrap()),
+                    Lifecycle::Stop(["a", "b"].try_into().unwrap()),
+                    Lifecycle::Stop(["a"].try_into().unwrap())
                 ]
             );
         }
@@ -3988,10 +3988,10 @@ mod tests {
             ];
             let test = ActionsTest::new("root", components, None).await;
             let root = test.model.root();
-            let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-            let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-            let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
-            let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+            let component_a = test.look_up(["a"].try_into().unwrap()).await;
+            let component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+            let component_c = test.look_up(["a", "b", "c"].try_into().unwrap()).await;
+            let component_d = test.look_up(["a", "b", "d"].try_into().unwrap()).await;
 
             // Component startup was eager, so they should all have an `Execution`.
             root.start_instance(&component_a.moniker, &StartReason::Eager)
@@ -4061,15 +4061,15 @@ mod tests {
                 let mut first: Vec<_> = events.drain(0..2).collect();
                 first.sort_unstable();
                 let expected: Vec<_> = vec![
-                    Lifecycle::Stop(vec!["a", "b", "c"].try_into().unwrap()),
-                    Lifecycle::Stop(vec!["a", "b", "d"].try_into().unwrap()),
+                    Lifecycle::Stop(["a", "b", "c"].try_into().unwrap()),
+                    Lifecycle::Stop(["a", "b", "d"].try_into().unwrap()),
                 ];
                 assert_eq!(first, expected);
                 assert_eq!(
                     events,
                     vec![
-                        Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
-                        Lifecycle::Stop(vec!["a"].try_into().unwrap())
+                        Lifecycle::Stop(["a", "b"].try_into().unwrap()),
+                        Lifecycle::Stop(["a"].try_into().unwrap())
                     ]
                 );
             }
