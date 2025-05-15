@@ -1326,6 +1326,7 @@ mod tests {
                     dad_transmits_remaining: None,
                     timer: bindings_ctx.new_timer(()),
                     ip_specific_state: Default::default(),
+                    probe_wait: None,
                 },
                 Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig {
                     inner: SlaacConfig::Stable {

@@ -105,3 +105,9 @@ where
         FakeTxMetadata
     }
 }
+
+impl<S, Meta, DeviceId> AsRef<S> for FakeCoreCtx<S, Meta, DeviceId> {
+    fn as_ref(&self) -> &S {
+        &self.state
+    }
+}

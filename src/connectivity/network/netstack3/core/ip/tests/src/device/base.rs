@@ -773,7 +773,8 @@ fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
         }
     }
 
-    // The stack should have installed a DAD timer and sent an ARP probe.
+    // The stack should have installed a DAD timer for PROBE_WAIT, but not yet
+    // sent an ARP probe.
     let expected_timer_id = TimerId::from(
         Ipv4DeviceTimerId::Dad(DadTimerId::new(
             device_id.downgrade(),
@@ -789,6 +790,14 @@ fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
     );
     ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(expected_timer_id.clone(), ..)]);
     ctx.bindings_ctx.with_fake_frame_ctx_mut(|ctx| {
+        assert_matches!(&ctx.take_frames()[..], []);
+    });
+
+    // Trigger the DAD Timer. Verify an ARP probe was sent and a second DAD
+    // timer was scheduled.
+    let (mut core_ctx, bindings_ctx) = ctx.contexts();
+    assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(expected_timer_id.clone()));
+    ctx.bindings_ctx.with_fake_frame_ctx_mut(|ctx| {
         let frames = ctx.take_frames();
         let (dev, buf) = assert_matches!(&frames[..], [frame] => frame);
         let dev = assert_matches!(dev, DispatchedFrame::Ethernet(device_id) => device_id);
@@ -801,6 +810,7 @@ fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
             .expect("should successfully parse ARP packet");
         assert_eq!(target_protocol_address, ipv4_addr_subnet.addr().get());
     });
+    ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(expected_timer_id.clone(), ..)]);
 
     // Trigger the DadTimer and verify the address became assigned.
     let (mut core_ctx, bindings_ctx) = ctx.contexts();

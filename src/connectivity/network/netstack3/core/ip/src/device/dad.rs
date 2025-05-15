@@ -12,7 +12,7 @@ use core::time::Duration;
 use arrayvec::ArrayVec;
 use derivative::Derivative;
 use log::debug;
-use net_types::ip::{Ip, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{Ip, IpVersion, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use net_types::MulticastAddr;
 use netstack3_base::{
     AnyDevice, CoreEventContext, CoreTimerContext, DeviceIdContext, EventContext, HandleableTimer,
@@ -309,14 +309,16 @@ pub enum DadState<I: DadIpExt, BT: DadBindingsTypes> {
     /// The address is considered unassigned to an interface for normal
     /// operations, but has the intention of being assigned in the future (e.g.
     /// once Duplicate Address Detection is completed).
-    ///
-    /// When `dad_transmits_remaining` is `None`, then no more DAD messages need
-    /// to be sent and DAD may be resolved.
-    #[allow(missing_docs)]
     Tentative {
+        /// The number of probes that still need to be sent. When `None`, there
+        /// are no more probes to send and DAD may resolve.
         dad_transmits_remaining: Option<NonZeroU16>,
+        /// The timer used to schedule DAD operations in the future.
         timer: BT::Timer,
+        /// Probing state specific to the given IP version.
         ip_specific_state: I::TentativeState,
+        /// The (optional) delay to wait before starting to send DAD probes.
+        probe_wait: Option<Duration>,
     },
 
     /// The address has not yet been initialized.
@@ -552,6 +554,12 @@ fn initialize_duplicate_address_detection<
                     NeedsDad::No
                 }
                 (true, Some(max_dad_transmits)) => {
+                    // Note: IPv4 requires waiting before starting to send DAD
+                    // probes, while IPv6 starts sending DAD probes immediately.
+                    let probe_wait = match I::VERSION {
+                        IpVersion::V4 => Some(ipv4_dad_probe_wait(bindings_ctx)),
+                        IpVersion::V6 => None,
+                    };
                     *dad_state = DadState::Tentative {
                         dad_transmits_remaining: Some(*max_dad_transmits),
                         timer: CC::new_timer(
@@ -563,6 +571,7 @@ fn initialize_duplicate_address_detection<
                             },
                         ),
                         ip_specific_state: Default::default(),
+                        probe_wait,
                     };
                     core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = false);
                     NeedsDad::Yes(StartDad { device_id, address_id: addr })
@@ -594,14 +603,30 @@ fn do_duplicate_address_detection<
         |DadStateRef { state, retrans_timer_data, max_dad_transmits: _ }| {
             let DadAddressStateRef { dad_state, core_ctx } = state;
 
-            let (remaining, timer, ip_specific_state) = match dad_state {
-                DadState::Tentative { dad_transmits_remaining, timer, ip_specific_state } => {
-                    (dad_transmits_remaining, timer, ip_specific_state)
-                }
+            let (remaining, timer, ip_specific_state, probe_wait) = match dad_state {
+                DadState::Tentative {
+                    dad_transmits_remaining,
+                    timer,
+                    ip_specific_state,
+                    probe_wait,
+                } => (dad_transmits_remaining, timer, ip_specific_state, probe_wait),
                 DadState::Uninitialized | DadState::Assigned => {
                     panic!("expected address to be tentative; addr={addr:?}")
                 }
             };
+
+            if let Some(probe_wait) = probe_wait.take() {
+                // Schedule a timer and short circuit, deferring the first probe
+                // until after the timer fires.
+                assert_eq!(
+                    bindings_ctx.schedule_timer(probe_wait, timer),
+                    None,
+                    "Unexpected DAD timer; addr={}, device_id={:?}",
+                    addr.addr(),
+                    device_id
+                );
+                return None;
+            }
 
             match remaining {
                 None => {
@@ -620,8 +645,6 @@ fn do_duplicate_address_detection<
                     None
                 }
                 Some(non_zero_remaining) => {
-                    // TODO(https://fxbug.dev/42077260): Support IPv4 PROBE_WAIT
-                    // as specified in RFC 5227 section 2.1.1.
                     *remaining = NonZeroU16::new(non_zero_remaining.get() - 1);
 
                     // Delay sending subsequent DAD probes.
@@ -692,7 +715,7 @@ fn stop_duplicate_address_detection<
 
             match dad_state {
                 DadState::Assigned => {}
-                DadState::Tentative { dad_transmits_remaining: _, timer, ip_specific_state: _ } => {
+                DadState::Tentative { timer, .. } => {
                     // Generally we should have a timer installed in the
                     // tentative state, but we could be racing with the
                     // timer firing in bindings so we can't assert that it's
@@ -737,15 +760,18 @@ fn handle_incoming_packet<
             match dad_state {
                 DadState::Uninitialized => DadIncomingPacketResult::Uninitialized,
                 DadState::Assigned => DadIncomingPacketResult::Assigned,
-                DadState::Tentative { dad_transmits_remaining, timer: _, ip_specific_state } => {
-                    DadIncomingPacketResult::Tentative {
-                        meta: I::handle_incoming_packet_while_tentative(
-                            data,
-                            ip_specific_state,
-                            dad_transmits_remaining,
-                        ),
-                    }
-                }
+                DadState::Tentative {
+                    dad_transmits_remaining,
+                    timer: _,
+                    ip_specific_state,
+                    probe_wait: _,
+                } => DadIncomingPacketResult::Tentative {
+                    meta: I::handle_incoming_packet_while_tentative(
+                        data,
+                        ip_specific_state,
+                        dad_transmits_remaining,
+                    ),
+                },
             }
         },
     )
@@ -926,6 +952,19 @@ pub fn ipv4_dad_probe_interval<BC: RngContext>(bindings_ctx: &mut BC) -> NonZero
     NonZeroDuration::new(retrans_interval).unwrap()
 }
 
+/// As defined in RFC 5227, section 1.1:
+///   PROBE_WAIT           1 second   (initial random delay)
+const IPV4_PROBE_WAIT_RANGE: RangeInclusive<Duration> = Duration::ZERO..=Duration::from_secs(1);
+
+/// Generate the duration to wait before starting to send IPv4 DAD probes.
+pub fn ipv4_dad_probe_wait<BC: RngContext>(bindings_ctx: &mut BC) -> Duration {
+    // As per RFC 5227, section 2.2.1:
+    //   When ready to begin probing, the host should then wait for a random
+    //   time interval selected uniformly in the range zero to PROBE_WAIT
+    //   seconds
+    bindings_ctx.rng().gen_range(IPV4_PROBE_WAIT_RANGE)
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::collections::hash_map::{Entry, HashMap};
@@ -967,11 +1006,11 @@ mod tests {
         fn expected_timer_range(now: FakeInstant) -> impl RangeBounds<FakeInstant> + Debug;
 
         type DadHandlerCtx: DadHandler<
-            Self,
-            FakeBindingsCtxImpl<Self>,
-            DeviceId = FakeDeviceId,
-            AddressId = AddrSubnet<Self::Addr, Self::AssignedWitness>,
-        >;
+                Self,
+                FakeBindingsCtxImpl<Self>,
+                DeviceId = FakeDeviceId,
+                AddressId = AddrSubnet<Self::Addr, Self::AssignedWitness>,
+            > + AsRef<FakeDadContext<Self>>;
 
         // A trampoline method to get access to `DadHandler<I, _>`.
         //
@@ -1253,18 +1292,21 @@ mod tests {
         dad_transmits_remaining: Option<NonZeroU16>,
     ) {
         let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
-        let ip_specific_state = assert_matches!(state, DadState::Tentative {
-            dad_transmits_remaining: got,
-            timer: _,
-            ip_specific_state,
-        } => {
-            assert_eq!(
-                *got,
+        let (got_transmits_remaining, ip_specific_state, probe_wait) = assert_matches!(
+            state,
+            DadState::Tentative {
+                timer: _,
                 dad_transmits_remaining,
-                "got dad_transmits_remaining = {got:?}, \
-                 want dad_transmits_remaining = {dad_transmits_remaining:?}");
-            ip_specific_state
-        });
+                ip_specific_state,
+                probe_wait,
+            } => (dad_transmits_remaining, ip_specific_state, probe_wait)
+        );
+        assert_eq!(
+            *got_transmits_remaining, dad_transmits_remaining,
+            "got dad_transmits_remaining = {got_transmits_remaining:?},
+                want dad_transmits_remaining = {dad_transmits_remaining:?}"
+        );
+        assert_eq!(probe_wait, &None);
         let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(!*assigned);
         check_multicast_groups(I::VERSION, groups);
@@ -1308,6 +1350,35 @@ mod tests {
         )]);
     }
 
+    // Verify that the probe wait field is properly set after DAD initialization.
+    fn check_probe_wait<I: TestDadIpExt>(core_ctx: &FakeDadContext<I>) {
+        let FakeDadContext { state, .. } = core_ctx;
+        let probe_wait = assert_matches!(
+            state,
+            DadState::Tentative { probe_wait, .. } => probe_wait
+        );
+        // IPv4 is expected to have a probe wait, while IPv6 should not.
+        match I::VERSION {
+            IpVersion::V4 => assert_matches!(probe_wait, Some(_)),
+            IpVersion::V6 => assert_matches!(probe_wait, None),
+        }
+    }
+
+    // Skip the probe wait period by triggering the next timer.
+    fn skip_probe_wait<I: TestDadIpExt>(
+        core_ctx: &mut FakeCoreCtxImpl<I>,
+        bindings_ctx: &mut FakeBindingsCtxImpl<I>,
+    ) {
+        // IPv4 is expected to have scheduled a probe wait timer, while IPv6
+        // should not.
+        match I::VERSION {
+            IpVersion::V4 => {
+                assert_eq!(bindings_ctx.trigger_next_timer(core_ctx), Some(dad_timer_id()))
+            }
+            IpVersion::V6 => {}
+        }
+    }
+
     #[ip_test(I)]
     fn perform_dad<I: TestDadIpExt>() {
         const DAD_TRANSMITS_REQUIRED: u16 = 5;
@@ -1326,8 +1397,11 @@ mod tests {
                 &address_id,
             );
             let token = assert_matches!(start_dad, NeedsDad::Yes(token) => token);
+            check_probe_wait::<I>(core_ctx.as_ref());
             core_ctx.start_duplicate_address_detection(bindings_ctx, token);
         });
+
+        skip_probe_wait::<I>(core_ctx, bindings_ctx);
 
         for count in 0..=(DAD_TRANSMITS_REQUIRED - 1) {
             check_dad(
@@ -1370,6 +1444,8 @@ mod tests {
             core_ctx.start_duplicate_address_detection(&mut bindings_ctx, token);
         });
 
+        skip_probe_wait::<I>(&mut core_ctx, &mut bindings_ctx);
+
         check_dad(&core_ctx, &bindings_ctx, 1, NonZeroU16::new(DAD_TRANSMITS_REQUIRED - 1));
 
         I::with_dad_handler(&mut core_ctx, |core_ctx| {
@@ -1400,6 +1476,7 @@ mod tests {
                     dad_transmits_remaining: NonZeroU16::new(1),
                     timer: bindings_ctx.new_timer(dad_timer_id()),
                     ip_specific_state: Default::default(),
+                    probe_wait: None,
                 },
             };
 
@@ -1537,6 +1614,7 @@ mod tests {
                     nonces: _,
                     added_extra_transmits_after_detecting_looped_back_ns
                 },
+                probe_wait: None,
             } => (dad_transmits_remaining, added_extra_transmits_after_detecting_looped_back_ns),
             "DAD state should be Tentative"
         );
@@ -1579,6 +1657,16 @@ mod tests {
         FakeCryptoRng::with_fake_rngs(100, |mut bindings_ctx| {
             let duration = ipv4_dad_probe_interval(&mut bindings_ctx).get();
             assert!(IPV4_PROBE_RANGE.contains(&duration), "actual={duration:?}");
+        })
+    }
+
+    #[test]
+    fn ipv4_dad_probe_wait_is_valid() {
+        // Verify that the IPv4 Dad Probe wait is always valid with a handful
+        // of different RNG seeds.
+        FakeCryptoRng::with_fake_rngs(100, |mut bindings_ctx| {
+            let duration = ipv4_dad_probe_wait(&mut bindings_ctx);
+            assert!(IPV4_PROBE_WAIT_RANGE.contains(&duration), "actual={duration:?}");
         })
     }
 }
