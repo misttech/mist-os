@@ -284,7 +284,7 @@ template("sdk_fuchsia_package") {
           dest = "packages/${_distribution_name}/meta.json"
           source = "${_sdk_package_metadata}"
           source_prebuild_info = {
-            api_level = override_target_api_level
+            api_level = current_build_target_api_level
             arch = target_cpu
             distribution_name = _distribution_name
             package_manifest =

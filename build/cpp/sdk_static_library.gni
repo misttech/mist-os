@@ -361,7 +361,7 @@ template("sdk_static_library") {
         get_label_info(":${main_target_name}", "label_with_toolchain")
     binaries = [
       {
-        api_level = override_target_api_level
+        api_level = current_build_target_api_level
         arch = target_cpu
         link_lib = link_lib
       },

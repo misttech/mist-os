@@ -493,7 +493,7 @@ template("sdk_shared_library") {
     headers = sdk_metadata_headers
     binaries = [
       {
-        api_level = override_target_api_level
+        api_level = current_build_target_api_level
         arch = target_cpu
         dist_lib = dist_lib
         dist_path = "lib/${lib_name}"
