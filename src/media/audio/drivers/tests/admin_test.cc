@@ -624,6 +624,8 @@ void AdminTest::DropRingBuffer() {
   CooldownAfterRingBufferDisconnect();
 }
 
+// General signalprocessing methods
+//
 // All signalprocessing-related methods are in AdminTest, because only Composite drivers support the
 // signalprocessing protocols, and Composite drivers have only AdminTest cases.
 void AdminTest::SignalProcessingConnect() {
@@ -638,6 +640,8 @@ void AdminTest::SignalProcessingConnect() {
   AddErrorHandler(signal_processing(), "SignalProcessing");
 }
 
+// Element methods
+//
 // Retrieve the element list. If signalprocessing is not supported, exit early;
 // otherwise save the ID of a RING_BUFFER element, and the ID of a DAI_INTERCONNECT element.
 // We will use these IDs later, when performing Dai-specific and RingBuffer-specific checks.
@@ -698,307 +702,6 @@ void AdminTest::RequestElements() {
     ASSERT_FALSE(element_ids.contains(element.id())) << "Duplicate element ID " << element.id();
     element_ids.insert(element.id());
   }
-}
-
-// First retrieve the element list. If signalprocessing is not supported, exit early;
-// otherwise save the ID of a RING_BUFFER element, and the ID of a DAI_INTERCONNECT element.
-// We will use these IDs later, when performing Dai-specific and RingBuffer-specific checks.
-void AdminTest::RequestTopologies() {
-  SignalProcessingConnect();
-  RequestElements();
-
-  if (!signalprocessing_is_supported_.value_or(false)) {
-    return;
-  }
-  if (!topologies_.empty()) {
-    return;
-  }
-
-  signal_processing()->GetTopologies(AddCallback(
-      "signalprocessing::Reader::GetTopologies", [this](fhasp::Reader_GetTopologies_Result result) {
-        if (result.is_err()) {
-          signalprocessing_is_supported_ = false;
-          FAIL() << "GetTopologies returned err " << result.err();
-          __UNREACHABLE;
-        }
-        topologies_ = std::move(result.response().topologies);
-      }));
-  ExpectCallbacks();
-
-  // We only call GetTopologies if we have elements, so we must have at least one topology.
-  if (topologies_.empty()) {
-    signalprocessing_is_supported_ = false;
-    FAIL() << "topologies list is empty";
-    __UNREACHABLE;
-  }
-
-  std::unordered_set<fhasp::TopologyId> topology_ids;
-  for (const auto& topology : topologies_) {
-    // All topologies must have an ID and a non-empty list of edges.
-    ASSERT_TRUE(topology.has_id());
-    ASSERT_TRUE(topology.has_processing_elements_edge_pairs())
-        << "Topology " << topology.id() << " processing_elements_edge_pairs is null";
-    ASSERT_FALSE(topology.processing_elements_edge_pairs().empty())
-        << "Topology " << topology.id() << " processing_elements_edge_pairs is empty";
-
-    // No topology ID may be a duplicate.
-    ASSERT_FALSE(topology_ids.contains(topology.id())) << "Duplicate topology ID " << topology.id();
-    topology_ids.insert(topology.id());
-  }
-}
-
-void AdminTest::RetrieveInitialTopology() {
-  SignalProcessingConnect();
-  RequestElements();
-  RequestTopologies();
-
-  ASSERT_TRUE(signalprocessing_is_supported_.value_or(false))
-      << "signalprocessing is required for this test";
-
-  if (initial_topology_id_.has_value()) {
-    return;
-  }
-
-  signal_processing()->WatchTopology(AddCallback(
-      "signalprocessing::Reader::WatchTopology", [this](fhasp::Reader_WatchTopology_Result result) {
-        ASSERT_TRUE(result.is_response());
-        initial_topology_id_ = result.response().topology_id;
-        current_topology_id_ = initial_topology_id_;
-      }));
-  ExpectCallbacks();
-
-  // We only call WatchTopology if we support signalprocessing, so a topology should be set now.
-  ASSERT_TRUE(current_topology_id_.has_value());
-  if (std::ranges::none_of(topologies_, [id = *current_topology_id_](const auto& topo) {
-        return (topo.has_id() && topo.id() == id);
-      })) {
-    // This topology_id is not in the list returned earlier.
-    signalprocessing_is_supported_ = false;
-    FAIL() << "WatchTopology returned " << *current_topology_id_
-           << " which is not in our topology list";
-  }
-}
-
-void AdminTest::WatchForTopology(fhasp::TopologyId id) {
-  ASSERT_TRUE(signalprocessing_is_supported_.value_or(false))
-      << "signalprocessing is required for this test";
-  // We only call WatchTopology if we support signalprocessing, so a topology should already be set.
-  ASSERT_TRUE(current_topology_id_.has_value());
-  // We should only expect a response if this represents a change. Don't call this method otherwise.
-  ASSERT_NE(id, *current_topology_id_);
-
-  // Make sure we're watching for a topology that is in the supported list.
-  if (std::ranges::none_of(topologies_,
-                           [id](const auto& t) { return (t.has_id() && t.id() == id); })) {
-    // This topology_id is not in the list returned earlier.
-    FAIL() << "We shouldn't wait for topology " << id << " which is not in our list";
-    __UNREACHABLE;
-  }
-
-  signal_processing()->WatchTopology(
-      AddCallbackUnordered("signalprocessing::Reader::WatchTopology(update)",
-                           [this, id](fhasp::Reader_WatchTopology_Result result) {
-                             ASSERT_TRUE(result.is_response());
-                             ASSERT_EQ(id, result.response().topology_id);
-                             current_topology_id_ = result.response().topology_id;
-                           }));
-}
-
-void AdminTest::FailOnWatchTopologyCompletion() {
-  signal_processing()->WatchTopology(AddUnexpectedCallback("unexpected WatchTopology completion"));
-}
-
-void AdminTest::SetAllTopologies() {
-  ASSERT_FALSE(topologies_.empty());
-  ASSERT_TRUE(initial_topology_id_.has_value());
-  ASSERT_TRUE(current_topology_id_.has_value());
-  ASSERT_EQ(current_topology_id_, initial_topology_id_);
-
-  if (topologies_.size() == 1) {
-    GTEST_SKIP() << "Device has only one topology; we cannot test changing it";
-    __UNREACHABLE;
-  }
-
-  // Ensure that all the supported topologies can be set.
-  for (const auto& t : topologies_) {
-    ASSERT_TRUE(t.has_id());
-    // Try them all, except the current one (which _should_ be the initial topology).
-    if (t.id() == *initial_topology_id_) {
-      continue;
-    }
-    SetTopologyAndExpectCallback(t.id());
-  }
-
-  // Now restore the initial topology.
-  SetTopologyAndExpectCallback(*initial_topology_id_);
-}
-
-void AdminTest::SetTopologyAndExpectCallback(fhasp::TopologyId id) {
-  ASSERT_NE(id, current_topology_id_);
-  ASSERT_FALSE(pending_set_topology_id_.has_value());
-  pending_set_topology_id_ = id;
-  signal_processing()->SetTopology(
-      id, AddCallbackUnordered("SetTopology(" + std::to_string(id) + ")",
-                               [this, id](fhasp::SignalProcessing_SetTopology_Result result) {
-                                 ASSERT_FALSE(result.is_err())
-                                     << "SetTopology(" << id << ") failed";
-                                 ASSERT_TRUE(pending_set_topology_id_.has_value());
-                                 ASSERT_EQ(*pending_set_topology_id_, id);
-                                 pending_set_topology_id_.reset();
-                               }));
-  ASSERT_TRUE(signal_processing().is_bound()) << "SignalProcessing failed to set the topology";
-  WatchForTopology(id);
-  ExpectCallbacks();
-}
-
-void AdminTest::WatchTopologyAndExpectDisconnect(zx_status_t expected_error) {
-  FailOnWatchTopologyCompletion();
-  ExpectError(signal_processing(), expected_error);
-  CooldownAfterSignalProcessingDisconnect();
-}
-
-void AdminTest::SetUnknownTopologyAndExpectError() {
-  RequestTopologies();
-  ASSERT_FALSE(pending_set_topology_id_.has_value());
-
-  fhasp::TopologyId unknown_id = 0;
-  while (std::ranges::any_of(topologies_, [unknown_id](const auto& topo) {
-    return topo.has_id() && topo.id() == unknown_id;
-  })) {
-    ++unknown_id;
-  }
-
-  pending_set_topology_id_ = unknown_id;
-  signal_processing()->SetTopology(
-      unknown_id,
-      AddCallback("SetTopology(" + std::to_string(unknown_id) + ")",
-                  [this, unknown_id](fhasp::SignalProcessing_SetTopology_Result result) {
-                    pending_set_topology_id_.reset();
-                    ASSERT_TRUE(result.is_err())
-                        << "SetTopology(" << unknown_id << ") did not fail";
-                    ASSERT_EQ(result.err(), ZX_ERR_INVALID_ARGS);
-                  }));
-  ASSERT_TRUE(signal_processing().is_bound())
-      << "SignalProcessing disconnected after setting an unknown topology";
-  FailOnWatchTopologyCompletion();
-  ExpectCallbacks();
-}
-
-void AdminTest::RetrieveInitialElementStates() {
-  ASSERT_TRUE(signalprocessing_is_supported_.value_or(false))
-      << "signalprocessing is required for this test";
-  ASSERT_FALSE(elements_.empty());
-
-  if (!initial_element_states_.empty()) {
-    return;
-  }
-
-  for (const auto& e : elements_) {
-    ASSERT_TRUE(e.has_id());
-
-    fhasp::ElementState state;
-    signal_processing()->WatchElementState(
-        e.id(),
-        AddCallback("initial WatchElementState(" + std::to_string(e.id()) + ")",
-                    [&state](const fhasp::ElementState& result) { state = fidl::Clone(result); }));
-    ExpectCallbacks();
-
-    initial_element_states_.emplace(e.id(), std::move(state));
-  }
-}
-
-void AdminTest::FailOnWatchElementStateCompletion(fhasp::ElementId id) {
-  signal_processing()->WatchElementState(
-      id, AddUnexpectedCallback("unexpected WatchElementState completion"));
-}
-
-void AdminTest::WatchElementStateAndExpectDisconnect(fhasp::ElementId id,
-                                                     zx_status_t expected_error) {
-  FailOnWatchElementStateCompletion(id);
-  ExpectError(signal_processing(), expected_error);
-  CooldownAfterSignalProcessingDisconnect();
-}
-
-void AdminTest::WatchUnknownElementStateAndExpectDisconnect(zx_status_t expected_error) {
-  fhasp::ElementId unknown_id = 0;
-  while (std::ranges::any_of(
-      elements_, [unknown_id](const auto& el) { return el.has_id() && el.id() == unknown_id; })) {
-    ++unknown_id;
-  }
-
-  signal_processing()->WatchElementState(
-      unknown_id, AddUnexpectedCallback("WatchElementState(" + std::to_string(unknown_id) + ")"));
-  ASSERT_TRUE(signal_processing().is_bound())
-      << "SignalProcessing disconnected after setting an unknown topology";
-  ExpectError(signal_processing(), expected_error);
-}
-
-// Validate that the collection of element IDs found in the topology list are complete and correct.
-void AdminTest::ValidateElementTopologyClosure() {
-  ASSERT_FALSE(elements().empty());
-  std::unordered_set<fhasp::ElementId> all_element_ids;
-  for (const auto& element : elements()) {
-    ASSERT_FALSE(all_element_ids.contains(element.id()));
-    all_element_ids.insert(element.id());
-  }
-  std::unordered_set<fhasp::ElementId> unused_element_ids = all_element_ids;
-
-  ASSERT_FALSE(topologies().empty());
-  for (const auto& topology : topologies()) {
-    std::unordered_set<fhasp::ElementId> edge_source_ids;
-    std::unordered_set<fhasp::ElementId> edge_dest_ids;
-    for (const auto& edge_pair : topology.processing_elements_edge_pairs()) {
-      ASSERT_TRUE(all_element_ids.contains(edge_pair.processing_element_id_from))
-          << "Topology " << topology.id() << " contains unknown element ID "
-          << edge_pair.processing_element_id_from;
-      ASSERT_TRUE(all_element_ids.contains(edge_pair.processing_element_id_to))
-          << "Topology " << topology.id() << " contains unknown element ID "
-          << edge_pair.processing_element_id_to;
-      unused_element_ids.erase(edge_pair.processing_element_id_from);
-      unused_element_ids.erase(edge_pair.processing_element_id_to);
-      edge_source_ids.insert(edge_pair.processing_element_id_from);
-      edge_dest_ids.insert(edge_pair.processing_element_id_to);
-    }
-    for (const auto& source_id : edge_source_ids) {
-      fhasp::ElementType source_element_type;
-      for (const auto& element : elements()) {
-        if (element.id() == source_id) {
-          source_element_type = element.type();
-        }
-      }
-      if (edge_dest_ids.contains(source_id)) {
-        if constexpr (!kTolerateNonTerminalDaiEndpoints) {
-          ASSERT_NE(source_element_type, fhasp::ElementType::DAI_INTERCONNECT)
-              << "Element " << source_id << " is not an endpoint in topology " << topology.id()
-              << ", but is DAI_INTERCONNECT";
-        }
-        ASSERT_NE(source_element_type, fhasp::ElementType::RING_BUFFER)
-            << "Element " << source_id << " is not an endpoint in topology " << topology.id()
-            << ", but is RING_BUFFER";
-        edge_dest_ids.erase(source_id);
-      } else {
-        ASSERT_TRUE(source_element_type == fhasp::ElementType::DAI_INTERCONNECT ||
-                    source_element_type == fhasp::ElementType::RING_BUFFER)
-            << "Element " << source_id << " is a terminal (source) endpoint in topology "
-            << topology.id() << ", but is neither DAI_INTERCONNECT nor RING_BUFFER";
-      }
-    }
-    for (const auto& dest_id : edge_dest_ids) {
-      fhasp::ElementType dest_element_type;
-      for (const auto& element : elements()) {
-        if (element.id() == dest_id) {
-          dest_element_type = element.type();
-        }
-      }
-      ASSERT_TRUE(dest_element_type == fhasp::ElementType::DAI_INTERCONNECT ||
-                  dest_element_type == fhasp::ElementType::RING_BUFFER)
-          << "Element " << dest_id << " is a terminal (destination) endpoint in topology "
-          << topology.id() << ", but is neither DAI_INTERCONNECT nor RING_BUFFER";
-    }
-  }
-  ASSERT_TRUE(unused_element_ids.empty())
-      << unused_element_ids.size() << "elements (including ID " << *unused_element_ids.cbegin()
-      << ") were not referenced in any topology";
 }
 
 // For all elements, validate their non-type-specific fields.
@@ -1097,15 +800,22 @@ void AdminTest::ValidateElement(const fhasp::Element& element) {
   // type: Required.
   ASSERT_TRUE(element.has_type());
 
+  // description: Optional, but cannot be "".
+  EXPECT_FALSE(element.has_description() && element.description().empty());
+
   // type_specific: Required for 5 Element types, disallowed for the others.
   bool should_have_type_specific = (element.type() == fhasp::ElementType::DAI_INTERCONNECT ||
                                     element.type() == fhasp::ElementType::DYNAMICS ||
                                     element.type() == fhasp::ElementType::EQUALIZER ||
                                     element.type() == fhasp::ElementType::GAIN ||
                                     element.type() == fhasp::ElementType::VENDOR_SPECIFIC);
-  ASSERT_EQ(element.has_type_specific(), should_have_type_specific)
+  EXPECT_EQ(element.has_type_specific(), should_have_type_specific)
       << "ElementTypeSpecific should " << (should_have_type_specific ? "" : "not")
       << " be set, for this ElementType";
+
+  // can_disable | type_specific.endpoint: Deprecated (removed in SDK 20), thus disallowed.
+  EXPECT_FALSE(element.has_can_disable());
+  EXPECT_FALSE(element.has_type_specific() && element.type_specific().is_endpoint());
 }
 
 // Validate the type-specific portion of this DAI_INTERCONNECT Element.
@@ -1116,7 +826,7 @@ void AdminTest::ValidateDaiElement(
   ASSERT_TRUE(element.type_specific().is_dai_interconnect());
 
   // plug_detect_capabilities: Required.
-  ASSERT_TRUE(element.type_specific().dai_interconnect().has_plug_detect_capabilities());
+  EXPECT_TRUE(element.type_specific().dai_interconnect().has_plug_detect_capabilities());
 }
 
 // Validate the type-specific portion of this DYNAMICS Element.
@@ -1134,7 +844,7 @@ void AdminTest::ValidateDynamicsElement(
   for (const auto& band : element.type_specific().dynamics().bands()) {
     // id: Required. Must be unique within this element
     ASSERT_TRUE(band.has_id());
-    ASSERT_FALSE(band_ids.contains(band.id()));
+    EXPECT_FALSE(band_ids.contains(band.id()));
     band_ids.insert(band.id());
   }
 }
@@ -1155,17 +865,17 @@ void AdminTest::ValidateEqualizerElement(
   for (const auto& band : element.type_specific().equalizer().bands()) {
     // id: Required. Must be unique within this element
     ASSERT_TRUE(band.has_id());
-    ASSERT_FALSE(band_ids.contains(band.id()));
+    EXPECT_FALSE(band_ids.contains(band.id()));
     band_ids.insert(band.id());
   }
 
   // min_frequency, max_frequency: Required. min_frequency must <= max_frequency.
   ASSERT_TRUE(eq.has_min_frequency());
   ASSERT_TRUE(eq.has_max_frequency());
-  ASSERT_LE(eq.min_frequency(), eq.max_frequency());
+  EXPECT_LE(eq.min_frequency(), eq.max_frequency());
 
   // max_q: Optional. If present, must be finite (like all floats) and positive.
-  ASSERT_TRUE(!eq.has_max_q() || (std::isfinite(eq.max_q()) && eq.max_q() > 0.0f));
+  EXPECT_TRUE(!eq.has_max_q() || (std::isfinite(eq.max_q()) && eq.max_q() > 0.0f));
 
   // min_gain_db, max_gain_db: Required for 3 suppported_controls values; disallowed otherwise.
   // min_gain_db must <= max_gain_db; both must be finite (like all floats).
@@ -1175,7 +885,7 @@ void AdminTest::ValidateEqualizerElement(
                                       fhasp::EqualizerSupportedControls::SUPPORTS_TYPE_HIGH_SHELF);
   ASSERT_TRUE(!requires_gain_db_vals || (eq.has_min_gain_db() && std::isfinite(eq.min_gain_db())));
   ASSERT_TRUE(!requires_gain_db_vals || (eq.has_max_gain_db() && std::isfinite(eq.max_gain_db())));
-  ASSERT_TRUE(!eq.has_min_gain_db() || !eq.has_max_gain_db() ||
+  EXPECT_TRUE(!eq.has_min_gain_db() || !eq.has_max_gain_db() ||
               eq.min_gain_db() <= eq.max_gain_db());
 }
 
@@ -1192,22 +902,21 @@ void AdminTest::ValidateGainElement(
   // min_gain: Required. Must be finite. Must be non-negative, if GainType is PERCENT.
   ASSERT_TRUE(element.type_specific().gain().has_min_gain());
   ASSERT_TRUE(std::isfinite(element.type_specific().gain().min_gain()));
-  ASSERT_TRUE(element.type_specific().gain().type() != fhasp::GainType::PERCENT ||
+  EXPECT_TRUE(element.type_specific().gain().type() != fhasp::GainType::PERCENT ||
               element.type_specific().gain().min_gain() >= 0.0);
 
-  // max_gain: Required. Must be finite. Cannot exceed 100, if GainType is PERCENT.
+  // max_gain: Required. Must be finite and >= min_gain. Cannot exceed 100, if GainType is PERCENT.
   ASSERT_TRUE(element.type_specific().gain().has_max_gain());
   ASSERT_TRUE(std::isfinite(element.type_specific().gain().max_gain()));
-  ASSERT_TRUE(element.type_specific().gain().type() != fhasp::GainType::PERCENT ||
+  EXPECT_GE(element.type_specific().gain().max_gain(), element.type_specific().gain().min_gain());
+  EXPECT_TRUE(element.type_specific().gain().type() != fhasp::GainType::PERCENT ||
               element.type_specific().gain().max_gain() <= 100.0);
-  // min_gain <= max_gain.
-  ASSERT_LE(element.type_specific().gain().min_gain(), element.type_specific().gain().max_gain());
 
   // min_gain_step: Required. Must be non-negative. Cannot exceed (max_gain - min_gain).
   ASSERT_TRUE(element.type_specific().gain().has_min_gain_step());
   ASSERT_TRUE(std::isfinite(element.type_specific().gain().min_gain_step()));
-  ASSERT_GE(element.type_specific().gain().min_gain_step(), 0.0f);
-  ASSERT_LE(element.type_specific().gain().min_gain_step(),
+  EXPECT_GE(element.type_specific().gain().min_gain_step(), 0.0f);
+  EXPECT_LE(element.type_specific().gain().min_gain_step(),
             element.type_specific().gain().max_gain() - element.type_specific().gain().min_gain());
 }
 
@@ -1216,7 +925,340 @@ void AdminTest::ValidateVendorSpecificElement(
     const fuchsia::hardware::audio::signalprocessing::Element& element) {
   // type_specific: Required (for this element type) and must be the VENDOR_SPECIFIC variant.
   ASSERT_TRUE(element.has_type_specific());
-  ASSERT_TRUE(element.type_specific().is_vendor_specific());
+  EXPECT_TRUE(element.type_specific().is_vendor_specific());
+}
+
+// Topology methods
+//
+// First retrieve the element list. If signalprocessing is not supported, exit early;
+// otherwise save the ID of a RING_BUFFER element, and the ID of a DAI_INTERCONNECT element.
+// We will use these IDs later, when performing Dai-specific and RingBuffer-specific checks.
+void AdminTest::RequestTopologies() {
+  SignalProcessingConnect();
+  RequestElements();
+
+  if (!signalprocessing_is_supported_.value_or(false)) {
+    return;
+  }
+  if (!topologies_.empty()) {
+    return;
+  }
+
+  signal_processing()->GetTopologies(AddCallback(
+      "signalprocessing::Reader::GetTopologies", [this](fhasp::Reader_GetTopologies_Result result) {
+        if (result.is_err()) {
+          signalprocessing_is_supported_ = false;
+          FAIL() << "GetTopologies returned err " << result.err();
+          __UNREACHABLE;
+        }
+        topologies_ = std::move(result.response().topologies);
+      }));
+  ExpectCallbacks();
+
+  // We only call GetTopologies if we have elements, so we must have at least one topology.
+  if (topologies_.empty()) {
+    signalprocessing_is_supported_ = false;
+    FAIL() << "topologies list is empty";
+    __UNREACHABLE;
+  }
+
+  std::unordered_set<fhasp::TopologyId> topology_ids;
+  for (const auto& topology : topologies_) {
+    // All topologies must have an ID and a non-empty list of edges.
+    ASSERT_TRUE(topology.has_id());
+    ASSERT_TRUE(topology.has_processing_elements_edge_pairs())
+        << "Topology " << topology.id() << " processing_elements_edge_pairs is null";
+    ASSERT_FALSE(topology.processing_elements_edge_pairs().empty())
+        << "Topology " << topology.id() << " processing_elements_edge_pairs is empty";
+
+    // No topology ID may be a duplicate.
+    ASSERT_FALSE(topology_ids.contains(topology.id())) << "Duplicate topology ID " << topology.id();
+    topology_ids.insert(topology.id());
+  }
+}
+
+// Having obtained the supported topologies, retrieve the current topology (the default).
+void AdminTest::RetrieveInitialTopology() {
+  SignalProcessingConnect();
+  RequestElements();
+  RequestTopologies();
+
+  ASSERT_TRUE(signalprocessing_is_supported_.value_or(false))
+      << "signalprocessing is required for this test";
+
+  if (initial_topology_id_.has_value()) {
+    return;
+  }
+
+  signal_processing()->WatchTopology(AddCallback(
+      "signalprocessing::Reader::WatchTopology", [this](fhasp::Reader_WatchTopology_Result result) {
+        ASSERT_TRUE(result.is_response());
+        initial_topology_id_ = result.response().topology_id;
+        current_topology_id_ = initial_topology_id_;
+      }));
+  ExpectCallbacks();
+
+  // We only call WatchTopology if we support signalprocessing, so a topology should be set now.
+  ASSERT_TRUE(current_topology_id_.has_value());
+  if (std::ranges::none_of(topologies_, [id = *current_topology_id_](const auto& topo) {
+        return (topo.has_id() && topo.id() == id);
+      })) {
+    // This topology_id is not in the list returned earlier.
+    signalprocessing_is_supported_ = false;
+    FAIL() << "WatchTopology returned " << *current_topology_id_
+           << " which is not in our topology list";
+  }
+}
+
+void AdminTest::WatchForTopology(fhasp::TopologyId id) {
+  ASSERT_TRUE(signalprocessing_is_supported_.value_or(false))
+      << "signalprocessing is required for this test";
+  // We only call WatchTopology if we support signalprocessing, so a topology should already be set.
+  ASSERT_TRUE(current_topology_id_.has_value());
+  // We should only expect a response if this represents a change. Don't call this method otherwise.
+  ASSERT_NE(id, *current_topology_id_);
+
+  // Make sure we're watching for a topology that is in the supported list.
+  if (std::ranges::none_of(topologies_,
+                           [id](const auto& t) { return (t.has_id() && t.id() == id); })) {
+    // This topology_id is not in the list returned earlier.
+    FAIL() << "We shouldn't wait for topology " << id << " which is not in our list";
+    __UNREACHABLE;
+  }
+
+  signal_processing()->WatchTopology(
+      AddCallbackUnordered("signalprocessing::Reader::WatchTopology(update)",
+                           [this, id](fhasp::Reader_WatchTopology_Result result) {
+                             ASSERT_TRUE(result.is_response());
+                             ASSERT_EQ(id, result.response().topology_id);
+                             current_topology_id_ = result.response().topology_id;
+                           }));
+}
+
+// Request a notification if the topology changes -- and fail if we receive one.
+void AdminTest::FailOnWatchTopologyCompletion() {
+  signal_processing()->WatchTopology(AddUnexpectedCallback("unexpected WatchTopology completion"));
+}
+
+// Validate that all of the supported topologies can be set (and restore the default, when done).
+void AdminTest::SetAllTopologies() {
+  ASSERT_FALSE(topologies_.empty());
+  ASSERT_TRUE(initial_topology_id_.has_value());
+  ASSERT_TRUE(current_topology_id_.has_value());
+  ASSERT_EQ(current_topology_id_, initial_topology_id_);
+
+  if (topologies_.size() == 1) {
+    GTEST_SKIP() << "Device has only one topology; we cannot test changing it";
+    __UNREACHABLE;
+  }
+
+  // Ensure that all the supported topologies can be set.
+  for (const auto& t : topologies_) {
+    ASSERT_TRUE(t.has_id());
+    // Try them all, except the current one (which _should_ be the initial topology).
+    if (t.id() == *initial_topology_id_) {
+      continue;
+    }
+    SetTopologyAndExpectCallback(t.id());
+  }
+
+  // Now restore the initial topology.
+  SetTopologyAndExpectCallback(*initial_topology_id_);
+}
+
+// Validate that we can change the current topology and receive notification of the change.
+void AdminTest::SetTopologyAndExpectCallback(fhasp::TopologyId id) {
+  ASSERT_NE(id, current_topology_id_);
+  ASSERT_FALSE(pending_set_topology_id_.has_value());
+  pending_set_topology_id_ = id;
+  signal_processing()->SetTopology(
+      id, AddCallbackUnordered("SetTopology(" + std::to_string(id) + ")",
+                               [this, id](fhasp::SignalProcessing_SetTopology_Result result) {
+                                 ASSERT_FALSE(result.is_err())
+                                     << "SetTopology(" << id << ") failed";
+                                 ASSERT_TRUE(pending_set_topology_id_.has_value());
+                                 ASSERT_EQ(*pending_set_topology_id_, id);
+                                 pending_set_topology_id_.reset();
+                               }));
+  ASSERT_TRUE(signal_processing().is_bound()) << "SignalProcessing failed to set the topology";
+  WatchForTopology(id);
+  ExpectCallbacks();
+}
+
+// Issue a topology-change-notification request, but expect our binding to disconnect in response.
+// This is used to validate correct behavior in the "Watch while already watching" case.
+void AdminTest::WatchTopologyAndExpectDisconnect(zx_status_t expected_error) {
+  FailOnWatchTopologyCompletion();
+  ExpectError(signal_processing(), expected_error);
+  CooldownAfterSignalProcessingDisconnect();
+}
+
+// Set the topology to an unsupported TopologyId, but expect our binding to disconnect in response.
+void AdminTest::SetTopologyUnknownIdAndExpectError() {
+  RequestTopologies();
+  ASSERT_FALSE(pending_set_topology_id_.has_value());
+
+  fhasp::TopologyId unknown_id = 0;
+  while (std::ranges::any_of(topologies_, [unknown_id](const auto& topo) {
+    return topo.has_id() && topo.id() == unknown_id;
+  })) {
+    ++unknown_id;
+  }
+
+  pending_set_topology_id_ = unknown_id;
+  signal_processing()->SetTopology(
+      unknown_id,
+      AddCallback("SetTopology(" + std::to_string(unknown_id) + ")",
+                  [this, unknown_id](fhasp::SignalProcessing_SetTopology_Result result) {
+                    pending_set_topology_id_.reset();
+                    ASSERT_TRUE(result.is_err())
+                        << "SetTopology(" << unknown_id << ") did not fail";
+                    EXPECT_EQ(result.err(), ZX_ERR_INVALID_ARGS);
+                  }));
+  ASSERT_TRUE(signal_processing().is_bound())
+      << "SignalProcessing disconnected after setting an unknown topology";
+  FailOnWatchTopologyCompletion();
+  ExpectCallbacks();
+}
+
+void AdminTest::SetTopologyNoChangeAndExpectNoWatch() {
+  ASSERT_TRUE(current_topology_id_.has_value());
+  auto id = *current_topology_id_;
+
+  FailOnWatchTopologyCompletion();
+
+  signal_processing()->SetTopology(
+      id, AddCallbackUnordered("SetTopology[no-change](" + std::to_string(id) + ")",
+                               [id](fhasp::SignalProcessing_SetTopology_Result result) {
+                                 EXPECT_FALSE(result.is_err())
+                                     << "SetTopology[no-change](" << id << ") failed";
+                               }));
+  ASSERT_TRUE(signal_processing().is_bound()) << "SignalProcessing failed to set the topology";
+
+  ExpectCallbacks();
+}
+
+// Validate that the collection of element IDs found in the topology list are complete and correct.
+void AdminTest::ValidateElementTopologyClosure() {
+  ASSERT_FALSE(elements().empty());
+  std::unordered_set<fhasp::ElementId> all_element_ids;
+  for (const auto& element : elements()) {
+    ASSERT_FALSE(all_element_ids.contains(element.id()));
+    all_element_ids.insert(element.id());
+  }
+  std::unordered_set<fhasp::ElementId> unused_element_ids = all_element_ids;
+
+  ASSERT_FALSE(topologies().empty());
+  for (const auto& topology : topologies()) {
+    std::unordered_set<fhasp::ElementId> edge_source_ids;
+    std::unordered_set<fhasp::ElementId> edge_dest_ids;
+    for (const auto& edge_pair : topology.processing_elements_edge_pairs()) {
+      ASSERT_TRUE(all_element_ids.contains(edge_pair.processing_element_id_from))
+          << "Topology " << topology.id() << " contains unknown element ID "
+          << edge_pair.processing_element_id_from;
+      ASSERT_TRUE(all_element_ids.contains(edge_pair.processing_element_id_to))
+          << "Topology " << topology.id() << " contains unknown element ID "
+          << edge_pair.processing_element_id_to;
+      unused_element_ids.erase(edge_pair.processing_element_id_from);
+      unused_element_ids.erase(edge_pair.processing_element_id_to);
+      edge_source_ids.insert(edge_pair.processing_element_id_from);
+      edge_dest_ids.insert(edge_pair.processing_element_id_to);
+    }
+    for (const auto& source_id : edge_source_ids) {
+      fhasp::ElementType source_element_type;
+      for (const auto& element : elements()) {
+        if (element.id() == source_id) {
+          source_element_type = element.type();
+        }
+      }
+      if (edge_dest_ids.contains(source_id)) {
+        if constexpr (!kTolerateNonTerminalDaiEndpoints) {
+          ASSERT_NE(source_element_type, fhasp::ElementType::DAI_INTERCONNECT)
+              << "Element " << source_id << " is not an endpoint in topology " << topology.id()
+              << ", but is DAI_INTERCONNECT";
+        }
+        ASSERT_NE(source_element_type, fhasp::ElementType::RING_BUFFER)
+            << "Element " << source_id << " is not an endpoint in topology " << topology.id()
+            << ", but is RING_BUFFER";
+        edge_dest_ids.erase(source_id);
+      } else {
+        ASSERT_TRUE(source_element_type == fhasp::ElementType::DAI_INTERCONNECT ||
+                    source_element_type == fhasp::ElementType::RING_BUFFER)
+            << "Element " << source_id << " is a terminal (source) endpoint in topology "
+            << topology.id() << ", but is neither DAI_INTERCONNECT nor RING_BUFFER";
+      }
+    }
+    for (const auto& dest_id : edge_dest_ids) {
+      fhasp::ElementType dest_element_type;
+      for (const auto& element : elements()) {
+        if (element.id() == dest_id) {
+          dest_element_type = element.type();
+        }
+      }
+      ASSERT_TRUE(dest_element_type == fhasp::ElementType::DAI_INTERCONNECT ||
+                  dest_element_type == fhasp::ElementType::RING_BUFFER)
+          << "Element " << dest_id << " is a terminal (destination) endpoint in topology "
+          << topology.id() << ", but is neither DAI_INTERCONNECT nor RING_BUFFER";
+    }
+  }
+  ASSERT_TRUE(unused_element_ids.empty())
+      << unused_element_ids.size() << "elements (including ID " << *unused_element_ids.cbegin()
+      << ") were not referenced in any topology";
+}
+
+// ElementState methods
+//
+void AdminTest::RetrieveInitialElementStates() {
+  ASSERT_TRUE(signalprocessing_is_supported_.value_or(false))
+      << "signalprocessing is required for this test";
+  ASSERT_FALSE(elements_.empty());
+
+  if (!initial_element_states_.empty()) {
+    return;
+  }
+
+  for (const auto& e : elements_) {
+    ASSERT_TRUE(e.has_id());
+
+    fhasp::ElementState state;
+    signal_processing()->WatchElementState(
+        e.id(),
+        AddCallback("initial WatchElementState(" + std::to_string(e.id()) + ")",
+                    [&state](const fhasp::ElementState& result) { state = fidl::Clone(result); }));
+    ExpectCallbacks();
+
+    initial_element_states_.emplace(e.id(), std::move(state));
+  }
+}
+
+// Request a notification if this element's state changes -- and fail if we receive one.
+void AdminTest::FailOnWatchElementStateCompletion(fhasp::ElementId id) {
+  signal_processing()->WatchElementState(
+      id, AddUnexpectedCallback("unexpected WatchElementState completion"));
+}
+
+// Request an element-state-change-notification, but expect our binding to disconnect in response.
+// This is used to validate correct behavior in the "Watch while already watching" case.
+void AdminTest::WatchElementStateAndExpectDisconnect(fhasp::ElementId id,
+                                                     zx_status_t expected_error) {
+  FailOnWatchElementStateCompletion(id);
+  ExpectError(signal_processing(), expected_error);
+  CooldownAfterSignalProcessingDisconnect();
+}
+
+// Request state-change notification for an unknown ElementId, expecting a disconnect in response.
+void AdminTest::WatchElementStateUnknownIdAndExpectDisconnect(zx_status_t expected_error) {
+  fhasp::ElementId unknown_id = 0;
+  while (std::ranges::any_of(
+      elements_, [unknown_id](const auto& el) { return el.has_id() && el.id() == unknown_id; })) {
+    ++unknown_id;
+  }
+
+  signal_processing()->WatchElementState(
+      unknown_id, AddUnexpectedCallback("WatchElementState(" + std::to_string(unknown_id) + ")"));
+  ASSERT_TRUE(signal_processing().is_bound())
+      << "SignalProcessing disconnected after setting an unknown topology";
+  ExpectError(signal_processing(), expected_error);
 }
 
 // Validate each ElementState, considering the Element that produced it.
@@ -1328,30 +1370,32 @@ void AdminTest::ValidateElementState(const fhasp::Element& element,
 
   // state: Required. If stopped then the element must support this.
   ASSERT_TRUE(state.has_started());
-  ASSERT_TRUE(state.started() || (element.has_can_stop() && element.can_stop()));
+  EXPECT_TRUE(state.started() || (element.has_can_stop() && element.can_stop()));
 
   // type_specific: "Optional". Actually required for 5 element types, disallowed for the others.
-  bool should_have_type_specific_state = (element.type() == fhasp::ElementType::DAI_INTERCONNECT ||
-                                          element.type() == fhasp::ElementType::DYNAMICS ||
-                                          element.type() == fhasp::ElementType::EQUALIZER ||
-                                          element.type() == fhasp::ElementType::GAIN ||
-                                          element.type() == fhasp::ElementType::VENDOR_SPECIFIC);
-  ASSERT_TRUE(state.has_type_specific() == should_have_type_specific_state);
+  bool element_should_have_type_specific_state =
+      (element.type() == fhasp::ElementType::DAI_INTERCONNECT ||
+       element.type() == fhasp::ElementType::DYNAMICS ||
+       element.type() == fhasp::ElementType::EQUALIZER ||
+       element.type() == fhasp::ElementType::GAIN ||
+       element.type() == fhasp::ElementType::VENDOR_SPECIFIC);
+  EXPECT_TRUE(state.has_type_specific() == element_should_have_type_specific_state);
 
   // bypassed: Optional. If present and set, then the element must support this.
-  ASSERT_TRUE(!state.has_bypassed() || !state.bypassed() || element.can_bypass());
+  EXPECT_TRUE(!state.has_bypassed() || !state.bypassed() || element.can_bypass());
 
-  // delays: Optional. If present then value cannot be negative.
-  ASSERT_TRUE(!state.has_turn_on_delay() || state.turn_on_delay() >= 0);
-  ASSERT_TRUE(!state.has_turn_off_delay() || state.turn_off_delay() >= 0);
-  ASSERT_TRUE(!state.has_processing_delay() || state.processing_delay() >= 0);
+  // delays: Optional. If present then cannot be negative.
+  EXPECT_TRUE(!state.has_turn_on_delay() || state.turn_on_delay() >= 0);
+  EXPECT_TRUE(!state.has_turn_off_delay() || state.turn_off_delay() >= 0);
+  EXPECT_TRUE(!state.has_processing_delay() || state.processing_delay() >= 0);
 
   // vendor_specific_data: Optional (for ALL element types). If present, cannot be empty.
-  ASSERT_FALSE(state.has_vendor_specific_data() && state.vendor_specific_data().empty());
+  EXPECT_FALSE(state.has_vendor_specific_data() && state.vendor_specific_data().empty());
 
-  // enabled | latency: Deprecated (removed in SDK 20), thus disallowed.
-  ASSERT_FALSE(state.has_enabled());
-  ASSERT_FALSE(state.has_latency());
+  // enabled | latency | type_specific.endpoint: Deprecated (removed in SDK 20), thus disallowed.
+  EXPECT_FALSE(state.has_enabled());
+  EXPECT_FALSE(state.has_latency());
+  EXPECT_FALSE(state.has_type_specific() && state.type_specific().is_endpoint());
 }
 
 // Validate the type-specific portion of the ElementState returned by a DAI_INTERCONNECT element.
@@ -1376,6 +1420,7 @@ void AdminTest::ValidateDaiElementState(const fhasp::Element& element,
   ASSERT_TRUE(state.type_specific().dai_interconnect().plug_state().has_plug_state_time());
   EXPECT_GE(state.type_specific().dai_interconnect().plug_state().plug_state_time(), 0);
 
+  // external_delay: Optional. If present, must be non-negative.
   EXPECT_TRUE(!state.type_specific().dai_interconnect().has_external_delay() ||
               state.type_specific().dai_interconnect().external_delay() >= 0);
 }
@@ -1408,40 +1453,40 @@ void AdminTest::ValidateDynamicsElementState(const fhasp::Element& element,
     // min_frequency and max_frequency: Required. Min must <= max.
     ASSERT_TRUE(band_state.has_min_frequency());
     ASSERT_TRUE(band_state.has_max_frequency());
-    ASSERT_LE(band_state.min_frequency(), band_state.max_frequency());
+    EXPECT_LE(band_state.min_frequency(), band_state.max_frequency());
 
     // threshold_db: Required. Like all floats, must be finite.
     ASSERT_TRUE(band_state.has_threshold_db());
-    ASSERT_TRUE(std::isfinite(band_state.threshold_db()));
+    EXPECT_TRUE(std::isfinite(band_state.threshold_db()));
 
     // threshold_type: Required.
-    ASSERT_TRUE(band_state.has_threshold_type());
+    EXPECT_TRUE(band_state.has_threshold_type());
 
     // ratio: Required. Like all floats, it must be finite.
     ASSERT_TRUE(band_state.has_ratio());
-    ASSERT_TRUE(std::isfinite(band_state.ratio()));
+    EXPECT_TRUE(std::isfinite(band_state.ratio()));
 
     // knee_width_db: Optional. If present, like all floats it must be finite.
-    ASSERT_TRUE(!band_state.has_knee_width_db() || std::isfinite(band_state.knee_width_db()));
+    EXPECT_TRUE(!band_state.has_knee_width_db() || std::isfinite(band_state.knee_width_db()));
 
     // attack: Optional. If present, like all durations it must be non-negative.
-    ASSERT_TRUE(!band_state.has_attack() || band_state.attack() >= 0);
+    EXPECT_TRUE(!band_state.has_attack() || band_state.attack() >= 0);
 
     // release: Optional. If present, like all durations it must be non-negative.
-    ASSERT_TRUE(!band_state.has_release() || band_state.release() >= 0);
+    EXPECT_TRUE(!band_state.has_release() || band_state.release() >= 0);
 
     // output_gain_db: Optional. If present, like all floats it must be finite.
-    ASSERT_TRUE(!band_state.has_output_gain_db() || std::isfinite(band_state.output_gain_db()));
+    EXPECT_TRUE(!band_state.has_output_gain_db() || std::isfinite(band_state.output_gain_db()));
 
     // input_gain_db: Optional. If present, like all floats it must be finite.
-    ASSERT_TRUE(!band_state.has_input_gain_db() || std::isfinite(band_state.input_gain_db()));
+    EXPECT_TRUE(!band_state.has_input_gain_db() || std::isfinite(band_state.input_gain_db()));
 
     // lookahead: Optional. If present, like all durations it must be non-negative.
-    ASSERT_TRUE(!band_state.has_lookahead() || band_state.lookahead() >= 0);
+    EXPECT_TRUE(!band_state.has_lookahead() || band_state.lookahead() >= 0);
   }
 
   // band_states must contain every band_id in the element's TypeSpecific.Dynamics.bands.
-  ASSERT_TRUE(band_ids.empty()) << "DynamicsState did not contain every band ID";
+  EXPECT_TRUE(band_ids.empty()) << "DynamicsState did not contain every band ID";
 }
 
 // Validate the type-specific portion of the ElementState returned by an EQUALIZER element.
@@ -1475,20 +1520,20 @@ void AdminTest::ValidateEqualizerElementState(const fhasp::Element& element,
     ASSERT_TRUE(band_state.has_type());
 
     // frequency: Required (Optional in FIDL definition, but without it a band cannot function).
-    ASSERT_TRUE(band_state.has_frequency());
+    EXPECT_TRUE(band_state.has_frequency());
 
     // q: Optional but must be positive and finite, if present
-    ASSERT_TRUE(!band_state.has_q() || (std::isfinite(band_state.q()) && band_state.q() > 0.0));
+    EXPECT_TRUE(!band_state.has_q() || (std::isfinite(band_state.q()) && band_state.q() > 0.0));
 
     // gain_db: Required for peak/shelves, disallowed for notch/cuts.
-    ASSERT_TRUE(!band_state.has_gain_db() || std::isfinite(band_state.gain_db()));
-    ASSERT_TRUE(band_state.has_gain_db() ==
+    EXPECT_TRUE(!band_state.has_gain_db() || std::isfinite(band_state.gain_db()));
+    EXPECT_TRUE(band_state.has_gain_db() ==
                 (band_state.type() == fhasp::EqualizerBandType::PEAK ||
                  band_state.type() == fhasp::EqualizerBandType::LOW_SHELF ||
                  band_state.type() == fhasp::EqualizerBandType::HIGH_SHELF));
   }
   // band_states must contain every band_id in the element's TypeSpecific.Equalizer.bands.
-  ASSERT_TRUE(band_ids.empty()) << "EqualizerState did not contain every band ID";
+  EXPECT_TRUE(band_ids.empty()) << "EqualizerState did not contain every band ID";
 }
 
 // Validate the type-specific portion of the ElementState returned by a GAIN element.
@@ -1514,6 +1559,860 @@ void AdminTest::ValidateVendorSpecificElementState(const fhasp::Element& element
   // type_specific: Required. Must contain the variant that matches its Element (VENDOR_SPECIFIC).
   ASSERT_TRUE(state.has_type_specific());
   EXPECT_TRUE(state.type_specific().is_vendor_specific());
+}
+
+// Validate the ability to change non-type-specific state, for all elements.
+void AdminTest::SetAllElementStates() {
+  ASSERT_FALSE(elements().empty());
+  ASSERT_FALSE(initial_element_states_.empty());
+
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_id());
+    ASSERT_TRUE(initial_element_states_.contains(element.id()));
+    const auto& initial_state = initial_element_states_.at(element.id());
+
+    if ((!element.has_can_stop() || !element.can_stop()) &&
+        (!element.has_can_bypass() || !element.can_bypass())) {
+      // Element cannot be stopped or bypassed, so we can't test non-type-specific SetElementState
+      // with this element. Keep trying the other elements, though.
+      continue;
+    }
+
+    found_one = true;
+    TestSetElementState(element, initial_state);
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "Can't stop/bypass any elements: cannot test non-type-specific SetElementState";
+  }
+}
+
+// Validate the ability to change type-specific state, for DYNAMICS elements.
+void AdminTest::SetAllDynamicsElementStates() {
+  ASSERT_FALSE(elements().empty());
+  ASSERT_FALSE(initial_element_states_.empty());
+
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fhasp::ElementType::DYNAMICS) {
+      found_one = true;
+      ASSERT_TRUE(element.has_type_specific());
+      ASSERT_TRUE(element.type_specific().is_dynamics());
+
+      ASSERT_TRUE(element.has_id());
+      ASSERT_TRUE(initial_element_states_.contains(element.id()));
+      const auto& initial_state = initial_element_states_.at(element.id());
+      ASSERT_TRUE(initial_state.has_type_specific());
+      ASSERT_TRUE(initial_state.type_specific().is_dynamics());
+
+      TestSetDynamicsElementState(element, initial_state);
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No DYNAMICS elements, cannot test type-specific ElementState changes";
+  }
+}
+
+// Validate the ability to change type-specific state, for EQUALIZER elements.
+void AdminTest::SetAllEqualizerElementStates() {
+  ASSERT_FALSE(elements().empty());
+  ASSERT_FALSE(initial_element_states_.empty());
+
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fhasp::ElementType::EQUALIZER) {
+      found_one = true;
+      ASSERT_TRUE(element.has_type_specific());
+      ASSERT_TRUE(element.type_specific().is_equalizer());
+
+      ASSERT_TRUE(element.has_id());
+      ASSERT_TRUE(initial_element_states_.contains(element.id()));
+      const auto& initial_state = initial_element_states_.at(element.id());
+      ASSERT_TRUE(initial_state.has_type_specific());
+      ASSERT_TRUE(initial_state.type_specific().is_equalizer());
+
+      TestSetEqualizerElementState(element, initial_state);
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No EQUALIZER elements, cannot test type-specific ElementState changes";
+  }
+}
+
+// Validate the ability to change type-specific state, for GAIN elements.
+void AdminTest::SetAllGainElementStates() {
+  ASSERT_FALSE(elements().empty());
+  ASSERT_FALSE(initial_element_states_.empty());
+
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fhasp::ElementType::GAIN) {
+      found_one = true;
+      ASSERT_TRUE(element.has_type_specific());
+      ASSERT_TRUE(element.type_specific().is_gain());
+
+      ASSERT_TRUE(element.has_id());
+      ASSERT_TRUE(initial_element_states_.contains(element.id()));
+      const auto& initial_state = initial_element_states_.at(element.id());
+      ASSERT_TRUE(initial_state.has_type_specific());
+      ASSERT_TRUE(initial_state.type_specific().is_gain());
+
+      TestSetGainElementState(element, initial_state);
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No GAIN elements, cannot test type-specific ElementState changes";
+  }
+}
+
+// Validate the ability to change type-specific state, for GAIN elements.
+void AdminTest::SetAllGainElementStatesNoChange() {
+  ASSERT_FALSE(elements().empty());
+  ASSERT_FALSE(initial_element_states_.empty());
+
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fhasp::ElementType::GAIN) {
+      found_one = true;
+      ASSERT_TRUE(element.has_type_specific());
+      ASSERT_TRUE(element.type_specific().is_gain());
+
+      ASSERT_TRUE(element.has_id());
+      ASSERT_TRUE(initial_element_states_.contains(element.id()));
+      const auto& initial_state = initial_element_states_.at(element.id());
+      ASSERT_TRUE(initial_state.has_type_specific());
+      ASSERT_TRUE(initial_state.type_specific().is_gain());
+      ASSERT_TRUE(initial_state.type_specific().gain().has_gain());
+
+      TestSetGainElementStateNoChange(element.id(), initial_state.type_specific().gain().gain());
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No GAIN elements, cannot test type-specific ElementState changes";
+  }
+}
+
+// Validate the ability to change type-specific state, for GAIN elements.
+void AdminTest::SetAllGainElementStatesInvalidGainShouldError() {
+  ASSERT_FALSE(elements().empty());
+  ASSERT_FALSE(initial_element_states_.empty());
+
+  bool found_one = false;
+  for (const auto& element : elements()) {
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fhasp::ElementType::GAIN) {
+      found_one = true;
+      ASSERT_TRUE(element.has_type_specific());
+      ASSERT_TRUE(element.type_specific().is_gain());
+
+      ASSERT_TRUE(element.has_id());
+      ASSERT_TRUE(initial_element_states_.contains(element.id()));
+      const auto& initial_state = initial_element_states_.at(element.id());
+      ASSERT_TRUE(initial_state.has_type_specific());
+      ASSERT_TRUE(initial_state.type_specific().is_gain());
+
+      TestSetGainElementStateInvalidGain(element.id());
+    }
+  }
+  if (!found_one) {
+    GTEST_SKIP() << "No GAIN elements, cannot test type-specific ElementState changes";
+  }
+}
+
+// Validate that a SetElementState with no-change does not trigger a WatchElementState completion.
+void AdminTest::SetAllElementStatesNoChange() {
+  ASSERT_FALSE(elements().empty());
+  ASSERT_FALSE(initial_element_states_.empty());
+
+  for (const auto& element : elements()) {
+    FailOnWatchElementStateCompletion(element.id());
+    SetElementStateNoChange(element.id());
+  }
+}
+
+void AdminTest::SetElementStateNoChange(fhasp::ElementId id) {
+  signal_processing()->SetElementState(
+      id, fhasp::SettableElementState{},
+      AddCallbackUnordered("SetElementState[no-change](" + std::to_string(id) + ")",
+                           [id](fhasp::SignalProcessing_SetElementState_Result result) {
+                             EXPECT_FALSE(result.is_err())
+                                 << "SetElementState[no-change](" << id << ") failed";
+                           }));
+  EXPECT_TRUE(signal_processing().is_bound()) << "SignalProcessing failed to set the ElementState";
+}
+
+// SetElementState for an unsupported ElementId, and expect our completion to contain an error.
+// However, our signalprocessing binding should not disconnect as a result.
+void AdminTest::SetElementStateUnknownIdAndExpectError() {
+  fhasp::ElementId unknown_id = 0;
+  while (std::ranges::any_of(elements_, [&unknown_id](const auto& element) {
+    return element.has_id() && element.id() == unknown_id;
+  })) {
+    ++unknown_id;
+  }
+
+  signal_processing()->SetElementState(
+      unknown_id, fuchsia::hardware::audio::signalprocessing::SettableElementState{},
+      AddCallback("SetElementState[unknown](" + std::to_string(unknown_id) + ")",
+                  [unknown_id](fhasp::SignalProcessing_SetElementState_Result result) {
+                    ASSERT_TRUE(result.is_err())
+                        << "SetElementState[unknown](" << unknown_id << ") did not fail";
+                    EXPECT_EQ(result.err(), ZX_ERR_INVALID_ARGS);
+                  }));
+  ASSERT_TRUE(signal_processing().is_bound())
+      << "SignalProcessing disconnected after trying to set element state for an unknown id";
+  ExpectCallbacks();
+}
+
+// Validate the ability to change non-type-specific state for this specific element.
+void AdminTest::TestSetElementState(const fhasp::Element& element,
+                                    const fhasp::ElementState& initial_state) {
+  ASSERT_TRUE(element.has_id());
+  // Change what we can, in the base (non-TypeSpecific) SettableElementState.
+  // Don't use vendor_specific_data since we cannot predict how a driver uses this.
+  {
+    bool can_stop = element.has_can_stop() && element.can_stop();
+    bool can_bypass = element.has_can_bypass() && element.can_bypass();
+    // We only call this method for elements that can stop or bypass.
+    ASSERT_TRUE(can_stop || can_bypass);
+
+    fhasp::SettableElementState state;
+    if (can_stop) {
+      state.set_started(!initial_state.has_started() || initial_state.started());
+    } else {
+      state.set_started(true);
+    }
+    if (can_bypass) {
+      state.set_bypassed(!(initial_state.has_bypassed() && initial_state.bypassed()));
+    } else {
+      state.set_bypassed(false);
+    }
+    bool new_started = state.started();
+    bool new_bypassed = state.bypassed();
+
+    signal_processing()->WatchElementState(
+        element.id(), AddCallbackUnordered(
+                          "WatchElementState[1](" + std::to_string(element.id()) + ")",
+                          [&element, new_started, new_bypassed](const fhasp::ElementState& result) {
+                            ValidateElementState(element, result);
+
+                            EXPECT_EQ(new_started, !result.has_started() || result.started());
+                            EXPECT_EQ(new_bypassed, result.has_bypassed() && result.bypassed());
+                          }));
+
+    signal_processing()->SetElementState(
+        element.id(), std::move(state),
+        AddCallbackUnordered(
+            "SetElementState[1](" + std::to_string(element.id()) + ")",
+            [id = element.id()](fhasp::SignalProcessing_SetElementState_Result result) {
+              EXPECT_FALSE(result.is_err()) << "SetElementState(" << id << ") failed";
+            }));
+    ASSERT_TRUE(signal_processing().is_bound())
+        << "SignalProcessing failed to set the ElementState";
+    ExpectCallbacks();
+  }
+
+  // Now restore the initial element state.
+  {
+    fhasp::SettableElementState state;
+    state.set_started(!initial_state.has_started() || initial_state.started());
+    state.set_bypassed(initial_state.has_bypassed() && initial_state.bypassed());
+
+    signal_processing()->WatchElementState(
+        element.id(),
+        AddCallbackUnordered("WatchElementState[2](" + std::to_string(element.id()) + ")",
+                             [&element, &initial_state](const fhasp::ElementState& result) {
+                               ValidateElementState(element, result);
+
+                               EXPECT_EQ(!initial_state.has_started() || initial_state.started(),
+                                         !result.has_started() || result.started());
+                               EXPECT_EQ(initial_state.has_bypassed() && initial_state.bypassed(),
+                                         result.has_bypassed() && result.bypassed());
+                             }));
+
+    signal_processing()->SetElementState(
+        element.id(), std::move(state),
+        AddCallbackUnordered(
+            "SetElementState[2](" + std::to_string(element.id()) + ")",
+            [id = element.id()](fhasp::SignalProcessing_SetElementState_Result result) {
+              EXPECT_FALSE(result.is_err()) << "SetElementState(" << id << ") failed";
+            }));
+    ASSERT_TRUE(signal_processing().is_bound())
+        << "SignalProcessing failed to restore the ElementState";
+    ExpectCallbacks();
+  }
+}
+
+// Validate the ability to change type-specific state for this specific DYNAMICS element.
+void AdminTest::TestSetDynamicsElementState(const fhasp::Element& element,
+                                            const fhasp::ElementState& initial_state) {
+  ASSERT_TRUE(element.has_type_specific());
+  ASSERT_TRUE(element.type_specific().is_dynamics());
+  ASSERT_TRUE(element.type_specific().dynamics().has_bands() &&
+              !element.type_specific().dynamics().bands().empty());
+
+  // Change what we can, in SettableElementState::DynamicsElementState
+  {
+    std::vector<::fuchsia::hardware::audio::signalprocessing::DynamicsBandState> new_band_states;
+    for (const auto& old_band_state : initial_state.type_specific().dynamics().band_states()) {
+      fhasp::DynamicsBandState new_band_state;
+      uint32_t id = static_cast<uint32_t>(old_band_state.id());
+      new_band_state.set_id(id);
+      new_band_state.set_min_frequency(20 + id);
+      new_band_state.set_max_frequency(10'000 + id);
+      new_band_state.set_threshold_db(static_cast<float>(id));
+      new_band_state.set_ratio(2.0f + static_cast<float>(id));
+
+      if (element.type_specific().dynamics().has_supported_controls() &&
+          (element.type_specific().dynamics().supported_controls() &
+           fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::THRESHOLD_TYPE)) {
+        new_band_state.set_threshold_type(fhasp::ThresholdType::ABOVE);
+      }
+      if (element.type_specific().dynamics().has_supported_controls() &&
+          (element.type_specific().dynamics().supported_controls() &
+           fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::KNEE_WIDTH)) {
+        new_band_state.set_knee_width_db(1.0f + static_cast<float>(id));
+      }
+      if (element.type_specific().dynamics().has_supported_controls() &&
+          (element.type_specific().dynamics().supported_controls() &
+           fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::ATTACK)) {
+        new_band_state.set_attack(1'000'000 + id);
+      }
+      if (element.type_specific().dynamics().has_supported_controls() &&
+          (element.type_specific().dynamics().supported_controls() &
+           fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::RELEASE)) {
+        new_band_state.set_release(5'000'000 + id);
+      }
+      if (element.type_specific().dynamics().has_supported_controls() &&
+          (element.type_specific().dynamics().supported_controls() &
+           fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::OUTPUT_GAIN)) {
+        new_band_state.set_output_gain_db(-3.0f + static_cast<float>(id));
+      }
+      if (element.type_specific().dynamics().has_supported_controls() &&
+          (element.type_specific().dynamics().supported_controls() &
+           fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::INPUT_GAIN)) {
+        new_band_state.set_input_gain_db(-5.0f + static_cast<float>(id));
+      }
+      if (element.type_specific().dynamics().has_supported_controls() &&
+          (element.type_specific().dynamics().supported_controls() &
+           fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::LEVEL_TYPE)) {
+        new_band_state.set_level_type(fhasp::LevelType::PEAK);
+      }
+      if (element.type_specific().dynamics().has_supported_controls() &&
+          (element.type_specific().dynamics().supported_controls() &
+           fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::LOOKAHEAD)) {
+        new_band_state.set_lookahead(2'000'000 + id);
+      }
+      if (element.type_specific().dynamics().has_supported_controls() &&
+          (element.type_specific().dynamics().supported_controls() &
+           fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::
+               LINKED_CHANNELS)) {
+        new_band_state.set_linked_channels(true);
+      }
+
+      new_band_states.emplace_back(std::move(new_band_state));
+    }
+    fhasp::DynamicsElementState dyn_state;
+    dyn_state.set_band_states(std::move(new_band_states));
+    fhasp::DynamicsElementState dyn_copy = fidl::Clone(dyn_state);
+    fhasp::SettableElementState new_state;
+    new_state.set_type_specific(
+        fhasp::SettableTypeSpecificElementState::WithDynamics(std::move(dyn_state)));
+
+    signal_processing()->WatchElementState(
+        element.id(),
+        AddCallbackUnordered(
+            "WatchElementState[dyn 1](" + std::to_string(element.id()) + ")",
+            [&element, &dyn_copy](const fhasp::ElementState& received_state) {
+              ValidateElementState(element, received_state);
+              ValidateDynamicsElementState(element, received_state);
+
+              ASSERT_TRUE(received_state.has_type_specific());
+              ASSERT_TRUE(received_state.type_specific().is_dynamics());
+              ASSERT_TRUE(received_state.type_specific().dynamics().has_band_states());
+              const auto& rs = received_state.type_specific().dynamics().band_states();
+              ASSERT_TRUE(!rs.empty());
+              for (auto idx = 0u; idx < rs.size(); ++idx) {
+                uint32_t id = static_cast<uint32_t>(dyn_copy.band_states()[idx].id());
+                ASSERT_TRUE(rs[idx].has_id());
+                EXPECT_EQ(rs[idx].id(), id);
+
+                ASSERT_TRUE(rs[idx].has_min_frequency());
+                EXPECT_EQ(rs[idx].min_frequency(), 20 + id);
+
+                ASSERT_TRUE(rs[idx].has_max_frequency());
+                EXPECT_EQ(rs[idx].max_frequency(), 10'000 + id);
+
+                ASSERT_TRUE(rs[idx].has_threshold_db());
+                EXPECT_EQ(rs[idx].threshold_db(), static_cast<float>(id));
+
+                if (element.type_specific().dynamics().supported_controls() &
+                    fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::
+                        THRESHOLD_TYPE) {
+                  ASSERT_TRUE(rs[idx].has_threshold_type());
+                  EXPECT_EQ(rs[idx].threshold_type(), fhasp::ThresholdType::ABOVE);
+                } else {
+                  EXPECT_FALSE(rs[idx].has_threshold_type());
+                }
+
+                ASSERT_TRUE(rs[idx].has_ratio());
+                EXPECT_EQ(rs[idx].ratio(), 2.0f + static_cast<float>(id));
+
+                if (element.type_specific().dynamics().supported_controls() &
+                    fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::
+                        KNEE_WIDTH) {
+                  ASSERT_TRUE(rs[idx].has_knee_width_db());
+                  EXPECT_EQ(rs[idx].knee_width_db(), 1.0f + static_cast<float>(id));
+                } else {
+                  EXPECT_FALSE(rs[idx].has_knee_width_db());
+                }
+
+                if (element.type_specific().dynamics().supported_controls() &
+                    fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::ATTACK) {
+                  ASSERT_TRUE(rs[idx].has_attack());
+                  EXPECT_EQ(rs[idx].attack(), 1'000'000 + id);
+                } else {
+                  EXPECT_FALSE(rs[idx].has_attack());
+                }
+
+                if (element.type_specific().dynamics().supported_controls() &
+                    fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::
+                        RELEASE) {
+                  ASSERT_TRUE(rs[idx].has_release());
+                  EXPECT_EQ(rs[idx].release(), 5'000'000 + id);
+                } else {
+                  EXPECT_FALSE(rs[idx].has_release());
+                }
+
+                if (element.type_specific().dynamics().supported_controls() &
+                    fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::
+                        OUTPUT_GAIN) {
+                  ASSERT_TRUE(rs[idx].has_output_gain_db());
+                  EXPECT_EQ(rs[idx].output_gain_db(), -3.0f + static_cast<float>(id));
+                } else {
+                  EXPECT_FALSE(rs[idx].has_output_gain_db());
+                }
+
+                if (element.type_specific().dynamics().supported_controls() &
+                    fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::
+                        INPUT_GAIN) {
+                  ASSERT_TRUE(rs[idx].has_input_gain_db());
+                  EXPECT_EQ(rs[idx].input_gain_db(), -5.0f + static_cast<float>(id));
+                } else {
+                  EXPECT_FALSE(rs[idx].has_input_gain_db());
+                }
+
+                if (element.type_specific().dynamics().supported_controls() &
+                    fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::
+                        LEVEL_TYPE) {
+                  ASSERT_TRUE(rs[idx].has_level_type());
+                  EXPECT_EQ(rs[idx].level_type(), fhasp::LevelType::PEAK);
+                } else {
+                  EXPECT_FALSE(rs[idx].has_level_type());
+                }
+
+                if (element.type_specific().dynamics().supported_controls() &
+                    fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::
+                        LOOKAHEAD) {
+                  ASSERT_TRUE(rs[idx].has_lookahead());
+                  EXPECT_EQ(rs[idx].lookahead(), 2'000'000 + id);
+                } else {
+                  EXPECT_FALSE(rs[idx].has_lookahead());
+                }
+
+                if (element.type_specific().dynamics().supported_controls() &
+                    fuchsia::hardware::audio::signalprocessing::DynamicsSupportedControls::
+                        LINKED_CHANNELS) {
+                  ASSERT_TRUE(rs[idx].has_linked_channels());
+                  EXPECT_EQ(rs[idx].linked_channels(), true);
+                } else {
+                  EXPECT_FALSE(rs[idx].has_linked_channels());
+                }
+              }
+            }));
+
+    signal_processing()->SetElementState(
+        element.id(), std::move(new_state),
+        AddCallbackUnordered(
+            "SetElementState[dyn](" + std::to_string(element.id()) + ")",
+            [id = element.id()](fhasp::SignalProcessing_SetElementState_Result result) {
+              EXPECT_FALSE(result.is_err()) << "SetElementState[dyn 1](" << id << ") failed";
+            }));
+    ASSERT_TRUE(signal_processing().is_bound()) << "SetElementState failed. Unbound";
+    ExpectCallbacks();
+  }
+
+  // Now restore the initial element state.
+  {
+    fhasp::SettableElementState restored_state;
+    restored_state.set_type_specific(fhasp::SettableTypeSpecificElementState::WithDynamics(
+        fidl::Clone(initial_state.type_specific().dynamics())));
+
+    signal_processing()->WatchElementState(
+        element.id(),
+        AddCallbackUnordered(
+            "WatchElementState[dyn 2](" + std::to_string(element.id()) + ")",
+            [&element, &initial_state](const fhasp::ElementState& received_state) {
+              ValidateElementState(element, received_state);
+              ValidateDynamicsElementState(element, received_state);
+
+              ASSERT_TRUE(received_state.has_type_specific());
+              ASSERT_TRUE(received_state.type_specific().is_dynamics());
+              ASSERT_TRUE(received_state.type_specific().dynamics().has_band_states());
+              const auto& rs = received_state.type_specific().dynamics().band_states();
+              ASSERT_TRUE(!rs.empty());
+              const auto& is = initial_state.type_specific().dynamics().band_states();
+              for (auto idx = 0u; idx < rs.size(); ++idx) {
+                ASSERT_TRUE(rs[idx].has_id());
+                ASSERT_EQ(rs[idx].has_min_frequency(), is[idx].has_min_frequency());
+                ASSERT_EQ(rs[idx].has_max_frequency(), is[idx].has_max_frequency());
+                ASSERT_EQ(rs[idx].has_threshold_db(), is[idx].has_threshold_db());
+                ASSERT_EQ(rs[idx].has_threshold_type(), is[idx].has_threshold_type());
+                ASSERT_EQ(rs[idx].has_ratio(), is[idx].has_ratio());
+                ASSERT_EQ(rs[idx].has_knee_width_db(), is[idx].has_knee_width_db());
+                ASSERT_EQ(rs[idx].has_attack(), is[idx].has_attack());
+                ASSERT_EQ(rs[idx].has_release(), is[idx].has_release());
+                ASSERT_EQ(rs[idx].has_output_gain_db(), is[idx].has_output_gain_db());
+                ASSERT_EQ(rs[idx].has_input_gain_db(), is[idx].has_input_gain_db());
+                ASSERT_EQ(rs[idx].has_level_type(), is[idx].has_level_type());
+                ASSERT_EQ(rs[idx].has_lookahead(), is[idx].has_lookahead());
+                ASSERT_EQ(rs[idx].has_linked_channels(), is[idx].has_linked_channels());
+
+                EXPECT_EQ(rs[idx].id(), is[idx].id());
+                if (is[idx].has_min_frequency()) {
+                  EXPECT_EQ(rs[idx].min_frequency(), is[idx].min_frequency());
+                }
+                if (is[idx].has_max_frequency()) {
+                  EXPECT_EQ(rs[idx].max_frequency(), is[idx].max_frequency());
+                }
+                if (is[idx].has_threshold_db()) {
+                  EXPECT_EQ(rs[idx].threshold_db(), is[idx].threshold_db());
+                }
+                if (is[idx].has_threshold_type()) {
+                  EXPECT_EQ(rs[idx].threshold_type(), is[idx].threshold_type());
+                }
+                if (is[idx].has_ratio()) {
+                  EXPECT_EQ(rs[idx].ratio(), is[idx].ratio());
+                }
+                if (is[idx].has_knee_width_db()) {
+                  EXPECT_EQ(rs[idx].knee_width_db(), is[idx].knee_width_db());
+                }
+                if (is[idx].has_attack()) {
+                  EXPECT_EQ(rs[idx].attack(), is[idx].attack());
+                }
+                if (is[idx].has_release()) {
+                  EXPECT_EQ(rs[idx].release(), is[idx].release());
+                }
+                if (is[idx].has_output_gain_db()) {
+                  EXPECT_EQ(rs[idx].output_gain_db(), is[idx].output_gain_db());
+                }
+                if (is[idx].has_input_gain_db()) {
+                  EXPECT_EQ(rs[idx].input_gain_db(), is[idx].input_gain_db());
+                }
+                if (is[idx].has_level_type()) {
+                  EXPECT_EQ(rs[idx].level_type(), is[idx].level_type());
+                }
+                if (is[idx].has_lookahead()) {
+                  EXPECT_EQ(rs[idx].lookahead(), is[idx].lookahead());
+                }
+                if (is[idx].has_linked_channels()) {
+                  EXPECT_EQ(rs[idx].linked_channels(), is[idx].linked_channels());
+                }
+              }
+            }));
+
+    signal_processing()->SetElementState(
+        element.id(), std::move(restored_state),
+        AddCallbackUnordered(
+            "SetElementState[dyn](" + std::to_string(element.id()) + ")",
+            [id = element.id()](fhasp::SignalProcessing_SetElementState_Result result) {
+              EXPECT_FALSE(result.is_err()) << "SetElementState[dyn 2](" << id << ") failed";
+            }));
+    ASSERT_TRUE(signal_processing().is_bound()) << "SetElementState failed (restoral). Unbound";
+    ExpectCallbacks();
+  }
+}
+
+// Validate the ability to change type-specific state for this specific EQUALIZER element.
+void AdminTest::TestSetEqualizerElementState(const fhasp::Element& element,
+                                             const fhasp::ElementState& initial_state) {
+  ASSERT_TRUE(element.has_type_specific());
+  ASSERT_TRUE(element.type_specific().is_equalizer());
+  ASSERT_TRUE(element.type_specific().equalizer().has_bands() &&
+              !element.type_specific().equalizer().bands().empty());
+
+  // Change what we can, in SettableElementState::EqualizerElementState
+  {
+    std::vector<::fuchsia::hardware::audio::signalprocessing::EqualizerBandState> new_band_states;
+    for (const auto& old_band_state : initial_state.type_specific().equalizer().band_states()) {
+      uint32_t id = static_cast<uint32_t>(old_band_state.id());
+      fhasp::EqualizerBandState new_band_state;
+      new_band_state.set_id(id);
+      if (element.type_specific().equalizer().has_supported_controls() &&
+          (element.type_specific().equalizer().supported_controls() &
+           fuchsia::hardware::audio::signalprocessing::EqualizerSupportedControls::
+               SUPPORTS_TYPE_PEAK)) {
+        new_band_state.set_type(fhasp::EqualizerBandType::PEAK);
+      }
+      if (element.type_specific().equalizer().has_supported_controls() &&
+          (element.type_specific().equalizer().supported_controls() &
+           fuchsia::hardware::audio::signalprocessing::EqualizerSupportedControls::
+               CAN_CONTROL_FREQUENCY)) {
+        new_band_state.set_frequency(400 + id);
+      }
+      if (element.type_specific().equalizer().has_supported_controls() &&
+          (element.type_specific().equalizer().supported_controls() &
+           fuchsia::hardware::audio::signalprocessing::EqualizerSupportedControls::CAN_CONTROL_Q)) {
+        new_band_state.set_q(static_cast<float>(id));
+      }
+      new_band_state.set_gain_db(10.0f + static_cast<float>(id));
+      new_band_state.set_enabled(true);
+      new_band_states.emplace_back(std::move(new_band_state));
+    }
+    fhasp::EqualizerElementState eq_state;
+    eq_state.set_band_states(std::move(new_band_states));
+    fhasp::EqualizerElementState eq_copy = fidl::Clone(eq_state);
+    fhasp::SettableElementState new_state;
+    new_state.set_type_specific(
+        fhasp::SettableTypeSpecificElementState::WithEqualizer(std::move(eq_state)));
+
+    signal_processing()->WatchElementState(
+        element.id(),
+        AddCallbackUnordered(
+            "WatchElementState[EQ 1](" + std::to_string(element.id()) + ")",
+            [&element, &eq_copy](const fhasp::ElementState& received_state) {
+              ValidateElementState(element, received_state);
+              ValidateEqualizerElementState(element, received_state);
+
+              ASSERT_TRUE(received_state.has_type_specific());
+              ASSERT_TRUE(received_state.type_specific().is_equalizer());
+              ASSERT_TRUE(received_state.type_specific().equalizer().has_band_states());
+              const auto& rs = received_state.type_specific().equalizer().band_states();
+              ASSERT_TRUE(!rs.empty());
+              for (auto idx = 0u; idx < rs.size(); ++idx) {
+                ASSERT_TRUE(rs[idx].has_id());
+                EXPECT_EQ(rs[idx].id(), eq_copy.band_states()[idx].id());
+                if (element.type_specific().equalizer().has_supported_controls() &&
+                    (element.type_specific().equalizer().supported_controls() &
+                     fuchsia::hardware::audio::signalprocessing::EqualizerSupportedControls::
+                         SUPPORTS_TYPE_PEAK)) {
+                  ASSERT_TRUE(rs[idx].has_type());
+                  EXPECT_EQ(rs[idx].type(), fhasp::EqualizerBandType::PEAK);
+                }
+                if (element.type_specific().equalizer().has_supported_controls() &&
+                    (element.type_specific().equalizer().supported_controls() &
+                     fuchsia::hardware::audio::signalprocessing::EqualizerSupportedControls::
+                         CAN_CONTROL_FREQUENCY)) {
+                  ASSERT_TRUE(rs[idx].has_frequency());
+                  EXPECT_EQ(rs[idx].frequency(), 400 + static_cast<uint32_t>(idx));
+                }
+                if (element.type_specific().equalizer().has_supported_controls() &&
+                    (element.type_specific().equalizer().supported_controls() &
+                     fuchsia::hardware::audio::signalprocessing::EqualizerSupportedControls::
+                         CAN_CONTROL_Q)) {
+                  ASSERT_TRUE(rs[idx].has_q());
+                  EXPECT_EQ(rs[idx].q(), static_cast<float>(idx));
+                }
+                ASSERT_TRUE(rs[idx].has_gain_db());
+                EXPECT_EQ(rs[idx].gain_db(), 10.0f + static_cast<float>(idx));
+                ASSERT_TRUE(rs[idx].has_enabled());
+                EXPECT_TRUE(rs[idx].enabled());
+              }
+            }));
+
+    signal_processing()->SetElementState(
+        element.id(), std::move(new_state),
+        AddCallbackUnordered(
+            "SetElementState[EQ 1](" + std::to_string(element.id()) + ")",
+            [id = element.id()](fhasp::SignalProcessing_SetElementState_Result result) {
+              EXPECT_FALSE(result.is_err()) << "SetElementState[EQ](" << id << ") failed";
+            }));
+    ASSERT_TRUE(signal_processing().is_bound()) << "SetElementState failed. Unbound";
+    ExpectCallbacks();
+  }
+
+  // Now restore the initial element state.
+  {
+    fhasp::SettableElementState restored_state;
+    restored_state.set_type_specific(fhasp::SettableTypeSpecificElementState::WithEqualizer(
+        fidl::Clone(initial_state.type_specific().equalizer())));
+
+    signal_processing()->WatchElementState(
+        element.id(),
+        AddCallbackUnordered(
+            "WatchElementState[EQ 2](" + std::to_string(element.id()) + ")",
+            [&element, &initial_state](const fhasp::ElementState& received_state) {
+              ValidateElementState(element, received_state);
+              ValidateEqualizerElementState(element, received_state);
+
+              ASSERT_TRUE(received_state.has_type_specific());
+              ASSERT_TRUE(received_state.type_specific().is_equalizer());
+              ASSERT_TRUE(received_state.type_specific().equalizer().has_band_states());
+              const auto& rs = received_state.type_specific().equalizer().band_states();
+              ASSERT_TRUE(!rs.empty());
+              const auto& is = initial_state.type_specific().equalizer().band_states();
+              for (auto idx = 0u; idx < rs.size(); ++idx) {
+                ASSERT_TRUE(rs[idx].has_id());
+                ASSERT_EQ(rs[idx].has_type(), is[idx].has_type());
+                ASSERT_EQ(rs[idx].has_frequency(), is[idx].has_frequency());
+                ASSERT_EQ(rs[idx].has_q(), is[idx].has_q());
+                ASSERT_EQ(rs[idx].has_gain_db(), is[idx].has_gain_db());
+                ASSERT_EQ(rs[idx].has_enabled(), is[idx].has_enabled());
+
+                EXPECT_EQ(rs[idx].id(), is[idx].id());
+                if (is[idx].has_type()) {
+                  EXPECT_EQ(rs[idx].type(), is[idx].type());
+                }
+                if (is[idx].has_frequency()) {
+                  EXPECT_EQ(rs[idx].frequency(), is[idx].frequency());
+                }
+                if (is[idx].has_q()) {
+                  EXPECT_EQ(rs[idx].q(), is[idx].q());
+                }
+                if (is[idx].has_gain_db()) {
+                  EXPECT_EQ(rs[idx].gain_db(), is[idx].gain_db());
+                }
+                if (is[idx].has_enabled()) {
+                  EXPECT_EQ(rs[idx].enabled(), is[idx].enabled());
+                }
+              }
+            }));
+
+    signal_processing()->SetElementState(
+        element.id(), std::move(restored_state),
+        AddCallbackUnordered(
+            "SetElementState[EQ 2](" + std::to_string(element.id()) + ")",
+            [id = element.id()](fhasp::SignalProcessing_SetElementState_Result result) {
+              ASSERT_FALSE(result.is_err()) << "SetElementState[EQ](" << id << ") failed";
+            }));
+    ASSERT_TRUE(signal_processing().is_bound()) << "SetElementState failed (restoral). Unbound";
+    ExpectCallbacks();
+  }
+}
+
+// Validate the ability to change type-specific state for this specific GAIN element.
+void AdminTest::TestSetGainElementState(const fhasp::Element& element,
+                                        const fhasp::ElementState& initial_state) {
+  const auto& gain_caps = element.type_specific().gain();
+
+  if (gain_caps.min_gain() == gain_caps.max_gain()) {
+    GTEST_SKIP() << "Cannot test GainElementState for element " << element.id()
+                 << ": min_gain == max_gain";
+  }
+
+  // Change what we can, in SettableElementState::GainElementState
+  {
+    fhasp::GainElementState gain_state;
+    if (initial_state.type_specific().gain().gain() == gain_caps.max_gain()) {
+      gain_state.set_gain(gain_caps.min_gain());
+    } else {
+      gain_state.set_gain(gain_caps.max_gain());
+    }
+    float expected_gain = gain_state.gain();
+    fhasp::SettableElementState state;
+    state.set_type_specific(
+        fhasp::SettableTypeSpecificElementState::WithGain(std::move(gain_state)));
+
+    signal_processing()->WatchElementState(
+        element.id(),
+        AddCallbackUnordered("WatchElementState[gain 1](" + std::to_string(element.id()) + ")",
+                             [&element, expected_gain](const fhasp::ElementState& result) {
+                               ValidateElementState(element, result);
+                               ValidateGainElementState(element, result);
+
+                               EXPECT_EQ(expected_gain, result.type_specific().gain().gain());
+                             }));
+
+    signal_processing()->SetElementState(
+        element.id(), std::move(state),
+        AddCallbackUnordered(
+            "SetElementState[gain 1](" + std::to_string(element.id()) + ")",
+            [id = element.id()](fhasp::SignalProcessing_SetElementState_Result result) {
+              ASSERT_FALSE(result.is_err()) << "SetElementState[gain](" << id << ") failed";
+            }));
+    ASSERT_TRUE(signal_processing().is_bound())
+        << "SignalProcessing failed to set the ElementState";
+    ExpectCallbacks();
+  }
+
+  // Now restore the initial element state.
+  {
+    fhasp::GainElementState gain_state;
+    gain_state.set_gain(initial_state.type_specific().gain().gain());
+    fhasp::SettableElementState state;
+    state.set_type_specific(
+        fhasp::SettableTypeSpecificElementState::WithGain(std::move(gain_state)));
+
+    signal_processing()->WatchElementState(
+        element.id(),
+        AddCallback("WatchElementState[gain 2](" + std::to_string(element.id()) + ")",
+                    [&element, expected_gain = initial_state.type_specific().gain().gain()](
+                        const fhasp::ElementState& result) {
+                      ValidateElementState(element, result);
+                      ValidateGainElementState(element, result);
+
+                      EXPECT_EQ(expected_gain, result.type_specific().gain().gain());
+                    }));
+
+    signal_processing()->SetElementState(
+        element.id(), std::move(state),
+        AddCallbackUnordered(
+            "SetElementState[gain 2](" + std::to_string(element.id()) + ")",
+            [id = element.id()](fhasp::SignalProcessing_SetElementState_Result result) {
+              EXPECT_FALSE(result.is_err()) << "SetElementState[gain](" << id << ") failed";
+            }));
+    ASSERT_TRUE(signal_processing().is_bound())
+        << "SignalProcessing failed to restore the ElementState";
+    ExpectCallbacks();
+  }
+}
+
+// Validate SetElementState for this specific GAIN element, when there is no change.
+// This also covers the edge case where min_gain == max_gain: we still validate SetElementState.
+void AdminTest::TestSetGainElementStateNoChange(fhasp::ElementId element_id, float current_gain) {
+  // Define a value in SettableElementState::GainElementState, but the same as current state.
+  fhasp::GainElementState gain_state;
+  gain_state.set_gain(current_gain);
+  fhasp::SettableElementState state;
+  state.set_type_specific(fhasp::SettableTypeSpecificElementState::WithGain(std::move(gain_state)));
+
+  FailOnWatchElementStateCompletion(element_id);
+
+  signal_processing()->SetElementState(
+      element_id, std::move(state),
+      AddCallback("SetElementState[gain no-change](" + std::to_string(element_id) + ")",
+                  [element_id](fhasp::SignalProcessing_SetElementState_Result result) {
+                    EXPECT_FALSE(result.is_err())
+                        << "SetElementState[gain no-change](" << element_id << ") failed";
+                  }));
+  ASSERT_TRUE(signal_processing().is_bound()) << "SignalProcessing failed to set the ElementState";
+  ExpectCallbacks();
+}
+
+// Validate this specific GAIN element, when SetElementState contains invalid type-specific data.
+void AdminTest::TestSetGainElementStateInvalidGain(fhasp::ElementId element_id) {
+  fhasp::GainElementState gain_state;
+  gain_state.set_gain(NAN);
+  fhasp::SettableElementState state;
+  state.set_type_specific(fhasp::SettableTypeSpecificElementState::WithGain(std::move(gain_state)));
+
+  FailOnWatchElementStateCompletion(element_id);
+
+  signal_processing()->SetElementState(
+      element_id, std::move(state),
+      AddCallback("SetElementState[gain NAN](" + std::to_string(element_id) + ")",
+                  [element_id](fhasp::SignalProcessing_SetElementState_Result result) {
+                    ASSERT_TRUE(result.is_err())
+                        << "SetElementState[gain NAN](" << element_id << ") did not fail";
+                    EXPECT_EQ(result.err(), ZX_ERR_INVALID_ARGS);
+                  }));
+  ASSERT_TRUE(signal_processing().is_bound())
+      << "SignalProcessing unbound upon the errant SetElementState";
+  ExpectCallbacks();
 }
 
 #define DEFINE_ADMIN_TEST_CLASS(CLASS_NAME, CODE)                               \
@@ -1593,87 +2492,6 @@ DEFINE_ADMIN_TEST_CLASS(VendorSpecificElements, {
   WaitForError();
 });
 
-// Validate the base ElementState for all elements.
-DEFINE_ADMIN_TEST_CLASS(InitialElementStates, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
-  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
-
-  ValidateElementStates();
-  WaitForError();
-});
-
-// There are five element types that have additional type-specific element state.
-//
-// Validate ElementState.type_specific, for DAI elements.
-DEFINE_ADMIN_TEST_CLASS(DaiElementStates, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
-  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
-
-  ValidateDaiElementStates();
-  WaitForError();
-});
-
-// Validate ElementState.type_specific, for Dynamics elements.
-DEFINE_ADMIN_TEST_CLASS(DynamicsElementStates, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
-  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
-
-  ValidateDynamicsElementStates();
-  WaitForError();
-});
-
-// Validate ElementState.type_specific, for Equalizer elements.
-DEFINE_ADMIN_TEST_CLASS(EqualizerElementStates, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
-  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
-
-  ValidateEqualizerElementStates();
-  WaitForError();
-});
-
-// Validate ElementState.type_specific, for Gain elements.
-DEFINE_ADMIN_TEST_CLASS(GainElementStates, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
-  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
-
-  ValidateGainElementStates();
-  WaitForError();
-});
-
-// Validate ElementState.type_specific, for Vendor-specific elements.
-DEFINE_ADMIN_TEST_CLASS(VendorSpecificElementStates, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
-  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
-
-  ValidateVendorSpecificElementStates();
-  WaitForError();
-});
-
-// Verify that calling WatchTopology while a previous call is still pending causes a disconnect.
-DEFINE_ADMIN_TEST_CLASS(WatchElementStateWhilePendingShouldDisconnect, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
-  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
-
-  fhasp::ElementId id = elements().front().id();
-  ASSERT_NO_FAILURE_OR_SKIP(FailOnWatchElementStateCompletion(id));
-  ASSERT_NO_FAILURE_OR_SKIP(WaitForError());
-
-  WatchElementStateAndExpectDisconnect(id, ZX_ERR_BAD_STATE);
-});
-
-// Verify that an unknown element_id causes a disconnect.
-DEFINE_ADMIN_TEST_CLASS(WatchUnknownElementStateShouldError, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
-
-  WatchUnknownElementStateAndExpectDisconnect(ZX_ERR_INVALID_ARGS);
-});
-
 // Verify that a valid topology list is successfully received.
 DEFINE_ADMIN_TEST_CLASS(GetTopologies, {
   RequestTopologies();
@@ -1709,12 +2527,22 @@ DEFINE_ADMIN_TEST_CLASS(ElementTopologyClosure, {
   WaitForError();
 });
 
-// Verify that an unknown topology causes an error but does not disconnect.
-DEFINE_ADMIN_TEST_CLASS(SetUnknownTopologyShouldError, {
+// Verify that SetTopology with the current topology does not cause WatchTopology to trigger.
+DEFINE_ADMIN_TEST_CLASS(SetTopologyNoChange, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
   ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
 
-  SetUnknownTopologyAndExpectError();  // ... but we should remain connected.
+  SetTopologyNoChangeAndExpectNoWatch();
+  WaitForError();
+});
+
+// Verify that an unknown topology causes an error but does not disconnect.
+DEFINE_ADMIN_TEST_CLASS(SetTopologyUnknownIdShouldError, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+
+  SetTopologyUnknownIdAndExpectError();  // ... but we should remain connected.
   WaitForError();
 });
 
@@ -1727,6 +2555,181 @@ DEFINE_ADMIN_TEST_CLASS(WatchTopologyWhilePendingShouldDisconnect, {
   ASSERT_NO_FAILURE_OR_SKIP(WaitForError());
 
   WatchTopologyAndExpectDisconnect(ZX_ERR_BAD_STATE);
+});
+
+// Validate the base ElementState for all elements.
+DEFINE_ADMIN_TEST_CLASS(InitialElementStates, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  ValidateElementStates();
+  WaitForError();
+});
+
+// There are five element types that have additional type-specific element state.
+//
+// Validate ElementState.type_specific, for DAI elements.
+DEFINE_ADMIN_TEST_CLASS(DaiElementStates, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  ValidateDaiElementStates();
+  WaitForError();
+});
+
+// Validate ElementState.type_specific, for Dynamics elements.
+DEFINE_ADMIN_TEST_CLASS(DynamicsElementStates, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  ValidateDynamicsElementStates();
+  WaitForError();
+});
+
+// Validate ElementState.type_specific, for Equalizer elements.
+DEFINE_ADMIN_TEST_CLASS(EqualizerElementStates, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  ValidateEqualizerElementStates();
+  WaitForError();
+});
+
+// Validate ElementState.type_specific, for Gain elements.
+DEFINE_ADMIN_TEST_CLASS(GainElementStates, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  ValidateGainElementStates();
+  WaitForError();
+});
+
+// Validate ElementState.type_specific, for Vendor-specific elements.
+DEFINE_ADMIN_TEST_CLASS(VendorSpecificElementStates, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  ValidateVendorSpecificElementStates();
+  WaitForError();
+});
+
+// Verify that calling WatchTopology while a previous call is still pending causes a disconnect.
+DEFINE_ADMIN_TEST_CLASS(WatchElementStateWhilePendingShouldDisconnect, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  fhasp::ElementId id = elements().front().id();
+  ASSERT_NO_FAILURE_OR_SKIP(FailOnWatchElementStateCompletion(id));
+  ASSERT_NO_FAILURE_OR_SKIP(WaitForError());
+
+  WatchElementStateAndExpectDisconnect(id, ZX_ERR_BAD_STATE);
+});
+
+// Verify that an unknown element_id causes a disconnect.
+DEFINE_ADMIN_TEST_CLASS(WatchElementStateUnknownIdShouldDisconnect, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+
+  WatchElementStateUnknownIdAndExpectDisconnect(ZX_ERR_INVALID_ARGS);
+});
+
+// For all elements, change non-type-specific portions of SettableElementState that can be set.
+DEFINE_ADMIN_TEST_CLASS(SetElementState, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  SetAllElementStates();
+  WaitForError();
+});
+
+// There are four element types that have additional settable type-specific element state.
+//
+// Validate SettableTypeSpecificElementState, for Dynamics elements.
+DEFINE_ADMIN_TEST_CLASS(SetDynamicsElementState, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  SetAllDynamicsElementStates();
+  WaitForError();
+});
+
+// Validate SettableTypeSpecificElementState, for Equalizer elements.
+DEFINE_ADMIN_TEST_CLASS(SetEqualizerElementState, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  SetAllEqualizerElementStates();
+  WaitForError();
+});
+
+// Validate SettableTypeSpecificElementState, for Gain elements.
+DEFINE_ADMIN_TEST_CLASS(SetGainElementState, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  SetAllGainElementStates();
+  WaitForError();
+});
+
+// Validate SettableTypeSpecificElementState, for Gain elements.
+DEFINE_ADMIN_TEST_CLASS(SetGainElementStateNoChange, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  SetAllGainElementStatesNoChange();
+  WaitForError();
+});
+
+// Validate SettableTypeSpecificElementState, for Gain elements.
+DEFINE_ADMIN_TEST_CLASS(SetGainElementStateInvalidGain, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  SetAllGainElementStatesInvalidGainShouldError();  // ... but we should remain connected.
+  WaitForError();
+});
+
+DEFINE_ADMIN_TEST_CLASS(SetElementStateNoChange, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  SetAllElementStatesNoChange();
+  WaitForError();
+});
+
+// Verify that an unknown topology causes an error but does not disconnect.
+DEFINE_ADMIN_TEST_CLASS(SetElementStateUnknownIdShouldError, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialTopology());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveInitialElementStates());
+
+  SetElementStateUnknownIdAndExpectError();  // ... but we should remain connected.
+  WaitForError();
 });
 
 // Verify that format-retrieval responses are successfully received and are complete and valid.
@@ -2137,6 +3140,7 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
     // signalprocessing Element test cases
     //
     REGISTER_ADMIN_TEST(GetElements, device_entry);
+    // type-specific cases
     REGISTER_ADMIN_TEST(DaiElements, device_entry);
     REGISTER_ADMIN_TEST(DynamicsElements, device_entry);
     REGISTER_ADMIN_TEST(EqualizerElements, device_entry);
@@ -2149,20 +3153,32 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
     REGISTER_ADMIN_TEST(ElementTopologyClosure, device_entry);
     REGISTER_ADMIN_TEST(InitialTopology, device_entry);
     REGISTER_ADMIN_TEST(SetTopology, device_entry);
-    REGISTER_ADMIN_TEST(SetUnknownTopologyShouldError, device_entry);
+    REGISTER_ADMIN_TEST(SetTopologyUnknownIdShouldError, device_entry);
     REGISTER_ADMIN_TEST(WatchTopologyWhilePendingShouldDisconnect, device_entry);
 
     // signalprocessing ElementState test cases
     //
     REGISTER_ADMIN_TEST(InitialElementStates, device_entry);
+    // type-specific cases
     REGISTER_ADMIN_TEST(DaiElementStates, device_entry);
     REGISTER_ADMIN_TEST(DynamicsElementStates, device_entry);
     REGISTER_ADMIN_TEST(EqualizerElementStates, device_entry);
     REGISTER_ADMIN_TEST(GainElementStates, device_entry);
     REGISTER_ADMIN_TEST(VendorSpecificElementStates, device_entry);
+
     REGISTER_ADMIN_TEST(WatchElementStateWhilePendingShouldDisconnect, device_entry);
-    REGISTER_ADMIN_TEST(WatchUnknownElementStateShouldError, device_entry);
-    // TODO(https://fxbug.dev/42077405): Add testing for SignalProcessing SetElementState.
+    REGISTER_ADMIN_TEST(WatchElementStateUnknownIdShouldDisconnect, device_entry);
+
+    REGISTER_ADMIN_TEST(SetElementState, device_entry);
+    REGISTER_ADMIN_TEST(SetElementStateNoChange, device_entry);
+    REGISTER_ADMIN_TEST(SetElementStateUnknownIdShouldError, device_entry);
+    // type-specific cases
+    REGISTER_ADMIN_TEST(SetDynamicsElementState, device_entry);
+    REGISTER_ADMIN_TEST(SetEqualizerElementState, device_entry);
+    REGISTER_ADMIN_TEST(SetGainElementState, device_entry);
+    REGISTER_ADMIN_TEST(SetGainElementStateNoChange, device_entry);
+    REGISTER_ADMIN_TEST(SetGainElementStateInvalidGain, device_entry);
+    // Cannot verify SettableVendorSpecificElementState unless we apply structure to it....
 
     // RingBuffer test cases
     //
@@ -2272,7 +3288,15 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
 
 // TODO(https://fxbug.dev/42077405): Add remaining testing for SignalProcessing methods.
 //
-// Proposed test cases for fuchsia.hardware.audio.signalprocessing listed below:
+// Proposed remaining test cases for fuchsia.hardware.audio.signalprocessing listed below:
+//
+// SetElementStateBadValues
+//    SetElementState(badVal) returns ZX_ERR_INVALID_ARGS, not close channel. Fail on other error.
+//    Bad val could be out-of-range, inf/nan, other malformed, or setting something unsettable.
+//    Test this for more type-specific variants of SettableElementState than just GAIN w/NAN?
+//
+//
+// Once drivers can accept a config change that invalidates the current signalprocessing state:
 //
 // SetTopologyInvalidated
 //    First make a change that invalidates the SignalProcessing configuration, then
@@ -2282,22 +3306,11 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
 //    First invalidate the SignalProcessing configuration, then retrieve the new topologies.
 //    SetTopology returns callback (does not fail or close channel).
 //    WatchTopology acknowledges the change made by SetTopology.
-
-// SetElementStateNoChange
-//    SetElementState does not returns callback, trigger WatchElementStateChange or close channel.
-// SetElementStateBadId
-//    SetElementState(badId) returns ZX_ERR_INVALID_ARGS, not close channel. Fail on other error.
-// SetElementStateBadValues
-//    SetElementState(badVal) returns ZX_ERR_INVALID_ARGS, not close channel. Fail on other error.
 // SetElementStateInvalidated
 //    First make a change that invalidates the SignalProcessing configuration, then
 //    SetElementState should return ZX_ERR_BAD_STATE and not close channel.
 // SetElementStateReconfigured
 //    First invalidate the SignalProcessing configuration, then retrieve new elements/topologies.
 //    SetElementState returns callback (does not fail or close channel).
-
-// WatchElementStateChange
-//    WatchElementState pends until SetElementState is called.
-//    Upon change, returns callback with values that match SetElementState.
 
 }  // namespace media::audio::drivers::test
