@@ -671,6 +671,8 @@ enum Ipv4DadTestOrder {
 fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
     let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
 
+    const DAD_TRANSMITS: u16 = 3;
+
     // Install a device.
     let local_mac = Ipv4::TEST_ADDRS.local_mac;
     let device_id = ctx
@@ -691,7 +693,7 @@ fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
             &device_id,
             Ipv4DeviceConfigurationUpdate {
                 ip_config: IpDeviceConfigurationUpdate {
-                    dad_transmits: Some(NonZeroU16::new(1)),
+                    dad_transmits: Some(NonZeroU16::new(DAD_TRANSMITS)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -793,24 +795,30 @@ fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
         assert_matches!(&ctx.take_frames()[..], []);
     });
 
-    // Trigger the DAD Timer. Verify an ARP probe was sent and a second DAD
-    // timer was scheduled.
-    let (mut core_ctx, bindings_ctx) = ctx.contexts();
-    assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(expected_timer_id.clone()));
-    ctx.bindings_ctx.with_fake_frame_ctx_mut(|ctx| {
-        let frames = ctx.take_frames();
-        let (dev, buf) = assert_matches!(&frames[..], [frame] => frame);
-        let dev = assert_matches!(dev, DispatchedFrame::Ethernet(device_id) => device_id);
-        assert_eq!(WeakDeviceId::Ethernet(dev.clone()), device_id.downgrade());
-        let ArpPacketInfo { target_protocol_address, .. } =
-            packet_formats::testutil::parse_arp_packet_in_ethernet_frame(
-                buf,
-                packet_formats::ethernet::EthernetFrameLengthCheck::NoCheck,
-            )
-            .expect("should successfully parse ARP packet");
-        assert_eq!(target_protocol_address, ipv4_addr_subnet.addr().get());
-    });
-    ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(expected_timer_id.clone(), ..)]);
+    // Trigger the DAD Timer. Verify an ARP probe was sent and an additional DAD
+    // timer was scheduled (once for each DAD_TRANSMITS). There should not be
+    // any events emitted yet.
+    for _ in 0..DAD_TRANSMITS {
+        let (mut core_ctx, bindings_ctx) = ctx.contexts();
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(expected_timer_id.clone()));
+        ctx.bindings_ctx.with_fake_frame_ctx_mut(|ctx| {
+            let frames = ctx.take_frames();
+            let (dev, buf) = assert_matches!(&frames[..], [frame] => frame);
+            let dev = assert_matches!(dev, DispatchedFrame::Ethernet(device_id) => device_id);
+            assert_eq!(WeakDeviceId::Ethernet(dev.clone()), device_id.downgrade());
+            let ArpPacketInfo { target_protocol_address, .. } =
+                packet_formats::testutil::parse_arp_packet_in_ethernet_frame(
+                    buf,
+                    packet_formats::ethernet::EthernetFrameLengthCheck::NoCheck,
+                )
+                .expect("should successfully parse ARP packet");
+            assert_eq!(target_protocol_address, ipv4_addr_subnet.addr().get());
+        });
+        ctx.bindings_ctx
+            .timer_ctx()
+            .assert_timers_installed_range([(expected_timer_id.clone(), ..)]);
+        assert_eq!(ctx.bindings_ctx.take_events()[..], []);
+    }
 
     // Trigger the DadTimer and verify the address became assigned.
     let (mut core_ctx, bindings_ctx) = ctx.contexts();
