@@ -125,12 +125,9 @@ config("compiler") {
     ":stack-size-section",
   ]
 
-  # TODO(https://fxbug.dev/322984857): Only add this config for is_gcc configs
-  # after we roll a toolchain with default TLSDESC for Fuchsia targets, at
-  # which point it can be moved into clang_defaults.
-  configs += [ ":default-tls-dialect" ]
-
-  if (!is_gcc) {
+  if (is_gcc) {
+    configs += [ ":default-tls-dialect" ]
+  } else {
     configs += [
       ":clang_defaults",
       ":embed_bitcode",
@@ -194,7 +191,6 @@ config("clang_defaults") {
     cflags_cc = [ "-stdlib=libc++" ]
     ldflags = [
       "-stdlib=libc++",
-
       "--start-no-unused-arguments",
       "-unwindlib=libunwind",
       "-rtlib=compiler-rt",
@@ -1584,7 +1580,7 @@ tlsdesc = {
     # On riscv64 TLSDESC is opt-in or opt-out via -mtls-dialect=... under Clang, but is not currently supported in GCC.
     can_enable = !is_gcc
     can_disable = !is_gcc
-    compiler_default = false
+    compiler_default = !is_gcc
   } else if (current_cpu == "x64") {
     enable_dialect = "gnu2"
     disable_dialect = "gnu"
@@ -1592,7 +1588,7 @@ tlsdesc = {
 
     can_enable = true
     can_disable = true
-    compiler_default = false
+    compiler_default = !is_gcc
   } else if (current_cpu == "arm") {
     enable_dialect = "gnu2"
     disable_dialect = "gnu"
