@@ -1466,85 +1466,36 @@ VmCowPages::ParentAndRange VmCowPages::FindParentAndRangeForCloneLocked(
   return ParentAndRange{ktl::move(parent), ktl::move(grandparent), offset, parent_limit, size};
 }
 
-void VmCowPages::AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t limit,
-                                                     VmCowPages* child, const LockedPtr& parent,
-                                                     bool update_backlinks) {
-  AddChildLocked(child, offset, limit);
-
-  VmCompression* compression = Pmm::Node().GetPageCompression();
-  __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(this);
-
-  auto page_update_backlink = [this, compression, &page_backlink_updater](
-                                  VmPageOrMarkerRef p, uint64_t off) __ALWAYS_INLINE {
-    if (p->IsReference()) {
-      // A regular reference we can move, a temporary reference we need to turn back into its
-      // page so we can move it. To determine if we have a temporary reference we can just
-      // attempt to move it, and if it was a temporary reference we will get a page returned.
-      if (auto maybe_page = MaybeDecompressReference(compression, p->Reference())) {
-        // For simplicity, since this is a very uncommon edge case, just update the page in
-        // place in this page list, then move it as a regular page.
-        AssertHeld(lock_ref());
-        SetNotPinnedLocked(*maybe_page, off);
-        VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*maybe_page);
-        ASSERT(compression->IsTempReference(ref));
-      }
-    }
-    // Not an else-if to intentionally perform this if the previous block turned a reference
-    // into a page.
-    if (p->IsPage()) {
-      page_backlink_updater.Push(p->Page(), off);
-    }
-    return ZX_ERR_NEXT;
-  };
-
-  // Add references to pages that the COW clone now shares ownership over, and add backlinks if
-  // required.
-  zx_status_t status = ForEveryOwnedMutableHierarchyPageInRangeLocked(
-      [this, compression, update_backlinks, &page_update_backlink](
-          VmPageOrMarkerRef p, VmCowPages* owner, uint64_t cow_clone_offset, uint64_t owner_offset)
-          __ALWAYS_INLINE {
-            if (update_backlinks && (owner == this)) {
-              page_update_backlink(p, owner_offset);
-            }
-
-            if (p->IsPage()) {
-              p->Page()->object.share_count++;
-            } else if (p->IsReference()) {
-              VmPageOrMarker::ReferenceValue ref = p->Reference();
-              compression->SetMetadata(ref, compression->GetMetadata(ref) + 1);
-            } else {
-              // Markers do not have references counts.
-            }
-
-            return ZX_ERR_NEXT;
-          },
-      offset, limit, parent);
-  DEBUG_ASSERT(status == ZX_OK);
-
-  // If this is a new node and the clone doesn't see all of the hidden parent, update the remaining
-  // part of the range.
-  if (update_backlinks && (offset > 0)) {
-    page_list_.ForEveryPageInRangeMutable(page_update_backlink, 0, offset);
-  }
-  if (update_backlinks && (limit < size_)) {
-    page_list_.ForEveryPageInRangeMutable(page_update_backlink, limit, size_);
-  }
-
-  page_backlink_updater.Flush();
-
-  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(child->DebugValidatePageSharingLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(child->DebugValidateVmoPageBorrowingLocked());
-}
-
-zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked(
-    const LockedPtr& parent) {
+zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneNewHiddenParentLocked(
+    uint64_t offset, uint64_t limit, uint64_t size, const LockedPtr& parent) {
   canary_.Assert();
 
+  const VmCowPagesOptions options = inheritable_options();
+
+  fbl::AllocChecker ac;
   fbl::RefPtr<VmHierarchyState> state;
 #if VMO_USE_SHARED_LOCK
   state = hierarchy_state_ptr_;
 #endif
+  LockedRefPtr cow_clone;
+  // Use a sub-scope to limit visibility of cow_clone_ref as it's just a temporary.
+  {
+    auto cow_clone_ref = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+        state, options, pmm_alloc_flags_, size, nullptr, nullptr, kLockOrderFirstAnon));
+    if (!ac.check()) {
+      return zx::error(ZX_ERR_NO_MEMORY);
+    }
+    // As this node was just constructed we know the lock is free, use one of the lock order gap
+    // values to acquire without a lockdep violation. If we have a parent, and hence hold its lock,
+    // then we must set the lock order after it.
+    DEBUG_ASSERT(parent_.get() == parent.get());
+    const uint64_t order = (parent ? parent->lock_order() : lock_order()) + 1;
+    cow_clone = LockedRefPtr(ktl::move(cow_clone_ref), order, VmLockAcquireMode::Reentrant);
+  }
+
+  DEBUG_ASSERT(!is_hidden());
+  // If `parent` is to be the new child's parent then it must become hidden first.
+  // That requires creating a new hidden node and rotating `parent` to be its child.
   DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
   DEBUG_ASSERT(children_list_len_ == 0);
 
@@ -1556,14 +1507,12 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked(
   // absence here when performing the range update.
   RangeChangeUpdateLocked(VmCowRange(0, size_), RangeChangeOp::RemoveWrite, nullptr);
 
-  VmCowPagesOptions options = inheritable_options();
   LockedRefPtr hidden_parent;
   // Use a sub-scope to limit visibility of hidden_parent_ref as it's just a temporary.
   {
-    fbl::AllocChecker ac;
-    // Lock order for a new hidden parent is either derived from its parent, or if no parent starts
-    // kLockOrderRoot. Cow creation rules state that our parent is either hidden, or a page root
-    // node ensuring that our derived lock order will still be in the hidden range.
+    // Lock order for a new hidden parent is either derived from its parent, or if no parent
+    // starts kLockOrderRoot. Cow creation rules state that our parent is either hidden, or a page
+    // root node ensuring that our derived lock order will still be in the hidden range.
     DEBUG_ASSERT(!parent_ || parent_->is_hidden() || parent_->page_source_);
     const uint64_t hidden_lock_order =
         parent_ ? parent_->lock_order() - kLockOrderDelta : kLockOrderRoot;
@@ -1574,14 +1523,51 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked(
       return zx::error(ZX_ERR_NO_MEMORY);
     }
     // If we have a parent (which will become the parent of the new hidden node) then since its
-    // lock is already acquired we cannot acquire the new hidden parent using its normal lock order.
-    // As we just created this node we know that no one else can be acquiring it, so we use the gap
-    // in the regular lock orders, taking into account that the new leaf node was already acquired
-    // into the same gap.
+    // lock is already acquired we cannot acquire the new hidden parent using its normal lock
+    // order. As we just created this node we know that no one else can be acquiring it, so we use
+    // the gap in the regular lock orders, taking into account that the new leaf node was already
+    // acquired into the same gap.
     const uint64_t order = parent ? parent->lock_order() + 2 : hidden_parent_ref->lock_order();
     hidden_parent = LockedRefPtr(ktl::move(hidden_parent_ref), order, VmLockAcquireMode::Reentrant);
   }
-  hidden_parent.locked().page_list_.InitializeSkew(page_list_.GetSkew(), 0);
+
+  VmCompression* compression = Pmm::Node().GetPageCompression();
+
+  {
+    __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(&hidden_parent.locked());
+    zx_status_t status = page_list_.RemovePages(
+        [&](VmPageOrMarker* p, uint64_t offset) {
+          if (p->IsReference()) {
+            // A regular reference we can move, a temporary reference we need to turn back into
+            // its page so we can move it. To determine if we have a temporary reference we can
+            // just attempt to move it, and if it was a temporary reference we will get a page
+            // returned.
+            if (auto maybe_page = MaybeDecompressReference(compression, p->Reference())) {
+              // For simplicity, since this is a very uncommon edge case, just update the page in
+              // place in this page list, then move it as a regular page.
+              AssertHeld(lock_ref());
+              SetNotPinnedLocked(*maybe_page, offset);
+              VmPageOrMarker::ReferenceValue ref = p->SwapReferenceForPage(*maybe_page);
+              ASSERT(compression->IsTempReference(ref));
+            }
+          }
+          // Not an else-if to intentionally perform this if the previous block turned a reference
+          // into a page.
+          if (p->IsPage()) {
+            page_backlink_updater.Push(p->Page(), offset);
+          }
+          return ZX_ERR_NEXT;
+        },
+        0, size_);
+    // RemovePages should never fail as we return no errors in it.
+    DEBUG_ASSERT(status == ZX_OK);
+    page_backlink_updater.Flush();
+  }
+
+  // Move our pagelist before adding ourselves as its child, because we cannot be added as a child
+  // unless we have no pages.
+  hidden_parent.locked().page_list_ = ktl::move(page_list_);
+
   hidden_parent.locked().TransitionToAliveLocked();
 
   // If the current object is not the root of the tree, then we need to replace ourselves in our
@@ -1607,65 +1593,9 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked(
     parent_offset_ = parent_limit_ = 0;
   }
 
-  // Move our pagelist before adding ourselves as its child, because we cannot be added as a child
-  // unless we have no pages. Backlinks will be incorrect after move, but are updated later in the
-  // clone operation.
-  DEBUG_ASSERT(hidden_parent.locked().page_list_.IsEmpty());
-  hidden_parent.locked().page_list_ = ktl::move(page_list_);
-  DEBUG_ASSERT(page_list_.IsEmpty());
-  DEBUG_ASSERT(page_list_.GetSkew() == 0);
-
+  // Add the children and then populate their initial page lists.
   hidden_parent.locked().AddChildLocked(this, 0, size_);
-
-  // Return the hidden parent as the replacement node.
-  return zx::ok(ktl::move(hidden_parent));
-}
-
-zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneBidirectionalLocked(uint64_t offset,
-                                                                          uint64_t limit,
-                                                                          uint64_t size,
-                                                                          const LockedPtr& parent) {
-  canary_.Assert();
-
-  VmCowPagesOptions options = inheritable_options();
-
-  fbl::AllocChecker ac;
-  fbl::RefPtr<VmHierarchyState> state;
-#if VMO_USE_SHARED_LOCK
-  state = hierarchy_state_ptr_;
-#endif
-  LockedRefPtr cow_clone;
-  // Use a sub-scope to limit visibility of cow_clone_ref as it's just a temporary.
-  {
-    auto cow_clone_ref = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-        ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr, kLockOrderFirstAnon));
-    if (!ac.check()) {
-      return zx::error(ZX_ERR_NO_MEMORY);
-    }
-    // As this node was just constructed we know the lock is free, use one of the lock order gap
-    // values to acquire without a lockdep violation. If we have a parent, and hence hold its lock,
-    // then we must set the lock order after it.
-    DEBUG_ASSERT(parent_.get() == parent.get());
-    const uint64_t order = (parent ? parent->lock_order() : lock_order()) + 1;
-    cow_clone = LockedRefPtr(ktl::move(cow_clone_ref), order, VmLockAcquireMode::Reentrant);
-  }
-
-  // If `parent` is to be the new child's parent then it must become hidden first.
-  // That requires creating a new hidden node and rotating `parent` to be its child.
-  if (!is_hidden()) {
-    auto result = ReplaceWithHiddenNodeLocked(parent);
-    if (result.is_error()) {
-      return result.take_error();
-    }
-    DEBUG_ASSERT((*result)->is_hidden());
-    (*result).locked().AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked(),
-                                                           parent, true);
-  } else {
-    // The COW clone's parent must be hidden because the clone must not see any future parent
-    // writes.
-    DEBUG_ASSERT(is_hidden());
-    AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked(), parent, false);
-  }
+  hidden_parent.locked().AddChildLocked(&cow_clone.locked(), offset, limit);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
@@ -1673,8 +1603,9 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneBidirectionalLocked(uint64
   return zx::ok(ktl::move(cow_clone));
 }
 
-zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneUnidirectionalLocked(
-    uint64_t offset, uint64_t limit, uint64_t size, const LockedPtr& parent) {
+zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneChildLocked(uint64_t offset, uint64_t limit,
+                                                                  uint64_t size,
+                                                                  const LockedPtr& parent) {
   canary_.Assert();
 
   VmCowPagesOptions options = inheritable_options();
@@ -1687,11 +1618,17 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneUnidirectionalLocked(
 #if VMO_USE_SHARED_LOCK
     state = hierarchy_state_ptr_;
 #endif
-    // If we do not have a parent, then we are constructing the first anonymous node (since we must
-    // be pager backed), and so we want to start at kLockOrderFirstAnon. Otherwise if we ourselves
-    // have a parent then this is a long unidirectional chain and we derive the new lock order from
-    // ourselves.
-    const uint64_t clone_order = parent_ ? lock_order() - kLockOrderDelta : kLockOrderFirstAnon;
+    // We are either constructing the first visible anonymous node in a chain, which gets
+    // kLockOrderFirstAnon, or this is part of a unidirectional clone chain and takes a lock order
+    // derived from ourselves. In full these possibilities are:
+    //  * This is userpager root (we have no parent and are not hidden), we are creating first
+    //    visible anonymous node
+    //  * This is a hidden node, we are creating first visible anonymous node
+    //  * Unidirectional clone chain (we have parent and are not hidden), creating derived visible
+    //    anonymous node.
+    // See comment above lock_order_ definition for more details.
+    const uint64_t clone_order =
+        (parent_ && !is_hidden()) ? lock_order() - kLockOrderDelta : kLockOrderFirstAnon;
     auto cow_clone_ref = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
         ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr, clone_order));
     if (!ac.check()) {
@@ -1706,8 +1643,6 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneUnidirectionalLocked(
                      VmLockAcquireMode::Reentrant);
   }
 
-  // The COW clone's parent must not be hidden because the clone may see future parent writes.
-  DEBUG_ASSERT(!is_hidden());
   AddChildLocked(&cow_clone.locked(), offset, limit);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
@@ -1786,29 +1721,6 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CreateCloneLocked(SnapshotType 
   }
   const bool unidirectional = !require_bidirectional && can_unidirectional_clone_locked();
 
-  // Now that we know whether it will be a unidirectional clone or not, determine where this clone
-  // will hang.
-  ParentAndRange child_range =
-      FindParentAndRangeForCloneLocked(range.offset, range.len, !unidirectional);
-
-  if (!unidirectional) {
-    if (require_unidirectional) {
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-    }
-    // The bidirectional clone check requires looking at the parent of where we want to hang the
-    // node, which is represented by |child_range.grandparent|.
-    if (!can_bidirectional_clone_locked(child_range.grandparent)) {
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-    }
-
-    // If this is non-zero, that means that there are pages which hardware can
-    // touch, so the vmo can't be safely cloned.
-    // TODO: consider immediately forking these pages.
-    if (pinned_page_count_locked()) {
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
-  }
-
   // Only contiguous VMOs have a source that handles free, and those may not have cow clones made of
   // them. Once there is a cow hierarchy tracking exactly what node a page was from to free it is
   // not performed, and it is assumed that therefore that we do not need to free owned pages to
@@ -1816,13 +1728,100 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CreateCloneLocked(SnapshotType 
   ASSERT(!is_source_handling_free());
 
   if (unidirectional) {
-    return child_range.parent.locked_or(this).CloneUnidirectionalLocked(
+    ParentAndRange child_range = FindParentAndRangeForCloneLocked(range.offset, range.len, false);
+
+    return child_range.parent.locked_or(this).CloneChildLocked(
         child_range.parent_offset, child_range.parent_limit, child_range.size,
         child_range.grandparent);
   }
-  return child_range.parent.locked_or(this).CloneBidirectionalLocked(
-      child_range.parent_offset, child_range.parent_limit, child_range.size,
-      child_range.grandparent);
+
+  if (require_unidirectional) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  // If this is non-zero, that means that there are pages which hardware can
+  // touch, so the vmo can't be safely cloned.
+  // TODO: consider immediately forking these pages.
+  if (pinned_page_count_locked()) {
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  VmCompression* compression = Pmm::Node().GetPageCompression();
+
+  // For any content that we have part or full ownership of in the range to be cloned, then the
+  // child, regardless of what actual node it ends up hanging of, will gain part ownership of said
+  // content.
+
+  // To account for any errors that result in needing to roll back we remember the range we have
+  // processed the share counts for.
+  uint64_t shared_end = range.offset;
+  auto rollback = fit::defer([this, &range, &shared_end, compression]() {
+    AssertHeld(lock_ref());
+
+    // Decrement the share count on all pages. As every page we can see is also owned by this, and
+    // we have continuously held our lock, no page should need to be freed as a result.
+    zx_status_t status = RemoveOwnedHierarchyPagesInRangeLocked(
+        [&](VmPageOrMarker* p, const VmCowPages* owner, uint64_t this_offset,
+            uint64_t owner_offset) {
+          if (p->IsPage()) {
+            vm_page_t* page = p->Page();
+            DEBUG_ASSERT(page->object.share_count > 0);
+            page->object.share_count--;
+          } else if (p->IsReference()) {
+            const uint32_t share_count = compression->GetMetadata(p->Reference());
+            DEBUG_ASSERT(share_count > 0);
+            compression->SetMetadata(p->Reference(), share_count - 1);
+          }
+          return ZX_ERR_NEXT;
+        },
+        range.offset, shared_end - range.offset, LockedPtr());
+    DEBUG_ASSERT(status == ZX_OK);
+  });
+
+  // Update any share counts for content the clone will be able to see.
+  zx_status_t status = ForEveryOwnedMutableHierarchyPageInRangeLocked(
+      [&](VmPageOrMarkerRef p, VmCowPages* owner, uint64_t cow_clone_offset,
+          uint64_t owner_offset) {
+        if (p->IsPage()) {
+          p->Page()->object.share_count++;
+        } else if (p->IsReference()) {
+          VmPageOrMarker::ReferenceValue ref = p->Reference();
+          compression->SetMetadata(ref, compression->GetMetadata(ref) + 1);
+        }
+        shared_end = owner_offset + PAGE_SIZE;
+
+        return ZX_ERR_NEXT;
+      },
+      range.offset, range.len, LockedPtr());
+
+  if (status != ZX_OK) {
+    // However far we got is recorded in |shared_end|, and |rollback| will clean it up.
+    return zx::error(status);
+  }
+
+  ParentAndRange child_range = FindParentAndRangeForCloneLocked(range.offset, range.len, true);
+
+  // The bidirectional clone check requires looking at the parent of where we want to hang the
+  // node, which is represented by |child_range.grandparent|.
+  if (!can_bidirectional_clone_locked(child_range.grandparent)) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  // If we found a hidden node to be our parent, then we can just hang a new node under that,
+  // otherwise we need to also create a new hidden node to place this and the new child under.
+  auto result = child_range.parent.locked_or(this).is_hidden()
+                    ? child_range.parent.locked().CloneChildLocked(
+                          child_range.parent_offset, child_range.parent_limit, child_range.size,
+                          child_range.grandparent)
+                    : child_range.parent.locked_or(this).CloneNewHiddenParentLocked(
+                          child_range.parent_offset, child_range.parent_limit, child_range.size,
+                          child_range.grandparent);
+  // If everything went well then we can finally cancel the rollback and let the clone own the
+  // content we added the share counts for.
+  if (result.is_ok()) {
+    rollback.cancel();
+  }
+  return result;
 }
 
 void VmCowPages::RemoveChildLocked(VmCowPages* removed, const LockedPtr& sibling) {
