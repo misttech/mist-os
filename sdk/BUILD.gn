@@ -347,43 +347,6 @@ if (!is_host) {
       ":host_tools_for_single_toolchain($host_toolchain)",
     ]
   }
-
-  # Builds the appropriate atoms depending on the build type - main build, CPU
-  # arch sub-build, and API level sub-build. It selects the deps of
-  # "fuchsia_collection" or "fuchsia_collection_for_subbuilds" as appropriate.
-  # This is only used by vendor repos, which do not have a separate collection
-  # for sub-builds, do not have an internal IDK, and depend on this (indirectly)
-  # from their collection.
-  #
-  # Due to limitations of the build system at the GN/Bazel boundary, this cannot
-  # contain testonly atoms. See https://fxbug.dev/42070088. Libraries and
-  # packages for use in tests absolutely belong in the IDK, but the `testonly`
-  # attribute must be removed before they can be added.
-  sdk_molecule("fuchsia_idk_atoms") {
-    visibility = []
-    visibility += [
-      "//vendor/*",
-
-      # Dependencies related to template sub-targets.
-      ":fuchsia_idk_atoms",
-      ":fuchsia_idk_atoms.validate",
-    ]
-
-    category = "partner"
-
-    if (!sdk_inside_sub_build) {
-      assert(
-          current_build_target_api_level == "PLATFORM" ||
-          # Handle core.x64-sdk_source_sets_and_shlibs-apiXX-build_only builders.
-          # TODO(https://fxbug.dev/42082833): Remove this.
-          override_target_api_level != false)
-      deps = [
-        ":fuchsia_collection.fuchsia_idk_atoms_produced_by_main_platform_build",
-      ]
-    } else {
-      deps = [ ":fuchsia_collection.fuchsia_idk_atoms_produced_by_subbuilds" ]
-    }
-  }
 }  # end if (!is_host)
 
 sdk_molecule("fuchsia_idk_atoms_host_tests") {
