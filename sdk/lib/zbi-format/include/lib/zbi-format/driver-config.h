@@ -30,6 +30,9 @@ typedef uint32_t zbi_kernel_driver_t;
 // 'ATIM'
 #define ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER ((zbi_kernel_driver_t)(0x4d495441u))
 
+// 'ATMM'
+#define ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER_MMIO ((zbi_kernel_driver_t)(0x4d4d5441u))
+
 // 'PL0U'
 #define ZBI_KERNEL_DRIVER_PL011_UART ((zbi_kernel_driver_t)(0x55304c50u))
 
@@ -163,6 +166,23 @@ typedef struct {
   uint32_t irq_sphys;
   uint32_t freq_override;
 } zbi_dcfg_arm_generic_timer_driver_t;
+
+// for ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER_MMIO
+typedef struct {
+  // Base address of `CNTCTLBase` frame.
+  uint64_t base_addr;
+
+  // The frequency of the main counter for the timer.
+  uint32_t frequency;
+
+  // Bitmask containing the set of active frames.
+  uint8_t active_frames_mask;
+  uint8_t reserved0[3];
+
+  // Information for each individual frame.
+  // Inactive frames must be zero-filled.
+  zbi_dcfg_simple_t frames[8];
+} zbi_dcfg_arm_generic_timer_mmio_driver_t;
 
 // for ZBI_KERNEL_DRIVER_AMLOGIC_HDCP
 typedef struct {
