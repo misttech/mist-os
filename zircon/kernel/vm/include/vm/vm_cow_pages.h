@@ -322,6 +322,37 @@ class VmCowPages final : public VmHierarchyBase,
     return page_source_ && page_source_->properties().is_preserving_page_content;
   }
 
+  // If true this node, and all nodes in this hierarchy, are using parent content markers to
+  // indicate when a leaf node may need to walk up the tree to find content.
+  //
+  // When parent content markers are in use an empty page list slot in a leaf node means that there
+  // is *no* visible parent content above, and the parent hierarchy does not have to be searched.
+  //
+  // For memory efficiency, and because it would be redundant, parent content markers are never
+  // placed in the hidden nodes, only leaf nodes.
+  //
+  // The presence of a parent content marker in a leaf node indicates that there *might* be content
+  // in a parent node and that a tree walk *must* be performed to search for it. The reason for
+  // spurious parent content markers is that zero page deduplication could happen on hidden nodes,
+  // which could remove the content, but leave the parent content markers in the leaf nodes. These
+  // parent content markers are redundant and could be cleaned up.
+  //
+  // Use of parent content markers is just the inverse of having a page source, since if there is a
+  // page source we always have to go to it for content as the zero page cannot be assumed. Although
+  // some page sources do supply zero content (physical page provider for contiguous VMOs),
+  // optimizing this check for that is redundant since such page sources do not support
+  // copy-on-write, and so never have children to begin with.
+  bool tree_has_parent_content_markers() const { return !root_has_page_source(); }
+
+  // Indicates whether this node can have parent content markers placed in it. This is just checking
+  // if it is both a leaf node, and the tree overall can have parent content markers.
+  //
+  // Note that even if this is false, if |tree_has_parent_content_markers| is true then reasoning
+  // may need to be done about parent content markers.
+  bool node_has_parent_content_markers() const {
+    return !is_hidden() && tree_has_parent_content_markers();
+  }
+
   // The modified state is only supported for root pager-backed VMOs, and will get queried (and
   // possibly reset) on the next QueryPagerVmoStatsLocked() call. Although the modified state is
   // only tracked for the root VMO.
@@ -1376,9 +1407,11 @@ class VmCowPages final : public VmHierarchyBase,
   // copy-on-write with the child.
   //
   // If there is a parent_ then the passed in |parent| is a locked ptr to it.
+  // An |initial_page_list| may be passed in to populate the clone's page list with any parent
+  // content markers if needed.
   zx::result<LockedRefPtr> CloneNewHiddenParentLocked(uint64_t offset, uint64_t limit,
-                                                      uint64_t size, const LockedPtr& parent)
-      TA_REQ(lock());
+                                                      uint64_t size, VmPageList&& initial_page_list,
+                                                      const LockedPtr& parent) TA_REQ(lock());
 
   // Helper function for |CreateCloneLocked|.
   //
@@ -1388,8 +1421,11 @@ class VmCowPages final : public VmHierarchyBase,
   // Anything in the |parent| above |this| in that range are also copy-in-write with the child.
   //
   // If there is a parent_ then the passed in |parent| is a locked ptr to it.
+  // An |initial_page_list| may be passed in to populate the clone's page list with any parent
+  // content markers if needed.
   zx::result<LockedRefPtr> CloneChildLocked(uint64_t offset, uint64_t limit, uint64_t size,
-                                            const LockedPtr& parent) TA_REQ(lock());
+                                            VmPageList&& initial_page_list, const LockedPtr& parent)
+      TA_REQ(lock());
 
   // Release any pages this VMO can reference from the provided start offset till the end of the
   // VMO. This releases both directly owned pages, as well as pages in hidden parents that may be
@@ -1856,8 +1892,23 @@ class VmCowPages::LookupCursor {
       // content, or if no parent keep returning empty slots. Unfortunately once the cursor returns
       // a nullptr we cannot know where the next content might be. To make things simpler we just
       // invalidate owner if we hit this case and re-walk from the bottom again.
-      if (!owner_cursor_ ||
-          (owner_cursor_->IsEmpty() && owner_info_.owner.locked_or(target_).parent_)) {
+      // Whether or not a parent might have content is a combination of
+      //  1. There must be a parent and the offset within the parent limit
+      //  2. Either the slot is empty, meaning we see the parent, and the node does not use parent
+      //     content markers. Or there is a parent content marker.
+      auto can_see_parent = [&]() TA_REQ(lock()) -> bool {
+        if (!owner_info_.owner.locked_or(target_).parent_) {
+          return false;
+        }
+        if (owner_info_.owner_offset >= owner_info_.owner.locked_or(target_).parent_limit_) {
+          return false;
+        }
+        if (owner_info_.owner.locked_or(target_).node_has_parent_content_markers()) {
+          return owner_cursor_->IsParentContent();
+        }
+        return owner_cursor_->IsEmpty();
+      };
+      if (!owner_cursor_ || can_see_parent()) {
         InvalidateCursor();
       }
     }
@@ -1888,6 +1939,7 @@ class VmCowPages::LookupCursor {
   bool CursorIsPage() const { return owner_cursor_ && owner_cursor_->IsPage(); }
   bool CursorIsMarker() const { return owner_cursor_ && owner_cursor_->IsMarker(); }
   bool CursorIsEmpty() const { return !owner_cursor_ || owner_cursor_->IsEmpty(); }
+  bool CursorIsParentContent() const { return owner_cursor_ && owner_cursor_->IsParentContent(); }
   bool CursorIsReference() const { return owner_cursor_ && owner_cursor_->IsReference(); }
   // Checks if the cursor is exactly at a sentinel, and not generally inside an interval.
   bool CursorIsIntervalZero() const { return owner_cursor_ && owner_cursor_->IsIntervalZero(); }

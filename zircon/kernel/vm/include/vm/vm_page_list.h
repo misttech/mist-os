@@ -40,6 +40,10 @@ class VMPLCursor;
 //                  two will be empty. If the interval spans a single page, it will be represented
 //                  as a Slot sentinel, which is conceptually the same as both a Start and an End
 //                  sentinel.
+//  * ParentContent - Indicates that there might be content for this slot, but the page list in the
+//                    parent must be checked for it. The different between `Empty`, which can also
+//                    indicate that the parent must be searched, and `ParentContent` is up to the
+//                    specific VMO.
 //
 // There are certain invariants that the page list tries to maintain at all times. It might not
 // always be possible to enforce these as the checks involved might be expensive, however it is
@@ -162,6 +166,7 @@ class VmPageOrMarker {
   bool IsReference() const { return GetType() == kReferenceType; }
   bool IsPageOrRef() const { return IsPage() || IsReference(); }
   bool IsInterval() const { return GetType() == kIntervalType; }
+  bool IsParentContent() const { return GetType() == kParentContentType; }
 
   VmPageOrMarker& operator=(VmPageOrMarker&& other) noexcept {
     // Forbid overriding content, as that would leak it.
@@ -177,6 +182,7 @@ class VmPageOrMarker {
   // A PageType that otherwise holds a null pointer is considered to be Empty.
   static VmPageOrMarker Empty() { return VmPageOrMarker{kPageType}; }
   static VmPageOrMarker Marker() { return VmPageOrMarker{kZeroMarkerType}; }
+  static VmPageOrMarker ParentContent() { return VmPageOrMarker{kParentContentType}; }
 
   [[nodiscard]] static VmPageOrMarker Page(vm_page* p) {
     // A null page is incorrect for two reasons
@@ -347,6 +353,7 @@ class VmPageOrMarker {
   static constexpr uint32_t kZeroMarkerType = 0b001;
   static constexpr uint32_t kReferenceType = 0b010;
   static constexpr uint32_t kIntervalType = 0b011;
+  static constexpr uint32_t kParentContentType = 0b100;
 
   // Ensure the reference values have alignment such the type bits can be set without overlapping
   // actual ref being stored. Unlike the page type, which does not allow the 0 value to be stored, a
@@ -960,6 +967,27 @@ class VmPageList final {
     bool found_page = false;
     ForEveryPageInRange(
         [&found_page](const VmPageOrMarker* page, uint64_t offset) {
+          found_page = true;
+          return ZX_ERR_STOP;
+        },
+        start_offset, end_offset);
+    // It is possible that the range forms a part of an interval even if no nodes in the range have
+    // populated slots. We can determine that by checking to see if the start offset in the range
+    // falls in an interval (we could technically perform this check for any inclusive offset in the
+    // range since the range is entirely unpopulated and hence would only fall in the same interval
+    // if applicable).
+    return found_page ? true : IsOffsetInInterval(start_offset);
+  }
+
+  // Similar to |AnyPagesOrIntervalsInRange| but skips over any ParentContent markers, as these do
+  // not represent content owned by this page list, but rather content owned by a parent.
+  bool AnyOwnedPagesOrIntervalsInRange(uint64_t start_offset, uint64_t end_offset) const {
+    bool found_page = false;
+    ForEveryPageInRange(
+        [&found_page](const VmPageOrMarker* page, uint64_t offset) {
+          if (page->IsParentContent()) {
+            return ZX_ERR_NEXT;
+          }
           found_page = true;
           return ZX_ERR_STOP;
         },
