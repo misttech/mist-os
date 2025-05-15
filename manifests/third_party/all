@@ -93,7 +93,7 @@
     <project name="third_party/crashpad"
              path="third_party/crashpad/src"
              remote="https://fuchsia.googlesource.com/third_party/crashpad"
-             revision="7d2bef18f97e83e61f92536a0b23eb72dd36a073"
+             revision="a851732f738eabe220a2706ac338e79a9894a121"
              gerrithost="https://fuchsia-review.googlesource.com"/>
     <project name="chromium/mini_chromium"
              path="third_party/mini_chromium/src"
