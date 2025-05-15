@@ -12,14 +12,11 @@ async fn file_resize_with_sufficient_rights() {
     if !harness.config.supports_truncate {
         return;
     }
+    let entries = vec![file(TEST_FILE, vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    for file_flags in
-        harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
-    {
-        let entries = vec![file(TEST_FILE, vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+    for flags in harness.file_rights.combinations_containing(fio::Rights::WRITE_BYTES) {
+        let file = dir.open_node::<fio::FileMarker>(TEST_FILE, flags, None).await.unwrap();
         file.resize(0)
             .await
             .expect("resize failed")
@@ -34,13 +31,11 @@ async fn file_resize_with_insufficient_rights() {
     if !harness.config.supports_truncate {
         return;
     }
+    let entries = vec![file(TEST_FILE, vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    for file_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES)
-    {
-        let entries = vec![file(TEST_FILE, vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+    for flags in harness.file_rights.combinations_without(fio::Rights::WRITE_BYTES) {
+        let file = dir.open_node::<fio::FileMarker>(TEST_FILE, flags, None).await.unwrap();
         let result = file.resize(0).await.expect("resize failed").map_err(zx::Status::from_raw);
         assert_eq!(result, Err(zx::Status::BAD_HANDLE));
     }

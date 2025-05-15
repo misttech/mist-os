@@ -15,17 +15,14 @@ struct Fixture {
 }
 
 impl Fixture {
-    async fn new(rights: fio::OpenFlags) -> Option<Self> {
+    async fn new(flags: fio::Flags) -> Option<Self> {
         let harness = TestHarness::new().await;
         if !harness.config.supports_link_into || !harness.config.supports_get_token {
             return None;
         }
-
         let entries = vec![file(TEST_FILE, CONTENTS.to_vec()), file("existing", vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-        let file = deprecated_open_file_with_flags(&dir, rights, TEST_FILE).await;
-
+        let file = dir.open_node::<fio::FileMarker>(TEST_FILE, flags, None).await.unwrap();
         Some(Self { _harness: harness, dir, file })
     }
 
@@ -36,9 +33,7 @@ impl Fixture {
 
 #[fuchsia::test]
 async fn file_link_into() {
-    let Some(fixture) =
-        Fixture::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE).await
-    else {
+    let Some(fixture) = Fixture::new(fio::PERM_READABLE | fio::PERM_WRITABLE).await else {
         return;
     };
 
@@ -54,9 +49,7 @@ async fn file_link_into() {
 
 #[fuchsia::test]
 async fn file_link_into_bad_name() {
-    let Some(fixture) =
-        Fixture::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE).await
-    else {
+    let Some(fixture) = Fixture::new(fio::PERM_READABLE | fio::PERM_WRITABLE).await else {
         return;
     };
 
@@ -75,8 +68,8 @@ async fn file_link_into_bad_name() {
 
 #[fuchsia::test]
 async fn file_link_into_insufficient_rights() {
-    for rights in [fio::OpenFlags::RIGHT_READABLE, fio::OpenFlags::RIGHT_WRITABLE] {
-        let Some(fixture) = Fixture::new(rights).await else { return };
+    for flags in [fio::PERM_READABLE, fio::PERM_WRITABLE] {
+        let Some(fixture) = Fixture::new(flags).await else { return };
         assert_eq!(
             fixture
                 .file
@@ -91,9 +84,7 @@ async fn file_link_into_insufficient_rights() {
 
 #[fuchsia::test]
 async fn file_link_into_for_unlinked_file() {
-    let Some(fixture) =
-        Fixture::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE).await
-    else {
+    let Some(fixture) = Fixture::new(fio::PERM_READABLE | fio::PERM_WRITABLE).await else {
         return;
     };
 
@@ -117,9 +108,7 @@ async fn file_link_into_for_unlinked_file() {
 
 #[fuchsia::test]
 async fn file_link_into_existing() {
-    let Some(fixture) =
-        Fixture::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE).await
-    else {
+    let Some(fixture) = Fixture::new(fio::PERM_READABLE | fio::PERM_WRITABLE).await else {
         return;
     };
 
@@ -136,18 +125,22 @@ async fn file_link_into_existing() {
 
 #[fuchsia::test]
 async fn file_link_into_target_unlinked_dir() {
-    let Some(fixture) =
-        Fixture::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE).await
-    else {
+    let Some(fixture) = Fixture::new(fio::PERM_READABLE | fio::PERM_WRITABLE).await else {
         return;
     };
 
-    let target_dir = deprecated_open_dir_with_flags(
-        &fixture.dir,
-        fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        "dir",
-    )
-    .await;
+    let target_dir = fixture
+        .dir
+        .open_node::<fio::DirectoryMarker>(
+            "dir",
+            fio::Flags::FLAG_MUST_CREATE
+                | fio::Flags::PROTOCOL_DIRECTORY
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE,
+            None,
+        )
+        .await
+        .unwrap();
 
     let token = get_token(&target_dir).await.into();
 
