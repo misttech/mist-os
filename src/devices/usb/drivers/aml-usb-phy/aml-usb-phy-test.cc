@@ -5,7 +5,6 @@
 #include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy.h"
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/ddk/metadata.h>
 #include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/zx/clock.h>
@@ -71,15 +70,12 @@ class TestAmlUsbPhyDevice : public AmlUsbPhyDevice {
 class AmlUsbPhyTestEnvironment : public fdf_testing::Environment {
  public:
   void Init(const zx::interrupt& interrupt) {
-    device_server_.Initialize("pdev");
-
     zx::interrupt duplicate;
     ASSERT_OK(interrupt.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate));
     std::map<uint32_t, zx::interrupt> irqs;
     irqs[0] = std::move(duplicate);
     pdev_.SetConfig({.irqs = std::move(irqs)});
 
-    static constexpr uint32_t kMagicNumbers[8] = {};
     static constexpr fuchsia_hardware_usb_phy::AmlogicPhyType kPhyType =
         fuchsia_hardware_usb_phy::AmlogicPhyType::kG12A;
     static const std::vector<fuchsia_hardware_usb_phy::UsbPhyMode> kPhyModes = {
@@ -99,12 +95,7 @@ class AmlUsbPhyTestEnvironment : public fdf_testing::Environment {
     }};
 
     ASSERT_OK(
-        device_server_.AddMetadata(DEVICE_METADATA_PRIVATE, &kMagicNumbers, sizeof(kMagicNumbers)));
-
-    fit::result persisted_metadata = fidl::Persist(kMetadata);
-    ASSERT_TRUE(persisted_metadata.is_ok());
-    ASSERT_OK(device_server_.AddMetadata(DEVICE_METADATA_USB_MODE, persisted_metadata->data(),
-                                         persisted_metadata->size()));
+        pdev_.AddFidlMetadata(fuchsia_hardware_usb_phy::Metadata::kSerializableName, kMetadata));
 
     registers_.ExpectWrite<uint32_t>(RESET1_LEVEL_OFFSET, aml_registers::USB_RESET1_LEVEL_MASK,
                                      aml_registers::USB_RESET1_LEVEL_MASK);
@@ -118,12 +109,6 @@ class AmlUsbPhyTestEnvironment : public fdf_testing::Environment {
   }
 
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    zx_status_t status =
-        device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-
     {
       zx::result result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
           pdev_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()), "pdev");
@@ -146,7 +131,6 @@ class AmlUsbPhyTestEnvironment : public fdf_testing::Environment {
   mock_registers::MockRegisters& registers() { return registers_; }
 
  private:
-  compat::DeviceServer device_server_;
   fdf_fake::FakePDev pdev_;
   mock_registers::MockRegisters registers_{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
 };

@@ -51,10 +51,8 @@ cc_library(
         "_ALL_SOURCE",
     ],
     deps = [
-        "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
         "//sdk/lib/driver/compat/cpp",
         "//src/devices/lib/amlogic",
-        "//src/lib/ddk:ddk_metadata",
         "//zircon/system/ulib/ddk-platform-defs",
         "@fuchsia_sdk//bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cc",
         "@fuchsia_sdk//bind/fuchsia:fuchsia_cc",

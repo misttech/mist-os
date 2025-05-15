@@ -4,8 +4,6 @@
 
 #include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy.h"
 
-#include <fidl/fuchsia.driver.compat/cpp/wire.h>
-
 #include <soc/aml-common/aml-registers.h>
 
 #include "src/devices/usb/drivers/aml-usb-phy/usb-phy-regs.h"

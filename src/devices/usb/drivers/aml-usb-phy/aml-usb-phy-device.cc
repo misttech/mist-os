@@ -5,10 +5,9 @@
 #include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy-device.h"
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <lib/ddk/metadata.h>
-#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 
 #include <mutex>
 
@@ -115,105 +114,97 @@ zx::result<> AmlUsbPhyDevice::Start() {
     reset_register = std::move(result.value());
   }
 
-  // Get metadata.
-  zx::result usb_phy_metadata = compat::GetMetadata<fuchsia_hardware_usb_phy::Metadata>(
-      incoming(), DEVICE_METADATA_USB_MODE, "pdev");
+  zx::result pdev_client_end =
+      incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
+  if (pdev_client_end.is_error()) {
+    fdf::error("Failed to connect to platform device: {}", pdev_client_end);
+    return pdev_client_end.take_error();
+  }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
+
+  zx::result usb_phy_metadata = pdev.GetFidlMetadata<fuchsia_hardware_usb_phy::Metadata>();
   if (usb_phy_metadata.is_error()) {
     fdf::error("Failed to get metadata: {}", usb_phy_metadata);
     return usb_phy_metadata.take_error();
   }
 
   // Get mmio.
-  std::optional<fdf::MmioBuffer> usbctrl_mmio;
   std::vector<UsbPhy2> usbphy2;
   std::vector<UsbPhy3> usbphy3;
-  zx::interrupt irq;
   bool needs_hack = false;
-  {
-    zx::result pdev_client_end =
-        incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
-    if (pdev_client_end.is_error()) {
-      fdf::error("Failed to connect to platform device: {}", pdev_client_end);
-      return pdev_client_end.take_error();
-    }
-    fdf::PDev pdev{std::move(pdev_client_end.value())};
+  zx::result dev_info = pdev.GetDeviceInfo();
+  if (dev_info.is_ok() &&
+      (dev_info->pid == bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2 ||
+       dev_info->pid == bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D3)) {
+    fdf::error("Using hack");
+    needs_hack = true;
+  }
 
-    zx::result dev_info = pdev.GetDeviceInfo();
-    if (dev_info.is_ok() &&
-        (dev_info->pid == bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2 ||
-         dev_info->pid == bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D3)) {
-      fdf::error("Using hack");
-      needs_hack = true;
-    }
+  zx::result usbctrl_mmio = MapMmio(pdev, 0);
+  if (usbctrl_mmio.is_error()) {
+    fdf::error("Failed to map mmio: {}", usbctrl_mmio);
+    return usbctrl_mmio.take_error();
+  }
 
-    zx::result mmio = MapMmio(pdev, 0);
+  uint32_t idx = 1;
+  const auto& usb_phy_modes = usb_phy_metadata.value().usb_phy_modes();
+  if (!usb_phy_modes.has_value()) {
+    fdf::error("Metadata missing usb_phy_modes field");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  for (size_t i = 0; i < usb_phy_modes.value().size(); ++i) {
+    zx::result mmio = MapMmio(pdev, idx);
     if (mmio.is_error()) {
-      fdf::error("Failed to map mmio: {}", mmio);
       return mmio.take_error();
     }
-    usbctrl_mmio.emplace(*std::move(mmio));
-
-    uint32_t idx = 1;
-    const auto& usb_phy_modes = usb_phy_metadata.value().usb_phy_modes();
-    if (!usb_phy_modes.has_value()) {
-      fdf::error("Metadata missing usb_phy_modes field");
+    const auto& phy_mode = usb_phy_modes.value()[i];
+    const auto& protocol = phy_mode.protocol();
+    if (!protocol.has_value()) {
+      fdf::error("Phy-mode {} missing protocol field", i);
       return zx::error(ZX_ERR_INTERNAL);
     }
-    for (size_t i = 0; i < usb_phy_modes.value().size(); ++i) {
-      zx::result mmio = MapMmio(pdev, idx);
-      if (mmio.is_error()) {
-        return mmio.take_error();
-      }
-      const auto& phy_mode = usb_phy_modes.value()[i];
-      const auto& protocol = phy_mode.protocol();
-      if (!protocol.has_value()) {
-        fdf::error("Phy-mode {} missing protocol field", i);
-        return zx::error(ZX_ERR_INTERNAL);
-      }
-      const auto& is_otg_capable = phy_mode.is_otg_capable();
-      if (!is_otg_capable.has_value()) {
-        fdf::error("Phy-mode {} missing is_otg_capable field", i);
-        return zx::error(ZX_ERR_INTERNAL);
-      }
-      const auto& dr_mode = phy_mode.dr_mode();
-      if (!is_otg_capable.has_value()) {
-        fdf::error("Phy-mode {} missing dr_mode field", i);
-        return zx::error(ZX_ERR_INTERNAL);
-      }
-
-      switch (protocol.value()) {
-        case fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20: {
-          usbphy2.emplace_back(usbphy2.size(), std::move(*mmio), is_otg_capable.value(),
-                               dr_mode.value());
-        } break;
-        case fuchsia_hardware_usb_phy::ProtocolVersion::kUsb30: {
-          usbphy3.emplace_back(std::move(*mmio), is_otg_capable.value(), dr_mode.value());
-        } break;
-        default:
-          fdf::error("Unsupported protocol type {}", static_cast<uint32_t>(protocol.value()));
-          break;
-      }
-      idx++;
+    const auto& is_otg_capable = phy_mode.is_otg_capable();
+    if (!is_otg_capable.has_value()) {
+      fdf::error("Phy-mode {} missing is_otg_capable field", i);
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    const auto& dr_mode = phy_mode.dr_mode();
+    if (!is_otg_capable.has_value()) {
+      fdf::error("Phy-mode {} missing dr_mode field", i);
+      return zx::error(ZX_ERR_INTERNAL);
     }
 
-    zx::result irq_result = pdev.GetInterrupt(0);
-    if (irq_result.is_error()) {
-      fdf::error("Failed to get interrupt: {}", irq_result);
-      return irq_result.take_error();
+    switch (protocol.value()) {
+      case fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20: {
+        usbphy2.emplace_back(usbphy2.size(), std::move(*mmio), is_otg_capable.value(),
+                             dr_mode.value());
+      } break;
+      case fuchsia_hardware_usb_phy::ProtocolVersion::kUsb30: {
+        usbphy3.emplace_back(std::move(*mmio), is_otg_capable.value(), dr_mode.value());
+      } break;
+      default:
+        fdf::error("Unsupported protocol type {}", static_cast<uint32_t>(protocol.value()));
+        break;
     }
-    irq = std::move(irq_result.value());
+    idx++;
+  }
 
-    // Optional MMIOs
-    {
-      auto power_mmio = MapMmio(pdev, idx++);
-      auto sleep_mmio = MapMmio(pdev, idx++);
-      if (power_mmio.is_ok() && sleep_mmio.is_ok()) {
-        fdf::info("Found power and sleep MMIO.");
-        auto status = PowerOn(reset_register, *power_mmio, *sleep_mmio);
-        if (status != ZX_OK) {
-          fdf::error("Failed to power on: {}", zx_status_get_string(status));
-          return zx::error(status);
-        }
+  zx::result interrupt = pdev.GetInterrupt(0);
+  if (interrupt.is_error()) {
+    fdf::error("Failed to get interrupt: {}", interrupt);
+    return interrupt.take_error();
+  }
+
+  // Optional MMIOs
+  {
+    auto power_mmio = MapMmio(pdev, idx++);
+    auto sleep_mmio = MapMmio(pdev, idx++);
+    if (power_mmio.is_ok() && sleep_mmio.is_ok()) {
+      fdf::info("Found power and sleep MMIO.");
+      auto status = PowerOn(reset_register, *power_mmio, *sleep_mmio);
+      if (status != ZX_OK) {
+        fdf::error("Failed to power on: {}", zx_status_get_string(status));
+        return zx::error(status);
       }
     }
   }
@@ -225,7 +216,7 @@ zx::result<> AmlUsbPhyDevice::Start() {
     return zx::error(ZX_ERR_INTERNAL);
   }
   device_ = std::make_unique<AmlUsbPhy>(this, phy_type.value(), std::move(reset_register),
-                                        std::move(*usbctrl_mmio), std::move(irq),
+                                        std::move(*usbctrl_mmio), std::move(interrupt.value()),
                                         std::move(usbphy2), std::move(usbphy3), needs_hack);
 
   {
@@ -300,31 +291,19 @@ AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator++() {
     ZX_ASSERT_MSG(result.is_ok(), "Failed to initialize compat server: %s", result.status_string());
   }
 
-  fidl::Arena arena;
-  auto offers = compat_server_.CreateOffers2(arena);
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_usb_phy::Service>(arena, name_));
-  auto args =
-      fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-          .name(arena, name_)
-          .offers2(arena, std::move(offers))
-          .properties(arena,
-                      std::vector{
-                          fdf::MakeProperty(arena, bind_fuchsia::PLATFORM_DEV_VID,
-                                            bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
-                          fdf::MakeProperty(arena, bind_fuchsia::PLATFORM_DEV_PID,
-                                            bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-                          fdf::MakeProperty(arena, bind_fuchsia::PLATFORM_DEV_DID, property_did_),
-                      })
-          .Build();
-
-  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
-
-  fidl::WireResult result =
-      parent_->node_->AddChild(args, std::move(controller_endpoints.server), {});
-  ZX_ASSERT_MSG(result.ok(), "Failed to add child: %s", result.FormatDescription().c_str());
-  ZX_ASSERT_MSG(result->is_ok(), "Failed to add child: %d",
-                static_cast<uint32_t>(result->error_value()));
-  controller_.Bind(std::move(controller_endpoints.client));
+  auto offers = compat_server_.CreateOffers2();
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_usb_phy::Service>(name_));
+  std::vector properties = {
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID, property_did_),
+  };
+  zx::result child = fdf::AddChild(parent_->node_.client_end(), *fdf::Logger::GlobalInstance(),
+                                   name_, properties, offers);
+  ZX_ASSERT_MSG(child.is_ok(), "Failed to add child: %s", child.status_string());
+  controller_.Bind(std::move(child.value()));
 
   return *this;
 }

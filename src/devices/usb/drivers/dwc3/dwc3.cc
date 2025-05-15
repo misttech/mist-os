@@ -51,11 +51,8 @@ zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t 
 
 zx::result<> Dwc3::Start() {
   {  // Compat server initialization.
-    auto result = compat_.Initialize(
-        incoming(), outgoing(), node_name(), name(),
-        compat::ForwardMetadata::Some(
-            {// TODO(b/408003904): Don't forward once DEVICE_METADATA_USB_MODE is no longer used.
-             DEVICE_METADATA_USB_MODE}));
+    auto result = compat_.Initialize(incoming(), outgoing(), node_name(), name(),
+                                     compat::ForwardMetadata::None());
     if (result.is_error()) {
       FDF_LOG(ERROR, "compat_.Initalize(): %s", result.status_string());
       return result.take_error();

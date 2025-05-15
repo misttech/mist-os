@@ -96,13 +96,6 @@ zx::result<> AmlUsbPhyVisitor::DriverVisit(fdf_devicetree::Node& node,
     return zx::error(persisted_metadata.error_value().status());
   }
 
-  fuchsia_hardware_platform_bus::Metadata legacy_usb_phy_metadata = {{
-      .id = std::to_string(DEVICE_METADATA_USB_MODE),
-      .data = persisted_metadata.value(),
-  }};
-  // TODO(b/408003904): Don't add once DEVICE_METADATA_USB_MODE is no longer used.
-  node.AddMetadata(std::move(legacy_usb_phy_metadata));
-
   fuchsia_hardware_platform_bus::Metadata usb_phy_metadata = {{
       .id = fuchsia_hardware_usb_phy::Metadata::kSerializableName,
       .data = std::move(persisted_metadata.value()),
