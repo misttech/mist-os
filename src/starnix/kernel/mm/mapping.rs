@@ -150,7 +150,7 @@ impl Mapping {
 
     #[cfg(feature = "alternate_anon_allocs")]
     pub fn new_private_anonymous(flags: MappingFlags, name: MappingName) -> Mapping {
-        MappingPreCompost {
+        MappingUnsplit {
             backing: MappingBacking::PrivateAnonymous,
             flags,
             max_access: Access::rwx(),
