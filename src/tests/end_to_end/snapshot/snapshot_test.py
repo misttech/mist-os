@@ -78,8 +78,15 @@ class SnapshotPerfResults(action_timer.ActionTimer[None, None]):
             perf_results = self._get_cpu_results(path)
             perf_results.extend(
                 profile.capture_and_compute_metrics(
-                    {"feedback": "feedback.cm", "archivist": "archivist.cm"},
-                    self._device,
+                    process_groups={
+                        "feedback": "feedback.cm",
+                        "archivist": "archivist.cm",
+                    },
+                    dut=self._device,
+                    principal_groups={
+                        "feedback": "core/feedback",
+                        "archivist": "bootstrap/archivist",
+                    },
                 ).metrics
             )
 

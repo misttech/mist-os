@@ -6,5 +6,8 @@ fuchsia.snapshot_test_cpu: CpuP5
 fuchsia.snapshot_test_cpu: CpuP50
 fuchsia.snapshot_test_cpu: CpuP75
 fuchsia.snapshot_test_cpu: CpuP95
-fuchsia.snapshot_test_cpu: Memory/Process/archivist/PrivatePopulated
-fuchsia.snapshot_test_cpu: Memory/Process/feedback/PrivatePopulated
+# TODO(b/381032254): Remove process metrics.
+fuchsia.snapshot_test_cpu: Memory/Process/archivist/PrivatePopulated [optional]
+fuchsia.snapshot_test_cpu: Memory/Process/feedback/PrivatePopulated [optional]
+fuchsia.snapshot_test_cpu: Memory/Principal/archivist/PrivatePopulated
+fuchsia.snapshot_test_cpu: Memory/Principal/feedback/PrivatePopulated
