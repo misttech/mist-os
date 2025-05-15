@@ -4,9 +4,7 @@
 
 pub mod args;
 
-use crate::common::{
-    node_property_key_to_string, node_property_value_to_string, write_node_properties,
-};
+use crate::common::{node_property_value_to_string, write_node_properties};
 use anyhow::{Context, Result};
 use args::ListCompositeNodeSpecsCommand;
 use fidl_fuchsia_driver_development as fdd;
@@ -56,7 +54,7 @@ pub async fn list_composite_node_specs(
             writeln!(writer, "{0: <10}: {1}", "Driver", "None")?;
         }
 
-        if let Some(nodes) = spec.parents {
+        if let Some(nodes) = spec.parents2 {
             writeln!(writer, "{0: <10}: {1}", "Nodes", nodes.len())?;
 
             for (i, node) in nodes.into_iter().enumerate() {
@@ -75,7 +73,7 @@ pub async fn list_composite_node_specs(
                 writeln!(writer, "  {0} {1}", bind_rules_len, "Bind Rules")?;
 
                 for (j, bind_rule) in node.bind_rules.into_iter().enumerate() {
-                    let key = node_property_key_to_string(&bind_rule.key);
+                    let key = &bind_rule.key;
                     let values = bind_rule
                         .values
                         .into_iter()
@@ -186,20 +184,16 @@ mod tests {
                             fdf::CompositeInfo {
                                 spec: Some(fdf::CompositeNodeSpec {
                                     name: Some("test_spec".to_string()),
-                                    parents: Some(vec![fdf::ParentSpec {
-                                        bind_rules: vec![fdf::BindRule {
-                                            key: fdf::NodePropertyKey::StringValue(
-                                                "rule_key".to_string(),
-                                            ),
+                                    parents2: Some(vec![fdf::ParentSpec2 {
+                                        bind_rules: vec![fdf::BindRule2 {
+                                            key: "rule_key".to_string(),
                                             condition: fdf::Condition::Accept,
                                             values: vec![fdf::NodePropertyValue::StringValue(
                                                 "rule_val".to_string(),
                                             )],
                                         }],
-                                        properties: vec![fdf::NodeProperty {
-                                            key: fdf::NodePropertyKey::StringValue(
-                                                "prop_key".to_string(),
-                                            ),
+                                        properties: vec![fdf::NodeProperty2 {
+                                            key: "prop_key".to_string(),
                                             value: fdf::NodePropertyValue::StringValue(
                                                 "prop_val".to_string(),
                                             ),
@@ -213,12 +207,10 @@ mod tests {
                             fdf::CompositeInfo {
                                 spec: Some(fdf::CompositeNodeSpec {
                                     name: Some("test_spec_with_driver".to_string()),
-                                    parents: Some(vec![
-                                        fdf::ParentSpec {
-                                            bind_rules: vec![fdf::BindRule {
-                                                key: fdf::NodePropertyKey::StringValue(
-                                                    "rule_key".to_string(),
-                                                ),
+                                    parents2: Some(vec![
+                                        fdf::ParentSpec2 {
+                                            bind_rules: vec![fdf::BindRule2 {
+                                                key: "rule_key".to_string(),
                                                 condition: fdf::Condition::Accept,
                                                 values: vec![
                                                     fdf::NodePropertyValue::StringValue(
@@ -229,19 +221,17 @@ mod tests {
                                                     ),
                                                 ],
                                             }],
-                                            properties: vec![fdf::NodeProperty {
-                                                key: fdf::NodePropertyKey::StringValue(
-                                                    "prop_key_0".to_string(),
-                                                ),
+                                            properties: vec![fdf::NodeProperty2 {
+                                                key: "prop_key_0".to_string(),
                                                 value: fdf::NodePropertyValue::StringValue(
                                                     "prop_val_0".to_string(),
                                                 ),
                                             }],
                                         },
-                                        fdf::ParentSpec {
+                                        fdf::ParentSpec2 {
                                             bind_rules: vec![
-                                                fdf::BindRule {
-                                                    key: fdf::NodePropertyKey::IntValue(0x0001),
+                                                fdf::BindRule2 {
+                                                    key: "0x0001".to_string(),
                                                     condition: fdf::Condition::Accept,
                                                     values: vec![
                                                         fdf::NodePropertyValue::IntValue(0x42),
@@ -249,8 +239,8 @@ mod tests {
                                                         fdf::NodePropertyValue::IntValue(0x234),
                                                     ],
                                                 },
-                                                fdf::BindRule {
-                                                    key: fdf::NodePropertyKey::IntValue(0xdeadbeef),
+                                                fdf::BindRule2 {
+                                                    key: "0xdeadbeef".to_string(),
                                                     condition: fdf::Condition::Accept,
                                                     values: vec![fdf::NodePropertyValue::IntValue(
                                                         0xbeef,
@@ -258,24 +248,18 @@ mod tests {
                                                 },
                                             ],
                                             properties: vec![
-                                                fdf::NodeProperty {
-                                                    key: fdf::NodePropertyKey::StringValue(
-                                                        "prop_key_1".to_string(),
-                                                    ),
+                                                fdf::NodeProperty2 {
+                                                    key: "prop_key_1".to_string(),
                                                     value: fdf::NodePropertyValue::EnumValue(
                                                         "prop_key_1.prop_val".to_string(),
                                                     ),
                                                 },
-                                                fdf::NodeProperty {
-                                                    key: fdf::NodePropertyKey::StringValue(
-                                                        "prop_key_2".to_string(),
-                                                    ),
+                                                fdf::NodeProperty2 {
+                                                    key: "prop_key_2".to_string(),
                                                     value: fdf::NodePropertyValue::IntValue(0x1),
                                                 },
-                                                fdf::NodeProperty {
-                                                    key: fdf::NodePropertyKey::StringValue(
-                                                        "prop_key_3".to_string(),
-                                                    ),
+                                                fdf::NodeProperty2 {
+                                                    key: "prop_key_3".to_string(),
                                                     value: fdf::NodePropertyValue::BoolValue(true),
                                                 },
                                             ],
@@ -319,26 +303,26 @@ Driver    : None
 Nodes     : 1
 Node 0    : None
   1 Bind Rules
-  [ 1/ 1] : Accept "rule_key" { "rule_val" }
+  [ 1/ 1] : Accept rule_key { "rule_val" }
   1 Properties
-  [ 1/ 1] : Key "prop_key"                     Value "prop_val"
+  [ 1/ 1] : Key prop_key                       Value "prop_val"
 
 Name      : test_spec_with_driver
 Driver    : driver_url
 Nodes     : 2
 Node 0    : "name_one"
   1 Bind Rules
-  [ 1/ 1] : Accept "rule_key" { "rule_val", "rule_val_2" }
+  [ 1/ 1] : Accept rule_key { "rule_val", "rule_val_2" }
   1 Properties
-  [ 1/ 1] : Key "prop_key_0"                   Value "prop_val_0"
+  [ 1/ 1] : Key prop_key_0                     Value "prop_val_0"
 Node 1    : "name_two" (Primary)
   2 Bind Rules
-  [ 1/ 2] : Accept fuchsia.BIND_PROTOCOL { 0x000042, 0x000123, 0x000234 }
+  [ 1/ 2] : Accept 0x0001 { 0x000042, 0x000123, 0x000234 }
   [ 2/ 2] : Accept 0xdeadbeef { 0x00beef }
   3 Properties
-  [ 1/ 3] : Key "prop_key_1"                   Value Enum(prop_key_1.prop_val)
-  [ 2/ 3] : Key "prop_key_2"                   Value 0x000001
-  [ 3/ 3] : Key "prop_key_3"                   Value true
+  [ 1/ 3] : Key prop_key_1                     Value Enum(prop_key_1.prop_val)
+  [ 2/ 3] : Key prop_key_2                     Value 0x000001
+  [ 3/ 3] : Key prop_key_3                     Value true
 
 "#
         );

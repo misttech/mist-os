@@ -39,14 +39,14 @@ pub fn node_property_value_to_string(value: &fdf::NodePropertyValue) -> String {
 }
 
 pub fn write_node_properties(
-    properties: &Vec<fdf::NodeProperty>,
+    properties: &Vec<fdf::NodeProperty2>,
     writer: &mut dyn Write,
 ) -> Result<()> {
     let props_len = properties.len();
     writeln!(writer, "  {0} {1}", props_len, "Properties")?;
 
     for (index, property) in properties.into_iter().enumerate() {
-        let key = node_property_key_to_string(&property.key);
+        let key = &property.key;
         let value = node_property_value_to_string(&property.value);
         writeln!(
             writer,
