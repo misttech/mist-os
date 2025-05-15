@@ -311,7 +311,9 @@ class PrebuildMap(object):
 
             debug_lib = binary.get("debug_lib", None)
 
-            if api_level in ("PLATFORM", 0):
+            # TODO(https://fxbug.dev/310006516): Remove the `if` block when the
+            # `arch/` directory is removed from the IDK.
+            if api_level == "PLATFORM":
                 binaries[arch] = {
                     "link": link_lib,
                 }
@@ -323,7 +325,7 @@ class PrebuildMap(object):
             else:
                 variant = {
                     "constraints": {
-                        "api_level": int(api_level),
+                        "api_level": api_level,
                         "arch": arch,
                     },
                     "values": {

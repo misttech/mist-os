@@ -372,7 +372,7 @@
       "atom_label": "//sdk/lib/fdio:fdio",
       "binaries": [
         {
-          "api_level": false,
+          "api_level": "PLATFORM",
           "arch": "x64",
           "debug_lib": "arch/x64/debug/libfdio.so",
           "dist_lib": "arch/x64/dist/libfdio.so",
