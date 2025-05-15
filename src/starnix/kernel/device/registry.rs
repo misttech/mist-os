@@ -450,6 +450,33 @@ impl DeviceRegistry {
         device
     }
 
+    /// Add a net device to the device registry.
+    ///
+    /// Net devices are different from other devices because they do not have a device number.
+    /// Instead, their `uevent` files have the following format:
+    ///
+    /// ```
+    /// INTERFACE={name}
+    /// IFINDEX={index}
+    /// ```
+    ///
+    /// Currently, we only register the net devices by name and use an empty `uevent` file.
+    pub fn add_net_device<F, N>(&self, name: &FsStr, create_device_sysfs_ops: F) -> Device
+    where
+        F: Fn(Device) -> N + Send + Sync + 'static,
+        N: FsNodeOps,
+    {
+        self.objects.create_device(name, None, self.objects.net_class(), create_device_sysfs_ops)
+    }
+
+    /// Remove a net device from the device registry.
+    ///
+    /// See `add_net_device` for more details.
+    pub fn remove_net_device(&self, device: Device) {
+        assert!(device.metadata.is_none());
+        self.objects.destroy_device(&device);
+    }
+
     /// Directly add a device to the KObjectStore that lacks a device number.
     ///
     /// This function should be used only by device do not have a major or a minor number. You can

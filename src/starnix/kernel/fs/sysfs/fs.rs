@@ -7,8 +7,7 @@ use crate::fs::sysfs::{
     sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, KObjectDirectory,
     VulnerabilitiesClassDirectory,
 };
-use crate::task::net::NetstackDevicesDirectory;
-use crate::task::{CurrentTask, Kernel};
+use crate::task::CurrentTask;
 use crate::vfs::stub_empty_file::StubEmptyFile;
 use crate::vfs::{
     BytesFile, CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps,
@@ -22,7 +21,6 @@ use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::{ino_t, statfs, SYSFS_MAGIC};
-use std::sync::Arc;
 
 pub const SYSFS_DEVICES: &str = "devices";
 pub const SYSFS_BUS: &str = "bus";
@@ -87,13 +85,6 @@ impl SysFs {
         dir.entry(current_task, SYSFS_CLASS, registry.objects.class.ops(), dir_mode);
         dir.entry(current_task, SYSFS_DEV, registry.objects.dev.ops(), dir_mode);
 
-        // TODO(b/297438880): Remove this workaround after net devices are registered correctly.
-        kernel
-            .device_registry
-            .objects
-            .class
-            .get_or_create_child("net".into(), |_| NetstackDevicesDirectory::new_sys_class_net());
-
         sysfs_kernel_directory(current_task, &mut dir);
         sysfs_power_directory(current_task, &mut dir);
 
@@ -128,10 +119,6 @@ impl SysFs {
 }
 
 struct SysFsHandle(FileSystemHandle);
-
-pub fn get_sys_fs(kernel: &Arc<Kernel>) -> Option<FileSystemHandle> {
-    kernel.expando.peek::<SysFsHandle>().map(|h| h.0.clone())
-}
 
 pub fn sys_fs(
     _locked: &mut Locked<'_, Unlocked>,

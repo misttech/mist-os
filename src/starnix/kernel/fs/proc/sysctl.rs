@@ -110,7 +110,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             StubBytesFile::new_node_with_data(
                 "/proc/sys/kernel/domainname",
                 bug_ref!("https://fxbug.dev/322873722"),
-                "(none)"
+                "(none)",
             ),
             mode,
         );
@@ -693,8 +693,8 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
     //	   Change all the interface-specific settings.
     //
     // Note that the all/default directories don't exist in `/sys/class/net`.
-    devs.add_dev(current_task, "all", Some(fs), None /* sys_fs */);
-    devs.add_dev(current_task, "default", Some(fs), None /* sys_fs */);
+    devs.legacy_add_dev(current_task, "all", Some(fs));
+    devs.legacy_add_dev(current_task, "default", Some(fs));
 
     dir.subdir(current_task, "core", 0o555, |dir| {
         dir.entry(

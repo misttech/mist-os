@@ -2,58 +2,65 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::device::kobject::Device;
 use crate::fs::proc::sys_net::ProcSysNetDev;
-use crate::task::CurrentTask;
+use crate::fs::sysfs::DeviceDirectory;
+use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
     unbounded_seek, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystemHandle, FsNode,
-    FsNodeHandle, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
+    FsNodeHandle, FsNodeOps, FsStr, FsString, SeekTarget,
 };
-use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, off_t};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 struct NetstackDevice {
     /// The device-specific directories that are found under `/proc/sys/net`.
     proc_sys_net: Option<ProcSysNetDev>,
-    /// The device-specific node found under `/sys/class.net`.
-    sys_class_net: Option<FsNodeHandle>,
 }
 
 /// Keeps track of network devices and their [`NetstackDevice`].
 #[derive(Default)]
 pub struct NetstackDevices {
+    /// The known netstack devices.
+    devices: Mutex<BTreeMap<FsString, Device>>,
+
+    /// Legacy entries for procfs. Will be remove once we refactor procfs to be dynamically created
+    /// from `devices`.
     entries: Mutex<HashMap<FsString, NetstackDevice>>,
 }
 
 impl NetstackDevices {
-    pub fn add_dev(
+    pub fn add_device(&self, kernel: &Kernel, name: &FsStr) {
+        let mut devices = self.devices.lock();
+        let device = kernel.device_registry.add_net_device(name, DeviceDirectory::new);
+        devices.insert(name.into(), device);
+    }
+
+    pub fn remove_device(&self, kernel: &Kernel, name: &FsStr) {
+        let mut devices = self.devices.lock();
+        if let Some(device) = devices.remove(name) {
+            kernel.device_registry.remove_net_device(device);
+        }
+    }
+
+    pub fn legacy_add_dev(
         &self,
         current_task: &CurrentTask,
         name: &str,
         proc_fs: Option<&FileSystemHandle>,
-        sys_fs: Option<&FileSystemHandle>,
     ) {
         // procfs or sysfs may not be mounted.
         let proc_sys_net = proc_fs.map(|fs| ProcSysNetDev::new(current_task, fs));
-        let sys_class_net = sys_fs.map(|sys_fs| {
-            // nodes in `/sys/class/net` are normally symlinks into
-            // `/sys/devices`. However, currently known use-cases only enumerate
-            // the nodes in `/sys/class/net` so we enable that use-case with the
-            // workaround here where we create empty directories.
-            track_stub!(TODO("https://fxbug.dev/297438880"), "/sys/class/net");
-            StaticDirectoryBuilder::new(sys_fs).build(current_task)
-        });
-
         let mut entries = self.entries.lock();
-        entries.insert(name.into(), NetstackDevice { proc_sys_net, sys_class_net });
+        entries.insert(name.into(), NetstackDevice { proc_sys_net });
     }
 
-    pub fn remove_dev(&self, name: &str) {
+    pub fn legacy_remove_dev(&self, name: &str) {
         let mut entries = self.entries.lock();
         let name: FsString = name.into();
         let _: Option<NetstackDevice> = entries.remove(&name);
@@ -81,10 +88,6 @@ impl NetstackDevicesDirectory {
 
     pub fn new_proc_sys_net_ipv6_neigh() -> Arc<Self> {
         Self::new(|d| d.proc_sys_net.as_ref().map(ProcSysNetDev::get_ipv6_neigh))
-    }
-
-    pub fn new_sys_class_net() -> Arc<Self> {
-        Self::new(|d| d.sys_class_net.as_ref())
     }
 
     fn new(dir_fn: fn(&NetstackDevice) -> Option<&FsNodeHandle>) -> Arc<Self> {

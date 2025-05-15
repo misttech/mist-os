@@ -89,6 +89,11 @@ impl KObjectStore {
         self.get_or_create_class("mem".into(), self.virtual_bus())
     }
 
+    /// The device class used for virtual net devices.
+    pub fn net_class(&self) -> Class {
+        self.get_or_create_class("net".into(), self.virtual_bus())
+    }
+
     /// The device class used for virtual misc devices.
     pub fn misc_class(&self) -> Class {
         self.get_or_create_class("misc".into(), self.virtual_bus())
