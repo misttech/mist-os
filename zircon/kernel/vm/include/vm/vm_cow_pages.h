@@ -631,9 +631,12 @@ class VmCowPages final : public VmHierarchyBase,
   using AttributionCounts = VmObject::AttributionCounts;
   AttributionCounts GetAttributedMemoryInRangeLocked(VmCowRange range) const TA_REQ(lock());
 
-  enum class EvictionHintAction : uint8_t {
-    Follow,
-    Ignore,
+  // TODO(sagebarreda@): consider refactoring eviction out of reclamation so it can be called
+  // instead of using reclamation with `Require`.
+  enum class EvictionAction : uint8_t {
+    FollowHint,
+    IgnoreHint,
+    Require,
   };
 
   // Asks the VMO to attempt to reclaim the specified page. There are a few possible outcomes:
@@ -651,7 +654,8 @@ class VmCowPages final : public VmHierarchyBase,
   // The effect of (2) is that the caller can assume in the case of reclamation failure it will not
   // keep finding this page as a reclamation candidate and infinitely retry it.
   // If the |compressor| is non-null then it must have just had |Arm| called on it.
-  // |hint_action| indicates whether the |always_need| eviction hint should be respected or ignored.
+  // |eviction_action| hints indicates whether the |always_need| eviction hint should be respected
+  // or ignored. Require will force eviction.
   //
   // The actual number of pages reclaimed is returned.
   struct ReclaimCounts {
@@ -662,7 +666,7 @@ class VmCowPages final : public VmHierarchyBase,
 
     uint64_t Total() const { return compressed + discarded + evicted_non_loaned + evicted_loaned; }
   };
-  ReclaimCounts ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
+  ReclaimCounts ReclaimPage(vm_page_t* page, uint64_t offset, EvictionAction eviction_action,
                             VmCompressor* compressor);
 
   // Helper for reclamation functions to perform common checks for whether or not reclamation should
@@ -841,7 +845,7 @@ class VmCowPages final : public VmHierarchyBase,
   // reclaim loaned pages.
   // Is also used as an internal helper by ReclaimPage.
   VmCowPages::ReclaimCounts ReclaimPageForEviction(vm_page_t* page, uint64_t offset,
-                                                   EvictionHintAction hint_action);
+                                                   EvictionAction eviction_action);
 
   // Potentially transitions from Alive->Dead if the cow pages is unreachable (i.e. has no
   // paged_ref_ and no children). Used by the VmObjectPaged when it unlinks the paged_ref_, but

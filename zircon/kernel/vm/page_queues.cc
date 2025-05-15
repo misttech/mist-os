@@ -130,7 +130,7 @@ class PageQueues::LruIsolate {
           }
         }
         if (VmCowPages::ReclaimCounts count = backlink.cow->ReclaimPage(
-                backlink.page, backlink.offset, VmCowPages::EvictionHintAction::Follow, compressor);
+                backlink.page, backlink.offset, VmCowPages::EvictionAction::FollowHint, compressor);
             count.Total() > 0) {
           pq_lru_pages_evicted.Add(count.evicted_non_loaned + count.evicted_loaned);
           pq_lru_pages_discarded.Add(count.discarded);

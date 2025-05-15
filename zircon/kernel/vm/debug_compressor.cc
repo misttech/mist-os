@@ -84,7 +84,7 @@ void VmDebugCompressor::CompressThread() {
       ASSERT(status == ZX_OK);
       if (uint64_t count =
               entry.cow
-                  ->ReclaimPage(entry.page, entry.offset, VmCowPages::EvictionHintAction::Ignore,
+                  ->ReclaimPage(entry.page, entry.offset, VmCowPages::EvictionAction::IgnoreHint,
                                 &instance.get())
                   .Total();
           count > 0) {

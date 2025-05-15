@@ -6687,7 +6687,7 @@ bool VmCowPages::CanReclaimPageLocked(vm_page_t* page, T actual) {
 }
 
 VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, uint64_t offset,
-                                                             EvictionHintAction hint_action) {
+                                                             EvictionAction eviction_action) {
   canary_.Assert();
   // Without a page source to bring the page back in we cannot even think about eviction.
   if (!can_evict()) {
@@ -6712,7 +6712,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   }
 
   // Do not evict if the |always_need| hint is set, unless we are told to ignore the eviction hint.
-  if (page->object.always_need == 1 && hint_action == EvictionHintAction::Follow) {
+  if (page->object.always_need == 1 && eviction_action == EvictionAction::FollowHint) {
     DEBUG_ASSERT(!page->is_loaned());
     // We still need to move the page from the tail of the LRU page queue(s) so that the eviction
     // loop can make progress. Since this page is always needed, move it out of the way and into the
@@ -6737,7 +6737,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   // Page has been accessed, don't evict.
   // TODO(https://fxbug.dev/412464435): don't unmap & return accessed status to avoid checking page
   // queues.
-  if (old_queue != new_queue) {
+  if ((old_queue != new_queue) && (eviction_action != EvictionAction::Require)) {
     vm_vmo_evict_accessed.Add(1);
     return ReclaimCounts{};
   }
@@ -6918,7 +6918,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
 }
 
 VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset,
-                                                  EvictionHintAction hint_action,
+                                                  EvictionAction hint_action,
                                                   VmCompressor* compressor) {
   canary_.Assert();
 
