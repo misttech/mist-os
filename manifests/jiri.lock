@@ -96,18 +96,18 @@
     },
     {
         "package": "fuchsia/drivers/rtc/board_input_bundle_set",
-        "version": "git_revision:0b3d46a7e94c3f3d64329fdbecaac8121c2f390c",
-        "instance_id": "9alBmaQQl6cEISd4Nau7BVRftBK_ZN1eqCkYnUXGjhsC"
+        "version": "git_revision:524b5c953081831a6ab09a0600adbe208fe935e3",
+        "instance_id": "RQpobCc1WGZ84FHZDWSRVmJlWOno7nFhzIu7kE_CsfgC"
     },
     {
         "package": "fuchsia/drivers/rtc/pcf8563/arm64",
-        "version": "git_revision:0b3d46a7e94c3f3d64329fdbecaac8121c2f390c",
-        "instance_id": "3bNaHhsz6KgEhkNwhmpn-LLwCBwL71gMwO1wijtiQV4C"
+        "version": "git_revision:524b5c953081831a6ab09a0600adbe208fe935e3",
+        "instance_id": "J_cYmkN1eVHugOwTcdYV2qcLS8P85Rv3fCHU5wZZzfAC"
     },
     {
         "package": "fuchsia/drivers/rtc/pcf8563/debug-symbols-arm64",
-        "version": "git_revision:0b3d46a7e94c3f3d64329fdbecaac8121c2f390c",
-        "instance_id": "33vJRSuJZ2sAO2Q18A5CImfy7l9bv2JQSRc185PDS3wC"
+        "version": "git_revision:524b5c953081831a6ab09a0600adbe208fe935e3",
+        "instance_id": "LpHhaXai6uEbo6-nulv33wIOmKP9OetAMclNY52ljOUC"
     },
     {
         "package": "fuchsia/drivers/wlan/intel/iwlwifi/debug-symbols-x86_64",
