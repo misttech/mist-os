@@ -1076,7 +1076,19 @@ void AudioCompositeServer::SetElementState(SetElementStateRequest& request,
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
-  // All elements are interconnects, no field is expected or acted upon.
+  // All elements are interconnects or ring_buffers that cannot be stopped or bypassed.
+  if (!request.state().started().value_or(true) || request.state().bypassed().value_or(false)) {
+    // Return an error, but no need to close down the entire protocol channel.
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+  // This driver does not expect or handle vendor_specific_data from clients.
+  if (request.state().vendor_specific_data().has_value()) {
+    FDF_LOG(WARNING,
+            "SetElementState(%zu): ignoring %zu bytes of vendor_specific_data (unsupported)",
+            request.processing_element_id(), request.state().vendor_specific_data()->size());
+  }
+  // No field is acted upon, so if we get this far then we can declare success.
   completer.Reply(zx::ok());
 }
 
