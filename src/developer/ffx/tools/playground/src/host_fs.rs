@@ -185,10 +185,6 @@ impl File for HostFile {
         file.sync_all()?;
         Ok(())
     }
-
-    fn event(&self) -> Result<Option<fidl::Event>, Status> {
-        Ok(None)
-    }
 }
 
 impl FileIo for HostFile {

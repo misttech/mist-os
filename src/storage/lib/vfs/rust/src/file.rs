@@ -230,12 +230,6 @@ pub trait File: Node {
     /// the call returns. It merely guarantees that any changes to the file have been propagated
     /// to the next layer in the storage stack.
     fn sync(&self, mode: SyncMode) -> impl Future<Output = Result<(), Status>> + Send;
-
-    /// Returns an optional event for the file which signals `fuchsia.io2.FileSignal` events to
-    /// clients (e.g. when a file becomes readable).  See `fuchsia.io2.File.Describe`.
-    fn event(&self) -> Result<Option<fidl::Event>, Status> {
-        Ok(None)
-    }
 }
 
 // Trait for handling reads and writes to a file. Files that support Streams should handle reads and

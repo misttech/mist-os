@@ -577,21 +577,13 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
             }
             #[cfg(not(target_os = "fuchsia"))]
             fio::FileRequest::Describe { responder } => {
-                responder.send(fio::FileInfo {
-                    stream: None,
-                    observer: self.file.event()?,
-                    ..Default::default()
-                })?;
+                responder.send(fio::FileInfo { stream: None, ..Default::default() })?;
             }
             #[cfg(target_os = "fuchsia")]
             fio::FileRequest::Describe { responder } => {
                 trace::duration!(c"storage", c"File::Describe");
                 let stream = self.file.duplicate_stream()?;
-                responder.send(fio::FileInfo {
-                    stream,
-                    observer: self.file.event()?,
-                    ..Default::default()
-                })?;
+                responder.send(fio::FileInfo { stream, ..Default::default() })?;
             }
             fio::FileRequest::LinkInto { dst_parent_token, dst, responder } => {
                 async move {
@@ -1139,7 +1131,6 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representa
         // TODO(https://fxbug.dev/324112547): Add support for connecting as Node.
         Ok(fio::Representation::File(fio::FileInfo {
             is_append: Some(self.options.is_append),
-            observer: self.file.event()?,
             #[cfg(target_os = "fuchsia")]
             stream: self.file.duplicate_stream()?,
             #[cfg(not(target_os = "fuchsia"))]
@@ -1158,7 +1149,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representa
         let stream = self.file.duplicate_stream()?;
         #[cfg(not(target_os = "fuchsia"))]
         let stream = None;
-        Ok(fio::NodeInfoDeprecated::File(fio::FileObject { event: self.file.event()?, stream }))
+        Ok(fio::NodeInfoDeprecated::File(fio::FileObject { event: None, stream }))
     }
 }
 
