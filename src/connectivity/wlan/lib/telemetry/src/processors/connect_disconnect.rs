@@ -337,6 +337,32 @@ impl ConnectDisconnectLogger {
             payload: MetricEventPayload::IntegerValue(info.connected_duration.into_millis()),
         });
 
+        let cobalt_disconnect_reason_code = match info.disconnect_source {
+            fidl_sme::DisconnectSource::Ap(cause) | fidl_sme::DisconnectSource::Mlme(cause) => {
+                cause.reason_code.into_primitive()
+            }
+            fidl_sme::DisconnectSource::User(reason) => reason as u16,
+        };
+        // This `max_event_code: 1000` is set in the metrics registry, but doesn't show up in the
+        // generated bindings.
+        let reason_code_max: u16 = 1000;
+        let cobalt_disconnect_reason_code =
+            std::cmp::min(cobalt_disconnect_reason_code, reason_code_max);
+        use metrics::ConnectivityWlanMetricDimensionDisconnectSource as C;
+        let cobalt_disconnect_source = match info.disconnect_source {
+            fidl_sme::DisconnectSource::Ap(..) => C::Ap,
+            fidl_sme::DisconnectSource::User(..) => C::User,
+            fidl_sme::DisconnectSource::Mlme(..) => C::Mlme,
+        };
+        metric_events.push(MetricEvent {
+            metric_id: metrics::DISCONNECT_BREAKDOWN_BY_REASON_CODE_METRIC_ID,
+            event_codes: vec![
+                u32::from(cobalt_disconnect_reason_code),
+                cobalt_disconnect_source as u32,
+            ],
+            payload: MetricEventPayload::Count(1),
+        });
+
         log_cobalt_batch!(self.cobalt_proxy, &metric_events, "log_disconnect_cobalt");
     }
 
@@ -1003,6 +1029,10 @@ mod tests {
         // Log the event
         let disconnect_info = DisconnectInfo {
             connected_duration: zx::BootDuration::from_millis(300_000),
+            disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
+                mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
+                reason_code: fidl_ieee80211::ReasonCode::ApInitiated,
+            }),
             ..fake_disconnect_info()
         };
         let mut test_fut = pin!(logger.log_disconnect(&disconnect_info));
@@ -1022,6 +1052,20 @@ mod tests {
         assert_eq!(
             connected_duration_metrics[0].payload,
             MetricEventPayload::IntegerValue(300_000)
+        );
+
+        let disconnect_by_reason_metrics =
+            test_helper.get_logged_metrics(metrics::DISCONNECT_BREAKDOWN_BY_REASON_CODE_METRIC_ID);
+        assert_eq!(disconnect_by_reason_metrics.len(), 1);
+        assert_eq!(disconnect_by_reason_metrics[0].payload, MetricEventPayload::Count(1));
+        assert_eq!(disconnect_by_reason_metrics[0].event_codes.len(), 2);
+        assert_eq!(
+            disconnect_by_reason_metrics[0].event_codes[0],
+            fidl_ieee80211::ReasonCode::ApInitiated.into_primitive() as u32
+        );
+        assert_eq!(
+            disconnect_by_reason_metrics[0].event_codes[1],
+            metrics::ConnectivityWlanMetricDimensionDisconnectSource::Ap as u32
         );
     }
 
