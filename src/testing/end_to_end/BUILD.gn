@@ -221,6 +221,7 @@ group("workbench_vim3_staging_tests") {
 ############################## Test groups - End ###############################
 
 ############################## WLAN Test groups - Start ###############################
+# Note - `wlan_core_vim3_stable_tests` are not yet running in CQ
 group("wlan_core_vim3_stable_tests") {
   testonly = true
   public_deps = [ "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/functional_tests:wlan_policy_ap_test_fc($host_toolchain)" ]
@@ -236,6 +237,9 @@ group("wlan_core_vim3_unstable_tests") {
 
 group("wlan_core_vim3_staging_tests") {
   testonly = true
-  public_deps = [ ":wlan_core_vim3_unstable_tests" ]
+  public_deps = [
+    ":wlan_core_vim3_stable_tests",
+    ":wlan_core_vim3_unstable_tests",
+  ]
 }
 ############################## WLAN Test groups - End ###############################
