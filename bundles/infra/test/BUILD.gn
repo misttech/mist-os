@@ -30,6 +30,9 @@ group("linux_x64_tools") {
 
   # Tools that are needed on Linux x64, regardless of the current host.
   _linux_x64_only_tools = [
+    # TODO(https://fxbug.dev/417807433): Remove fastboot once it's
+    # no longer needed for flashing.
+    "//build/images/tools:fastboot",
     "//src/diagnostics/triage:triage_bin",
     "//tools/debug/covargs",
     "//tools/testing/resultdb",
