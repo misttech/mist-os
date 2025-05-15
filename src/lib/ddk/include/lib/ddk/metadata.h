@@ -37,10 +37,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // type: uint8_t
 #define DEVICE_METADATA_INTERRUPT_CONTROLLER_TYPE 0x43544E49  // INTC
 
-// Partition info (for GPT driver)
-// type: fuchsia.hardware.gpt.metadata.GptInfo
-#define DEVICE_METADATA_GPT_INFO 0x49545047  // GPTI
-
 // Button Metadata
 // type: fuchsia.buttons.Metadata
 #define DEVICE_METADATA_BUTTONS 0x534E5442  // BTNS

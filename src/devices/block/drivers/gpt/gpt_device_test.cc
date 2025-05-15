@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.gpt.metadata/cpp/fidl.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
@@ -307,103 +306,7 @@ TEST_F(GptDeviceTest, ValidatePartitionBindProps) {
   }
 }
 
-TEST_F(GptDeviceTest, ValidatePartitionGuidWithMap) {
-  const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
-      .partition_info = {{
-          {{
-              .name = "Linux filesystem",
-              .options = {{
-                  .type_guid_override = {{std::array<uint8_t, 16>{GUID_METADATA}}},
-              }},
-          }},
-      }},
-  }};
-
-  fit::result encoded = fidl::Persist(metadata);
-  ASSERT_TRUE(encoded.is_ok());
-
-  fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
-                            encoded.value().size());
-
-  ASSERT_OK(Bind());
-  ASSERT_EQ(fake_parent_->child_count(), 3);
-
-  char name[MAX_PARTITION_NAME_LENGTH];
-  guid_t guid;
-
-  // Device 0
-  PartitionDevice* dev0 = GetDev(0);
-  ASSERT_NOT_NULL(dev0);
-  ASSERT_OK(dev0->BlockPartitionGetName(name, sizeof(name)));
-  ASSERT_EQ(strcmp(name, "Linux filesystem"), 0);
-  ASSERT_OK(dev0->BlockPartitionGetGuid(GUIDTYPE_TYPE, &guid));
-  {
-    uint8_t expected_guid[GPT_GUID_LEN] = GUID_METADATA;
-    EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(&guid), expected_guid, GPT_GUID_LEN);
-  }
-  ASSERT_OK(dev0->BlockPartitionGetGuid(GUIDTYPE_INSTANCE, &guid));
-  {
-    uint8_t expected_guid[GPT_GUID_LEN] = GUID_UNIQUE_PART0;
-    EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(&guid), expected_guid, GPT_GUID_LEN);
-  }
-
-  PartitionDevice* dev1 = GetDev(1);
-  ASSERT_NOT_NULL(dev1);
-  ASSERT_OK(dev1->BlockPartitionGetName(name, sizeof(name)));
-  ASSERT_EQ(kPartition1Name, name);
-
-  ASSERT_OK(dev1->BlockPartitionGetGuid(GUIDTYPE_TYPE, &guid));
-  {
-    uint8_t expected_guid[GPT_GUID_LEN] = GUID_LINUX_FILESYSTEM;
-    EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(&guid), expected_guid, GPT_GUID_LEN);
-  }
-  ASSERT_OK(dev1->BlockPartitionGetGuid(GUIDTYPE_INSTANCE, &guid));
-  {
-    uint8_t expected_guid[GPT_GUID_LEN] = GUID_UNIQUE_PART1;
-    EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(&guid), expected_guid, GPT_GUID_LEN);
-  }
-}
-
-TEST_F(GptDeviceTest, CorruptMetadataMap) {
-  const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
-      .partition_info = {{
-          {{
-              .name = "Linux filesystem",
-              .options = {{
-                  .type_guid_override = {{std::array<uint8_t, 16>{GUID_METADATA}}},
-              }},
-          }},
-      }},
-  }};
-
-  fit::result encoded = fidl::Persist(metadata);
-  ASSERT_TRUE(encoded.is_ok());
-
-  // Set the length of the metadata to be one byte smaller than is expected, which should then fail
-  // loading the driver (rather than continuing with a corrupt GUID map).
-  fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
-                            encoded.value().size() - 1);
-  ASSERT_STATUS(ZX_ERR_INTERNAL, Bind());
-}
-
 TEST_F(GptDeviceTest, BlockOpsPropagate) {
-  const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
-      .partition_info = {{
-          {{
-              .name = "Linux filesystem",
-              .options = {{
-                  .type_guid_override = {{std::array<uint8_t, 16>{GUID_METADATA}}},
-              }},
-          }},
-      }},
-  }};
-
-  fit::result encoded = fidl::Persist(metadata);
-  ASSERT_TRUE(encoded.is_ok());
-
-  fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
-                            encoded.value().size());
-
   ASSERT_OK(Bind());
   ASSERT_EQ(fake_parent_->child_count(), 3);
 
@@ -472,23 +375,6 @@ TEST_F(GptDeviceTest, BlockOpsPropagate) {
 }
 
 TEST_F(GptDeviceTest, BlockOpsOutOfBounds) {
-  const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
-      .partition_info = {{
-          {{
-              .name = "Linux filesystem",
-              .options = {{
-                  .type_guid_override = {{std::array<uint8_t, 16>{GUID_METADATA}}},
-              }},
-          }},
-      }},
-  }};
-
-  fit::result encoded = fidl::Persist(metadata);
-  ASSERT_TRUE(encoded.is_ok());
-
-  fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
-                            encoded.value().size());
-
   ASSERT_OK(Bind());
   ASSERT_EQ(fake_parent_->child_count(), 3);
 
@@ -573,7 +459,9 @@ TEST_F(GptDeviceTest, AddPartition) {
     EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(&guid), expected_guid, GPT_GUID_LEN);
   }
   ASSERT_OK(dev->BlockPartitionGetGuid(GUIDTYPE_INSTANCE, &guid));
-  { EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(&guid), &instance.value, GPT_GUID_LEN); }
+  {
+    EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(&guid), &instance.value, GPT_GUID_LEN);
+  }
 }
 
 TEST_F(GptDeviceTest, AddPartitionWithInvalidGuid) {

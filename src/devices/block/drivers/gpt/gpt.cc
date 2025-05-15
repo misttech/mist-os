@@ -5,7 +5,6 @@
 #include "gpt.h"
 
 #include <assert.h>
-#include <fidl/fuchsia.hardware.gpt.metadata/cpp/wire.h>
 #include <inttypes.h>
 #include <lib/cksum.h>
 #include <lib/ddk/binding_driver.h>
@@ -61,16 +60,6 @@ void uint8_to_guid_string(char* dst, const uint8_t* src) {
   sprintf(dst, "%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X", guid->data1, guid->data2,
           guid->data3, guid->data4[0], guid->data4[1], guid->data4[2], guid->data4[3],
           guid->data4[4], guid->data4[5], guid->data4[6], guid->data4[7]);
-}
-
-void apply_guid_map(const fidl::VectorView<fuchsia_hardware_gpt_metadata::wire::PartitionInfo>& map,
-                    const char* name, uint8_t* type) {
-  for (const auto& entry : map) {
-    if (entry.name.get() == name && entry.options.has_type_guid_override()) {
-      memcpy(type, entry.options.type_guid_override().value.data(), GPT_GUID_LEN);
-      return;
-    }
-  }
 }
 
 }  // namespace
@@ -374,9 +363,6 @@ zx_status_t PartitionManager::AddPartition(block_info_t block_info, size_t block
     zxlogf(ERROR, "gpt: bad partition name, ignoring entry");
     return ZX_ERR_NEXT;
   }
-  if (metadata_ && (*metadata_)->has_partition_info()) {
-    apply_guid_map((*metadata_)->partition_info(), partition_name, entry->type);
-  }
 
   char type_guid[GPT_GUID_STRLEN] = {};
   uint8_to_guid_string(type_guid, entry->type);
@@ -398,14 +384,6 @@ zx_status_t PartitionManager::AddPartition(block_info_t block_info, size_t block
 }
 
 zx_status_t PartitionManager::Bind(void* ctx, zx_device_t* parent) {
-  auto metadata = ddk::GetEncodedMetadata<fuchsia_hardware_gpt_metadata::wire::GptInfo>(
-      parent, DEVICE_METADATA_GPT_INFO);
-  if (!metadata.is_ok() && metadata.status_value() != ZX_ERR_NOT_FOUND) {
-    zxlogf(ERROR, "gpt: GetEncodedMetadata failed: %s",
-           zx_status_get_string(metadata.status_value()));
-    return metadata.status_value();
-  }
-
   block_impl_protocol_t block_protocol;
   if (device_get_protocol(parent, ZX_PROTOCOL_BLOCK, &block_protocol) != ZX_OK) {
     zxlogf(ERROR, "gpt: ERROR: block device parent does not support block protocol");
@@ -458,12 +436,8 @@ zx_status_t PartitionManager::Bind(void* ctx, zx_device_t* parent) {
 
   zxlogf(TRACE, "gpt: found gpt header");
 
-  std::optional<ddk::DecodedMetadata<fuchsia_hardware_gpt_metadata::wire::GptInfo>> metadata_opt;
-  if (metadata.is_ok()) {
-    metadata_opt = std::move(*metadata);
-  }
-  auto manager = std::make_unique<PartitionManager>(std::move(gpt), std::move(metadata_opt),
-                                                    std::move(block_protocol), parent);
+  auto manager =
+      std::make_unique<PartitionManager>(std::move(gpt), std::move(block_protocol), parent);
   if (zx_status_t status =
           manager->DdkAdd(ddk::DeviceAddArgs("gpt").set_flags(DEVICE_ADD_NON_BINDABLE));
       status != ZX_OK) {

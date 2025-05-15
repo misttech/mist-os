@@ -69,8 +69,7 @@ zx_status_t PartitionDevice::AddDevice() {
     auto result = compat_server_.Initialize(
         sdmmc_parent_->parent()->driver_incoming(), sdmmc_parent_->parent()->driver_outgoing(),
         sdmmc_parent_->parent()->driver_node_name(), partition_name_,
-        compat::ForwardMetadata::Some({DEVICE_METADATA_GPT_INFO}), std::move(banjo_config),
-        path_from_parent);
+        compat::ForwardMetadata::None(), std::move(banjo_config), path_from_parent);
     if (result.is_error()) {
       return result.status_value();
     }
