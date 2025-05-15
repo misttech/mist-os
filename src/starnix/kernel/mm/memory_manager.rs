@@ -4762,7 +4762,7 @@ mod tests {
             // Verify that results stop if there is a hole.
             assert_equal(
                 mm_state
-                    .get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 10)
+                    .get_contiguous_mappings_at((addr_a + page_size / 2).unwrap(), page_size * 10)
                     .unwrap(),
                 vec![(map_a, page_size * 2 + page_size / 2)],
             );
