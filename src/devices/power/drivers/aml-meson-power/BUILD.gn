@@ -22,29 +22,36 @@ driver_bind_rules("aml-meson-power-bind") {
   ]
 }
 
-fuchsia_cc_driver("aml-meson-power-driver") {
-  legacy = true
-  output_name = "aml-meson-power"
-  defines = [ "_ALL_SOURCE" ]
-  configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
+source_set("common") {
   sources = [
     "aml-power.cc",
     "aml-power.h",
   ]
-  public_deps = [ "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp" ]
-  deps = [
-    ":aml-meson-power-bind",
+  public_deps = [
     "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
     "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_cpp",
-    "//sdk/lib/fidl",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
     "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//zircon/system/ulib/zx",
+  ]
+  deps = [
+    "//src/lib/ddk:ddk_metadata",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_cc_driver("aml-meson-power-driver") {
+  output_name = "aml-meson-power"
+  defines = [ "_ALL_SOURCE" ]
+  configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
+  deps = [
+    ":aml-meson-power-bind",
+    ":common",
   ]
 }
 
@@ -63,33 +70,16 @@ fuchsia_driver_package("package") {
 
 test("aml-meson-power-test-bin") {
   output_name = "aml-meson-power-test"
-  sources = [
-    "aml-power-test.cc",
-    "aml-power.cc",
-    "aml-power.h",
-  ]
+  sources = [ "aml-power-test.cc" ]
   deps = [
     ":aml-meson-power-bind",
-    "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
+    ":common",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_testing",
     "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_cpp_testing",
-    "//sdk/lib/async-default",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/mmio",
-    "//src/devices/testing/no_ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/mock-function",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 
@@ -97,6 +87,9 @@ fuchsia_unittest_package("aml-meson-power-test") {
   deps = [ ":aml-meson-power-test-bin" ]
   test_specs = {
     environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
 

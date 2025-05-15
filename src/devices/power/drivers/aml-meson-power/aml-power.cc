@@ -4,14 +4,13 @@
 
 #include "aml-power.h"
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/platform-defs.h>
+#include <lib/ddk/metadata.h>
+#include <lib/driver/compat/cpp/metadata.h>
+#include <lib/driver/component/cpp/driver_export.h>
 
 #include <algorithm>
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <vector>
 
 #include <fbl/alloc_checker.h>
@@ -36,11 +35,11 @@ zx_status_t InitPwmProtocolClient(const fidl::WireSyncClient<fuchsia_hardware_pw
 
   auto result = client->Enable();
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: Could not enable PWM", __func__);
+    fdf::error("Failed to send Enable request: {}", result.status_string());
     return result.status();
   }
   if (result.value().is_error()) {
-    zxlogf(ERROR, "%s: Could not enable PWM", __func__);
+    fdf::error("Failed to not enable PWM: {}", zx_status_get_string(result.value().error_value()));
     return result.value().error_value();
   }
   return ZX_OK;
@@ -72,8 +71,7 @@ zx_status_t AmlPower::PowerImplReadPmicCtrlReg(uint32_t index, uint32_t addr, ui
 
 zx_status_t AmlPower::PowerImplDisablePowerDomain(uint32_t index) {
   if (index >= domain_info_.size()) {
-    zxlogf(ERROR, "%s: Requested Disable for a domain that doesn't exist, idx = %u", __func__,
-           index);
+    fdf::error("Requested Disable for a domain that doesn't exist, idx = {}", index);
     return ZX_ERR_OUT_OF_RANGE;
   }
 
@@ -82,8 +80,7 @@ zx_status_t AmlPower::PowerImplDisablePowerDomain(uint32_t index) {
 
 zx_status_t AmlPower::PowerImplEnablePowerDomain(uint32_t index) {
   if (index >= domain_info_.size()) {
-    zxlogf(ERROR, "%s: Requested Enable for a domain that doesn't exist, idx = %u", __func__,
-           index);
+    fdf::error("Requested Enable for a domain that doesn't exist, idx = {}", index);
     return ZX_ERR_OUT_OF_RANGE;
   }
 
@@ -93,14 +90,13 @@ zx_status_t AmlPower::PowerImplEnablePowerDomain(uint32_t index) {
 zx_status_t AmlPower::PowerImplGetPowerDomainStatus(uint32_t index,
                                                     power_domain_status_t* out_status) {
   if (index >= domain_info_.size()) {
-    zxlogf(ERROR,
-           "%s: Requested PowerImplGetPowerDomainStatus for a domain that doesn't exist, idx = %u",
-           __func__, index);
+    fdf::error("Requested PowerImplGetPowerDomainStatus for a domain that doesn't exist, idx = {}",
+               index);
     return ZX_ERR_OUT_OF_RANGE;
   }
 
   if (out_status == nullptr) {
-    zxlogf(ERROR, "%s: out_status must not be null", __func__);
+    fdf::error("out_status must not be null");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -112,14 +108,13 @@ zx_status_t AmlPower::PowerImplGetPowerDomainStatus(uint32_t index,
 zx_status_t AmlPower::PowerImplGetSupportedVoltageRange(uint32_t index, uint32_t* min_voltage,
                                                         uint32_t* max_voltage) {
   if (!min_voltage || !max_voltage) {
-    zxlogf(ERROR, "Need non-nullptr for min_voltage and max_voltage");
+    fdf::error("Need non-nullptr for min_voltage and max_voltage");
     return ZX_ERR_INVALID_ARGS;
   }
 
   if (index >= domain_info_.size()) {
-    zxlogf(ERROR,
-           "%s: Requested GetSupportedVoltageRange for a domain that doesn't exist, idx = %u",
-           __func__, index);
+    fdf::error("Requested GetSupportedVoltageRange for a domain that doesn't exist, idx = {}",
+               index);
     return ZX_ERR_OUT_OF_RANGE;
   }
 
@@ -127,21 +122,20 @@ zx_status_t AmlPower::PowerImplGetSupportedVoltageRange(uint32_t index, uint32_t
   if (domain.vreg) {
     fidl::WireResult params = (*domain.vreg)->GetRegulatorParams();
     if (!params.ok()) {
-      zxlogf(ERROR, "Failed to send request to get regulator params: %s", params.status_string());
+      fdf::error("Failed to send request to get regulator params: {}", params.status_string());
       return params.status();
     }
 
     if (params->is_error()) {
-      zxlogf(ERROR, "Failed to get regulator params: %s",
-             zx_status_get_string(params->error_value()));
+      fdf::error("Failed to get regulator params: {}", zx_status_get_string(params->error_value()));
       return params->error_value();
     }
 
     *min_voltage = CalculateVregVoltage(params.value()->min_uv, params.value()->step_size_uv, 0);
     *max_voltage = CalculateVregVoltage(params.value()->min_uv, params.value()->step_size_uv,
                                         params.value()->num_steps);
-    zxlogf(DEBUG, "%s: Getting %s Cluster VReg Range max = %u, min = %u", __func__,
-           index ? "Little" : "Big", *max_voltage, *min_voltage);
+    fdf::debug("Getting {} Cluster VReg Range max = {}, min = {}", index ? "Little" : "Big",
+               *max_voltage, *min_voltage);
 
     return ZX_OK;
   }
@@ -150,15 +144,14 @@ zx_status_t AmlPower::PowerImplGetSupportedVoltageRange(uint32_t index, uint32_t
     // the maximum voltage is the first element.
     *min_voltage = domain.voltage_table.back().microvolt;
     *max_voltage = domain.voltage_table.front().microvolt;
-    zxlogf(DEBUG, "%s: Getting %s Cluster VReg Range max = %u, min = %u", __func__,
-           index ? "Little" : "Big", *max_voltage, *min_voltage);
+    fdf::debug("Getting {} Cluster VReg Range max = {}, min = {}", index ? "Little" : "Big",
+               *max_voltage, *min_voltage);
 
     return ZX_OK;
   }
 
-  zxlogf(ERROR,
-         "%s: Neither Vreg nor PWM are supported for this cluster. This should never happen.",
-         __func__);
+  fdf::error("Neither Vreg nor PWM are supported for this cluster. This should never happen.",
+             __func__);
   return ZX_ERR_INTERNAL;
 }
 
@@ -179,13 +172,13 @@ zx_status_t AmlPower::GetTargetIndex(const fidl::WireSyncClient<fuchsia_hardware
                        });
 
   if (target == domain.voltage_table.cend()) {
-    zxlogf(ERROR, "%s: Could not find a voltage less than or equal to %u\n", __func__, u_volts);
+    fdf::error("Could not find a voltage less than or equal to {}\n", u_volts);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
   size_t target_idx = target - domain.voltage_table.cbegin();
   if (target_idx >= INT_MAX || target_idx >= domain.voltage_table.size()) {
-    zxlogf(ERROR, "%s: voltage target index out of bounds", __func__);
+    fdf::error("voltage target index out of bounds");
     return ZX_ERR_OUT_OF_RANGE;
   }
   *target_index = static_cast<int>(target_idx);
@@ -202,13 +195,12 @@ zx_status_t AmlPower::GetTargetIndex(const fidl::WireSyncClient<fuchsia_hardware
 
   fidl::WireResult params = vreg->GetRegulatorParams();
   if (!params.ok()) {
-    zxlogf(ERROR, "Failed to send request to get regulator params: %s", params.status_string());
+    fdf::error("Failed to send request to get regulator params: {}", params.status_string());
     return params.status();
   }
 
   if (params->is_error()) {
-    zxlogf(ERROR, "Failed to get regulator params: %s",
-           zx_status_get_string(params->error_value()));
+    fdf::error("Failed to get regulator params: {}", zx_status_get_string(params->error_value()));
     return params->error_value();
   }
 
@@ -218,8 +210,7 @@ zx_status_t AmlPower::GetTargetIndex(const fidl::WireSyncClient<fuchsia_hardware
       params.value()->min_uv, params.value()->step_size_uv, params.value()->num_steps);
   // Find the step value that achieves the requested voltage.
   if (u_volts < min_voltage_uv || u_volts > max_voltage_uv) {
-    zxlogf(ERROR, "%s: Voltage must be between %u and %u microvolts", __func__, min_voltage_uv,
-           max_voltage_uv);
+    fdf::error("Voltage must be between {} and {} microvolts", min_voltage_uv, max_voltage_uv);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -254,11 +245,11 @@ zx_status_t AmlPower::Update(const fidl::WireSyncClient<fuchsia_hardware_vreg::V
                              DomainInfo& domain, uint32_t target_idx) {
   fidl::WireResult step = vreg->SetVoltageStep(target_idx);
   if (!step.ok()) {
-    zxlogf(ERROR, "Failed to send request to set voltage step: %s", step.status_string());
+    fdf::error("Failed to send request to set voltage step: {}", step.status_string());
     return step.status();
   }
   if (step->is_error()) {
-    zxlogf(ERROR, "Failed to set voltage step: %s", zx_status_get_string(step->error_value()));
+    fdf::error("Failed to set voltage step: {}", zx_status_get_string(step->error_value()));
     return step->error_value();
   }
   usleep(kVoltageSettleTimeUs);
@@ -272,7 +263,7 @@ zx_status_t AmlPower::RequestVoltage(const ProtocolClient& client, uint32_t u_vo
   uint32_t target_idx;
   auto status = GetTargetIndex(client, u_volts, domain, &target_idx);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not get target index\n");
+    fdf::error("Could not get target index\n");
     return status;
   }
 
@@ -281,7 +272,7 @@ zx_status_t AmlPower::RequestVoltage(const ProtocolClient& client, uint32_t u_vo
   if (domain.current_voltage_index == DomainInfo::kInvalidIndex) {
     status = Update(client, domain, target_idx);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: Could not update", __func__);
+      fdf::error("Could not update");
       return status;
     }
     return ZX_OK;
@@ -307,7 +298,7 @@ zx_status_t AmlPower::RequestVoltage(const ProtocolClient& client, uint32_t u_vo
     }
     status = Update(client, domain, domain.current_voltage_index);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: Could not update", __func__);
+      fdf::error("Could not update");
       return status;
     }
   }
@@ -317,8 +308,7 @@ zx_status_t AmlPower::RequestVoltage(const ProtocolClient& client, uint32_t u_vo
 zx_status_t AmlPower::PowerImplRequestVoltage(uint32_t index, uint32_t voltage,
                                               uint32_t* actual_voltage) {
   if (index >= domain_info_.size()) {
-    zxlogf(ERROR, "%s: Requested voltage for a range that doesn't exist, idx = %u", __func__,
-           index);
+    fdf::error("Requested voltage for a range that doesn't exist, idx = {}", index);
     return ZX_ERR_OUT_OF_RANGE;
   }
 
@@ -336,13 +326,13 @@ zx_status_t AmlPower::PowerImplRequestVoltage(uint32_t index, uint32_t voltage,
     if ((st == ZX_OK) && actual_voltage) {
       fidl::WireResult params = (*domain.vreg)->GetRegulatorParams();
       if (!params.ok()) {
-        zxlogf(ERROR, "Failed to send request to get regulator params: %s", params.status_string());
+        fdf::error("Failed to send request to get regulator params: {}", params.status_string());
         return params.status();
       }
 
       if (params->is_error()) {
-        zxlogf(ERROR, "Failed to get regulator params: %s",
-               zx_status_get_string(params->error_value()));
+        fdf::error("Failed to get regulator params: {}",
+                   zx_status_get_string(params->error_value()));
         return params->error_value();
       }
 
@@ -357,13 +347,12 @@ zx_status_t AmlPower::PowerImplRequestVoltage(uint32_t index, uint32_t voltage,
 
 zx_status_t AmlPower::PowerImplGetCurrentVoltage(uint32_t index, uint32_t* current_voltage) {
   if (!current_voltage) {
-    zxlogf(ERROR, "Cannot take nullptr for current_voltage");
+    fdf::error("Cannot take nullptr for current_voltage");
     return ZX_ERR_INVALID_ARGS;
   }
 
   if (index >= domain_info_.size()) {
-    zxlogf(ERROR, "%s: Requested voltage for a range that doesn't exist, idx = %u", __func__,
-           index);
+    fdf::error("Requested voltage for a range that doesn't exist, idx = {}", index);
     return ZX_ERR_OUT_OF_RANGE;
   }
 
@@ -375,13 +364,12 @@ zx_status_t AmlPower::PowerImplGetCurrentVoltage(uint32_t index, uint32_t* curre
   } else if (domain.vreg) {
     fidl::WireResult params = (*domain.vreg)->GetRegulatorParams();
     if (!params.ok()) {
-      zxlogf(ERROR, "Failed to send request to get regulator params: %s", params.status_string());
+      fdf::error("Failed to send request to get regulator params: {}", params.status_string());
       return params.status();
     }
 
     if (params->is_error()) {
-      zxlogf(ERROR, "Failed to get regulator params: %s",
-             zx_status_get_string(params->error_value()));
+      fdf::error("Failed to get regulator params: {}", zx_status_get_string(params->error_value()));
       return params->error_value();
     }
 
@@ -394,102 +382,93 @@ zx_status_t AmlPower::PowerImplGetCurrentVoltage(uint32_t index, uint32_t* curre
   return ZX_OK;
 }
 
-void AmlPower::DdkRelease() { delete this; }
+zx::result<> AmlPower::Start() {
+  compat::DeviceServer::BanjoConfig banjo_config{.default_proto_id = ZX_PROTOCOL_POWER_IMPL};
+  banjo_config.callbacks[ZX_PROTOCOL_POWER_IMPL] = banjo_server_.callback();
+  zx::result<> result = compat_server_.Initialize(
+      incoming(), outgoing(), node_name(), kChildNodeName,
+      compat::ForwardMetadata::Some({DEVICE_METADATA_POWER_DOMAINS}), std::move(banjo_config));
+  if (result.is_error()) {
+    fdf::error("Failed to initialize compat server: {}", result);
+    return result.take_error();
+  }
 
-zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
   // Create tries to get all possible metadata and fragments. The required combination of metadata
   // and fragment is expected to be configured appropriately by the board driver. After gathering
   // all the available metadata and fragment DomainInfo for little core and big core (if exists) is
   // populated. DomainInfo vector is then used to construct AmlPower.
-  auto voltage_table =
-      ddk::GetMetadataArray<aml_voltage_table_t>(parent, DEVICE_METADATA_AML_VOLTAGE_TABLE);
+  zx::result voltage_table =
+      compat::GetMetadataArray<aml_voltage_table_t>(incoming(), DEVICE_METADATA_AML_VOLTAGE_TABLE);
   if (voltage_table.is_ok()) {
     if (!IsSortedDescending(*voltage_table)) {
-      zxlogf(ERROR, "%s: Voltage table was not sorted in strictly descending order", __func__);
-      return ZX_ERR_INTERNAL;
+      fdf::error("Voltage table was not sorted in strictly descending order");
+      return zx::error(ZX_ERR_INTERNAL);
     }
-  } else if (voltage_table.error_value() != ZX_ERR_NOT_FOUND) {
-    zxlogf(ERROR, "%s: Failed to get aml voltage table, st = %d", __func__,
-           voltage_table.error_value());
-    return voltage_table.error_value();
+  } else if (voltage_table.status_value() != ZX_ERR_NOT_FOUND) {
+    fdf::error("Failed to get aml voltage table: {}", voltage_table);
+    return voltage_table.take_error();
   }
 
-  zx::result<std::unique_ptr<voltage_pwm_period_ns_t>> pwm_period =
-      ddk::GetMetadata<voltage_pwm_period_ns_t>(parent, DEVICE_METADATA_AML_PWM_PERIOD_NS);
-  if (!pwm_period.is_ok() && pwm_period.error_value() != ZX_ERR_NOT_FOUND) {
-    zxlogf(ERROR, "%s: Failed to get aml pwm period, st = %d", __func__, pwm_period.error_value());
-    return pwm_period.error_value();
+  zx::result pwm_period =
+      compat::GetMetadata<voltage_pwm_period_ns_t>(incoming(), DEVICE_METADATA_AML_PWM_PERIOD_NS);
+  if (pwm_period.is_error() && pwm_period.status_value() != ZX_ERR_NOT_FOUND) {
+    fdf::error("Failed to get aml pwm period: {}", pwm_period);
+    return pwm_period.take_error();
   }
 
-  zx_status_t st;
-  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> primary_cluster_pwm;
   zx::result client_end =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>(parent, "pwm-primary");
-
+      incoming()->Connect<fuchsia_hardware_pwm::Service::Pwm>(kPwmPrimaryParentName);
+  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> primary_cluster_pwm;
   // The fragment may be optional, so we do not return on error.
-  if (!client_end.is_error()) {
-    zxlogf(INFO, "Connected to primary pwm");
+  if (client_end.is_ok()) {
+    fdf::info("Connected to primary pwm");
     primary_cluster_pwm.Bind(std::move(client_end.value()));
-    st = InitPwmProtocolClient(primary_cluster_pwm);
-    if (st != ZX_OK) {
-      zxlogf(ERROR, "%s: Failed to initialize Big Cluster PWM Client, st = %d", __func__, st);
-      return st;
+    zx_status_t status = InitPwmProtocolClient(primary_cluster_pwm);
+    if (status != ZX_OK) {
+      fdf::error("Failed to initialize Big Cluster PWM Client: {}", zx_status_get_string(status));
+      return zx::error(status);
     }
   }
 
   zx::result little_cluster_vreg =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_vreg::Service::Vreg>(parent,
-                                                                           "vreg-pwm-little");
+      incoming()->Connect<fuchsia_hardware_vreg::Service::Vreg>(kVregPwmLittleParentName);
 
   zx::result big_cluster_vreg =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_vreg::Service::Vreg>(parent, "vreg-pwm-big");
+      incoming()->Connect<fuchsia_hardware_vreg::Service::Vreg>(kVregPwmBigParentName);
 
-  std::vector<DomainInfo> domain_info;
   if (primary_cluster_pwm.is_valid() && voltage_table.is_ok() && pwm_period.is_ok()) {
     // For Astro.
-    domain_info.emplace_back(std::move(primary_cluster_pwm), *voltage_table, *pwm_period.value());
+    domain_info_.emplace_back(std::move(primary_cluster_pwm), *voltage_table, *pwm_period.value());
   } else {
     // For Vim3.
     if (big_cluster_vreg.is_error() || little_cluster_vreg.is_error()) {
-      zxlogf(ERROR, "Unable to connect to VReg Devices: big = %s, little = %s",
-             big_cluster_vreg.is_error() ? "Success" : "Failure",
-             little_cluster_vreg.is_error() ? "Success" : "Failure");
-      return ZX_ERR_INTERNAL;
+      fdf::error("Unable to connect to VReg Devices: big={}, little={}", big_cluster_vreg,
+                 little_cluster_vreg);
+      return zx::error(ZX_ERR_INTERNAL);
     }
 
     // TODO(b/376751395): This conflates power domain IDs with indices in the domain_info vector.
     //                    In other words domain IDs are implicitly coupled to their index in this
     //                    vector which creates a fragile mapping from power domain ID to power.
     //                    We should reconsider this.
-    domain_info.emplace_back(
+    domain_info_.emplace_back(
         fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>(std::move(big_cluster_vreg.value())));
-    domain_info.emplace_back(
+    domain_info_.emplace_back(
         fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>(std::move(little_cluster_vreg.value())));
   }
 
-  std::unique_ptr<AmlPower> power_impl_device =
-      std::make_unique<AmlPower>(parent, std::move(domain_info));
-
-  st = power_impl_device->DdkAdd(
-      ddk::DeviceAddArgs("power-impl").forward_metadata(parent, DEVICE_METADATA_POWER_DOMAINS));
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAdd failed, st = %d", __func__, st);
+  std::vector offers = compat_server_.CreateOffers2();
+  std::vector<fuchsia_driver_framework::NodeProperty2> properties = {
+      fdf::MakeProperty2(bind_fuchsia::PROTOCOL, static_cast<uint32_t>(ZX_PROTOCOL_POWER_IMPL))};
+  zx::result child = AddChild(kChildNodeName, properties, offers);
+  if (child.is_error()) {
+    fdf::error("Failed to add child: {}", child);
+    return child.take_error();
   }
 
-  // Let device runner take ownership of this object.
-  [[maybe_unused]] auto* dummy = power_impl_device.release();
-
-  return st;
+  return zx::ok();
 }
-
-static constexpr zx_driver_ops_t aml_power_driver_ops = []() {
-  zx_driver_ops_t driver_ops = {};
-  driver_ops.version = DRIVER_OPS_VERSION;
-  driver_ops.bind = AmlPower::Create;
-  // driver_ops.run_unit_tests = run_test;  # TODO(gkalsi).
-  return driver_ops;
-}();
 
 }  // namespace power
 
-ZIRCON_DRIVER(aml_power, power::aml_power_driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(power::AmlPower);

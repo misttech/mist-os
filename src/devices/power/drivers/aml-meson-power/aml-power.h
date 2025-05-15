@@ -8,21 +8,19 @@
 #include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
 #include <fidl/fuchsia.hardware.vreg/cpp/wire.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/zx/result.h>
 #include <threads.h>
 
 #include <optional>
 #include <vector>
 
-#include <ddktl/device.h>
 #include <soc/aml-common/aml-power.h>
 
 namespace power {
 
-class AmlPower;
-using AmlPowerType = ddk::Device<AmlPower>;
-
-class AmlPower : public AmlPowerType, public ddk::PowerImplProtocol<AmlPower, ddk::base_protocol> {
+class AmlPower : public fdf::DriverBase, public ddk::PowerImplProtocol<AmlPower> {
  public:
   class DomainInfo {
    public:
@@ -43,19 +41,17 @@ class AmlPower : public AmlPowerType, public ddk::PowerImplProtocol<AmlPower, dd
     int current_voltage_index = kInvalidIndex;
   };
 
-  AmlPower(zx_device_t* parent, std::vector<DomainInfo> domain_info)
-      : AmlPowerType(parent), domain_info_(std::move(domain_info)) {}
+  static constexpr std::string_view kDriverName = "aml-power";
+  static constexpr std::string_view kChildNodeName = "power-impl";
+  static constexpr std::string_view kPwmPrimaryParentName = "pwm-primary";
+  static constexpr std::string_view kVregPwmLittleParentName = "vreg-pwm-little";
+  static constexpr std::string_view kVregPwmBigParentName = "vreg-pwm-big";
 
-  AmlPower(const AmlPower&) = delete;
-  AmlPower(AmlPower&&) = delete;
-  AmlPower& operator=(const AmlPower&) = delete;
-  AmlPower& operator=(AmlPower&&) = delete;
+  AmlPower(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
 
-  virtual ~AmlPower() = default;
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
-
-  // Device protocol implementation
-  void DdkRelease();
+  // fdf::DriverBase implementation.
+  zx::result<> Start() override;
 
   zx_status_t PowerImplGetPowerDomainStatus(uint32_t index, power_domain_status_t* out_status);
   zx_status_t PowerImplEnablePowerDomain(uint32_t index);
@@ -81,6 +77,10 @@ class AmlPower : public AmlPowerType, public ddk::PowerImplProtocol<AmlPower, dd
   zx_status_t RequestVoltage(const ProtocolClient& pwm, uint32_t u_volts, DomainInfo& domain);
 
   std::vector<DomainInfo> domain_info_;
+
+  compat::SyncInitializedDeviceServer compat_server_;
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_;
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_POWER_IMPL, this, &power_impl_protocol_ops_};
 };
 
 }  // namespace power
