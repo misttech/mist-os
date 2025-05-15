@@ -37,8 +37,7 @@ zx::result<FidlType> GetMetadataFromFidlService(
   {
     zx::result result = ConnectToMetadataProtocol(incoming, service_name, instance_name);
     if (result.is_error()) {
-      FDF_SLOG(ERROR, "Failed to connect to metadata server.",
-               KV("status", result.status_string()));
+      fdf::error("Failed to connect to metadata server: {}", result.status_string());
       return result.take_error();
     }
     client.Bind(std::move(result.value()));
@@ -47,21 +46,21 @@ zx::result<FidlType> GetMetadataFromFidlService(
   fidl::WireResult<fuchsia_driver_metadata::Metadata::GetPersistedMetadata> persisted_metadata =
       client->GetPersistedMetadata();
   if (!persisted_metadata.ok()) {
-    FDF_SLOG(ERROR, "Failed to send GetPersistedMetadata request.",
-             KV("status", persisted_metadata.status_string()));
+    fdf::error("Failed to send GetPersistedMetadata request: {}",
+               persisted_metadata.status_string());
     return zx::error(persisted_metadata.status());
   }
   if (persisted_metadata->is_error()) {
-    FDF_SLOG(ERROR, "Failed to get persisted metadata.",
-             KV("status", zx_status_get_string(persisted_metadata->error_value())));
+    fdf::error("Failed to get persisted metadata: {}",
+               zx_status_get_string(persisted_metadata->error_value()));
     return zx::error(persisted_metadata->error_value());
   }
 
   fit::result metadata =
       fidl::Unpersist<FidlType>(persisted_metadata.value()->persisted_metadata.get());
   if (metadata.is_error()) {
-    FDF_SLOG(ERROR, "Failed to unpersist metadata.",
-             KV("status", zx_status_get_string(metadata.error_value().status())));
+    fdf::error("Failed to unpersist metadata: {}",
+               zx_status_get_string(metadata.error_value().status()));
     return zx::error(metadata.error_value().status());
   }
 
@@ -92,8 +91,7 @@ zx::result<std::optional<FidlType>> GetMetadataFromFidlServiceIfExists(
   {
     zx::result result = ConnectToMetadataProtocol(incoming, service_name, instance_name);
     if (result.is_error()) {
-      FDF_SLOG(DEBUG, "Failed to connect to metadata server.",
-               KV("status", result.status_string()));
+      fdf::debug("Failed to connect to metadata server: {}", result);
       return zx::ok(std::nullopt);
     }
     client.Bind(std::move(result.value()));
@@ -105,30 +103,29 @@ zx::result<std::optional<FidlType>> GetMetadataFromFidlServiceIfExists(
     if (persisted_metadata.status() == ZX_ERR_PEER_CLOSED) {
       // We assume that the metadata does not exist because we assume that the FIDL server does not
       // exist because we received a peer closed status.
-      FDF_SLOG(DEBUG, "Failed to send GetPersistedMetadata request.",
-               KV("status", persisted_metadata.status_string()));
+      fdf::debug("Failed to send GetPersistedMetadata request: {}",
+                 persisted_metadata.status_string());
       return zx::ok(std::nullopt);
     }
-    FDF_SLOG(ERROR, "Failed to send GetPersistedMetadata request.",
-             KV("status", persisted_metadata.status_string()));
+    fdf::error("Failed to send GetPersistedMetadata request: {}",
+               persisted_metadata.status_string());
     return zx::error(persisted_metadata.status());
   }
   if (persisted_metadata->is_error()) {
     if (persisted_metadata->error_value() == ZX_ERR_NOT_FOUND) {
-      FDF_SLOG(DEBUG, "Failed to get persisted metadata.",
-               KV("status", zx_status_get_string(persisted_metadata->error_value())));
+      fdf::debug("Failed to get persisted metadata: {}",
+                 zx_status_get_string(persisted_metadata->error_value()));
       return zx::ok(std::nullopt);
     }
-    FDF_SLOG(ERROR, "Failed to get persisted metadata.",
-             KV("status", zx_status_get_string(persisted_metadata->error_value())));
+    fdf::error("Failed to get persisted metadata: {}",
+               zx_status_get_string(persisted_metadata->error_value()));
     return zx::error(persisted_metadata->error_value());
   }
 
   fit::result metadata =
       fidl::Unpersist<FidlType>(persisted_metadata.value()->persisted_metadata.get());
   if (metadata.is_error()) {
-    FDF_SLOG(ERROR, "Failed to unpersist metadata.",
-             KV("status", zx_status_get_string(metadata.error_value().status())));
+    fdf::error("Failed to unpersist metadata: {}", metadata.error_value().FormatDescription());
     return zx::error(metadata.error_value().status());
   }
 

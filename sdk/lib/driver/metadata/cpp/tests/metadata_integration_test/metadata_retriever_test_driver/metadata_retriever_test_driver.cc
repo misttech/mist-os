@@ -13,8 +13,7 @@ namespace fdf_metadata::test {
 zx::result<> MetadataRetrieverTestDriver::Start() {
   zx_status_t status = InitControllerNode();
   if (status != ZX_OK) {
-    FDF_SLOG(ERROR, "Failed to initialize controller node.",
-             KV("status", zx_status_get_string(status)));
+    fdf::error("Failed to initialize controller node: {}", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -23,13 +22,13 @@ zx::result<> MetadataRetrieverTestDriver::Start() {
 
 zx_status_t MetadataRetrieverTestDriver::InitControllerNode() {
   if (controller_node_.has_value()) {
-    FDF_SLOG(ERROR, "Controller node already initialized.");
+    fdf::error("Controller node already initialized.");
     return ZX_ERR_BAD_STATE;
   }
 
   zx::result connector = devfs_connector_.Bind(dispatcher());
   if (connector.is_error()) {
-    FDF_SLOG(ERROR, "Failed to bind devfs connector.", KV("status", connector.status_string()));
+    fdf::error("Failed to bind devfs connector: {}", connector);
     return connector.status_value();
   }
 
@@ -37,7 +36,7 @@ zx_status_t MetadataRetrieverTestDriver::InitControllerNode() {
 
   zx::result result = AddOwnedChild(kControllerNodeName, devfs_args);
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add child.", KV("status", result.status_string()));
+    fdf::error("Failed to add child: {}", result);
     return result.status_value();
   }
 
@@ -56,14 +55,14 @@ void MetadataRetrieverTestDriver::GetMetadata(GetMetadataCompleter::Sync& comple
   zx::result metadata = fdf_metadata::GetMetadata<fuchsia_hardware_test::Metadata>(*incoming());
 
   if (metadata.is_error()) {
-    FDF_SLOG(ERROR, "Failed to get metadata.", KV("status", metadata.status_string()));
+    fdf::error("Failed to get metadata: {}", metadata);
     completer.Reply(fit::error(metadata.status_value()));
     return;
   }
 
   completer.Reply(fit::ok(std::move(metadata.value())));
 #else
-  FDF_SLOG(ERROR, "Getting metadata not supported at current Fuchsia API level.");
+  fdf::error("Getting metadata not supported at current Fuchsia API level.");
   completer.Reply(fit::error(ZX_ERR_UNSUPPORTED));
 #endif
 }
@@ -74,7 +73,7 @@ void MetadataRetrieverTestDriver::GetMetadataIfExists(
   zx::result result =
       fdf_metadata::GetMetadataIfExists<fuchsia_hardware_test::Metadata>(*incoming());
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to get metadata.", KV("status", result.status_string()));
+    fdf::error("Failed to get metadata: {}", result);
     completer.Reply(fit::error(result.status_value()));
     return;
   }
@@ -91,7 +90,7 @@ void MetadataRetrieverTestDriver::GetMetadataIfExists(
       {.metadata = std::move(metadata.value()), .retrieved_metadata = true}};
   completer.Reply(fit::ok(std::move(response)));
 #else
-  FDF_SLOG(ERROR, "Getting metadata not supported at current Fuchsia API level.");
+  fdf::error("Getting metadata not supported at current Fuchsia API level.");
   completer.Reply(fit::error(ZX_ERR_UNSUPPORTED));
 #endif
 }

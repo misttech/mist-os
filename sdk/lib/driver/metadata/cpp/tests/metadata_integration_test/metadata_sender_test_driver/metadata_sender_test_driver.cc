@@ -14,8 +14,7 @@ namespace fdf_metadata::test {
 zx::result<> MetadataSenderTestDriver::Start() {
   zx_status_t status = InitControllerNode();
   if (status != ZX_OK) {
-    FDF_SLOG(ERROR, "Failed to initialize controller node.",
-             KV("status", zx_status_get_string(status)));
+    fdf::error("Failed to initialize controller node: {}", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -31,14 +30,14 @@ void MetadataSenderTestDriver::ServeMetadata(ServeMetadataCompleter::Sync& compl
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   zx::result result = metadata_server_.Serve(*outgoing(), dispatcher());
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", result.status_string()));
+    fdf::error("Failed to serve metadata: {}", result);
     completer.Reply(fit::error(result.error_value()));
     return;
   }
   offer_metadata_to_child_nodes_ = true;
   completer.Reply(fit::ok());
 #else
-  FDF_SLOG(ERROR, "Serving metadata not supported at current Fuchsia API level.");
+  fdf::error("Serving metadata not supported at current Fuchsia API level.");
   completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
 #endif
 }
@@ -48,12 +47,12 @@ void MetadataSenderTestDriver::SetMetadata(SetMetadataRequest& request,
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   zx::result result = metadata_server_.SetMetadata(request.metadata());
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to set metadata.", KV("status", result.status_string()));
+    fdf::error("Failed to set metadata: {}", result);
     completer.Reply(fit::error(result.error_value()));
   }
   completer.Reply(fit::ok());
 #else
-  FDF_SLOG(ERROR, "Setting metadata not supported at current Fuchsia API level.");
+  fdf::error("Setting metadata not supported at current Fuchsia API level.");
   completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
 #endif
 }
@@ -112,7 +111,7 @@ zx_status_t MetadataSenderTestDriver::AddMetadataNode(
 #endif
   zx::result result = AddChild(node_name, node_properties, offers);
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add child.", KV("status", result.status_string()));
+    fdf::error("Failed to add child: {}", result);
     return result.status_value();
   }
   metadata_node_controllers_.emplace_back(std::move(result.value()));
@@ -121,13 +120,13 @@ zx_status_t MetadataSenderTestDriver::AddMetadataNode(
 
 zx_status_t MetadataSenderTestDriver::InitControllerNode() {
   if (controller_node_.has_value()) {
-    FDF_SLOG(ERROR, "Controller node already initialized.");
+    fdf::error("Controller node already initialized.");
     return ZX_ERR_BAD_STATE;
   }
 
   zx::result connector = devfs_connector_.Bind(dispatcher());
   if (connector.is_error()) {
-    FDF_SLOG(ERROR, "Failed to bind devfs connector.", KV("status", connector.status_string()));
+    fdf::error("Failed to bind devfs connector: {}", connector);
     return connector.status_value();
   }
 
@@ -135,7 +134,7 @@ zx_status_t MetadataSenderTestDriver::InitControllerNode() {
 
   zx::result result = AddOwnedChild(kControllerNodeName, devfs_args);
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add child.", KV("status", result.status_string()));
+    fdf::error("Failed to add child: {}", result);
     return result.status_value();
   }
 

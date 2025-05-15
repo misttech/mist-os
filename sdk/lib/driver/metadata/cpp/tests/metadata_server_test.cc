@@ -212,7 +212,7 @@ class ForwardMetadataTest : public gtest::TestLoopFixture {
   std::shared_ptr<fdf::Namespace> incoming_;
 
   // Sets the global logger instance which is needed by `fdf_metadata::MetadataServer` in order to
-  // make `FDF_LOG` statements.
+  // make log statements.
   fdf_testing::ScopedGlobalLogger logger_;
 };
 

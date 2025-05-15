@@ -102,7 +102,7 @@ class MetadataTest : public ::testing::Test {
   std::optional<fdf::Namespace> incoming_;
 
   // Sets the global logger instance which is needed by functions within the `fdf_metadata`
-  // namespace in order to make `FDF_LOG` statements.
+  // namespace in order to make log statements.
   fdf_testing::ScopedGlobalLogger logger_;
 };
 
