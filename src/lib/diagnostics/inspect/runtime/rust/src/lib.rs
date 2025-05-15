@@ -12,7 +12,7 @@ use fuchsia_inspect::Inspector;
 use log::error;
 use pin_project::pin_project;
 use std::future::Future;
-use std::pin::Pin;
+use std::pin::{pin, Pin};
 use std::task::{Context, Poll};
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync};
 
@@ -224,6 +224,15 @@ impl PublishedInspectController {
         self.scope.await;
         Some(EscrowToken { token: ep1 })
     }
+
+    /// Cancels the running published controller.
+    ///
+    /// The future resolves when no more serving tasks are running.
+    pub async fn cancel(self) {
+        let Self { scope, inspector: _, tree_koid: _ } = self;
+        let scope = pin!(scope);
+        scope.cancel().await;
+    }
 }
 
 impl Future for PublishedInspectController {
@@ -346,6 +355,35 @@ mod tests {
         );
 
         assert!(request_stream.next().await.is_none());
+    }
+
+    #[fuchsia::test]
+    async fn cancel_published_controller() {
+        let (client, server) = zx::Channel::create();
+        let inspector = Inspector::default();
+        inspector.root().record_string("hello", "world");
+        let controller = publish(
+            &inspector,
+            PublishOptions::default()
+                .on_inspect_sink_client(ClientEnd::<finspect::InspectSinkMarker>::new(client)),
+        )
+        .expect("create controller");
+        let mut request_stream =
+            InspectSinkRequestStream::from_channel(fidl::AsyncChannel::from_channel(server));
+
+        let tree = request_stream.next().await.unwrap();
+
+        let tree = assert_matches!(tree, Ok(InspectSinkRequest::Publish {
+            payload: finspect::InspectSinkPublishRequest { tree: Some(tree), .. }, ..}) => tree
+        );
+
+        assert!(request_stream.next().await.is_none());
+
+        controller.cancel().await;
+        fidl::AsyncChannel::from_channel(tree.into_channel())
+            .on_closed()
+            .await
+            .expect("wait closed");
     }
 
     #[fuchsia::test]
