@@ -252,33 +252,6 @@ void Lp8556Device::GetMaxAbsoluteBrightness(GetMaxAbsoluteBrightnessCompleter::S
   }
 }
 
-void Lp8556Device::SetNormalizedBrightnessScale(
-    SetNormalizedBrightnessScaleRequestView request,
-    SetNormalizedBrightnessScaleCompleter::Sync& completer) {
-  if (!metadata_.allow_set_current_scale) {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-    return;
-  }
-
-  double scale = std::clamp(request->scale, 0.0, 1.0);
-
-  zx_status_t status = SetCurrentScale(static_cast<uint16_t>(scale * kBrightnessRegMaxValue));
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
-  } else {
-    completer.ReplySuccess();
-  }
-}
-
-void Lp8556Device::GetNormalizedBrightnessScale(
-    GetNormalizedBrightnessScaleCompleter::Sync& completer) {
-  if (!metadata_.allow_set_current_scale) {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  } else {
-    completer.ReplySuccess(static_cast<double>(scale_) / kBrightnessRegMaxValue);
-  }
-}
-
 void Lp8556Device::GetPowerWatts(GetPowerWattsCompleter::Sync& completer) {
   // Only supported on Nelson for now.
   if (board_pid_ == PDEV_PID_NELSON) {

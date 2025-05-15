@@ -73,19 +73,6 @@ class Vim3PwmBacklight : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  // `fuchsia_hardware_backlight::Device`
-  void SetNormalizedBrightnessScale(
-      SetNormalizedBrightnessScaleRequestView request,
-      SetNormalizedBrightnessScaleCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  // `fuchsia_hardware_backlight::Device`
-  void GetNormalizedBrightnessScale(
-      GetNormalizedBrightnessScaleCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-
  private:
   // Initialize the hardware controller and sets the backlight to the predefined
   // initial state.
