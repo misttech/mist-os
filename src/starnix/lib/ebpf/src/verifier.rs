@@ -1229,7 +1229,7 @@ impl PartialOrd for Stack {
 
 macro_rules! bpf_log {
     ($context:ident, $verification_context:ident, $($msg:tt)*) => {
-        let prefix = format!("{}: ({:02x})", $context.pc, $verification_context.code[$context.pc].code);
+        let prefix = format!("{}: ({:02x})", $context.pc, $verification_context.code[$context.pc].code());
         let suffix = format!($($msg)*);
         $verification_context.logger.log(format!("{prefix} {suffix}").as_bytes());
     }

@@ -3,15 +3,14 @@
 // found in the LICENSE file.
 
 use crate::{
-    DataWidth, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_ATOMIC, BPF_B,
-    BPF_CALL, BPF_CLS_MASK, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H,
-    BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE,
-    BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDDW, BPF_LDX,
-    BPF_LOAD_STORE_MASK, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR,
+    DataWidth, EbpfInstruction, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH,
+    BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CLS_MASK, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT,
+    BPF_FETCH, BPF_H, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP,
+    BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDDW,
+    BPF_LDX, BPF_LOAD_STORE_MASK, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR,
     BPF_PSEUDO_MAP_IDX, BPF_RSH, BPF_SIZE_MASK, BPF_SRC_MASK, BPF_SRC_REG, BPF_ST, BPF_STX,
     BPF_SUB, BPF_SUB_OP_MASK, BPF_TO_BE, BPF_W, BPF_XCHG, BPF_XOR,
 };
-use linux_uapi::bpf_insn;
 
 /// The index into the registers. 10 is the stack pointer.
 pub type Register = u8;
@@ -25,12 +24,12 @@ pub enum Source {
     Value(u64),
 }
 
-impl From<&bpf_insn> for Source {
-    fn from(instruction: &bpf_insn) -> Self {
-        if instruction.code & BPF_SRC_MASK == BPF_SRC_REG {
+impl From<&EbpfInstruction> for Source {
+    fn from(instruction: &EbpfInstruction) -> Self {
+        if instruction.code() & BPF_SRC_MASK == BPF_SRC_REG {
             Self::Reg(instruction.src_reg())
         } else {
-            Self::Value(instruction.imm as u64)
+            Self::Value(instruction.imm() as u64)
         }
     }
 }
@@ -517,19 +516,19 @@ pub trait BpfVisitor {
     fn visit<'a>(
         &mut self,
         context: &mut Self::Context<'a>,
-        code: &[bpf_insn],
+        code: &[EbpfInstruction],
     ) -> Result<(), String> {
         if code.is_empty() {
             return Err("incomplete instruction".to_string());
         }
         let instruction = &code[0];
         let invalid_op_code =
-            || -> Result<(), String> { Err(format!("invalid op code {:x}", instruction.code)) };
+            || -> Result<(), String> { Err(format!("invalid op code {:x}", instruction.code())) };
 
-        let class = instruction.code & BPF_CLS_MASK;
+        let class = instruction.code() & BPF_CLS_MASK;
         match class {
             BPF_ALU64 | BPF_ALU => {
-                let alu_op = instruction.code & BPF_SUB_OP_MASK;
+                let alu_op = instruction.code() & BPF_SUB_OP_MASK;
                 let is_64 = class == BPF_ALU64;
                 match alu_op {
                     BPF_ADD => {
@@ -721,15 +720,15 @@ pub trait BpfVisitor {
                         }
                     }
                     BPF_END => {
-                        let is_be = instruction.code & BPF_TO_BE == BPF_TO_BE;
-                        let width = match instruction.imm {
+                        let is_be = instruction.code() & BPF_TO_BE == BPF_TO_BE;
+                        let width = match instruction.imm() {
                             16 => DataWidth::U16,
                             32 => DataWidth::U32,
                             64 => DataWidth::U64,
                             _ => {
                                 return Err(format!(
                                     "invalid width for endianness operation: {}",
-                                    instruction.imm
+                                    instruction.imm()
                                 ))
                             }
                         };
@@ -743,7 +742,7 @@ pub trait BpfVisitor {
                 }
             }
             BPF_JMP | BPF_JMP32 => {
-                let jmp_op = instruction.code & BPF_SUB_OP_MASK;
+                let jmp_op = instruction.code() & BPF_SUB_OP_MASK;
                 let is_64 = class == BPF_JMP;
                 match jmp_op {
                     BPF_JEQ => {
@@ -752,14 +751,14 @@ pub trait BpfVisitor {
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         } else {
                             return self.jeq(
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         }
                     }
@@ -769,14 +768,14 @@ pub trait BpfVisitor {
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         } else {
                             return self.jgt(
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         }
                     }
@@ -786,14 +785,14 @@ pub trait BpfVisitor {
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         } else {
                             return self.jge(
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         }
                     }
@@ -803,14 +802,14 @@ pub trait BpfVisitor {
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         } else {
                             return self.jset(
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         }
                     }
@@ -820,14 +819,14 @@ pub trait BpfVisitor {
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         } else {
                             return self.jne(
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         }
                     }
@@ -837,14 +836,14 @@ pub trait BpfVisitor {
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         } else {
                             return self.jsgt(
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         }
                     }
@@ -854,14 +853,14 @@ pub trait BpfVisitor {
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         } else {
                             return self.jsge(
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         }
                     }
@@ -871,14 +870,14 @@ pub trait BpfVisitor {
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         } else {
                             return self.jlt(
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         }
                     }
@@ -888,14 +887,14 @@ pub trait BpfVisitor {
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         } else {
                             return self.jle(
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         }
                     }
@@ -905,14 +904,14 @@ pub trait BpfVisitor {
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         } else {
                             return self.jslt(
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         }
                     }
@@ -922,25 +921,25 @@ pub trait BpfVisitor {
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         } else {
                             return self.jsle(
                                 context,
                                 instruction.dst_reg(),
                                 Source::from(instruction),
-                                instruction.off,
+                                instruction.offset(),
                             );
                         }
                     }
 
                     BPF_JA => {
-                        return self.jump(context, instruction.off);
+                        return self.jump(context, instruction.offset());
                     }
                     BPF_CALL => {
                         if instruction.src_reg() == 0 {
                             // Call to external function
-                            return self.call_external(context, instruction.imm as u32);
+                            return self.call_external(context, instruction.imm() as u32);
                         }
                         // Unhandled call
                         return Err(format!(
@@ -955,7 +954,7 @@ pub trait BpfVisitor {
                 }
             }
             BPF_LD => {
-                if instruction.code == BPF_LDDW {
+                if instruction.code() == BPF_LDDW {
                     if code.len() < 2 {
                         return Err(format!("incomplete lddw"));
                     }
@@ -967,15 +966,15 @@ pub trait BpfVisitor {
 
                     match instruction.src_reg() {
                         0 => {
-                            let value: u64 = ((instruction.imm as u32) as u64)
-                                | (((next_instruction.imm as u32) as u64) << 32);
+                            let value: u64 = ((instruction.imm() as u32) as u64)
+                                | (((next_instruction.imm() as u32) as u64) << 32);
                             return self.load64(context, instruction.dst_reg(), value, 1);
                         }
                         BPF_PSEUDO_MAP_IDX => {
                             return self.load_map_ptr(
                                 context,
                                 instruction.dst_reg(),
-                                instruction.imm as u32,
+                                instruction.imm() as u32,
                                 1,
                             );
                         }
@@ -984,14 +983,14 @@ pub trait BpfVisitor {
                         }
                     }
                 }
-                let width = match instruction.code & BPF_SIZE_MASK {
+                let width = match instruction.code() & BPF_SIZE_MASK {
                     BPF_B => DataWidth::U8,
                     BPF_H => DataWidth::U16,
                     BPF_W => DataWidth::U32,
                     BPF_DW => DataWidth::U64,
                     _ => unreachable!(),
                 };
-                let register_offset = match instruction.code & BPF_LOAD_STORE_MASK {
+                let register_offset = match instruction.code() & BPF_LOAD_STORE_MASK {
                     BPF_ABS => None,
                     BPF_IND => Some(instruction.src_reg()),
                     _ => return invalid_op_code(),
@@ -1002,13 +1001,13 @@ pub trait BpfVisitor {
                     0,
                     // Read the packet from r6
                     6,
-                    instruction.imm,
+                    instruction.imm(),
                     register_offset,
                     width,
                 );
             }
             BPF_STX | BPF_ST | BPF_LDX => {
-                let width = match instruction.code & BPF_SIZE_MASK {
+                let width = match instruction.code() & BPF_SIZE_MASK {
                     BPF_B => DataWidth::U8,
                     BPF_H => DataWidth::U16,
                     BPF_W => DataWidth::U32,
@@ -1016,39 +1015,39 @@ pub trait BpfVisitor {
                     _ => unreachable!(),
                 };
                 if class == BPF_LDX {
-                    if instruction.code & BPF_LOAD_STORE_MASK != BPF_MEM {
+                    if instruction.code() & BPF_LOAD_STORE_MASK != BPF_MEM {
                         // Unsupported instruction.
                         return invalid_op_code();
                     }
                     return self.load(
                         context,
                         instruction.dst_reg(),
-                        instruction.off,
+                        instruction.offset(),
                         instruction.src_reg(),
                         width,
                     );
                 } else {
-                    if instruction.code & BPF_LOAD_STORE_MASK == BPF_MEM {
+                    if instruction.code() & BPF_LOAD_STORE_MASK == BPF_MEM {
                         let src = if class == BPF_ST {
-                            Source::Value(instruction.imm as u64)
+                            Source::Value(instruction.imm() as u64)
                         } else {
                             Source::Reg(instruction.src_reg())
                         };
                         return self.store(
                             context,
                             instruction.dst_reg(),
-                            instruction.off,
+                            instruction.offset(),
                             src,
                             width,
                         );
-                    } else if instruction.code & BPF_LOAD_STORE_MASK == BPF_ATOMIC {
+                    } else if instruction.code() & BPF_LOAD_STORE_MASK == BPF_ATOMIC {
                         if !matches!(width, DataWidth::U32 | DataWidth::U64) {
                             return Err(format!(
                                 "unsupported atomic operation of width {}",
                                 width.bytes()
                             ));
                         }
-                        let operation = instruction.imm as u8;
+                        let operation = instruction.imm() as u8;
                         let fetch = operation & BPF_FETCH == BPF_FETCH;
                         let is_64 = width == DataWidth::U64;
                         const BPF_ADD_AND_FETCH: u8 = BPF_ADD | BPF_FETCH;
@@ -1062,7 +1061,7 @@ pub trait BpfVisitor {
                                         context,
                                         fetch,
                                         instruction.dst_reg(),
-                                        instruction.off,
+                                        instruction.offset(),
                                         instruction.src_reg(),
                                     )
                                 } else {
@@ -1070,7 +1069,7 @@ pub trait BpfVisitor {
                                         context,
                                         fetch,
                                         instruction.dst_reg(),
-                                        instruction.off,
+                                        instruction.offset(),
                                         instruction.src_reg(),
                                     )
                                 }
@@ -1081,7 +1080,7 @@ pub trait BpfVisitor {
                                         context,
                                         fetch,
                                         instruction.dst_reg(),
-                                        instruction.off,
+                                        instruction.offset(),
                                         instruction.src_reg(),
                                     )
                                 } else {
@@ -1089,7 +1088,7 @@ pub trait BpfVisitor {
                                         context,
                                         fetch,
                                         instruction.dst_reg(),
-                                        instruction.off,
+                                        instruction.offset(),
                                         instruction.src_reg(),
                                     )
                                 }
@@ -1100,7 +1099,7 @@ pub trait BpfVisitor {
                                         context,
                                         fetch,
                                         instruction.dst_reg(),
-                                        instruction.off,
+                                        instruction.offset(),
                                         instruction.src_reg(),
                                     )
                                 } else {
@@ -1108,7 +1107,7 @@ pub trait BpfVisitor {
                                         context,
                                         fetch,
                                         instruction.dst_reg(),
-                                        instruction.off,
+                                        instruction.offset(),
                                         instruction.src_reg(),
                                     )
                                 }
@@ -1119,7 +1118,7 @@ pub trait BpfVisitor {
                                         context,
                                         fetch,
                                         instruction.dst_reg(),
-                                        instruction.off,
+                                        instruction.offset(),
                                         instruction.src_reg(),
                                     )
                                 } else {
@@ -1127,7 +1126,7 @@ pub trait BpfVisitor {
                                         context,
                                         fetch,
                                         instruction.dst_reg(),
-                                        instruction.off,
+                                        instruction.offset(),
                                         instruction.src_reg(),
                                     )
                                 }
@@ -1138,7 +1137,7 @@ pub trait BpfVisitor {
                                         context,
                                         fetch,
                                         instruction.dst_reg(),
-                                        instruction.off,
+                                        instruction.offset(),
                                         instruction.src_reg(),
                                     )
                                 } else {
@@ -1146,7 +1145,7 @@ pub trait BpfVisitor {
                                         context,
                                         fetch,
                                         instruction.dst_reg(),
-                                        instruction.off,
+                                        instruction.offset(),
                                         instruction.src_reg(),
                                     )
                                 }
@@ -1156,14 +1155,14 @@ pub trait BpfVisitor {
                                     self.atomic_cmpxchg64(
                                         context,
                                         instruction.dst_reg(),
-                                        instruction.off,
+                                        instruction.offset(),
                                         instruction.src_reg(),
                                     )
                                 } else {
                                     self.atomic_cmpxchg(
                                         context,
                                         instruction.dst_reg(),
-                                        instruction.off,
+                                        instruction.offset(),
                                         instruction.src_reg(),
                                     )
                                 }

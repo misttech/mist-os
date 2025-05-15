@@ -19,7 +19,7 @@ use fidl_fuchsia_ebpf as febpf;
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::auth::{CAP_BPF, CAP_NET_ADMIN, CAP_PERFMON, CAP_SYS_ADMIN};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::{bpf_attr__bindgen_ty_4, bpf_insn, errno, error};
+use starnix_uapi::{bpf_attr__bindgen_ty_4, errno, error};
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 
@@ -70,7 +70,7 @@ impl Program {
         current_task: &CurrentTask,
         info: ProgramInfo,
         logger: &mut dyn OutputBuffer,
-        mut code: Vec<bpf_insn>,
+        mut code: Vec<EbpfInstruction>,
     ) -> Result<Program, Errno> {
         Self::check_load_access(current_task, &info)?;
         let maps = link_maps_fds(current_task, &mut code)?;
@@ -205,7 +205,7 @@ fn link_maps_fds(
     let code_len = code.len();
     let mut maps = Vec::<PinnedMap>::new();
     for (pc, instruction) in code.iter_mut().enumerate() {
-        if instruction.code == BPF_LDDW {
+        if instruction.code() == BPF_LDDW {
             // BPF_LDDW requires 2 instructions.
             if pc >= code_len - 1 {
                 return error!(EINVAL);
@@ -218,7 +218,7 @@ fn link_maps_fds(
                     // and create a reference from this program to that object.
                     instruction.set_src_reg(BPF_PSEUDO_MAP_IDX);
 
-                    let fd = FdNumber::from_raw(instruction.imm);
+                    let fd = FdNumber::from_raw(instruction.imm());
                     let object = get_bpf_object(current_task, fd)?;
                     let map: &PinnedMap = object.as_map()?;
 
@@ -234,7 +234,7 @@ fn link_maps_fds(
                         }
                     };
 
-                    instruction.imm = index.try_into().unwrap();
+                    instruction.set_imm(index.try_into().unwrap());
                 }
                 BPF_PSEUDO_MAP_IDX
                 | BPF_PSEUDO_MAP_VALUE
