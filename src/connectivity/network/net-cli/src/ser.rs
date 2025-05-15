@@ -230,6 +230,7 @@ pub struct ForwardingEntry {
     #[serde(rename = "gateway")]
     next_hop: Option<std::net::IpAddr>,
     metric: u32,
+    table_id: u32,
 }
 
 /// Errors returned when converting from [`froutes_ext::InstalledRoute`]
@@ -246,7 +247,7 @@ impl<I: net_types::ip::Ip> TryFrom<froutes_ext::InstalledRoute<I>> for Forwardin
         let froutes_ext::InstalledRoute {
             route: froutes_ext::Route { destination, action, properties: _ },
             effective_properties: froutes_ext::EffectiveRouteProperties { metric },
-            table_id: _,
+            table_id,
         } = route;
         let (device_id, next_hop) = match action {
             froutes_ext::RouteAction::Forward(froutes_ext::RouteTarget {
@@ -259,7 +260,7 @@ impl<I: net_types::ip::Ip> TryFrom<froutes_ext::InstalledRoute<I>> for Forwardin
         };
         let subnet = destination.into();
         let next_hop = next_hop.map(|next_hop| next_hop.get().to_ip_addr().into());
-        Ok(Self { subnet, device_id, next_hop, metric })
+        Ok(Self { subnet, device_id, next_hop, metric, table_id: table_id.get() })
     }
 }
 

@@ -3238,19 +3238,22 @@ mac               -
                 "destination":{"addr":"1.1.1.0","prefix_len":24},
                 "gateway":"1.1.1.2",
                 "metric":4,
-                "nicid":3
+                "nicid":3,
+                "table_id":0,
             },
             {
                 "destination":{"addr":"10.10.10.0","prefix_len":24},
                 "gateway":"10.10.10.20",
                 "metric":40,
-                "nicid":30
+                "nicid":30,
+                "table_id":1,
             },
             {
                 "destination":{"addr":"fe80::","prefix_len":64},
                 "gateway":serde_json::Value::Null,
                 "metric":400,
-                "nicid":300
+                "nicid":300,
+                "table_id":2,
             }
 
         ])
