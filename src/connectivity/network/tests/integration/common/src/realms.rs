@@ -20,6 +20,7 @@ use {
     fidl_fuchsia_net_masquerade as fnet_masquerade,
     fidl_fuchsia_net_multicast_admin as fnet_multicast_admin, fidl_fuchsia_net_name as fnet_name,
     fidl_fuchsia_net_ndp as fnet_ndp, fidl_fuchsia_net_neighbor as fnet_neighbor,
+    fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy,
     fidl_fuchsia_net_reachability as fnet_reachability, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_net_test_realm as fntr,
@@ -197,6 +198,7 @@ pub enum ManagerConfig {
     AllDelegated,
     IfacePrefix,
     DuplicateNames,
+    EnableSocketProxy,
     PacketFilterEthernet,
     PacketFilterWlan,
     WithBlackhole,
@@ -211,6 +213,7 @@ impl ManagerConfig {
             ManagerConfig::AllDelegated => "/pkg/netcfg/all_delegated.json",
             ManagerConfig::IfacePrefix => "/pkg/netcfg/iface_prefix.json",
             ManagerConfig::DuplicateNames => "/pkg/netcfg/duplicate_names.json",
+            ManagerConfig::EnableSocketProxy => "/pkg/netcfg/enable_socket_proxy.json",
             ManagerConfig::PacketFilterEthernet => "/pkg/netcfg/packet_filter_ethernet.json",
             ManagerConfig::PacketFilterWlan => "/pkg/netcfg/packet_filter_wlan.json",
             ManagerConfig::WithBlackhole => "/pkg/netcfg/with_blackhole.json",
@@ -228,6 +231,7 @@ pub enum KnownServiceProvider {
         config: ManagerConfig,
         use_dhcp_server: bool,
         use_out_of_stack_dhcp_client: bool,
+        use_socket_proxy: bool,
     },
     SecureStash,
     DhcpServer {
@@ -239,6 +243,7 @@ pub enum KnownServiceProvider {
     Reachability {
         eager: bool,
     },
+    SocketProxy,
     NetworkTestRealm {
         require_outer_netstack: bool,
     },
@@ -265,6 +270,10 @@ pub mod constants {
         // in its component manifest, i.e. netcfg.cml.
         pub const DEV_CLASS_NETWORK: &str = "dev-class-network";
         pub const CLASS_NETWORK_PATH: &str = "class/network";
+    }
+    pub mod socket_proxy {
+        pub const COMPONENT_NAME: &str = "network-socket-proxy";
+        pub const COMPONENT_URL: &str = "#meta/network-socket-proxy.cm";
     }
     pub mod secure_stash {
         pub const COMPONENT_NAME: &str = "stash_secure";
@@ -364,6 +373,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                 use_dhcp_server,
                 config,
                 use_out_of_stack_dhcp_client,
+                use_socket_proxy,
             } => {
                 let enable_dhcpv6 = match config {
                     ManagerConfig::Dhcpv6 => true,
@@ -372,6 +382,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     | ManagerConfig::AllDelegated
                     | ManagerConfig::IfacePrefix
                     | ManagerConfig::DuplicateNames
+                    | ManagerConfig::EnableSocketProxy
                     | ManagerConfig::PacketFilterEthernet
                     | ManagerConfig::PacketFilterWlan
                     | ManagerConfig::WithBlackhole => false,
@@ -421,6 +432,25 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                                     constants::dhcp_client::COMPONENT_NAME,
                                 ))
                             }))
+                            .chain(
+                                use_socket_proxy
+                                    .then(|| {
+                                        [
+                                            fnetemul::Capability::ChildDep(protocol_dep::<
+                                                fnp_socketproxy::FuchsiaNetworksMarker,
+                                            >(
+                                                constants::socket_proxy::COMPONENT_NAME,
+                                            )),
+                                            fnetemul::Capability::ChildDep(protocol_dep::<
+                                                fnp_socketproxy::DnsServerWatcherMarker,
+                                            >(
+                                                constants::socket_proxy::COMPONENT_NAME,
+                                            )),
+                                        ]
+                                    })
+                                    .into_iter()
+                                    .flatten(),
+                            )
                             .chain(
                                 [
                                     fnetemul::Capability::LogSink(fnetemul::Empty {}),
@@ -654,6 +684,30 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     )),
                 ])),
                 eager: Some(*eager),
+                ..Default::default()
+            },
+            KnownServiceProvider::SocketProxy => fnetemul::ChildDef {
+                name: Some(constants::socket_proxy::COMPONENT_NAME.to_string()),
+                source: Some(fnetemul::ChildSource::Component(
+                    constants::socket_proxy::COMPONENT_URL.to_string(),
+                )),
+                exposes: Some(vec![
+                    fposix_socket::ProviderMarker::PROTOCOL_NAME.to_string(),
+                    fposix_socket_raw::ProviderMarker::PROTOCOL_NAME.to_string(),
+                    fnp_socketproxy::StarnixNetworksMarker::PROTOCOL_NAME.to_string(),
+                    fnp_socketproxy::FuchsiaNetworksMarker::PROTOCOL_NAME.to_string(),
+                    fnp_socketproxy::DnsServerWatcherMarker::PROTOCOL_NAME.to_string(),
+                ]),
+                uses: Some(fnetemul::ChildUses::Capabilities(vec![
+                    fnetemul::Capability::ChildDep(protocol_dep::<fposix_socket::ProviderMarker>(
+                        constants::netstack::COMPONENT_NAME,
+                    )),
+                    fnetemul::Capability::ChildDep(
+                        protocol_dep::<fposix_socket_raw::ProviderMarker>(
+                            constants::netstack::COMPONENT_NAME,
+                        ),
+                    ),
+                ])),
                 ..Default::default()
             },
             KnownServiceProvider::NetworkTestRealm { require_outer_netstack } => {

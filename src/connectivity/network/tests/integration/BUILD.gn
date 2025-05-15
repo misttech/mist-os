@@ -49,6 +49,7 @@ tests = [
       "//src/connectivity/network/dns:component_with_fake_time",
       "//src/connectivity/policy/netcfg:component-advanced",
       "//src/connectivity/policy/netcfg:component-basic",
+      "//src/connectivity/policy/socket-proxy:component",
       "//src/connectivity/policy/tests/integration:netcfg-netemul-configs",
       "//src/lib/fake-clock/svc",
       "//src/sys/stash:stash_secure_v2",

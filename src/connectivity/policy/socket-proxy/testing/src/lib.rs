@@ -4,8 +4,13 @@
 
 use fidl_fuchsia_net::{IpAddress, SocketAddress};
 use fidl_fuchsia_net_policy_socketproxy::{
-    DnsServerList, FuchsiaNetworkInfo, Network, NetworkDnsServers, NetworkInfo, StarnixNetworkInfo,
+    DnsServerList, FuchsiaNetworkInfo, FuchsiaNetworksProxy, Network, NetworkDnsServers,
+    NetworkInfo, NetworkRegistryAddResult, NetworkRegistryRemoveResult,
+    NetworkRegistrySetDefaultResult, NetworkRegistryUpdateResult, StarnixNetworkInfo,
+    StarnixNetworksProxy,
 };
+use fidl_fuchsia_posix_socket::OptionalUint32;
+use std::future::Future;
 
 fn dns_server_list(id: u32) -> DnsServerList {
     DnsServerList { source_network_id: Some(id), addresses: Some(vec![]), ..Default::default() }
@@ -106,3 +111,61 @@ impl<D: ToDnsServerList + Clone> ToDnsServerList for &D {
         self.clone().to_dns_server_list()
     }
 }
+
+pub trait NetworkRegistry {
+    fn set_default(
+        &self,
+        network_id: &OptionalUint32,
+    ) -> impl Future<Output = Result<NetworkRegistrySetDefaultResult, fidl::Error>>;
+    fn add(
+        &self,
+        network: &Network,
+    ) -> impl Future<Output = Result<NetworkRegistryAddResult, fidl::Error>>;
+    fn update(
+        &self,
+        network: &Network,
+    ) -> impl Future<Output = Result<NetworkRegistryUpdateResult, fidl::Error>>;
+    fn remove(
+        &self,
+        network_id: u32,
+    ) -> impl Future<Output = Result<NetworkRegistryRemoveResult, fidl::Error>>;
+}
+
+macro_rules! impl_network_registry {
+    ($($ty:ty),*) => {
+        $(
+            impl NetworkRegistry for $ty {
+                fn set_default(
+                    &self,
+                    network_id: &OptionalUint32,
+                ) -> impl Future<Output = Result<NetworkRegistrySetDefaultResult, fidl::Error>> {
+                    self.set_default(network_id)
+                }
+
+                fn add(
+                    &self,
+                    network: &Network,
+                ) -> impl Future<Output = Result<NetworkRegistryAddResult, fidl::Error>> {
+                    self.add(network)
+                }
+
+                fn update(
+                    &self,
+                    network: &Network,
+                ) -> impl Future<Output = Result<NetworkRegistryUpdateResult, fidl::Error>> {
+                    self.update(network)
+                }
+
+                fn remove(
+                    &self,
+                    network_id: u32,
+                ) -> impl Future<Output = Result<NetworkRegistryRemoveResult, fidl::Error>> {
+                    self.remove(network_id)
+                }
+            }
+        )*
+    };
+    ($($ty:ty),*,) => { impl_network_registry!($($ty),*); };
+}
+
+impl_network_registry!(StarnixNetworksProxy, FuchsiaNetworksProxy);
