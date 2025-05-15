@@ -19,7 +19,13 @@ if (is_host) {
     unbuffered_output = true
     main_source = "main.py"
     output_name = "disable_ctf_tests.pyz"
-    sources = []
+    sources = [
+      "cli.py",
+      "command_runner.py",
+      "data_structure.py",
+      "util.py",
+    ]
+    deps = [ "//scripts/lib/json_get" ]
   }
 
   python_host_test("disable_ctf_tests_test") {
@@ -27,5 +33,9 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
     libraries = []
+    deps = [
+      ":disable_ctf_tests",  # Include this to MyPy everything
+      "//scripts/lib/json_get",
+    ]
   }
 }
