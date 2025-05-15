@@ -15,6 +15,10 @@ group("test") {
     # build it for the host toolchain.
     "//tools/symbolizer($host_toolchain)",
 
+    # TODO(https://fxbug.dev/417807433): Fastboot is also only needed on Linux x64.
+    # Remove once it's no longer needed for flashing.
+    "//build/images/tools:fastboot($host_toolchain)",
+
     # The Linux x64 tools needed regardless of target_arch and host_os
     ":linux_x64_tools",
 
