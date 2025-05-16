@@ -6674,12 +6674,8 @@ bool VmCowPages::CanReclaimPageLocked(vm_page_t* page, T actual) {
   }
   // Pinned pages could be in use by DMA so we cannot safely reclaim them.
   if (page->object.pin_count != 0) {
-    pmm_page_queues()->MarkAccessed(page);
-    return false;
-  }
-  if (high_priority_count_ != 0) {
-    // Not allowed to reclaim. To avoid this page remaining in a reclamation list we simulate an
-    // access.
+    // Loaned pages should never end up pinned.
+    DEBUG_ASSERT(!page->is_loaned());
     pmm_page_queues()->MarkAccessed(page);
     return false;
   }
@@ -6702,6 +6698,11 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
     return ReclaimCounts{};
   }
 
+  // Now allowed to reclaim if high priority, unless being required to do so.
+  if (high_priority_count_ != 0 && (eviction_action != EvictionAction::Require)) {
+    pmm_page_queues()->MarkAccessed(page);
+    return ReclaimCounts{};
+  }
   DEBUG_ASSERT(is_page_dirty_tracked(page));
 
   // We cannot evict the page unless it is clean. If the page is dirty, it will already have been
@@ -6774,6 +6775,12 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
     if ((paged_ref_ && (paged_backlink_locked(this)->GetMappingCachePolicyLocked() &
                         ZX_CACHE_POLICY_MASK) != ZX_CACHE_POLICY_CACHED)) {
       // To avoid this page remaining in the reclamation list we simulate an access.
+      pmm_page_queues()->MarkAccessed(page);
+      return ReclaimCounts{};
+    }
+
+    // Not allows to reclaim if high priority.
+    if (high_priority_count_ != 0) {
       pmm_page_queues()->MarkAccessed(page);
       return ReclaimCounts{};
     }
