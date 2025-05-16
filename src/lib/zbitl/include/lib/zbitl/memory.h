@@ -59,24 +59,25 @@ class StorageTraits<fbl::Array<T>> {
     return SpanTraits::Payload(span, offset, length).take_value();
   }
 
-  template <typename U, bool LowLocality>
-  static std::enable_if_t<(alignof(U) <= kStorageAlignment),
-                          fit::result<error_type, std::span<const U>>>
-  Read(const Storage& storage, payload_type payload, uint32_t length) {
+  template <PayloadCompatibleStorage U, bool LowLocality>
+  static fit::result<error_type, std::span<const U>> Read(const Storage& storage,
+                                                          payload_type payload, uint32_t length) {
     auto span = AsSpan<T>(storage);
     return SpanTraits::template Read<U, LowLocality>(span, payload, length).take_value();
   }
 
-  template <typename S = T, typename = std::enable_if_t<!std::is_const_v<S>>>
-  static fit::result<error_type> Write(Storage& storage, uint32_t offset, ByteView data) {
+  static fit::result<error_type> Write(Storage& storage, uint32_t offset, ByteView data)
+    requires(!std::is_const_v<T>)
+  {
     auto span = AsSpan<T>(storage);
     auto result = SpanTraits::Write(span, offset, data);
     ZX_DEBUG_ASSERT(result.is_ok());
     return fit::ok();
   }
 
-  template <typename S = T, typename = std::enable_if_t<!std::is_const_v<S>>>
-  static fit::result<error_type, void*> Write(Storage& storage, uint32_t offset, uint32_t length) {
+  static fit::result<error_type, void*> Write(Storage& storage, uint32_t offset, uint32_t length)
+    requires(!std::is_const_v<T>)
+  {
     auto span = AsSpan<T>(storage);
     return SpanTraits::Write(span, offset, length).take_value();
   }
