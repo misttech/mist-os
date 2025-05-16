@@ -143,6 +143,7 @@ async fn route() {
             error_summary: Some(_),
             source_moniker: None,
             service_instances: None,
+            dictionary_entries: None,
             outcome: RouteOutcome::Failed,
         } if capability == "fuchsia.foo.Bar"
     );
@@ -156,6 +157,7 @@ async fn route() {
             error_summary: None,
             source_moniker: Some(m),
             service_instances: None,
+            dictionary_entries: None,
             outcome: RouteOutcome::Success,
         } if capability == "data" && m == "."
     );
@@ -179,6 +181,7 @@ async fn route() {
             error_summary: Some(_),
             source_moniker: None,
             service_instances: None,
+            dictionary_entries: None,
             outcome: RouteOutcome::Failed,
         } if capability == "fuchsia.foo.Bar"
     );
@@ -192,6 +195,7 @@ async fn route() {
             error_summary: None,
             source_moniker: Some(m),
             service_instances: None,
+            dictionary_entries: None,
             outcome: RouteOutcome::Success,
         } if capability == "fuchsia.foo.Bar" && m == "."
     );
@@ -242,6 +246,7 @@ async fn route_void() {
             error_summary: None,
             source_moniker: Some(m),
             service_instances: None,
+            dictionary_entries: None,
             outcome: RouteOutcome::Void,
         } if capability == "void-protocol" && m == "foo"
     );
@@ -266,6 +271,7 @@ async fn route_void() {
             error_summary: None,
             source_moniker: Some(m),
             service_instances: None,
+            dictionary_entries: None,
             outcome: RouteOutcome::Void,
         } if capability == "void-protocol" && m == "foo"
     );

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::route::DictionaryEntry;
 use anyhow::{format_err, Result};
 use flex_fuchsia_sys2 as fsys;
 use moniker::Moniker;
@@ -32,6 +33,9 @@ pub struct RouteReport {
 
     /// The requested level of availability of the capability.
     pub availability: Option<cm_rust::Availability>,
+
+    /// The contents of the dictionary, if the capability was a dictionary.
+    pub dictionary_entries: Option<Vec<DictionaryEntry>>,
 }
 
 impl TryFrom<fsys::RouteReport> for RouteReport {
@@ -43,8 +47,12 @@ impl TryFrom<fsys::RouteReport> for RouteReport {
         let capability = report.capability.ok_or_else(|| format_err!("missing capability name"))?;
         let availability: Option<cm_rust::Availability> =
             report.availability.map(cm_rust::Availability::from);
+        let dictionary_entries = report
+            .dictionary_entries
+            .map(|e| e.into_iter().map(DictionaryEntry::try_from).collect())
+            .transpose()?;
         let error_summary = if let Some(error) = report.error { error.summary } else { None };
-        Ok(RouteReport { decl_type, capability, error_summary, availability })
+        Ok(RouteReport { decl_type, capability, error_summary, availability, dictionary_entries })
     }
 }
 
@@ -89,10 +97,14 @@ pub async fn validate_routes(
     reports.into_iter().map(|r| r.try_into()).collect()
 }
 
-fn format(report: &RouteReport) -> Row {
+fn format(report: &RouteReport) -> Vec<Row> {
+    let capability = match report.dictionary_entries {
+        Some(_) => format!("{} (Dictionary)", report.capability),
+        None => report.capability.clone(),
+    };
     let capability = match report.availability {
-        Some(cm_rust::Availability::Required) | None => report.capability.clone(),
-        Some(availability) => format!("{} ({})", report.capability, availability),
+        Some(cm_rust::Availability::Required) | None => capability,
+        Some(availability) => format!("{} ({})", capability, availability),
     };
     let capability = textwrap::fill(&capability, CAPABILITY_COLUMN_WIDTH);
     let (mark, summary) = if let Some(summary) = &report.error_summary {
@@ -104,7 +116,18 @@ fn format(report: &RouteReport) -> Row {
         let summary = textwrap::fill(SUCCESS_SUMMARY, SUMMARY_COLUMN_WIDTH);
         (mark, summary)
     };
-    row!(mark, capability, summary)
+    let mut rows = vec![row!(mark, capability, summary)];
+    if let Some(dictionary_entries) = &report.dictionary_entries {
+        let mut table = Table::new();
+        let mut format = *FORMAT_CLEAN;
+        format.padding(0, 0);
+        table.set_format(format);
+        for e in dictionary_entries {
+            table.add_row(row!(&e.name));
+        }
+        rows.push(row!("", table))
+    }
+    rows
 }
 
 // Construct the used and exposed capability tables from the given route reports.
@@ -114,8 +137,16 @@ pub fn create_tables(reports: &Vec<RouteReport>) -> (Table, Table) {
 
     for report in reports {
         match &report.decl_type {
-            DeclType::Use => use_table.add_row(format(&report)),
-            DeclType::Expose => expose_table.add_row(format(&report)),
+            DeclType::Use => {
+                for r in format(&report) {
+                    use_table.add_row(r);
+                }
+            }
+            DeclType::Expose => {
+                for r in format(&report) {
+                    expose_table.add_row(r);
+                }
+            }
         };
     }
     (use_table, expose_table)
@@ -189,6 +220,10 @@ mod test {
             vec![fsys::RouteReport {
                 capability: Some("fuchsia.foo.bar".to_string()),
                 decl_type: Some(fsys::DeclType::Use),
+                dictionary_entries: Some(vec![fsys::DictionaryEntry {
+                    name: Some("k1".into()),
+                    ..Default::default()
+                }]),
                 error: None,
                 ..Default::default()
             }],
@@ -201,6 +236,7 @@ mod test {
         let report = reports.remove(0);
         assert_eq!(report.capability, "fuchsia.foo.bar");
         assert_eq!(report.decl_type, DeclType::Use);
+        assert_eq!(report.dictionary_entries.unwrap(), [DictionaryEntry { name: "k1".into() }]);
         assert!(report.error_summary.is_none());
     }
 

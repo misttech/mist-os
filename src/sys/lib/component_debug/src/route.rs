@@ -24,6 +24,7 @@ pub struct RouteReport {
     pub error_summary: Option<String>,
     pub source_moniker: Option<String>,
     pub service_instances: Option<Vec<ServiceInstance>>,
+    pub dictionary_entries: Option<Vec<DictionaryEntry>>,
     pub outcome: RouteOutcome,
 }
 
@@ -51,6 +52,20 @@ impl TryFrom<fsys::ServiceInstance> for ServiceInstance {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Debug, PartialEq)]
+pub struct DictionaryEntry {
+    pub name: String,
+}
+
+impl TryFrom<fsys::DictionaryEntry> for DictionaryEntry {
+    type Error = anyhow::Error;
+
+    fn try_from(value: fsys::DictionaryEntry) -> std::result::Result<Self, Self::Error> {
+        Ok(Self { name: value.name.ok_or_else(|| format_err!("missing name"))? })
+    }
+}
+
 impl TryFrom<fsys::RouteReport> for RouteReport {
     type Error = anyhow::Error;
 
@@ -62,6 +77,10 @@ impl TryFrom<fsys::RouteReport> for RouteReport {
         let source_moniker = report.source_moniker;
         let service_instances = report
             .service_instances
+            .map(|s| s.into_iter().map(|s| s.try_into()).collect())
+            .transpose()?;
+        let dictionary_entries = report
+            .dictionary_entries
             .map(|s| s.into_iter().map(|s| s.try_into()).collect())
             .transpose()?;
         let outcome = match report.outcome {
@@ -82,6 +101,7 @@ impl TryFrom<fsys::RouteReport> for RouteReport {
             error_summary,
             source_moniker,
             service_instances,
+            dictionary_entries,
             outcome,
         })
     }
@@ -224,6 +244,16 @@ fn add_report(report: RouteReport, table: &mut Table) {
         }
         table.add_row(row!(r->"Service instances: ", service_table));
     }
+    if let Some(dictionary_entries) = report.dictionary_entries {
+        let mut dict_table = Table::new();
+        let mut format = *FORMAT_CLEAN;
+        format.padding(0, 0);
+        dict_table.set_format(format);
+        for e in dictionary_entries {
+            dict_table.add_row(row!(&e.name));
+        }
+        table.add_row(row!(r->"Contents: ", dict_table));
+    }
 }
 
 #[cfg(test)]
@@ -293,6 +323,7 @@ mod test {
                 error_summary: Some(s),
                 source_moniker: None,
                 service_instances: None,
+                dictionary_entries: None,
                 outcome: RouteOutcome::Failed,
             } if capability == "fuchsia.foo.bar" && s == "Access denied"
         );
@@ -332,6 +363,10 @@ mod test {
                             ..Default::default()
                         },
                     ]),
+                    dictionary_entries: Some(vec![
+                        fsys::DictionaryEntry { name: Some("k1".into()), ..Default::default() },
+                        fsys::DictionaryEntry { name: Some("k2".into()), ..Default::default() },
+                    ]),
                     error: None,
                     // Test inference of Success
                     outcome: None,
@@ -353,6 +388,7 @@ mod test {
                 error_summary: None,
                 source_moniker: Some(m),
                 service_instances: None,
+                dictionary_entries: None,
                 outcome: RouteOutcome::Void,
             } if capability == "fuchsia.foo.bar" && m == "<component manager>"
         );
@@ -365,10 +401,11 @@ mod test {
                 decl_type: DeclType::Expose,
                 error_summary: None,
                 source_moniker: Some(m),
-                service_instances: Some(v),
+                service_instances: Some(s),
+                dictionary_entries: Some(d),
                 outcome: RouteOutcome::Success,
             } if capability == "fuchsia.foo.baz" && m == "/test/src"
-                && v == vec![
+                && s == vec![
                     ServiceInstance {
                         instance_name: "1234abcd".into(),
                         child_name: "a".into(),
@@ -378,6 +415,14 @@ mod test {
                         instance_name: "abcd1234".into(),
                         child_name: "b".into(),
                         child_instance_name: "other".into(),
+                    },
+                ]
+                && d == vec![
+                    DictionaryEntry {
+                        name: "k1".into(),
+                    },
+                    DictionaryEntry {
+                        name: "k2".into(),
                     },
                 ]
         );
