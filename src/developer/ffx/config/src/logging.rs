@@ -72,6 +72,7 @@ const LOG_ENABLED: &str = "log.enabled";
 const LOG_TARGET_LEVELS: &str = "log.target_levels";
 const LOG_LEVEL: &str = "log.level";
 const LOG_INCLUDE_SPANS: &str = "log.include_spans";
+const LOG_LOGGER: &str = "log.logger";
 
 // The log filename and basename should always be in-sync.
 pub const LOG_FILENAME: &str = "ffx.log";
@@ -395,12 +396,30 @@ pub fn init(
         destinations.push(LogDestination::Stdout);
     }
 
-    let level = filter_level(ctx);
+    let logging_method = ctx.get(LOG_LOGGER).unwrap_or_else(|_| "tracing".to_string());
 
-    configure_subscribers(ctx, destinations, level).init();
+    match logging_method.as_str() {
+        "ffxlog" => {
+            log_based::setup_logging_with_log(ctx, destinations)?;
+        }
+        _ => {
+            let level = filter_level(ctx);
+            setup_logging_with_tracing(ctx, destinations, level)?;
+        }
+    }
 
     log::info!("ffx logging initialized. ffx version info: {:?}", ffx_build_version::build_info());
+    log::info!("logging method: {}", logging_method);
 
+    Ok(())
+}
+
+fn setup_logging_with_tracing(
+    ctx: &EnvironmentContext,
+    destinations: Vec<LogDestination>,
+    level: LevelFilter,
+) -> Result<()> {
+    configure_subscribers(ctx, destinations, level).init();
     Ok(())
 }
 
@@ -526,4 +545,107 @@ pub(crate) fn configure_subscribers(
         .with(test_layer)
         .with(global_layer)
         .with(file_layer)
+}
+
+mod log_based {
+    use super::*;
+    use logging::log_based::{FfxLog, FfxLogSink, FormatOpts, LogSinkTrait, TargetsFilter};
+
+    fn level_filter(ctx: &EnvironmentContext) -> log::LevelFilter {
+        ctx.query(LOG_LEVEL)
+        .get::<String>()
+        .ok()
+        .map(|str|
+            // Ideally we could log here, but there may be no log sink, so print a warning to
+            // stderr and fall back to a 'sensible' default
+            log::LevelFilter::from_str(&str).unwrap_or_else(|_| {
+                eprintln!("Warning: '{str}' is not a valid log level.\n\
+                    \n\
+                    Supported log levels are 'Off', 'Error', 'Warn', 'Info', 'Debug', and 'Trace'.\n\
+                    \n\
+                    If you didn't pass this log level with `--log-level`, you may need to change your \
+                    configured log level to something valid with `ffx config set log.level`");
+                log::LevelFilter::Info
+            })
+        )
+        .unwrap_or(log::LevelFilter::Info)
+    }
+    pub fn target_levels_log(ctx: &EnvironmentContext) -> Vec<(String, log::LevelFilter)> {
+        // Parse the targets from the config. Ideally we'd log errors, but since there might be no log
+        // sink, filter out any unexpected values.
+        if let Ok(targets) = ctx.query(LOG_TARGET_LEVELS).get::<serde_json::Value>() {
+            if let serde_json::Value::Object(o) = targets {
+                return o
+                    .into_iter()
+                    .filter_map(|(target, level)| {
+                        if let serde_json::Value::String(level) = level {
+                            if let Ok(level) = log::LevelFilter::from_str(&level) {
+                                return Some((target, level));
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+            }
+        }
+
+        vec![]
+    }
+
+    pub fn setup_logging_with_log(
+        ctx: &EnvironmentContext,
+        destinations: Vec<LogDestination>,
+    ) -> Result<()> {
+        let level = level_filter(ctx);
+        let target_levels = target_levels_log(ctx);
+        let format = FormatOpts::new(*LOGGING_ID);
+
+        let toggle_filter = DisableableFilter {};
+        let targets_filter = TargetsFilter::new(target_levels);
+
+        let mut sinks: Vec<Box<dyn LogSinkTrait>> = vec![];
+
+        if destinations.contains(&LogDestination::Stderr) {
+            sinks.push(FfxLogSink::new(Arc::new(Mutex::new(std::io::stderr()))).boxed());
+        }
+        if destinations.contains(&LogDestination::Stdout) {
+            sinks.push(FfxLogSink::new(Arc::new(Mutex::new(std::io::stdout()))).boxed());
+        }
+        if destinations.contains(&LogDestination::TestWriter) {
+            sinks.push(FfxLogSink::new(Arc::new(Mutex::new(TestWriter::default()))).boxed());
+        }
+        if destinations.contains(&LogDestination::Global) {
+            let lfh = log_file_holder().expect("uninitialized LFH when use_file is set??");
+            sinks.push(
+                FfxLogSink::new(Arc::new(Mutex::new(std::io::LineWriter::new(
+                    lfh.get_resettable_writer(),
+                ))))
+                .boxed(),
+            );
+        }
+        for d in destinations {
+            if let LogDestination::File(p) = d {
+                let fres = open_log_file(p.as_path());
+                match fres {
+                    Ok(f) => {
+                        sinks.push(FfxLogSink::new(Arc::new(Mutex::new(f))).boxed());
+                    }
+                    Err(e) => {
+                        eprintln!("Could not log file: {p:?}: {e}");
+                    }
+                }
+            }
+        }
+
+        let logger = FfxLog::new(sinks, format, toggle_filter, level, targets_filter);
+        let _ = log::set_boxed_logger(Box::new(logger))
+            .map(|()| log::set_max_level(log::LevelFilter::Trace));
+        Ok(())
+    }
+
+    impl logging::log_based::Filter for DisableableFilter {
+        fn should_emit(&self, _record: &log::Metadata<'_>) -> bool {
+            LOG_ENABLED_FLAG.load(Ordering::Relaxed)
+        }
+    }
 }

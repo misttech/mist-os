@@ -19,6 +19,7 @@ libs = [
   "fastboot_file_discovery",
   "fho",
   "isolate",
+  "logging",
   "manual_targets",
   "mdns_discovery",
   "metrics",
