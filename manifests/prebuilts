@@ -665,7 +665,7 @@
     <!-- ARM Mali Vulkan ICDs -->
     <package name="fuchsia/prebuilt/proprietary/vendor/arm/libvulkan/libvulkan_arm_mali_g52_r0p0"
              path="prebuilt/proprietary/vendor/arm/libvulkan_arm_g52_r0p0"
-             version="kIu6cU-MrscEI0C3LftO5x4az-QXLCsXeFZMuY7mfEIC"
+             version="7mmcQHVdaPiJGLz1PCWrpU86lNVXqvNxJxyEsuNUQgQC"
              internal="true"/>
 
     <!-- Bazel SDK sample packages built OOT -->
