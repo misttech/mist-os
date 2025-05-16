@@ -15,7 +15,10 @@ declare_args() {
   #  * `balanced`: some optimizations, but prioritizing compilation speed over
   #                 runtime performance.
   #  * `release`: all the optimizations, used for product releases.
+  # LINT.IfChange
   compilation_mode = ""
+
+  # LINT.ThenChange(//build/bazel/BUILD.gn)
 
   # Overridden settings for the compilation mode.  This is a set of override
   # values for variables whose default values are set by the chosen compilation

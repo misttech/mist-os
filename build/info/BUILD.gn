@@ -6,14 +6,6 @@ import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/info/info.gni")
 
-declare_args() {
-  # Truncate the date in the build_info to midnight UTC, and replace the commit
-  # hash with one that's synthesized from that date.
-  # LINT.IfChange
-  truncate_build_info_commit_date = false
-  # LINT.ThenChange(//build/bazel/gn_build_args.txt)
-}
-
 if (current_toolchain == default_toolchain) {
   group("build_info_files") {
     public_deps = [

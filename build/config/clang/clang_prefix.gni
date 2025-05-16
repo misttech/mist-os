@@ -9,7 +9,7 @@ declare_args() {
   # additionally consumed by the Go toolchain.
   # LINT.IfChange
   clang_prefix = default_clang_prefix
-  # LINT.ThenChange(//build/bazel/gn_build_args.txt)
+  # LINT.ThenChange(//build/bazel/BUILD.gn)
 }
 
 # The value of clang_prefix relative to root_build_dir, useful

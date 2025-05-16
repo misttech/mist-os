@@ -451,13 +451,13 @@ def main() -> int:
         )
 
         # Generate the content of the @fuchsia_build_info directory.
+        # `extra_ninja_inputs` does not need to be updated because the content
+        # is derived from GN args, and any changes would cause GN gen to run.
         log("Generating @fuchsia_build_info content")
-        extra_ninja_build_inputs |= (
-            workspace_utils.GnBuildArgs.generate_fuchsia_build_info(
-                fuchsia_dir=fuchsia_dir,
-                build_dir=build_dir,
-                repository_dir=regenerator_outputs_dir / "fuchsia_build_info",
-            )
+        workspace_utils.GnBuildArgs.generate_fuchsia_build_info(
+            fuchsia_dir=fuchsia_dir,
+            build_dir=build_dir,
+            repository_dir=regenerator_outputs_dir / "fuchsia_build_info",
         )
 
         # Generate the bazel launcher and Bazel workspace files.

@@ -217,7 +217,7 @@ load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@fuchsia_build_info//:args.bzl", "clang_prefix")
 
 # If clang_prefix is set in GN, it'll point to the "bin" directory under clang root.
-_clang_dir = paths.dirname(clang_prefix) if clang_prefix else "prebuilt/third_party/clang/" + fuchsia_host_tag
+_clang_dir = paths.dirname(clang_prefix)
 
 # buildifier: disable=load-on-top
 load(

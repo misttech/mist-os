@@ -8,5 +8,5 @@ declare_args() {
   # changing the netcfg configuration at runtime.
   # LINT.IfChange
   delegated_network_provisioning = false
-  # LINT.ThenChange(//build/bazel/gn_build_args.txt)
+  # LINT.ThenChange(//build/bazel/BUILD.bazel)
 }

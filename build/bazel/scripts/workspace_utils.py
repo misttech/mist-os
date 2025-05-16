@@ -1004,240 +1004,166 @@ def generate_fuchsia_workspace(
 
 
 class GnBuildArgs(object):
-    """A class to handle gn_build_args.txt input files.
+    """A class to handle `gn_build_variables_for_bazel.json` input files.
 
-    These files are used to filter the content of the GN-generated
-    `args.json` file and generate corresponding args.bzl or
-    vendor_<name>_args.bzl in the @fuchsia_build_info Bazel repository.
+    These files are used to export the values of GN args to an `args.bzl` file
+    and optionally `vendor_<name>_args.bzl` files in the @fuchsia_build_info
+    Bazel repository.
 
-    See comments in //build/bazel/gn_build_args.txt for their specific
-    format.
+    See the comments for //build/bazel:gn_build_variables_for_bazel for the
+    format of the `gn_build_variables_for_bazel.json` files.
 
-    Vendor-specific files should always be placed under
-    //vendor/<name>/build/bazel/gn_build_args.txt.
+    Vendor-specific files should always be placed at
+        $OUT_DIR/vendor_<name>_gn_build_variables_for_bazel.json
+    and the target that generates them must always be in the dependency graph
+    when building anything from the vendor repo.
     """
 
     @staticmethod
-    def find_and_read_all_build_args(
-        fuchsia_dir: Path,
-    ) -> tuple[dict[str, str], set[Path]]:
-        """Find and read all gn_build_args.txt files in Fuchsia checkout.
+    def find_all_gn_build_variables_for_bazel(
+        fuchsia_dir: Path, build_dir: Path
+    ) -> list[str]:
+        """Find `all gn_build_variables_for_bazel.json` files in the Fuchsia checkout.
 
         Args:
             fuchsia_dir: Path to Fuchsia source dir.
+            build_dir: Path to Fuchsia build directory.
 
         Returns:
-            A (mapping, extra_ninja_inputs) pair, where |mapping| is a dictionary
-            mapping Fuchsia relative file paths to their string content, and
-            where |extra_ninja_inputs| is a set of extra Ninja inputs used by regenerator
-            to patch the Ninja build plan.
+            A list of `gn_build_variables_for_bazel.json` file paths relative to
+            the build directory root.
 
         Raises:
             ValueError if a required input file is missing.
         """
-        mapping: dict[str, str] = {}
-        extra_ninja_inputs: set[Path] = set()
+        args_files: list[str] = []
 
-        def add_file(relative_path: str, required: bool = False) -> None:
-            file_path = fuchsia_dir / relative_path
-            if not file_path.exists():
-                if required:
-                    raise ValueError(
-                        f"Missing required build arguments file: {file_path}"
-                    )
-                return
+        base_file_name = "gn_build_variables_for_bazel.json"
 
-            extra_ninja_inputs.add(file_path)
-            mapping[relative_path] = file_path.read_text()
+        main_file_path = build_dir / base_file_name
+        if not (main_file_path).exists():
+            raise ValueError(
+                f"Missing required build arguments file: {main_file_path}"
+            )
+        args_files.append(base_file_name)
 
-        add_file("build/bazel/gn_build_args.txt", required=True)
-
-        # The //vendor/ tree is optional and does not exist on open-source checkouts.
+        # The //vendor/ tree is optional and does not exist in open-source checkouts.
         vendor_dir = fuchsia_dir / "vendor"
         if vendor_dir.is_dir():
             for vendor_name in os.listdir(vendor_dir):
-                add_file(
-                    f"vendor/{vendor_name}/build/bazel/gn_build_args.txt",
-                    required=False,
-                )
+                vendor_file = f"vendor_{vendor_name}_{base_file_name}"
+                if (build_dir / vendor_file).exists():
+                    args_files.append(vendor_file)
 
-        return mapping, extra_ninja_inputs
+        return args_files
 
     @staticmethod
     def generate_args_bzl(
-        gn_args: T.Mapping[str, T.Any], build_args: str, build_args_path: str
+        gn_args_to_export: list[dict[str, T.Any]], args_json_path: Path
     ) -> str:
-        """Generate an args.bzl file that defines values extracted from GN's args.gn.
+        """Generate an `args.bzl` file defining values extracted from GN's args.
 
         Args:
-            gn_args: The GN args.json file as a JSON dictionary.
-            build_args: The content of a gn_build_args.txt file as a string.
-            build_args_path: Path of source file for build_args (never accessed).
+            gn_args_to_export: A list of dictionaries describing each GN arg.
+                See comments for //build/bazel:gn_build_variables_for_bazel for
+                the format.
+            args_json_path: Path of source file for build_args (never accessed).
         Returns:
-            The content of the generated args.bzl file as a string.
+            The content of the generated `args.bzl` file as a string.
         Raises:
-            ValueError is the input content is malformed.
+            ValueError if the input content is malformed.
         """
 
         def fail(msg: str) -> None:
             raise ValueError(msg)
 
-        # Parse the list file to generate the content of args.bzl
         args_contents = """# AUTO-GENERATED BY FUCHSIA BUILD - DO NOT EDIT
 # Variables listed from {source_path}
 
+\"\"\"A subset of GN args that are needed in the Bazel build.\"\"\"
 """.format(
-            source_path=build_args_path
+            source_path=args_json_path
         )
 
-        # Avoid Gerrit warnings by constructing the linting prefixes with string concatenation.
-        lint_change_if_prefix = "LINT." + "IfChange("
-        lint_change_then_prefix = "LINT." + "ThenChange("
-        lint_change_if_start_line = -1
-        pending_lines = ""
-        line_count = 0
-        for line in build_args.splitlines():
-            line_count += 1
-            line = line.strip()
-
-            if not line:  # Ignore empty lines
-                continue
-
-            if line[0] == "#":
-                comment = line[1:].lstrip()
-                if comment.startswith(lint_change_if_prefix):
-                    if pending_lines:
-                        fail(
-                            "{}:{}: Previous {} at line {} was never closed!".format(
-                                build_args_path,
-                                line_count,
-                                lint_change_if_prefix,
-                                lint_change_if_start_line,
-                            )
-                        )
-                    lint_change_if_start_line = line_count
-                    continue
-
-                if comment.startswith(lint_change_then_prefix):
-                    source_start = len(lint_change_then_prefix)
-                    source_end = comment.find(")", source_start)
-                    if source_end < 0:
-                        fail(
-                            "{}:{}: Unterminated {} line: {}".format(
-                                build_args_path,
-                                line_count,
-                                lint_change_then_prefix,
-                                line,
-                            )
-                        )
-                    source_path = comment[source_start:source_end]
-                    args_contents += (
-                        "# From {}\n".format(source_path) + pending_lines + "\n"
-                    )
-                    pending_lines = ""
-                    continue
-
-                # Skip other comment lines.
-                continue
-
-            name_end = line.find(":")
-            if name_end < 0:
-                fail(
-                    "{}:{}: Missing colon separator: {}".format(
-                        build_args_path, line_count, line
-                    )
-                )
-
-            varname = line[0:name_end]
-            vartype = line[name_end + 1 :].strip()
-            if vartype == "bool":
-                value = gn_args.get(varname, False)
-                pending_lines += "{} = {}\n".format(varname, value)
-            elif vartype == "string":
-                value = gn_args.get(varname, "")
-                pending_lines += '{} = "{}"\n'.format(varname, value)
-            elif vartype == "string_or_false":
-                if not gn_args.get(varname):
+        for gn_arg in gn_args_to_export:
+            args_contents += "\n# From {}\n".format(gn_arg["location"])
+            varname = gn_arg["name"]
+            vartype = gn_arg["type"]
+            value = gn_arg["value"]
+            if vartype in ["bool", "array_of_strings"]:
+                args_contents += "{} = {}".format(varname, value)
+            elif vartype in ["string", "string_or_false", "path"]:
+                if vartype == "string_or_false" and not value:
                     value = ""
-                else:
-                    value = gn_args[varname]
-                pending_lines += '{} = "{}"\n'.format(varname, value)
+                elif vartype == "path":
+                    if not value.startswith("//"):
+                        fail(
+                            "Path '{}' does not begin with '//'".format(
+                                value,
+                            )
+                        )
+                    value = value[2:]
+                args_contents += '{} = "{}"'.format(varname, value)
             else:
                 fail(
-                    "{}:{}: Unknown type name '{}': {}".format(
-                        build_args_path,
-                        line_count,
+                    "Unknown type name '{}'".format(
                         vartype,
-                        line,
                     )
                 )
-
-        if pending_lines:
-            fail(
-                "{}:{}: {} statement was never closed!".format(
-                    build_args_path,
-                    lint_change_if_start_line,
-                    lint_change_if_prefix,
-                )
-            )
+            args_contents += "\n"
 
         return args_contents
 
     @staticmethod
     def record_fuchsia_build_config_dir(
         fuchsia_dir: Path,
-        args_json: T.Mapping[str, T.Any],
+        build_dir: Path,
         generated: GeneratedWorkspaceFiles,
-    ) -> set[Path]:
+    ) -> None:
         """Record the content of @fuchsia_build_info in a GeneratedWorkspaceFiles instance.
 
         Args:
-            fuchsia_dir: Path to fuchsia source directory.
-            args_json: The GN-generated args.json file content as a JSON value.
+            fuchsia_dir: Path to Fuchsia source directory.
+            build_dir: Path to Fuchsia build directory.
             generated: A GeneratedWorkspaceFiles instance. Its record_file_content()
                 method will be called to populate the repository.
-
-        Returns:
-            A set of Path for extra inputs, used by regenerator to patch the Ninja build plan.
         """
-        (
-            build_args_map,
-            extra_ninja_inputs,
-        ) = GnBuildArgs.find_and_read_all_build_args(fuchsia_dir)
-
         generated.record_file_content("WORKSPACE.bazel", "")
         generated.record_file_content("BUILD.bazel", "")
 
-        for relative_path, build_args in sorted(build_args_map.items()):
-            args_bzl_content = GnBuildArgs.generate_args_bzl(
-                args_json, build_args, relative_path
+        args_files_relative_paths = (
+            GnBuildArgs.find_all_gn_build_variables_for_bazel(
+                fuchsia_dir, build_dir
             )
-            if relative_path.startswith("vendor/"):
-                vendor_name = relative_path.split("/")[1]
+        )
+
+        for relative_path in sorted(args_files_relative_paths):
+            file_path = build_dir / relative_path
+            with (file_path).open("rb") as f:
+                gn_args_json = json.load(f)
+            args_bzl_content = GnBuildArgs.generate_args_bzl(
+                gn_args_json, file_path
+            )
+
+            if relative_path.startswith("vendor_"):
+                vendor_name = relative_path.split("_")[1]
                 args_bzl_filename = f"vendor_{vendor_name}_args.bzl"
             else:
                 args_bzl_filename = "args.bzl"
             generated.record_file_content(args_bzl_filename, args_bzl_content)
 
-        return extra_ninja_inputs
-
     @staticmethod
     def generate_fuchsia_build_info(
         fuchsia_dir: Path, build_dir: Path, repository_dir: Path
-    ) -> set[Path]:
-        # Read args.json
-        with (build_dir / "args.json").open("rb") as f:
-            args_json = json.load(f)
-
+    ) -> None:
         generated = GeneratedWorkspaceFiles()
-        extra_ninja_inputs = GnBuildArgs.record_fuchsia_build_config_dir(
-            fuchsia_dir, args_json, generated
+        GnBuildArgs.record_fuchsia_build_config_dir(
+            fuchsia_dir, build_dir, generated
         )
 
         generated.update_if_needed(
             repository_dir, Path(f"{repository_dir}.generated-info.json")
         )
-        return extra_ninja_inputs
 
 
 def record_gn_targets_dir(
