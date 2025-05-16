@@ -96,13 +96,13 @@ impl Credentials {
     /// empty set of credentials.
     pub async fn load_or_new() -> Self {
         let instance = if let Ok(instance) = load_from_home_data() {
-            tracing::debug!("Load credential from home data");
+            log::debug!("Load credential from home data");
             instance
         } else {
-            tracing::debug!("Create new credential");
+            log::debug!("Create new credential");
             Credentials::new()
         };
-        tracing::debug!("Loaded credentials version {}", instance.version);
+        log::debug!("Loaded credentials version {}", instance.version);
         instance
     }
 
@@ -120,7 +120,7 @@ impl Credentials {
         serde_json::to_writer_pretty(&mut writer, &self)
             .with_context(|| format!("writing json to {:?}", path))?;
         writer.flush()?;
-        tracing::debug!("Saved credentials version {}", self.version);
+        log::debug!("Saved credentials version {}", self.version);
         Ok(())
     }
 
