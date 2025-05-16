@@ -5,9 +5,9 @@ end
 
 complete -c fx --no-files --require-parameter
 
-complete -c fx --condition '__fish_use_subcommand' --arguments "help" --description "Show help for COMMAND"
-complete -c fx --condition "__fish_seen_subcommand_from help" -l "no-contrib" --description "Hide contrib commands (see //tools/devshell/README.md)"
-complete -c fx --condition "__fish_seen_subcommand_from help" -l "deprecated" --description "Do not hide deprecated commands"
+complete -c fx --condition __fish_use_subcommand --arguments help --description "Show help for COMMAND"
+complete -c fx --condition "__fish_seen_subcommand_from help" -l no-contrib --description "Hide contrib commands (see //tools/devshell/README.md)"
+complete -c fx --condition "__fish_seen_subcommand_from help" -l deprecated --description "Do not hide deprecated commands"
 
 # Compute vendor directories using set to avoid getting a Fish error if
 # $FUCHSIA_DIR/vendor does not exist.
@@ -16,14 +16,14 @@ set -l vendor_devshell_dirs $FUCHSIA_DIR/vendor/*/scripts/devshell/
 
 # Find fx subcommands and their descriptions
 find $FUCHSIA_DIR/tools/devshell/ $vendor_devshell_dirs \
--maxdepth 2 -type f \( -executable -or -name '*.fx' \) \
-| xargs grep -E '^### +' \
-| while read -a -l line -d ':### '
+    -maxdepth 2 -type f \( -executable -or -name '*.fx' \) \
+    | xargs grep -E '^### +' \
+    | while read -a -l line -d ':### '
     set -l command_name (basename -s '.fx' $line[1])
     set -l command_desc (string trim $line[2])
     # save subcommand name
     set -a fx_subcommands $command_name
-    complete -c fx --condition '__fish_use_subcommand' --arguments $command_name --description $command_desc
+    complete -c fx --condition __fish_use_subcommand --arguments $command_name --description $command_desc
     complete -c fx --condition "__fish_seen_subcommand_from help" --arguments $command_name --description $command_desc
 end
 
@@ -33,17 +33,17 @@ function __fish_fx_needs_subcommand
 end
 
 # global fx options
-complete -c fx --condition "__fish_fx_needs_subcommand" -l "dir" -d "Path to the build directory to use when running COMMAND."
-complete -c fx --condition "__fish_fx_needs_subcommand" -o "d" -d "Target a specific device."
-complete -c fx --condition "__fish_fx_needs_subcommand" -o "i" -d "Iterative mode"
-complete -c fx --condition "__fish_fx_needs_subcommand" -o "x" -d "Print commands and their arguments as they are executed."
-complete -c fx --condition "__fish_fx_needs_subcommand" -o "xx" -d "Print extra logging of the fx tool itself (implies -x)"
+complete -c fx --condition __fish_fx_needs_subcommand -l dir -d "Path to the build directory to use when running COMMAND."
+complete -c fx --condition __fish_fx_needs_subcommand -o d -d "Target a specific device."
+complete -c fx --condition __fish_fx_needs_subcommand -o i -d "Iterative mode"
+complete -c fx --condition __fish_fx_needs_subcommand -o x -d "Print commands and their arguments as they are executed."
+complete -c fx --condition __fish_fx_needs_subcommand -o xx -d "Print extra logging of the fx tool itself (implies -x)"
 
 # Find fx subcommand options
 find $FUCHSIA_DIR/tools/devshell/ \
--maxdepth 2 -type f \( -executable -or -name '*.fx' \) \
-| xargs grep -E '^## +-[^ ]' \
-| while read -a -l line -d ':'
+    -maxdepth 2 -type f \( -executable -or -name '*.fx' \) \
+    | xargs grep -E '^## +-[^ ]' \
+    | while read -a -l line -d ':'
     set -l command_name (basename -s '.fx' $line[1])
     set -l command_desc $line[2]
     set -l shortoption
@@ -116,6 +116,19 @@ find $FUCHSIA_DIR/tools/devshell/ \
     end
 end
 
+# Functions that will be available in subcommand completers
+function __fuchsia_build_dir
+    set -l build_dir_file "$FUCHSIA_DIR"/.fx-build-dir
+
+    if test -f "$build_dir_file"
+        # If the file exists, return its contents
+        cat "$build_dir_file"
+    else
+        # If the file does not exist, return an empty string
+        echo ""
+    end
+end
+
 # Source any additional completers for the fx subcommands. If you would
 # like to add additionaly functionality for a completer create a file
 # named fx-<command>.fish which runs the completion command.
@@ -123,5 +136,5 @@ end
 # subcommands to override any complete commands that have already been called.
 set sub_command_completers (dirname (status --current-filename))/fx-*.fish
 for completer in $sub_command_completers
-  source $completer
+    source $completer
 end
