@@ -9,13 +9,13 @@ using zx;
 
 /// The overall status of the battery, informing its general availability.
 type BatteryStatus = strict enum {
-    /// uninitialized battery status
+    /// Uninitialized battery status.
     UNKNOWN = 0;
-    /// battery present and available
+    /// Battery present and available.
     OK = 1;
-    /// battery present, but not available (e.g. disabled)
+    /// Battery present, but not available (e.g. disabled).
     NOT_AVAILABLE = 2;
-    /// battery not present (e.g. removed or no battery)
+    /// Battery not present (e.g. removed or no battery).
     NOT_PRESENT = 3;
 };
 
@@ -41,9 +41,9 @@ type ChargeSource = strict enum {
 type LevelStatus = strict enum {
     UNKNOWN = 0;
     OK = 1;
-    WARNING = 2; // OEM defined signal for initial notification UI to charge
-    LOW = 3; // OEM defined at around 5% of capacity (sufficient for S1-S4)
-    CRITICAL = 4; // no longer capable of supplying power, emergency shutdown
+    WARNING = 2; // OEM defined signal for initial notification UI to charge.
+    LOW = 3; // OEM defined at around 5% of capacity (sufficient for S1-S4).
+    CRITICAL = 4; // no longer capable of supplying power, emergency shutdown.
 };
 
 /// The general status related to the overall health of the battery.
@@ -62,31 +62,31 @@ type TimeRemaining = flexible union {
     /// Representation of indeterminate state with zero duration.
     1: indeterminate zx.Duration;
 
-    /// Remaining battery life while discharging
+    /// Remaining battery life while discharging.
     2: battery_life zx.Duration;
 
-    /// Remaining time until full while charging
+    /// Remaining time until full while charging.
     3: full_charge zx.Duration;
 };
 
-/// Type of data that are determined by manufacturer
+/// Type of data that are determined by manufacturer.
 type BatterySpec = table {
-    /// Represent the battery's charging current spec in micro amps
+    /// Represent the battery's charging current spec in micro amps.
     1: max_charging_current_ua int32;
 
-    /// Represent the battery's charging voltage spec in micro volt
+    /// Represent the battery's charging voltage spec in micro volt.
     2: max_charnging_voltage_uv int32;
 
-    /// Battery Full Charge Design Capacity in micro amp hour
+    /// Battery Full Charge Design Capacity in micro amp hour.
     3: design_capacity_uah int32;
 };
 
-/// Current battery state information
+/// Current battery state information.
 type BatteryInfo = table {
-    /// General battery status with respect to presence & availability
+    /// General battery status with respect to presence & availability.
     1: status BatteryStatus;
 
-    /// The current state of the battery with respect to charging
+    /// The current state of the battery with respect to charging.
     2: charge_status ChargeStatus;
 
     /// The charge source while battery is actively charging.
@@ -98,45 +98,48 @@ type BatteryInfo = table {
     /// level status is known.
     4: level_percent float32;
 
-    /// Battery level as a general status, including low and critical
+    /// Battery level as a general status, including low and critical.
     5: level_status LevelStatus;
 
-    /// Overall battery health
+    /// Overall battery health.
     6: health HealthStatus;
 
-    /// Time remaining relative to the current charge status
+    /// Time remaining relative to the current charge status.
     7: time_remaining TimeRemaining;
 
-    /// Timestamp to distinguish between latest and stale status
+    /// Timestamp to distinguish between latest and stale status.
     8: timestamp zx.Time;
 
-    /// Forward the voltage level in mv
+    /// Forward the voltage level in mv.
     9: present_voltage_mv uint32;
 
-    /// Forward the battery capqacity in uAh
+    /// Forward the battery capqacity in uAh.
     10: remaining_capacity_uah uint32;
 
-    /// Battery spec
+    /// Battery spec.
     11: battery_spec BatterySpec;
+
+    /// Full Charge Capacity in uAh.
+    12: full_capacity_uah int32;
 };
 
-/// Provider interface used to obtain battery status details
+/// Provider interface used to obtain battery status details.
 @discoverable
 closed protocol BatteryInfoProvider {
-    /// Gets battery info
+    /// Gets battery info.
     strict GetBatteryInfo() -> (struct {
         info BatteryInfo;
     });
 
-    /// Registers a watcher for battery info changes
+    /// Registers a watcher for battery info changes.
     strict Watch(resource struct {
         watcher client_end:BatteryInfoWatcher;
     });
 };
 
-/// Watcher on battery info
+/// Watcher on battery info.
 closed protocol BatteryInfoWatcher {
-    /// Callback triggered when battery info changes
+    /// Callback triggered when battery info changes.
     strict OnChangeBatteryInfo(resource struct {
         info BatteryInfo;
 
@@ -145,10 +148,10 @@ closed protocol BatteryInfoWatcher {
     }) -> ();
 };
 
-/// General manager interface for battery management
+/// General manager interface for battery management.
 @discoverable
 closed protocol BatteryManager {
-    // Provides battery status information
+    // Provides battery status information.
     compose BatteryInfoProvider;
 };
 
