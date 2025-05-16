@@ -288,6 +288,7 @@
 
                 // These duplicate a service advertised by devfs, below.
                 // "fuchsia.gpu.magma.Service",
+                // "fuchsia.hardware.backlight.Service",
                 // "fuchsia.hardware.rtc.Service",
                 // "fuchsia.hardware.cpu.ctrl.Service",
             ],

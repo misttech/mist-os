@@ -191,6 +191,10 @@
             availability: "optional",
         },
         {
+            service: "fuchsia.hardware.backlight.Service",
+            availability: "optional",
+        },
+        {
             service: "fuchsia.gpu.magma.Service",
             availability: "optional",
         },

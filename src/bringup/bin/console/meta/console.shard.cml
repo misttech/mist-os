@@ -275,6 +275,11 @@
             to: "#console-launcher",
         },
         {
+            service: "fuchsia.hardware.backlight.Service",
+            from: "#boot-drivers",
+            to: "#console-launcher",
+        },
+        {
             service: "fuchsia.hardware.usb.peripheral.Service",
             from: "#boot-drivers",
             to: "#console-launcher",
