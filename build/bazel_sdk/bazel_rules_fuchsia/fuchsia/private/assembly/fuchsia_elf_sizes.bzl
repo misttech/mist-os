@@ -11,6 +11,7 @@ load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION",
 
 def _fuchsia_elf_sizes_impl(ctx):
     images_out = ctx.attr.product[FuchsiaProductImageInfo].images_out
+    images_intermediates = ctx.attr.product[FuchsiaProductImageInfo].images_intermediates
     zbi = get_fuchsia_sdk_toolchain(ctx).zbi
 
     extracted_zbi_bootfs_dir = ctx.actions.declare_directory(ctx.label.name + "_extracted_zbi_bootfs")
@@ -51,7 +52,7 @@ def _fuchsia_elf_sizes_impl(ctx):
             "--sizes",
             elf_sizes_json.path,
             "--blobs",
-            images_out.path + "/blobs.json",
+            images_intermediates.path + "/blobs.json",
             "--zbi",
             extracted_zbi_json.path,
             "--bootfs-dir",

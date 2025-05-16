@@ -32,7 +32,6 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         base_package_name,
     } = args;
 
-    let gendir = gendir.unwrap_or_else(|| outdir.clone());
     let base_package_name =
         base_package_name.unwrap_or_else(|| PackageDestination::Base.to_string());
 

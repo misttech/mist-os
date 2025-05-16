@@ -47,7 +47,7 @@ pub struct CreateSystemArgs {
 
     /// the directory to write generated intermediate files to.
     #[argh(option)]
-    pub gendir: Option<Utf8PathBuf>,
+    pub gendir: Utf8PathBuf,
 
     /// name to give the Base Package. This is useful if you must publish multiple
     /// base packages to the same TUF repository.

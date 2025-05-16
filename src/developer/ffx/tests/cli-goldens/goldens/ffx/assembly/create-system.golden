@@ -49,7 +49,7 @@
           "arg_name": "gendir"
         }
       },
-      "optionality": "optional",
+      "optionality": "required",
       "long": "--gendir",
       "short": null,
       "description": "the directory to write generated intermediate files to.",
