@@ -249,7 +249,6 @@ tracing_visibility = [
   # At this time we are not enforcing restrictions on ffx and related libraries.
   "//src/developer/ffx/config:*",
   "//src/developer/ffx/lib/logging/*",
-  "//src/lib/fuchsia-lockfile:*",
 
   # At this time we are not enforcing restrictions on the below since the
   # sources are in a 3P library.

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::{error, info, warn};
 use nix::unistd::{self, Pid};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -9,7 +10,6 @@ use std::fs::{remove_file, File, Metadata, OpenOptions};
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
-use tracing::{error, info, warn};
 
 /// Opens and controls a lockfile against a specific filename using create-only
 /// file modes, deleting the file on drop. Writes the current pid to the file
