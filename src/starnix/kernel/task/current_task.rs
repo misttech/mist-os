@@ -1439,7 +1439,7 @@ impl CurrentTask {
         let mut cgroup2_pid_table = kernel.cgroups.lock_cgroup2_pid_table();
         // Create a `KernelSignal::Freeze` to put onto the new task, if the cgroup is frozen.
         let child_kernel_signals = cgroup2_pid_table
-            .maybe_create_freeze_signal(self.get_pid())
+            .maybe_create_freeze_signal(self.thread_group())
             .into_iter()
             .collect::<VecDeque<_>>();
 
@@ -1537,11 +1537,8 @@ impl CurrentTask {
 
                 task_info.thread_group.write().is_sharing = is_sharing;
 
-                cgroup2_pid_table.inherit_cgroup(
-                    self.get_pid(),
-                    pid,
-                    &OwnedRef::temp(&task_info.thread_group),
-                );
+                cgroup2_pid_table
+                    .inherit_cgroup(&OwnedRef::temp(self.thread_group()), &task_info.thread_group);
 
                 task_info
             }

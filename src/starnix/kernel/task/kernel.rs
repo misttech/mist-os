@@ -452,7 +452,7 @@ impl Kernel {
             shutting_down: AtomicBool::new(false),
             container_control_handle: Mutex::new(None),
             ebpf_attachments: Default::default(),
-            cgroups: KernelCgroups::new(kernel.clone()),
+            cgroups: Default::default(),
             time_adjustment_proxy,
         });
 

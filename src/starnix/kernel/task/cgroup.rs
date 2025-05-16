@@ -7,16 +7,17 @@
 //! There is no support for actual resource constraints, or any operations outside of adding tasks
 //! to a control group (for the duration of their lifetime).
 
+use crate::task::Kernel;
 use starnix_core::signals::{send_freeze_signal, SignalInfo};
-use starnix_core::task::{Kernel, ThreadGroup, WaitQueue, Waiter};
+use starnix_core::task::{ThreadGroup, ThreadGroupKey, WaitQueue, Waiter};
 use starnix_core::vfs::{FsStr, FsString, PathBuilder};
 use starnix_logging::{log_warn, trace_duration, track_stub, CATEGORY_STARNIX};
 use starnix_sync::{Mutex, MutexGuard};
-use starnix_types::ownership::{TempRef, WeakRef};
+use starnix_types::ownership::{OwnedRef, TempRef};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::SIGKILL;
 use starnix_uapi::{errno, error, pid_t};
-use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
+use std::collections::{btree_map, hash_map, BTreeMap, HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
@@ -26,19 +27,22 @@ use crate::signals::KernelSignal;
 /// All cgroups of the kernel. There is a single cgroup v2 hierarchy, and one-or-more cgroup v1
 /// hierarchies.
 /// TODO(https://fxbug.dev/389748287): Add cgroup v1 hierarchies on the kernel.
+#[derive(Debug)]
 pub struct KernelCgroups {
     pub cgroup2: Arc<CgroupRoot>,
 }
 
 impl KernelCgroups {
-    pub fn new(kernel: Weak<Kernel>) -> Self {
-        Self { cgroup2: CgroupRoot::new(kernel) }
-    }
-
     /// Returns a locked `CgroupPidTable`, which guarantees that processes would not move in this
     /// cgroup hierarchy until the lock is freed.
     pub fn lock_cgroup2_pid_table(&self) -> MutexGuard<'_, CgroupPidTable> {
         self.cgroup2.pid_table.lock()
+    }
+}
+
+impl Default for KernelCgroups {
+    fn default() -> Self {
+        Self { cgroup2: CgroupRoot::new() }
     }
 }
 
@@ -79,8 +83,7 @@ pub trait CgroupOps: Send + Sync + 'static {
     fn id(&self) -> u64;
 
     /// Add a process to a cgroup. Errors if the cgroup has been deleted.
-    fn add_process(&self, pid: pid_t, thread_group: &TempRef<'_, ThreadGroup>)
-        -> Result<(), Errno>;
+    fn add_process(&self, thread_group: &TempRef<'_, ThreadGroup>) -> Result<(), Errno>;
 
     /// Create a new sub-cgroup as a child of this cgroup. Errors if the cgroup is deleted, or a
     /// child with `name` already exists.
@@ -97,7 +100,7 @@ pub trait CgroupOps: Send + Sync + 'static {
     fn remove_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno>;
 
     /// Return all pids that belong to this cgroup.
-    fn get_pids(&self) -> Vec<pid_t>;
+    fn get_pids(&self, kernel: &Kernel) -> Vec<pid_t>;
 
     /// Kills all processes in the cgroup and its descendants.
     fn kill(&self);
@@ -117,10 +120,10 @@ pub trait CgroupOps: Send + Sync + 'static {
 
 /// `CgroupPidTable` contains the mapping of `ThreadGroup` (by pid) to non-root cgroup.
 /// If `pid` is valid but does not exist in the mapping, then it is assumed to be in the root cgroup.
-#[derive(Default)]
-pub struct CgroupPidTable(HashMap<pid_t, Weak<Cgroup>>);
+#[derive(Debug, Default)]
+pub struct CgroupPidTable(HashMap<ThreadGroupKey, Weak<Cgroup>>);
 impl Deref for CgroupPidTable {
-    type Target = HashMap<pid_t, Weak<Cgroup>>;
+    type Target = HashMap<ThreadGroupKey, Weak<Cgroup>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -137,29 +140,30 @@ impl CgroupPidTable {
     /// `ThreadGroup` does not have any `Task` associated with it.
     pub fn inherit_cgroup(
         &mut self,
-        parent_pid: pid_t,
-        child_pid: pid_t,
-        thread_group: &TempRef<'_, ThreadGroup>,
+        parent: &TempRef<'_, ThreadGroup>,
+        child: &OwnedRef<ThreadGroup>,
     ) {
-        assert!(thread_group.read().tasks_count() == 0, "threadgroup must be newly created");
-
-        if let Some(weak_cgroup) = self.0.get(&parent_pid).cloned() {
+        assert!(child.read().tasks_count() == 0, "threadgroup must be newly created");
+        if let Some(weak_cgroup) = self.0.get(&parent.into()).cloned() {
             let Some(cgroup) = weak_cgroup.upgrade() else {
                 log_warn!("ignored attempt to inherit a non-existant cgroup");
                 return;
             };
             assert!(
-                self.0.insert(child_pid, weak_cgroup).is_none(),
+                self.0.insert(child.into(), weak_cgroup).map(|c| c.strong_count() == 0).is_none(),
                 "child pid should not exist when inheriting"
             );
             // Skip freezer propagation because the `ThreadGroup` is newly created and has no tasks.
-            cgroup.state.lock().processes.insert(child_pid, WeakRef::from(thread_group));
+            cgroup.state.lock().processes.insert(child.into());
         }
     }
 
     /// Creates a new `KernelSignal` for a new `Task`, if that `Task` is added to a frozen cgroup.
-    pub fn maybe_create_freeze_signal(&self, pid: pid_t) -> Option<KernelSignal> {
-        let Some(weak_cgroup) = self.0.get(&pid) else {
+    pub fn maybe_create_freeze_signal<TG: Copy + Into<ThreadGroupKey>>(
+        &self,
+        tg: TG,
+    ) -> Option<KernelSignal> {
+        let Some(weak_cgroup) = self.0.get(&tg.into()) else {
             return None;
         };
         let Some(cgroup) = weak_cgroup.upgrade() else {
@@ -184,7 +188,7 @@ impl CgroupPidTable {
 /// to the whole system.
 ///
 /// - The root does not own a `FsNode` as it is created and owned by the `FileSystem` instead.
-#[derive(Default)]
+#[derive(Debug)]
 pub struct CgroupRoot {
     /// Look up cgroup by pid. Must be locked before child states.
     pid_table: Mutex<CgroupPidTable>,
@@ -192,22 +196,20 @@ pub struct CgroupRoot {
     /// Sub-cgroups of this cgroup.
     children: Mutex<CgroupChildren>,
 
-    /// Weak reference to Kernel, used to get processes and tasks.
-    kernel: Weak<Kernel>,
-
     /// Weak reference to self, used when creating child cgroups.
     weak_self: Weak<CgroupRoot>,
 
     /// Used to generate IDs for descendent Cgroups.
     next_id: AtomicU64,
 }
+
 impl CgroupRoot {
-    pub fn new(kernel: Weak<Kernel>) -> Arc<CgroupRoot> {
+    pub fn new() -> Arc<CgroupRoot> {
         Arc::new_cyclic(|weak_self| Self {
+            pid_table: Default::default(),
+            children: Default::default(),
             weak_self: weak_self.clone(),
-            kernel,
             next_id: AtomicU64::new(1),
-            ..Default::default()
         })
     }
 
@@ -215,12 +217,8 @@ impl CgroupRoot {
         self.next_id.fetch_add(1, Ordering::Relaxed)
     }
 
-    fn kernel(&self) -> Arc<Kernel> {
-        self.kernel.upgrade().expect("kernel is available for cgroup operations")
-    }
-
-    pub fn get_cgroup(&self, pid: pid_t) -> Option<Weak<Cgroup>> {
-        self.pid_table.lock().get(&pid).cloned()
+    pub fn get_cgroup<TG: Copy + Into<ThreadGroupKey>>(&self, tg: TG) -> Option<Weak<Cgroup>> {
+        self.pid_table.lock().get(&tg.into()).cloned()
     }
 }
 
@@ -229,17 +227,13 @@ impl CgroupOps for CgroupRoot {
         0
     }
 
-    fn add_process(
-        &self,
-        pid: pid_t,
-        thread_group: &TempRef<'_, ThreadGroup>,
-    ) -> Result<(), Errno> {
+    fn add_process(&self, thread_group: &TempRef<'_, ThreadGroup>) -> Result<(), Errno> {
         let mut pid_table = self.pid_table.lock();
-        match pid_table.entry(pid) {
+        match pid_table.entry(thread_group.into()) {
             hash_map::Entry::Occupied(entry) => {
                 // If pid is in a child cgroup, remove it.
                 if let Some(cgroup) = entry.get().upgrade() {
-                    cgroup.state.lock().remove_process(pid, thread_group)?;
+                    cgroup.state.lock().remove_process(thread_group)?;
                 }
                 entry.remove();
             }
@@ -272,10 +266,11 @@ impl CgroupOps for CgroupRoot {
         Ok(children.get_children())
     }
 
-    fn get_pids(&self) -> Vec<pid_t> {
-        let controlled_pids = self.pid_table.lock();
-        let kernel_pids = self.kernel().pids.read().process_ids();
-        kernel_pids.into_iter().filter(|pid| !controlled_pids.contains_key(pid)).collect()
+    fn get_pids(&self, kernel: &Kernel) -> Vec<pid_t> {
+        let controlled_pids: HashSet<pid_t> =
+            self.pid_table.lock().keys().filter_map(|v| v.upgrade().map(|tg| tg.leader)).collect();
+        let kernel_pids = kernel.pids.read().process_ids();
+        kernel_pids.into_iter().filter(|pid| !controlled_pids.contains(pid)).collect()
     }
 
     fn kill(&self) {
@@ -299,7 +294,7 @@ impl CgroupOps for CgroupRoot {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct CgroupChildren(BTreeMap<FsString, CgroupHandle>);
 impl CgroupChildren {
     fn insert_child(&mut self, name: FsString, child: CgroupHandle) -> Result<CgroupHandle, Errno> {
@@ -349,13 +344,13 @@ impl Deref for CgroupChildren {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct CgroupState {
     /// Subgroups of this control group.
     children: CgroupChildren,
 
     /// The tasks that are part of this control group.
-    processes: HashMap<pid_t, WeakRef<ThreadGroup>>,
+    processes: HashSet<ThreadGroupKey>,
 
     /// If true, can no longer add children or tasks.
     deleted: bool,
@@ -381,7 +376,7 @@ impl CgroupState {
 
     // Goes through `processes` and remove processes that are no longer alive.
     fn update_processes(&mut self) {
-        self.processes.retain(|_pid, thread_group| {
+        self.processes.retain(|thread_group| {
             let Some(thread_group) = thread_group.upgrade() else {
                 return false;
             };
@@ -416,15 +411,11 @@ impl CgroupState {
         std::cmp::max(self.self_freezer_state, self.inherited_freezer_state)
     }
 
-    fn add_process(
-        &mut self,
-        pid: pid_t,
-        thread_group: &TempRef<'_, ThreadGroup>,
-    ) -> Result<(), Errno> {
+    fn add_process(&mut self, thread_group: &TempRef<'_, ThreadGroup>) -> Result<(), Errno> {
         if self.deleted {
             return error!(ENOENT);
         }
-        self.processes.insert(pid, WeakRef::from(thread_group));
+        self.processes.insert(thread_group.into());
 
         if self.get_effective_freezer_state() == FreezerState::Frozen {
             self.freeze_thread_group(&thread_group);
@@ -432,15 +423,11 @@ impl CgroupState {
         Ok(())
     }
 
-    fn remove_process(
-        &mut self,
-        pid: pid_t,
-        thread_group: &TempRef<'_, ThreadGroup>,
-    ) -> Result<(), Errno> {
+    fn remove_process(&mut self, thread_group: &TempRef<'_, ThreadGroup>) -> Result<(), Errno> {
         if self.deleted {
             return error!(ENOENT);
         }
-        self.processes.remove(&pid);
+        self.processes.remove(&thread_group.into());
 
         if self.get_effective_freezer_state() == FreezerState::Frozen {
             self.thaw_thread_group(thread_group);
@@ -455,7 +442,7 @@ impl CgroupState {
             return;
         }
 
-        for (_, thread_group) in self.processes.iter() {
+        for thread_group in self.processes.iter() {
             let Some(thread_group) = thread_group.upgrade() else {
                 continue;
             };
@@ -479,7 +466,7 @@ impl CgroupState {
     }
 
     fn propagate_kill(&self) {
-        for (_, thread_group) in self.processes.iter() {
+        for thread_group in self.processes.iter() {
             let Some(thread_group) = thread_group.upgrade() else {
                 continue;
             };
@@ -494,6 +481,7 @@ impl CgroupState {
 }
 
 /// `Cgroup` is a non-root cgroup in a cgroup hierarchy, and can have other `Cgroup`s as children.
+#[derive(Debug)]
 pub struct Cgroup {
     root: Weak<CgroupRoot>,
 
@@ -566,32 +554,28 @@ impl CgroupOps for Cgroup {
         self.id
     }
 
-    fn add_process(
-        &self,
-        pid: pid_t,
-        thread_group: &TempRef<'_, ThreadGroup>,
-    ) -> Result<(), Errno> {
+    fn add_process(&self, thread_group: &TempRef<'_, ThreadGroup>) -> Result<(), Errno> {
         let root = self.root()?;
         let mut pid_table = root.pid_table.lock();
-        match pid_table.entry(pid) {
+        match pid_table.entry(thread_group.into()) {
             hash_map::Entry::Occupied(mut entry) => {
-                // Check if pid is already in the current cgroup. Linux does not return an error if
+                // Check if thread_group is already in the current cgroup. Linux does not return an error if
                 // it already exists.
                 if std::ptr::eq(self, entry.get().as_ptr()) {
                     return Ok(());
                 }
 
-                // If pid is in another cgroup, we need to remove it first.
+                // If thread_group is in another cgroup, we need to remove it first.
                 track_stub!(TODO("https://fxbug.dev/383374687"), "check permissions");
                 if let Some(other_cgroup) = entry.get().upgrade() {
-                    other_cgroup.state.lock().remove_process(pid, thread_group)?;
+                    other_cgroup.state.lock().remove_process(thread_group)?;
                 }
 
-                self.state.lock().add_process(pid, thread_group)?;
+                self.state.lock().add_process(thread_group)?;
                 entry.insert(self.weak_self.clone());
             }
             hash_map::Entry::Vacant(entry) => {
-                self.state.lock().add_process(pid, thread_group)?;
+                self.state.lock().add_process(thread_group)?;
                 entry.insert(self.weak_self.clone());
             }
         }
@@ -632,10 +616,10 @@ impl CgroupOps for Cgroup {
         Ok(state.children.get_children())
     }
 
-    fn get_pids(&self) -> Vec<pid_t> {
+    fn get_pids(&self, _kernel: &Kernel) -> Vec<pid_t> {
         let mut state = self.state.lock();
         state.update_processes();
-        state.processes.keys().copied().collect()
+        state.processes.iter().filter_map(|v| v.upgrade().map(|tg| tg.leader)).collect()
     }
 
     fn kill(&self) {
@@ -693,8 +677,8 @@ mod test {
 
     #[::fuchsia::test]
     async fn cgroup_path_from_root() {
-        let (kernel, _current_task) = create_kernel_and_task();
-        let root = CgroupRoot::new(Arc::downgrade(&kernel));
+        let (_, _current_task) = create_kernel_and_task();
+        let root = CgroupRoot::new();
 
         let test_cgroup = root.new_child("test".into()).expect("new_child on root cgroup succeeds");
         let child_cgroup =
@@ -712,12 +696,10 @@ mod test {
         let cgroup = root.new_child("test".into()).expect("new_child on root cgroup succeeds");
 
         let process = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        cgroup
-            .add_process(process.get_pid(), &OwnedRef::temp(process.thread_group()))
-            .expect("add process to cgroup");
+        cgroup.add_process(&OwnedRef::temp(process.thread_group())).expect("add process to cgroup");
         cgroup.freeze();
-        assert_eq!(cgroup.get_pids().first(), Some(process.get_pid()).as_ref());
-        assert_eq!(root.get_cgroup(process.get_pid()).unwrap().as_ptr(), Arc::as_ptr(&cgroup));
+        assert_eq!(cgroup.get_pids(&kernel).first(), Some(process.get_pid()).as_ref());
+        assert_eq!(root.get_cgroup(process.thread_group()).unwrap().as_ptr(), Arc::as_ptr(&cgroup));
 
         let thread = process.clone_task_for_test(
             &mut locked,
