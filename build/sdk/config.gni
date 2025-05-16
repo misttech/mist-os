@@ -64,5 +64,8 @@ declare_args() {
   # architecture support. For example, `fx build //sdk:final_fuchsia_idk`.
   #
   # To override the set of API levels, see `idk_buildable_api_levels`.
+  # LINT.IfChange
   idk_buildable_cpus = idk_buildable_cpus_default
+
+  # LINT.ThenChange(//build/bazel/BUILD.gn)
 }

@@ -20,7 +20,15 @@ import os
 import pathlib
 import sys
 
-import depfile
+_SCRIPT_DIR = pathlib.Path(__file__).parent.parent
+
+# See comment in BUILD.bazel to see why changing sys.path manually
+# is required here. Bytecode generation is also disallowed to avoid
+# polluting the Bazel execroot with .pyc files that can end up in
+# the generated TreeArtifact, resulting in issues when dependent
+# actions try to read it.
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(_SCRIPT_DIR))
 import generate_idk
 
 
@@ -92,7 +100,7 @@ def main() -> int:
         "--stamp-file",
         help="Path to the stamp file",
         type=pathlib.Path,
-        required=True,
+        required=False,
     )
     parser.add_argument(
         "--depfile",
@@ -169,9 +177,12 @@ def main() -> int:
             sort_keys=True,
         )
 
-    args.stamp_file.touch()
+    if args.stamp_file:
+        args.stamp_file.touch()
 
     if args.depfile:
+        import depfile  # Import here to avoid importing from Bazel.
+
         depfile_path: pathlib.Path = args.depfile
         depfile_path.parent.mkdir(parents=True, exist_ok=True)
         with depfile_path.open("w") as depfile_out:

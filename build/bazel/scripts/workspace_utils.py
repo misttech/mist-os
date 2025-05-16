@@ -891,6 +891,15 @@ def record_fuchsia_workspace(
         # LINT.ThenChange(//build/regenerator.py)
     )
 
+    # Used when merging the IDK sub-build directories. For other use cases,
+    # prefer a symlink with a narrower scope.
+    generated.record_symlink(
+        # LINT.IfChange
+        "workspace/fuchsia_build_generated/ninja_root_build_dir",
+        # LINT.ThenChange(//build/bazel/bazel_sdk/BUILD.bazel)
+        gn_output_dir,
+    )
+
     generated.record_symlink(
         # LINT.IfChange
         "workspace/fuchsia_build_generated/fuchsia_internal_only_idk.hash",

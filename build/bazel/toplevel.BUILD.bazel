@@ -73,6 +73,9 @@ exports_files(
         "fuchsia_build_generated/jiri_snapshot.xml",
     ] +
 
+    # Used in IDK generation.
+    ["build/sdk/meta"] +
+
     # end of list.
     [],
 )

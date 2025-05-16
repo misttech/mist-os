@@ -151,6 +151,7 @@ group("bazel_action_allowlist") {
     "//examples/drivers/template:bazel_package.bazel_build",
     "//examples/drivers/transport/driver/v2:child_bazel_package.bazel_build",
     "//examples/drivers/transport/driver/v2:parent_bazel_package.bazel_build",
+    "//sdk:bazel_built_fuchsia_idk",
     "//sdk/lib/driver/devicetree/examples/example-board:bazel_package.bazel_build",
     "//src:bazel_tests.bazel_build",
     "//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-no-banjo-bazel-package.bazel_build",
@@ -182,7 +183,8 @@ group("bazel_action_allowlist") {
 #   - string_or_false: Either the false Boolean value, or a string. Always
 #        mapped to a Starlark string (false will be mapped to the empty string).
 #   - array_of_strings: An array of strings, mapped to a Starlark list of
-#        strings.
+#        strings. The array must not contain a mix of types, such as integers
+#        and strings.
 #   - path: A string beginning with "//", mapped to a string with the "//" stripped
 generated_file("gn_build_variables_for_bazel") {
   outputs = [ "$root_build_dir/gn_build_variables_for_bazel.json" ]
@@ -302,4 +304,53 @@ generated_file("gn_build_variables_for_bazel") {
   ]
 
   # LINT.ThenChange(//build/config/compilation_modes.gni)
+
+  # LINT.IfChange
+  declaration = "//sdk/config.gni"
+  import(declaration)
+  contents += [
+    {
+      name = "sdk_id"
+      value = sdk_id
+      type = "string"
+      location = declaration
+    },
+  ]
+
+  # LINT.ThenChange(//sdk/config.gni)
+
+  # LINT.IfChange
+  declaration = "//build/sdk/config.gni"
+  import(declaration)
+  contents += [
+    {
+      name = "idk_buildable_cpus"
+      value = idk_buildable_cpus
+      type = "array_of_strings"
+      location = declaration
+    },
+  ]
+
+  # LINT.ThenChange(//build/sdk/config.gni)
+
+  # LINT.IfChange
+  declaration = "//build/config/fuchsia/platform_version.gni"
+  import(declaration)
+
+  # GN supports a list of both integers and strings. Ensure all levels are
+  # strings as required by Bazel.
+  string_api_levels = []
+  foreach(api_level, idk_buildable_api_levels) {
+    string_api_levels += [ "${api_level}" ]
+  }
+  contents += [
+    {
+      name = "idk_buildable_api_levels"
+      value = string_api_levels
+      type = "array_of_strings"
+      location = declaration
+    },
+  ]
+
+  # LINT.ThenChange(//build/config/fuchsia/platform_version.gni)
 }

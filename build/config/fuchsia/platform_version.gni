@@ -40,7 +40,10 @@ declare_args() {
   # To override the set of CPU architectures, see `idk_buildable_cpus`.
   #
   # Do not use the `platform_version` member directly.
+  # LINT.IfChange
   idk_buildable_api_levels = platform_version.default_idk_buildable_api_levels
+
+  # LINT.ThenChange(//build/bazel/BUILD.gn)
 
   # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
   # are too slow to enable this setting, and therefore the mac IDK won't have

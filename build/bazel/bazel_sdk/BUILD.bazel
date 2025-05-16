@@ -2,8 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("@fuchsia_build_info//:args.bzl", "idk_buildable_api_levels", "idk_buildable_cpus")
 load("@rules_python//python:py_binary.bzl", "py_binary")
-load(":rules.bzl", "compare_bazel_sdk_contents", "generate_bazel_sdk")
+load(":rules.bzl", "compare_bazel_sdk_contents", "generate_bazel_sdk", "generate_merged_idk")
 
 # A script used to convert an IDK export directory into a Fuchsia Bazel SDK directory.
 #
@@ -47,6 +48,23 @@ py_binary(
     name = "compare_bazel_sdks",
     srcs = ["compare_bazel_sdks.py"],
     main = "compare_bazel_sdks.py",
+)
+
+# Generates the final merged Fuchsia IDK from one or more IDK collection builds.
+generate_merged_idk(
+    name = "final_fuchsia_idk",
+
+    # Support all CPU architectures and API levels.
+    buildable_api_levels = idk_buildable_api_levels,
+    buildable_cpus = idk_buildable_cpus,
+
+    # LINT.IfChange
+    collection_name = "fuchsia_collection",
+    # LINT.ThenChange(//sdk/BUILD.gn)
+
+    # LINT.IfChange
+    ninja_root_build_dir = "fuchsia_build_generated/ninja_root_build_dir",
+    # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
 )
 
 # Generates a Bazel SDK from an IDK collection built by Ninja. This is only used
