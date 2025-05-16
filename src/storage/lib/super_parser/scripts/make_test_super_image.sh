@@ -14,14 +14,14 @@
 
 rm -f /tmp/simple_super.img ../testdata/simple_super.img.zstd
 
-lpmake --device-size 1073741824 \
-  --metadata-size 65536 \
-  --metadata-slots 1 \
-  --partition system:readonly:4096 \
-  --partition system_ext:readonly:0 \
-  --block-size 4096 \
-  --virtual-ab \
-  --force-full-image \
-  --output /tmp/simple_super.img
+lpmake  -device-size 10485760 \
+    --metadata-size 65536 \
+    --metadata-slots 2 \
+    --partition system:readonly:8192 \
+    --partition system_ext:readonly:4096 \
+    --block-size 4096 \
+    --virtual-ab \
+    --force-full-image \
+    --output /tmp/simple_super.img
 
 zstd /tmp/simple_super.img -o ../testdata/simple_super.img.zstd

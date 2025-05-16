@@ -221,7 +221,7 @@ mod tests {
         let max_size = geometry.metadata_max_size;
         let metadata_slot_count = geometry.metadata_slot_count;
         assert_eq!(max_size, 65536);
-        assert_eq!(metadata_slot_count, 1);
+        assert_eq!(metadata_slot_count, 2);
         Ok(())
     }
 
@@ -231,7 +231,7 @@ mod tests {
         let num_partition_entries = header.partitions.num_entries;
         let num_extent_entries = header.extents.num_entries;
         assert_eq!(num_partition_entries, 2);
-        assert_eq!(num_extent_entries, 1);
+        assert_eq!(num_extent_entries, 2);
         Ok(())
     }
 
@@ -257,14 +257,23 @@ mod tests {
         assert_eq!(partition_name[..expected_name.len()], expected_name);
         let partition_attributes = partitions[1].attributes;
         assert_eq!(partition_attributes, PartitionAttributes::READONLY);
+        let system_partition_extent_index = partitions[1].first_extent_index;
+        let system_partition_num_extents = partitions[1].num_extents;
+        assert_eq!(system_partition_extent_index, 1);
+        assert_eq!(system_partition_num_extents, 1);
         Ok(())
     }
 
     // Verify metadata extents table against the image at `IMAGE_PATH`.
     fn verify_extents_table(metadata: &Metadata) -> Result<(), Error> {
-        // The simple super image has a "system" partition of size 4096 bytes. This extent entry
+        // The simple super image has a "system" partition of size 8192 bytes. This extent entry
         // refers to the extent used by that partition.
         let num_sectors = metadata.extents[0].num_sectors;
+        assert_eq!(num_sectors * SECTOR_SIZE as u64, 8192);
+
+        // The simple super image has a "system_ext" partition of size 4096 bytes. This extent entry
+        // refers to the extent used by that partition.
+        let num_sectors = metadata.extents[1].num_sectors;
         assert_eq!(num_sectors * SECTOR_SIZE as u64, 4096);
         Ok(())
     }
@@ -291,7 +300,7 @@ mod tests {
             .expect("failed to convert partition entry name to string");
         assert_eq!(partition_name[..expected_name.len()], expected_name);
         let device_size = block_devices[0].size;
-        assert_eq!(device_size, 1073741824);
+        assert_eq!(device_size, 10485760);
         Ok(())
     }
 
