@@ -12,7 +12,7 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::Arc;
 
-const SUSPEND_EVENT_BUFFER_SIZE: usize = 4096;
+const SUSPEND_EVENT_BUFFER_SIZE: usize = 512;
 
 static INSPECT_FIELD_EVENT_CAPACITY: &str = "event_capacity";
 static INSPECT_FIELD_HISTORY_DURATION: &str = "history_duration_seconds";
