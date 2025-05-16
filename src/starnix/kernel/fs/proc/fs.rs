@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::proc_directory::ProcDirectory;
-use crate::task::{CurrentTask, Kernel};
+use crate::task::CurrentTask;
 use crate::vfs::{
     CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr,
 };
@@ -14,10 +14,6 @@ use starnix_uapi::{statfs, PROC_SUPER_MAGIC};
 use std::sync::Arc;
 
 struct ProcFsHandle(FileSystemHandle);
-
-pub fn get_proc_fs(kernel: &Arc<Kernel>) -> Option<FileSystemHandle> {
-    kernel.expando.peek::<ProcFsHandle>().map(|h| h.0.clone())
-}
 
 /// Returns `kernel`'s procfs instance, initializing it if needed.
 pub fn proc_fs(

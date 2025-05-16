@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fs::proc::sys_net::{
+    ProcSysNetIpv4Conf, ProcSysNetIpv4Neigh, ProcSysNetIpv6Conf, ProcSysNetIpv6Neigh,
+};
 use crate::security;
-use crate::task::net::NetstackDevicesDirectory;
 use crate::task::{ptrace_get_scope, ptrace_set_scope, CurrentTask, SeccompAction};
 use crate::vfs::stub_bytes_file::StubBytesFile;
 use crate::vfs::{
@@ -683,19 +685,6 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
     let file_mode = mode!(IFREG, 0o644);
     let dir_mode = mode!(IFDIR, 0o644);
 
-    let devs = &current_task.kernel().netstack_devices;
-    // Per https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt,
-    //
-    //   conf/default/*:
-    //	   Change the interface-specific default settings.
-    //
-    //   conf/all/*:
-    //	   Change all the interface-specific settings.
-    //
-    // Note that the all/default directories don't exist in `/sys/class/net`.
-    devs.legacy_add_dev(current_task, "all", Some(fs));
-    devs.legacy_add_dev(current_task, "default", Some(fs));
-
     dir.subdir(current_task, "core", 0o555, |dir| {
         dir.entry(
             current_task,
@@ -747,12 +736,7 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
         );
     });
     dir.subdir(current_task, "ipv4", 0o555, |dir| {
-        dir.entry(
-            current_task,
-            "conf",
-            NetstackDevicesDirectory::new_proc_sys_net_ipv4_conf(),
-            dir_mode,
-        );
+        dir.entry(current_task, "conf", ProcSysNetIpv4Conf, dir_mode);
         dir.entry(
             current_task,
             "fwmark_reflect",
@@ -771,12 +755,7 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             ),
             file_mode,
         );
-        dir.entry(
-            current_task,
-            "neigh",
-            NetstackDevicesDirectory::new_proc_sys_net_ipv4_neigh(),
-            dir_mode,
-        );
+        dir.entry(current_task, "neigh", ProcSysNetIpv4Neigh, dir_mode);
         dir.entry(
             current_task,
             "ping_group_range",
@@ -815,12 +794,7 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
         );
     });
     dir.subdir(current_task, "ipv6", 0o555, |dir| {
-        dir.entry(
-            current_task,
-            "conf",
-            NetstackDevicesDirectory::new_proc_sys_net_ipv6_conf(),
-            dir_mode,
-        );
+        dir.entry(current_task, "conf", ProcSysNetIpv6Conf, dir_mode);
         dir.entry(
             current_task,
             "fwmark_reflect",
@@ -830,12 +804,7 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             ),
             file_mode,
         );
-        dir.entry(
-            current_task,
-            "neigh",
-            NetstackDevicesDirectory::new_proc_sys_net_ipv6_neigh(),
-            dir_mode,
-        );
+        dir.entry(current_task, "neigh", ProcSysNetIpv6Neigh, dir_mode);
     });
     dir.subdir(current_task, "unix", 0o555, |dir| {
         dir.entry(

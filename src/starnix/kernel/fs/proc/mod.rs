@@ -30,4 +30,4 @@ mod uptime;
 mod vmstat;
 mod zoneinfo;
 
-pub use fs::{get_proc_fs, proc_fs};
+pub use fs::proc_fs;

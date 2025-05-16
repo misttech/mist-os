@@ -27,8 +27,7 @@ use crate::vfs::socket::{
     SocketAddress,
 };
 use crate::vfs::{
-    DelayedReleaser, FileHandle, FileOps, FileSystemHandle, FsNode, FsString, Mounts,
-    StaticDirectoryBuilder,
+    DelayedReleaser, FileHandle, FileOps, FsNode, FsString, Mounts, StaticDirectoryBuilder,
 };
 use bstr::BString;
 use expando::Expando;
@@ -332,24 +331,6 @@ pub struct Kernel {
 struct InterfacesHandlerImpl(Weak<Kernel>);
 
 impl InterfacesHandlerImpl {
-    fn with_netstack_devices<
-        F: FnOnce(&CurrentTask, &Arc<NetstackDevices>, Option<&FileSystemHandle>)
-            + Sync
-            + Send
-            + 'static,
-    >(
-        &mut self,
-        f: F,
-    ) {
-        if let Some(kernel) = self.0.upgrade() {
-            kernel.kthreads.spawner().spawn(move |_, current_task| {
-                let kernel = current_task.kernel();
-                let procfs = crate::fs::proc::get_proc_fs(&kernel);
-                f(current_task, &kernel.netstack_devices, procfs.as_ref())
-            });
-        }
-    }
-
     fn kernel(&self) -> Option<Arc<Kernel>> {
         self.0.upgrade()
     }
@@ -360,22 +341,12 @@ impl InterfacesHandler for InterfacesHandlerImpl {
         if let Some(kernel) = self.kernel() {
             kernel.netstack_devices.add_device(&kernel, name.into());
         }
-
-        let name = name.to_owned();
-        self.with_netstack_devices(move |current_task, devs, proc_fs| {
-            devs.legacy_add_dev(current_task, &name, proc_fs)
-        })
     }
 
     fn handle_deleted_link(&mut self, name: &str) {
         if let Some(kernel) = self.kernel() {
             kernel.netstack_devices.remove_device(&kernel, name.into());
         }
-
-        let name = name.to_owned();
-        self.with_netstack_devices(move |_current_task, devs, _proc_fs| {
-            devs.legacy_remove_dev(&name)
-        })
     }
 }
 
