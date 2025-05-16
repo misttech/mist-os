@@ -183,7 +183,7 @@ class WakeLease {
   // Intended for testing, gets a shared pointer to the wrapped
   // fdf_power::TimeoutWakeLease object.
   std::shared_ptr<ManualWakeLease> GetWakeLease() { return lease_; }
-  ~WakeLease() { zx::result<zx::eventpair> obsolete_lease = lease_->TakeWakeLease(); }
+  ~WakeLease() { zx::result<zx::eventpair> obsolete_lease = lease_->End(); }
 
  private:
   std::shared_ptr<ManualWakeLease> lease_;
