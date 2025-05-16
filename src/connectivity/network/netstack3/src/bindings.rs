@@ -1500,7 +1500,7 @@ impl NetstackSeed {
 
         // We just let this be destroyed on drop because it's effectively tied
         // to the lifecycle of the entire component.
-        let _inspect_task = inspect_publisher.publish();
+        let inspect_task = inspect_publisher.publish();
 
         // Wait for services to stop.
         services_fut.await;
@@ -1558,6 +1558,9 @@ impl NetstackSeed {
         // Drop all inspector data, it holds ctx clones.
         std::mem::drop(inspect_nodes);
         inspector.root().clear_recorded();
+        if let Some(inspect_task) = inspect_task {
+            inspect_task.cancel().await;
+        }
 
         info!("shutdown complete");
 
