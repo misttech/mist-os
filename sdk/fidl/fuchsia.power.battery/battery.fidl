@@ -4,6 +4,7 @@
 @available(added=HEAD)
 library fuchsia.power.battery;
 
+using fuchsia.power.system;
 using zx;
 
 /// The overall status of the battery, informing its general availability.
@@ -136,8 +137,11 @@ closed protocol BatteryInfoProvider {
 /// Watcher on battery info
 closed protocol BatteryInfoWatcher {
     /// Callback triggered when battery info changes
-    strict OnChangeBatteryInfo(struct {
+    strict OnChangeBatteryInfo(resource struct {
         info BatteryInfo;
+
+        /// Optional wake lease for power baton passing.
+        wake_lease fuchsia.power.system.LeaseToken:optional;
     }) -> ();
 };
 

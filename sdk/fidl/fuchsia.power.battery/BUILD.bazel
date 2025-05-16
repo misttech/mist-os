@@ -24,6 +24,7 @@ fuchsia_fidl_library(
     ],
     target_compatible_with = ["@platforms//os:fuchsia"],
     deps = [
+        "@fuchsia_sdk//fidl/fuchsia.power.system",
         "@fuchsia_sdk//fidl/zx",
     ],
 )

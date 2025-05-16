@@ -260,7 +260,7 @@ mod tests {
         upstream_battery_notifier: &fpower::BatteryInfoWatcherProxy,
         update: fpower::BatteryInfo,
     ) -> Result<BatteryInfo, BatteryClientError> {
-        let update_fut = upstream_battery_notifier.on_change_battery_info(&update);
+        let update_fut = upstream_battery_notifier.on_change_battery_info(&update, None);
         let mut update_fut = pin!(update_fut);
         exec.run_until_stalled(&mut update_fut).expect_pending("waiting for fidl response");
 
