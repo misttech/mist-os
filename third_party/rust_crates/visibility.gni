@@ -278,7 +278,8 @@ tracing_subscriber_visibility = [
   # (cd $FUCHSIA_DIR && git grep  --files-with-matches '//third_party/rust_crates:tracing-subscriber' -- '*BUILD.gn' | sed 's|\(.*\)/BUILD.gn|"//\1:*",|')
   #
   # At this time we are not enforcing restrictions on ffx and related code.
-  "//src/developer/ffx/*",
+  "//src/developer/ffx/config:*",
+  "//src/developer/ffx/lib/logging/*",
   "//tools/funnel:*",
 
   # At this time we are not enforcing restrictions on the below.
