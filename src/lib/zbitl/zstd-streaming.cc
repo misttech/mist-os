@@ -27,8 +27,8 @@ Streaming::Context* Streaming::Init(void* scratch_space, size_t size) {
   return reinterpret_cast<Context*>(ZSTD_initStaticDStream(scratch_space, size));
 }
 
-fit::result<std::string_view, cpp20::span<std::byte>> Streaming::Decompress(
-    Streaming::Context* dctx, cpp20::span<std::byte> buffer, ByteView& chunk) {
+fit::result<std::string_view, std::span<std::byte>> Streaming::Decompress(
+    Streaming::Context* dctx, std::span<std::byte> buffer, ByteView& chunk) {
   // Streaming mode.  This may be one of many calls with consecutive chunks.
 
   auto stream = reinterpret_cast<ZSTD_DStream*>(dctx);

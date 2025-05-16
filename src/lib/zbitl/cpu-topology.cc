@@ -21,7 +21,7 @@ fit::result<std::string_view, CpuTopologyTable> CpuTopologyTable::FromPayload(
         return fit::error("ZBI_TYPE_CPU_TOPOLOGY payload not a multiple of entry size");
       }
       CpuTopologyTable result;
-      result.table_ = cpp20::span{
+      result.table_ = std::span{
           reinterpret_cast<const zbi_topology_node_t*>(payload.data()),
           payload.size_bytes() / sizeof(zbi_topology_node_t),
       };
@@ -37,7 +37,7 @@ fit::result<std::string_view, CpuTopologyTable> CpuTopologyTable::FromPayload(
       }
 
       CpuTopologyTable result;
-      result.table_ = cpp20::span{
+      result.table_ = std::span{
           reinterpret_cast<const zbi_topology_node_v2_t*>(payload.data()),
           payload.size_bytes() / sizeof(zbi_topology_node_v2_t),
       };
@@ -69,23 +69,23 @@ fit::result<std::string_view, CpuTopologyTable> CpuTopologyTable::FromPayload(
 struct CpuTopologyTable::Dispatch {
   // Set up with the modern table format, just use the input as is.
 
-  static size_t TableSize(cpp20::span<const zbi_topology_node_t> nodes) { return nodes.size(); }
+  static size_t TableSize(std::span<const zbi_topology_node_t> nodes) { return nodes.size(); }
 
-  static iterator TableBegin(cpp20::span<const zbi_topology_node_t> nodes) {
+  static iterator TableBegin(std::span<const zbi_topology_node_t> nodes) {
     iterator result;
     result.it_ = nodes.begin();
     return result;
   }
 
-  static iterator TableEnd(cpp20::span<const zbi_topology_node_t> nodes) {
+  static iterator TableEnd(std::span<const zbi_topology_node_t> nodes) {
     iterator result;
     result.it_ = nodes.end();
     return result;
   }
 
-  static size_t TableSize(cpp20::span<const zbi_topology_node_v2_t> nodes) { return nodes.size(); }
+  static size_t TableSize(std::span<const zbi_topology_node_v2_t> nodes) { return nodes.size(); }
 
-  static iterator TableBegin(cpp20::span<const zbi_topology_node_v2_t> nodes) {
+  static iterator TableBegin(std::span<const zbi_topology_node_v2_t> nodes) {
     V2ConvertingIterator it;
     it.v2_nodes_ = nodes;
     it.idx_ = 0;
@@ -95,7 +95,7 @@ struct CpuTopologyTable::Dispatch {
     return result;
   }
 
-  static iterator TableEnd(cpp20::span<const zbi_topology_node_v2_t> nodes) {
+  static iterator TableEnd(std::span<const zbi_topology_node_v2_t> nodes) {
     V2ConvertingIterator it;
     it.v2_nodes_ = nodes;
     it.idx_ = nodes.size();
@@ -109,7 +109,7 @@ struct CpuTopologyTable::Dispatch {
 
   static size_t TableSize(const zbi_cpu_config_t* config) {
     size_t nodes = 0;
-    cpp20::span clusters(config->clusters, config->cluster_count);
+    std::span clusters(config->clusters, config->cluster_count);
     for (const zbi_cpu_cluster_t& cluster : clusters) {
       // There's a node for the cluster, then a node for each CPU.
       nodes += 1 + cluster.cpu_count;
@@ -120,7 +120,7 @@ struct CpuTopologyTable::Dispatch {
   static iterator TableBegin(const zbi_cpu_config_t* config) {
     V1ConvertingIterator it;
     if (config->cluster_count > 0) {
-      it.clusters_ = cpp20::span(config->clusters, config->cluster_count);
+      it.clusters_ = std::span(config->clusters, config->cluster_count);
       it.logical_id_ = 0;
     }
     iterator result;

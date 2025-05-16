@@ -6,10 +6,10 @@
 #define SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_ITEMS_CPU_TOPOLOGY_H_
 
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/internal/deprecated-cpu.h>
 
+#include <span>
 #include <variant>
 
 #include "../storage-traits.h"
@@ -50,8 +50,8 @@ class CpuTopologyTable {
   class V2ConvertingIterator;
   struct Dispatch;
 
-  std::variant<cpp20::span<const zbi_topology_node_t>,     //
-               cpp20::span<const zbi_topology_node_v2_t>,  //
+  std::variant<std::span<const zbi_topology_node_t>,     //
+               std::span<const zbi_topology_node_v2_t>,  //
                const zbi_cpu_config_t*>
       table_;
 };
@@ -77,7 +77,7 @@ class CpuTopologyTable::V1ConvertingIterator {
  private:
   friend Dispatch;
 
-  cpp20::span<const zbi_cpu_cluster_t> clusters_;
+  std::span<const zbi_cpu_cluster_t> clusters_;
   size_t next_node_idx_ = 0;
   size_t cluster_node_idx_ = 0;
   uint8_t cluster_idx_ = 0;
@@ -109,7 +109,7 @@ class CpuTopologyTable::V2ConvertingIterator {
  private:
   friend Dispatch;
 
-  cpp20::span<const zbi_topology_node_v2_t> v2_nodes_;
+  std::span<const zbi_topology_node_v2_t> v2_nodes_;
   std::optional<size_t> idx_;
 };
 
@@ -142,7 +142,7 @@ class CpuTopologyTable::iterator {
  private:
   friend Dispatch;
 
-  std::variant<cpp20::span<const zbi_topology_node_t>::iterator, V1ConvertingIterator,
+  std::variant<std::span<const zbi_topology_node_t>::iterator, V1ConvertingIterator,
                V2ConvertingIterator>
       it_;
 };

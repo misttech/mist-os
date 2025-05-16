@@ -6,9 +6,9 @@
 #define SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_ITEMS_DEBUGDATA_H_
 
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <cstdint>
+#include <span>
 #include <string_view>
 
 namespace zbitl {
@@ -23,11 +23,11 @@ class Debugdata {
  public:
   // This fails if the header is invalid, meaning it's missing or truncated, or
   // its sizes add up to more than the payload size available.
-  fit::result<std::string_view> Init(cpp20::span<const std::byte> payload);
+  fit::result<std::string_view> Init(std::span<const std::byte> payload);
 
-  cpp20::span<const std::byte> contents() const { return contents_; }
+  std::span<const std::byte> contents() const { return contents_; }
 
-  cpp20::span<std::byte> mutable_contents() const {
+  std::span<std::byte> mutable_contents() const {
     return {const_cast<std::byte*>(contents_.data()), contents_.size_bytes()};
   }
 
@@ -37,7 +37,7 @@ class Debugdata {
 
  private:
   std::string_view sink_name_, vmo_name_, log_;
-  cpp20::span<const std::byte> contents_;
+  std::span<const std::byte> contents_;
 };
 
 }  // namespace zbitl

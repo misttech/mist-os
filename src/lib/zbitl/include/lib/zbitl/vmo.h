@@ -253,7 +253,7 @@ class StorageTraits<MapUnownedVmo> {
   // case, the unbuffered `Read()` is recommended instead.
   template <typename T, bool LowLocality>
   static std::enable_if_t<(alignof(T) <= kStorageAlignment) && !LowLocality,
-                          fit::result<error_type, cpp20::span<const T>>>
+                          fit::result<error_type, std::span<const T>>>
   Read(MapUnownedVmo& zbi, payload_type payload, uint32_t length) {
     auto result = Map(zbi, payload, length, false);
     if (result.is_error()) {

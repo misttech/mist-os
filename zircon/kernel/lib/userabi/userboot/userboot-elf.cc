@@ -17,6 +17,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 
 #include "bootfs.h"
@@ -42,7 +43,7 @@ zx_vaddr_t load(const zx::debuglog& log, std::string_view what, const zx::vmar& 
       diag, file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
   ZX_ASSERT(headers);
   auto& [ehdr, phdrs_result] = *headers;
-  cpp20::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
+  std::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
 
   std::optional<size_t> stack;
   std::optional<elfldltl::Elf<>::Phdr> interp;

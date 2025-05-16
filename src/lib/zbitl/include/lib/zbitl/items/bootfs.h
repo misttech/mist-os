@@ -6,13 +6,12 @@
 #define SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_ITEMS_BOOTFS_H_
 
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
-#include <lib/stdcompat/string_view.h>
 #include <lib/zbi-format/internal/bootfs.h>
 #include <lib/zbitl/storage-traits.h>
 #include <zircon/assert.h>
 
 #include <initializer_list>
+#include <span>
 #include <string_view>
 #include <type_traits>
 #include <variant>
@@ -175,12 +174,12 @@ class Bootfs {
 
   static constexpr bool kCanOneShotRead = Traits::template CanOneShotRead<std::byte, false>();
   using Dirents =
-      std::conditional_t<kCanOneShotRead, cpp20::span<const std::byte>, fbl::Array<std::byte>>;
+      std::conditional_t<kCanOneShotRead, std::span<const std::byte>, fbl::Array<std::byte>>;
 
   Bootfs(storage_type storage, Dirents dirents, uint32_t capacity)
       : storage_(std::move(storage)), dirents_(std::move(dirents)), capacity_(capacity) {}
 
-  cpp20::span<const std::byte> dirents() const { return dirents_; }
+  std::span<const std::byte> dirents() const { return dirents_; }
 
   const zbi_bootfs_dirent_t* DirentAt(uint32_t offset) const {
     uint32_t offset_into_dir = offset - uint32_t{sizeof(zbi_bootfs_header_t)};
@@ -323,7 +322,7 @@ class BootfsView {
 
       // The BOOTFS spec guarantees that directory entries are sorted by
       // name, so the first entry outside of the directory marks the end.
-      if (!cpp20::starts_with(filename, bootfs_->dir_prefix_)) {
+      if (!filename.starts_with(bootfs_->dir_prefix_)) {
         *this = bootfs_->end();
         return;
       }
@@ -488,7 +487,7 @@ class BootfsView {
             .entry_offset = it.dirent_offset(),
         }};
       }
-      if (cpp20::starts_with(it->name, name) && (it->name)[name.size()] == '/') {
+      if (it->name.starts_with(name) && (it->name)[name.size()] == '/') {
         // The subdirectory prefix is canonically accessed directly from the
         // associated dirent.
         const auto* dirent = reader_->DirentAt(it.dirent_offset());
@@ -518,7 +517,7 @@ class BootfsView {
   /// this method. end() is returned if there is no match or an error occurred
   /// during iteration.
   iterator find(std::initializer_list<std::string_view> path_parts) {
-    cpp20::span<const std::string_view> parts(path_parts.begin(), path_parts.end());
+    std::span<const std::string_view> parts(path_parts.begin(), path_parts.end());
     for (auto it = begin(); it != end(); ++it) {
       if (HasPathParts(it->name, parts)) {
         return it;
@@ -578,24 +577,24 @@ class BootfsView {
     ZX_ASSERT_MSG(reader_, "%s on default-constructed zbitl::BootfsView", func);
   }
 
-  static bool HasPathParts(std::string_view path, cpp20::span<const std::string_view> parts) {
+  static bool HasPathParts(std::string_view path, std::span<const std::string_view> parts) {
     for (size_t i = 0; i < parts.size(); ++i) {
       std::string_view part = parts[i];
 
       ZX_ASSERT_MSG(!part.empty(), "path part may not be empty");
-      ZX_ASSERT_MSG(!cpp20::starts_with(part, '/'), "path part %.*s may not begin with a '/'",
+      ZX_ASSERT_MSG(!part.starts_with('/'), "path part %.*s may not begin with a '/'",
                     static_cast<int>(part.size()), part.data());
-      ZX_ASSERT_MSG(!cpp20::ends_with(part, '/'), "path part %.*s may not end with a '/'",
+      ZX_ASSERT_MSG(!part.ends_with('/'), "path part %.*s may not end with a '/'",
                     static_cast<int>(part.size()), part.data());
 
-      if (!cpp20::starts_with(path, part)) {
+      if (!path.starts_with(part)) {
         return false;
       }
       path.remove_prefix(part.size());
 
       // Unless this is the last file part, a separator should follow.
       if (i < parts.size() - 1) {
-        if (!cpp20::starts_with(path, '/')) {
+        if (!path.starts_with('/')) {
           return false;
         }
         path.remove_prefix(1);

@@ -183,8 +183,8 @@ inline void TestExtendBogusZbiImage() {
 
   zbitl::Image bogus_zbi(std::move(storage));
 
-  std::vector<cpp17::byte> good_zbi_buffer(4096, static_cast<cpp17::byte>(1));
-  auto good_zbi = zbitl::Image(cpp20::span(good_zbi_buffer));
+  std::vector<std::byte> good_zbi_buffer(4096, static_cast<std::byte>(1));
+  auto good_zbi = zbitl::Image(std::span(good_zbi_buffer));
   ASSERT_TRUE(good_zbi.clear().is_ok());
 
   // 1 item to extend.

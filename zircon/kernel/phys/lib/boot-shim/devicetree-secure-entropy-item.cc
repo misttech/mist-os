@@ -21,7 +21,7 @@ namespace {
 constexpr std::string_view kKaslrProperty = "kaslr-seed";
 constexpr std::string_view kRngProperty = "rng-seed";
 
-fit::result<ItemBase::DataZbi::Error> MaybeAppendEntropy(cpp20::span<std::byte> random_bytes,
+fit::result<ItemBase::DataZbi::Error> MaybeAppendEntropy(std::span<std::byte> random_bytes,
                                                          zbi_secure_entropy_t entropy_type,
                                                          ItemBase::DataZbi& zbi) {
   if (!random_bytes.empty()) {

@@ -59,7 +59,7 @@ TEST(ZbitlViewFblByteArrayTests, BoundsChecking) {
   // Byte-range, direct copy: offset + length exceeds ZBI size
   {
     std::byte buff[kOneItemZbiSize];
-    cpp20::span to{buff, kOneItemZbiSize};
+    std::span to{buff, kOneItemZbiSize};
     auto result = view.Copy(to, kOneItemZbiSize, 1u);
     ASSERT_TRUE(result.is_error());
     EXPECT_EQ("offset + length exceeds ZBI size", std::move(result).error_value().zbi_error);
@@ -68,7 +68,7 @@ TEST(ZbitlViewFblByteArrayTests, BoundsChecking) {
   // Byte-range, direct copy: to_offset + length overflows
   {
     std::byte buff[kOneItemZbiSize];
-    cpp20::span to{buff, kOneItemZbiSize};
+    std::span to{buff, kOneItemZbiSize};
     auto result = view.Copy(to, 0u, 1u, std::numeric_limits<uint32_t>::max());
     ASSERT_TRUE(result.is_error());
     EXPECT_EQ("to_offset + length overflows", std::move(result).error_value().zbi_error);
@@ -103,7 +103,7 @@ TEST(StorageFromRawHeader, Creation) {
     EXPECT_EQ(view.size(), image.size_bytes());
   }
   {
-    auto view = zbitl::StorageFromRawHeader<cpp20::span<const std::byte>>(header);
+    auto view = zbitl::StorageFromRawHeader<std::span<const std::byte>>(header);
     EXPECT_EQ(view.data(), raw_pointer);
     EXPECT_EQ(view.size(), image.size_bytes());
   }

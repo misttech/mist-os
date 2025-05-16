@@ -16,6 +16,7 @@
 #include <lib/zx/vmo.h>
 #include <zircon/types.h>
 
+#include <span>
 #include <string_view>
 
 #include "fidl.h"
@@ -37,7 +38,7 @@ class Bootfs {
 
   zx::vmo Open(std::string_view root, std::string_view filename, std::string_view purpose);
 
-  cpp20::span<BootfsFileVmo> entries() { return std::span(entries_).subspan(0, entry_count_); }
+  std::span<BootfsFileVmo> entries() { return std::span(entries_).subspan(0, entry_count_); }
 
  private:
   using BootfsReader = zbitl::Bootfs<zbitl::MapOwnedVmo>;

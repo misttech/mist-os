@@ -17,6 +17,7 @@
 #include <stdio.h>
 
 #include <optional>
+#include <span>
 
 #include "../legacy-boot.h"
 
@@ -37,7 +38,7 @@ using LegacyBootShimBase = boot_shim::BootShim<  //
 class LegacyBootShim : public LegacyBootShimBase {
  public:
   LegacyBootShim(const char* name, const LegacyBoot& info, FILE* log = stdout)
-      : LegacyBootShimBase(name, log), input_zbi_(cpp20::as_bytes(info.ramdisk)) {
+      : LegacyBootShimBase(name, log), input_zbi_(std::as_bytes(info.ramdisk)) {
     set_info(info.bootloader);
     set_cmdline(info.cmdline);
     Log(input_zbi_.storage());
@@ -80,7 +81,8 @@ class LegacyBootShim : public LegacyBootShimBase {
 };
 
 // If |zbi| contains a uart driver, |uart| is overwritten with such configuration.
-uart::all::Config<> UartFromZbi(LegacyBootShim::InputZbi zbi, const uart::all::Config<>& uart_config);
+uart::all::Config<> UartFromZbi(LegacyBootShim::InputZbi zbi,
+                                const uart::all::Config<>& uart_config);
 
 std::optional<uart::all::Config<>> GetUartFromRange(LegacyBootShim::InputZbi::iterator start,
                                                     LegacyBootShim::InputZbi::iterator end);
