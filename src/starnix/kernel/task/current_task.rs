@@ -1537,8 +1537,7 @@ impl CurrentTask {
 
                 task_info.thread_group.write().is_sharing = is_sharing;
 
-                cgroup2_pid_table
-                    .inherit_cgroup(&OwnedRef::temp(self.thread_group()), &task_info.thread_group);
+                cgroup2_pid_table.inherit_cgroup(self.thread_group(), &task_info.thread_group);
 
                 task_info
             }

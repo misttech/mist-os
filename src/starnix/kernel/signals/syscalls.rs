@@ -29,9 +29,9 @@ use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{
     errno, error, pid_t, rusage, sigaltstack, P_ALL, P_PGID, P_PID, P_PIDFD, SFD_CLOEXEC,
-    SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SI_USER,
-    SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG, WNOWAIT, WSTOPPED,
-    WUNTRACED, __WALL, __WCLONE,
+    SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SS_AUTODISARM,
+    SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG, WNOWAIT, WSTOPPED, WUNTRACED, __WALL,
+    __WCLONE,
 };
 use static_assertions::const_assert_eq;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
@@ -582,13 +582,13 @@ pub fn sys_pidfd_send_signal(
     }
 
     let file = current_task.files.get(pidfd)?;
-    let target = current_task.get_task(file.as_pid()?);
+    let target = file.as_thread_group_key()?;
     let target = target.upgrade().ok_or_else(|| errno!(ESRCH))?;
 
     if siginfo_ref.is_null() {
-        send_unchecked_signal(current_task, &target, unchecked_signal, SI_USER as i32)
+        target.send_signal_unchecked(current_task, unchecked_signal)
     } else {
-        send_unchecked_signal_info(current_task, &target, unchecked_signal, siginfo_ref)
+        target.send_signal_unchecked_with_info(current_task, unchecked_signal, siginfo_ref)
     }
 }
 
@@ -699,7 +699,7 @@ impl WaitingOptions {
 fn wait_on_pid(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    selector: ProcessSelector,
+    selector: &ProcessSelector,
     options: &WaitingOptions,
 ) -> Result<Option<WaitResult>, Errno> {
     let waiter = Waiter::new();
@@ -793,7 +793,7 @@ pub fn sys_waitid(
             if file.flags().contains(OpenFlags::NONBLOCK) {
                 waiting_options.block = false;
             }
-            ProcessSelector::Pid(file.as_pid()?)
+            ProcessSelector::Process(file.as_thread_group_key()?)
         }
         _ => return error!(EINVAL),
     };
@@ -801,7 +801,7 @@ pub fn sys_waitid(
     // wait_on_pid returns None if the task was not waited on. In that case, we don't write out a
     // siginfo. This seems weird but is the correct behavior according to the waitid(2) man page.
     if let Some(waitable_process) =
-        wait_on_pid(locked, current_task, task_selector, &waiting_options)?
+        wait_on_pid(locked, current_task, &task_selector, &waiting_options)?
     {
         if !user_rusage.is_null() {
             let usage = rusage {
@@ -860,7 +860,8 @@ pub fn sys_wait4(
         return error!(ENOSYS);
     };
 
-    if let Some(waitable_process) = wait_on_pid(locked, current_task, selector, &waiting_options)? {
+    if let Some(waitable_process) = wait_on_pid(locked, current_task, &selector, &waiting_options)?
+    {
         let status = waitable_process.exit_info.status.wait_status();
 
         if !user_rusage.is_null() {
@@ -937,7 +938,7 @@ mod tests {
         SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM, SIGTRAP,
         SIGUSR1,
     };
-    use starnix_uapi::{sigaction_t, uaddr, uid_t, SI_QUEUE};
+    use starnix_uapi::{sigaction_t, uaddr, uid_t, SI_QUEUE, SI_USER};
     use zerocopy::IntoBytes;
 
     #[cfg(target_arch = "x86_64")]
@@ -1829,7 +1830,7 @@ mod tests {
             wait_on_pid(
                 &mut locked,
                 &current_task,
-                ProcessSelector::Any,
+                &ProcessSelector::Any,
                 &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions")
             ),
             error!(ECHILD)
@@ -1853,7 +1854,7 @@ mod tests {
             wait_on_pid(
                 &mut locked,
                 &current_task,
-                ProcessSelector::Any,
+                &ProcessSelector::Any,
                 &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions")
             ),
             Ok(Some(expected_result))
@@ -1873,7 +1874,7 @@ mod tests {
             wait_on_pid(
                 &mut locked,
                 &task,
-                ProcessSelector::Any,
+                &ProcessSelector::Any,
                 &WaitingOptions::new_for_wait4(WNOHANG, 0).expect("WaitingOptions")
             ),
             Ok(None)
@@ -1899,7 +1900,7 @@ mod tests {
         let waited_child = wait_on_pid(
             &mut locked,
             &task,
-            ProcessSelector::Any,
+            &ProcessSelector::Any,
             &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions"),
         )
         .expect("wait_on_pid")
@@ -1930,7 +1931,7 @@ mod tests {
         let errno = wait_on_pid(
             &mut locked,
             &task,
-            ProcessSelector::Any,
+            &ProcessSelector::Any,
             &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions"),
         )
         .expect_err("wait_on_pid");

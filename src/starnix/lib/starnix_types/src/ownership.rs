@@ -382,6 +382,11 @@ impl<'a, T> From<&OwnedRef<T>> for WeakRefKey<T> {
         Self(WeakRef::from(owned_ref))
     }
 }
+impl<T> Clone for WeakRefKey<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
 impl<T> Eq for WeakRefKey<T> {}
 impl<T> Hash for WeakRefKey<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {

@@ -1,4 +1,4 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Cmpyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -7,7 +7,8 @@ use crate::mm::{DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt, 
 use crate::power::OnWakeOps;
 use crate::security;
 use crate::task::{
-    CurrentTask, EncryptionKeyId, EventHandler, Task, WaitCallback, WaitCanceler, Waiter,
+    CurrentTask, EncryptionKeyId, EventHandler, Task, ThreadGroupKey, WaitCallback, WaitCanceler,
+    Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::file_server::serve_file;
@@ -427,7 +428,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Returns the associated pid_t.
     ///
     /// Used by pidfd and `/proc/<pid>`. Unlikely to be used by other files.
-    fn as_pid(&self, _file: &FileObject) -> Result<pid_t, Errno> {
+    fn as_thread_group_key(&self, _file: &FileObject) -> Result<ThreadGroupKey, Errno> {
         error!(EBADF)
     }
 
@@ -610,8 +611,8 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
         self.deref().to_handle(file, current_task)
     }
 
-    fn as_pid(&self, file: &FileObject) -> Result<pid_t, Errno> {
-        self.deref().as_pid(file)
+    fn as_thread_group_key(&self, file: &FileObject) -> Result<ThreadGroupKey, Errno> {
+        self.deref().as_thread_group_key(file)
     }
 
     fn readahead(
@@ -2012,8 +2013,8 @@ impl FileObject {
         self.ops().to_handle(self, current_task)
     }
 
-    pub fn as_pid(&self) -> Result<pid_t, Errno> {
-        self.ops().as_pid(self)
+    pub fn as_thread_group_key(&self) -> Result<ThreadGroupKey, Errno> {
+        self.ops().as_thread_group_key(self)
     }
 
     pub fn update_file_flags(&self, value: OpenFlags, mask: OpenFlags) {

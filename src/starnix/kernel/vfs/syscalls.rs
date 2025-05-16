@@ -29,6 +29,7 @@ use crate::vfs::{
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_types::ownership::TempRef;
 use starnix_types::time::{
     duration_from_poll_timeout, duration_from_timespec, time_from_timespec, timespec_from_duration,
 };
@@ -2051,8 +2052,9 @@ pub fn sys_pidfd_getfd(
     }
 
     let file = current_task.files.get(pidfd)?;
-    let task = current_task.get_task(file.as_pid()?);
-    let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
+    let tg = file.as_thread_group_key()?;
+    let tg = tg.upgrade().ok_or_else(|| errno!(ESRCH))?;
+    let task = TempRef::into_static(tg.read().tasks().next().ok_or_else(|| errno!(ESRCH))?);
 
     current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &task)?;
 

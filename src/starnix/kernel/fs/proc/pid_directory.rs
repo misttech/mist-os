@@ -6,6 +6,7 @@ use crate::mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, 
 use crate::security;
 use crate::task::{
     path_from_root, CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup,
+    ThreadGroupKey,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::stub_empty_file::StubEmptyFile;
@@ -295,8 +296,9 @@ impl FileOps for TaskDirectory {
         Ok(())
     }
 
-    fn as_pid(&self, _file: &FileObject) -> Result<pid_t, Errno> {
-        Ok(self.task_weak.upgrade().ok_or_else(|| errno!(ESRCH))?.pid)
+    fn as_thread_group_key(&self, _file: &FileObject) -> Result<ThreadGroupKey, Errno> {
+        let task = self.task_weak.upgrade().ok_or_else(|| errno!(ESRCH))?;
+        Ok(task.thread_group().into())
     }
 }
 

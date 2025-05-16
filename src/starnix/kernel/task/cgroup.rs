@@ -13,7 +13,7 @@ use starnix_core::task::{ThreadGroup, ThreadGroupKey, WaitQueue, Waiter};
 use starnix_core::vfs::{FsStr, FsString, PathBuilder};
 use starnix_logging::{log_warn, trace_duration, track_stub, CATEGORY_STARNIX};
 use starnix_sync::{Mutex, MutexGuard};
-use starnix_types::ownership::{OwnedRef, TempRef};
+use starnix_types::ownership::TempRef;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::SIGKILL;
 use starnix_uapi::{errno, error, pid_t};
@@ -83,7 +83,7 @@ pub trait CgroupOps: Send + Sync + 'static {
     fn id(&self) -> u64;
 
     /// Add a process to a cgroup. Errors if the cgroup has been deleted.
-    fn add_process(&self, thread_group: &TempRef<'_, ThreadGroup>) -> Result<(), Errno>;
+    fn add_process(&self, thread_group: &ThreadGroup) -> Result<(), Errno>;
 
     /// Create a new sub-cgroup as a child of this cgroup. Errors if the cgroup is deleted, or a
     /// child with `name` already exists.
@@ -138,11 +138,7 @@ impl DerefMut for CgroupPidTable {
 impl CgroupPidTable {
     /// Add a newly created `ThreadGroup` to the same cgroup as its parent. Assumes that
     /// `ThreadGroup` does not have any `Task` associated with it.
-    pub fn inherit_cgroup(
-        &mut self,
-        parent: &TempRef<'_, ThreadGroup>,
-        child: &OwnedRef<ThreadGroup>,
-    ) {
+    pub fn inherit_cgroup(&mut self, parent: &ThreadGroup, child: &ThreadGroup) {
         assert!(child.read().tasks_count() == 0, "threadgroup must be newly created");
         if let Some(weak_cgroup) = self.0.get(&parent.into()).cloned() {
             let Some(cgroup) = weak_cgroup.upgrade() else {
@@ -227,7 +223,7 @@ impl CgroupOps for CgroupRoot {
         0
     }
 
-    fn add_process(&self, thread_group: &TempRef<'_, ThreadGroup>) -> Result<(), Errno> {
+    fn add_process(&self, thread_group: &ThreadGroup) -> Result<(), Errno> {
         let mut pid_table = self.pid_table.lock();
         match pid_table.entry(thread_group.into()) {
             hash_map::Entry::Occupied(entry) => {
@@ -411,7 +407,7 @@ impl CgroupState {
         std::cmp::max(self.self_freezer_state, self.inherited_freezer_state)
     }
 
-    fn add_process(&mut self, thread_group: &TempRef<'_, ThreadGroup>) -> Result<(), Errno> {
+    fn add_process(&mut self, thread_group: &ThreadGroup) -> Result<(), Errno> {
         if self.deleted {
             return error!(ENOENT);
         }
@@ -423,7 +419,7 @@ impl CgroupState {
         Ok(())
     }
 
-    fn remove_process(&mut self, thread_group: &TempRef<'_, ThreadGroup>) -> Result<(), Errno> {
+    fn remove_process(&mut self, thread_group: &ThreadGroup) -> Result<(), Errno> {
         if self.deleted {
             return error!(ENOENT);
         }
@@ -554,7 +550,7 @@ impl CgroupOps for Cgroup {
         self.id
     }
 
-    fn add_process(&self, thread_group: &TempRef<'_, ThreadGroup>) -> Result<(), Errno> {
+    fn add_process(&self, thread_group: &ThreadGroup) -> Result<(), Errno> {
         let root = self.root()?;
         let mut pid_table = root.pid_table.lock();
         match pid_table.entry(thread_group.into()) {
@@ -671,7 +667,6 @@ mod test {
     use super::*;
     use assert_matches::assert_matches;
     use starnix_core::testing::{create_kernel_and_task, create_kernel_task_and_unlocked};
-    use starnix_types::ownership::OwnedRef;
     use starnix_uapi::signals::SIGCHLD;
     use starnix_uapi::{CLONE_SIGHAND, CLONE_THREAD, CLONE_VM};
 
@@ -696,7 +691,7 @@ mod test {
         let cgroup = root.new_child("test".into()).expect("new_child on root cgroup succeeds");
 
         let process = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        cgroup.add_process(&OwnedRef::temp(process.thread_group())).expect("add process to cgroup");
+        cgroup.add_process(process.thread_group()).expect("add process to cgroup");
         cgroup.freeze();
         assert_eq!(cgroup.get_pids(&kernel).first(), Some(process.get_pid()).as_ref());
         assert_eq!(root.get_cgroup(process.thread_group()).unwrap().as_ptr(), Arc::as_ptr(&cgroup));
