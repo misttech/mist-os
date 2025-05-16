@@ -22,7 +22,7 @@ All blackout tests follow the same pattern:
  - Interrupt that load generation. The tests support the following modes -
    - "None" - no reboot between load gen and verification. In this case, the test should have an
      end condition so it exits.
-   - "Soft-Reboot" - runs `dm reboot` on the device.
+   - "Soft-Reboot" - runs `power reboot` on the device.
    - "Hard-Reboot" - in infra, this will use the DMC to issue a power cycle to the device harness.
    - "Suspend-Resume" - in progress.
  - Verify that the filesystem is consistent. This likely runs fsck.

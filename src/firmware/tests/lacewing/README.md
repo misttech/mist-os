@@ -10,7 +10,7 @@ tested in infra, e.g. things like `getvar` variables.
 
 Any physical device should work as long as it supports:
 
-* rebooting from an SSH shell into the bootloader (i.e. `dm reboot bootloader`)
+* rebooting from an SSH shell into the bootloader (i.e. `power reboot bootloader`)
 * fastboot over USB or TCP
 
 ## Run manually

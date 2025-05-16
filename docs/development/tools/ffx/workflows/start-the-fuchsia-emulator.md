@@ -664,11 +664,11 @@ $
 After starting the emulator instance, this command drops you into a Fuchsia command line prompt
 where you can issue various on-device command lines directly to the instance.
 
-To exit the serial port console, you can issue the `dm poweroff` command, which also terminates
+To exit the serial port console, you can issue the `power off` command, which also terminates
 the emulator instance, for example:
 
 ```none {:.devsite-disable-click-to-copy}
-$ dm poweroff
+$ power off
 [00258.335] 26935:26939> [shutdown-shim]: checking power_manager liveness
 [... various log entries]
 [00260.447] 03742:03744> [00260.447038][3742][3744][driver_manager.cm] WARNING: [src/devices/bin/driver_manager/v1/suspend_handler.cc(211)] Failed to cause VFS exit ourselves, this is expected during orderly shutdown: FIDL operation failed d

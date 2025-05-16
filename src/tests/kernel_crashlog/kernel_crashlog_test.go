@@ -168,7 +168,7 @@ func TestKernelCrashlogRootJobTermination(t *testing.T) {
 }
 
 func TestKernelCrashlogNoCrash(t *testing.T) {
-	testCommon(t, "dm reboot", "[shutdown-shim]: started", "NO CRASH")
+	testCommon(t, "power reboot", "[shutdown-shim]: started", "NO CRASH")
 	// We don't (currently) expect any payload from an graceful reboot.
 }
 

@@ -272,9 +272,9 @@ pub async fn reboot(to_addr: TargetIpAddr) -> Result<()> {
 }
 
 pub async fn reboot_to_bootloader(to_addr: TargetIpAddr) -> Result<()> {
-    send(Opcode::ShellCmd, "dm reboot-bootloader\0", to_addr).await
+    send(Opcode::ShellCmd, "power reboot-bootloader\0", to_addr).await
 }
 
 pub async fn reboot_to_recovery(to_addr: TargetIpAddr) -> Result<()> {
-    send(Opcode::ShellCmd, "dm reboot-recovery\0", to_addr).await
+    send(Opcode::ShellCmd, "power reboot-recovery\0", to_addr).await
 }

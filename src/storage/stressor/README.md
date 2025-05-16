@@ -57,7 +57,7 @@ $ echo '{"Aggressive":{"target_free_bytes":16777216}}' > /data/persistent/storag
 $ echo '{"Aggressive":{"target_free_bytes":67108864}}' > /data/persistent/storage_stressor:0/data/config.json
 $ echo '{"Aggressive":{"target_free_bytes":268435456}}' > /data/persistent/storage_stressor:0/data/config.json
 $ echo '{"Aggressive":{"target_free_bytes":1073741824}}' > /data/persistent/storage_stressor:0/data/config.json
-$ dm reboot
+$ power reboot
 ```
 
 You can monitor its progress using `fx log`.

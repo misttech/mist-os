@@ -39,7 +39,7 @@ func TestShutdown(t *testing.T) {
 	}
 
 	// Trigger a shutdown.
-	i.RunCommand("dm shutdown")
+	i.RunCommand("power shutdown")
 
 	// Start a timer so we can abort the wait by explicitly killing. This will yield a nice error
 	// from the wait command that we can detect.

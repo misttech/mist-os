@@ -74,7 +74,7 @@ pub async fn handle_stop<P: PlatformServices>(
 
 fn get_graceful_stop_command(guest_cmd: ShutdownCommand) -> Vec<u8> {
     let arg_string = match guest_cmd {
-        ShutdownCommand::ZirconShutdownCommand => "dm shutdown\n".to_string(),
+        ShutdownCommand::ZirconShutdownCommand => "power shutdown\n".to_string(),
         ShutdownCommand::DebianShutdownCommand => "shutdown now\n".to_string(),
     };
 

@@ -361,7 +361,7 @@ class Sl4f {
     // Issue a reboot command and wait.
     // TODO(https://fxbug.dev/42149229): trap errors
     final Stopwatch rebootStopwatch = Stopwatch()..start();
-    await ssh.run('dm reboot');
+    await ssh.run('power reboot');
     await Future.delayed(Duration(seconds: 20));
 
     // Try to restart SL4F

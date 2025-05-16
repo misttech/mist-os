@@ -9,7 +9,7 @@ group("tests") {
   testonly = true
   deps = []
   if (host_os == "linux") {
-    deps += [ ":dm_reboot_bringup_test($host_toolchain)" ]
+    deps += [ ":power_reboot_bringup_test($host_toolchain)" ]
   }
 }
 
@@ -17,14 +17,14 @@ if (is_linux) {
   go_library("lib") {
     testonly = true
     deps = [ "//src/tests/reboot:reboottest" ]
-    sources = [ "dm_reboot_bringup_test.go" ]
+    sources = [ "power_reboot_bringup_test.go" ]
   }
 
   host_test_data("bringup_zbi") {
     sources = [ "$root_build_dir/bringup.zbi" ]
   }
 
-  go_test("dm_reboot_bringup_test") {
+  go_test("power_reboot_bringup_test") {
     library = ":lib"
     non_go_deps = [ ":bringup_zbi" ]
   }

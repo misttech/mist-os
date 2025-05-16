@@ -10,11 +10,11 @@ import (
 	"go.fuchsia.dev/fuchsia/src/tests/reboot/reboottest"
 )
 
-// Test that "dm reboot" will reboot the system.
+// Test that "power reboot" will reboot the system.
 //
 // It's important to also test that bringup reboots cleanly because bringup
 // doesn't have storage. Bringup must shutdown cleanly without some components
 // that normally live in storage (like PowerManager).
-func TestDmReboot(t *testing.T) {
-	reboottest.RebootWithCommand(t, "dm reboot", reboottest.CleanReboot, reboottest.Reboot, reboottest.NoCrash)
+func TestPowerReboot(t *testing.T) {
+	reboottest.RebootWithCommand(t, "power reboot", reboottest.CleanReboot, reboottest.Reboot, reboottest.NoCrash)
 }

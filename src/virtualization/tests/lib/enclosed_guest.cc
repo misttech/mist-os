@@ -640,7 +640,7 @@ zx_status_t ZirconEnclosedGuest::ShutdownAndWait(zx::time deadline) {
   std::optional<GuestConsole>& console_opt = GetConsole();
   if (console_opt.has_value()) {
     GuestConsole& console = console_opt.value();
-    zx_status_t status = console.SendBlocking("dm shutdown\n", deadline);
+    zx_status_t status = console.SendBlocking("power shutdown\n", deadline);
     if (status != ZX_OK) {
       return status;
     }

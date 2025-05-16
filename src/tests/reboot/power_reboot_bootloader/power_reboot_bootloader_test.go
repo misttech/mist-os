@@ -10,11 +10,11 @@ import (
 	"go.fuchsia.dev/fuchsia/src/tests/reboot/reboottest"
 )
 
-// Test that "dm reboot-bootloader" will reboot the system.
+// Test that "power reboot-bootloader" will reboot the system.
 //
 // On a real system, "reboot-bootloader" will reboot to the bootloader.
 // However, in this test environment it will simply reboot and the system will
 // end up back where it started.
-func TestDmRebootBootloader(t *testing.T) {
-	reboottest.RebootWithCommand(t, "dm reboot-bootloader", reboottest.CleanReboot, reboottest.RebootBootloader, reboottest.NoCrash)
+func TestPowerRebootBootloader(t *testing.T) {
+	reboottest.RebootWithCommand(t, "power reboot-bootloader", reboottest.CleanReboot, reboottest.RebootBootloader, reboottest.NoCrash)
 }

@@ -125,7 +125,7 @@ configure and build
 use the emulator
   ffx emu start             Emulate a device and interact with it
   ffx emu start --headless  Run without a graphic terminal
-  shell dm shutdown         Shut down Fuchsia on the emulator
+  shell power shutdown      Shut down Fuchsia on the emulator
   ffx emu --help            Show emu help
 
 test

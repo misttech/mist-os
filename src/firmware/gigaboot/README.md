@@ -21,7 +21,7 @@ Gigaboot itself.
 ## Fastboot support
 
 Gigaboot supports fastboot over UDP. You can enter fastboot mode by pressing `f`
-during boot, or by invoking `dm reboot-bootloader` from Fuchsia.
+during boot, or by invoking `power reboot-bootloader` from Fuchsia.
 
 ### Protocol Information
 

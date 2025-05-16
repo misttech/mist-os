@@ -113,7 +113,7 @@ accessible from Zircon.
 
   ```
   > touch /data/foobar
-  > dm reboot
+  > power reboot
   > ls /data
   ```
 
