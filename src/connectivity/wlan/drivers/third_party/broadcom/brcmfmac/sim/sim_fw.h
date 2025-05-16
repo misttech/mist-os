@@ -319,6 +319,12 @@ class SimFirmware {
   void TriggerFirmwareDeauthIndFromBssid(wlan_ieee80211_wire::ReasonCode reason,
                                          const uint8_t bssid[ETH_ALEN]);
 
+  // Send a spurious REASSOC attempt event.
+  void TriggerFirmwareReassocEvent(const common::MacAddr& bssid);
+
+  // Send a spurious ROAM NO_NETWORKS failure event.
+  void TriggerFirmwareRoamEvent(const common::MacAddr& bssid);
+
   // Allow simulation to set CapabilityIovars
   void SetCapabilityIovars(CapabilityIovars new_iovars) { capability_iovars_ = new_iovars; }
 

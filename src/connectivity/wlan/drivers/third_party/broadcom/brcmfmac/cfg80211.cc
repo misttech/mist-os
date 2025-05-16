@@ -5826,6 +5826,11 @@ static zx_status_t brcmf_bss_roam_done(brcmf_if* ifp, brcmf_connect_status_t con
       // Roam is done, so reset roam_start_sent.
       cfg->roam_start_sent = false;
     } else {
+      if (!ifp->roam_req.has_value()) {
+        BRCMF_ERR("Missing roam request, cannot notify SME of roam conf");
+        clear_roam_attempt(ifp);
+        return ZX_ERR_INTERNAL;
+      }
       brcmf_return_roam_conf(ndev, target_bssid, status_code);
     }
 
@@ -6721,6 +6726,13 @@ static zx_status_t brcmf_handle_reassoc_event(struct brcmf_if* ifp, const struct
   }
   ZX_DEBUG_ASSERT(!brcmf_is_apmode(ifp->vif));
 
+  // Ignore REASSOC events unless roaming is expected.
+  if (!brcmf_roaming_offload_enabled(ifp) && !ifp->roam_req.has_value()) {
+    BRCMF_WARN("Ignoring REASSOC (%s) event because reassociation/roaming is not expected",
+               brcmf_fweh_get_event_status_str(e->status));
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   if (e->status == BRCMF_E_STATUS_ATTEMPT || e->status == BRCMF_E_STATUS_NEWASSOC) {
     BRCMF_DBG(CONN, "REASSOC event: attempting roam to " FMT_MAC, FMT_MAC_ARGS(e->addr));
     std::array<uint8_t, ETH_ALEN> target_bssid;
@@ -7353,6 +7365,11 @@ static zx_status_t brcmf_notify_roaming_status(struct brcmf_if* ifp,
 
   BRCMF_DBG_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
 
+  if (!brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
+    // Roam failure was already reported, or this is a spurious ROAM event.
+    return ZX_OK;
+  }
+
   switch (status) {
     case BRCMF_E_STATUS_ATTEMPT: {
       BRCMF_DBG(CONN, "ROAM event: attempt");
@@ -7380,10 +7397,6 @@ static zx_status_t brcmf_notify_roaming_status(struct brcmf_if* ifp,
     }
   }
 
-  if (!brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
-    // Roam failure was already reported.
-    return ZX_OK;
-  }
   const auto status_code = fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedReasonUnspecified;
   const auto connect_status = brcmf_connect_status_t::REASSOC_REQ_FAILED;
   return brcmf_bss_roam_done(ifp, connect_status, status_code);

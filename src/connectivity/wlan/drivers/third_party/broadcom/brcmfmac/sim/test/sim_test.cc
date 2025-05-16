@@ -170,6 +170,9 @@ void SimInterface::ConnectConf(ConnectConfRequestView request,
 void SimInterface::RoamConf(RoamConfRequestView request, RoamConfCompleter::Sync& completer) {
   ZX_ASSERT(assoc_ctx_.state == AssocContext::kAssociated);
   ZX_ASSERT(request->has_status_code());
+  const auto roam_conf = fidl::ToNatural(*request);
+  stats_.roam_confirmations.push_back(roam_conf);
+
   if (request->status_code() == wlan_ieee80211::StatusCode::kSuccess) {
     ++stats_.roam_successes;
     ZX_ASSERT(request->has_selected_bssid());
@@ -192,6 +195,8 @@ void SimInterface::RoamResultInd(RoamResultIndRequestView request,
                                  RoamResultIndCompleter::Sync& completer) {
   ZX_ASSERT(assoc_ctx_.state == AssocContext::kAssociated);
   ZX_ASSERT(request->has_status_code());
+  const auto roam_result = fidl::ToNatural(*request);
+  stats_.roam_result_indications.push_back(roam_result);
   if (request->status_code() == wlan_ieee80211::StatusCode::kSuccess) {
     stats_.connect_successes++;
     ZX_ASSERT(request->has_selected_bssid());

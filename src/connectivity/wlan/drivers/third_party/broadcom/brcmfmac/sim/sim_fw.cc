@@ -954,6 +954,16 @@ void SimFirmware::TriggerFirmwareDeauthIndFromBssid(wlan_ieee80211_wire::ReasonC
                     fidl::ToUnderlying(reason), src);
 }
 
+void SimFirmware::TriggerFirmwareReassocEvent(const common::MacAddr& bssid) {
+  SendEventToDriver(0, nullptr, BRCMF_E_REASSOC, BRCMF_E_STATUS_ATTEMPT, kClientIfidx, 0, 0, 0,
+                    bssid);
+}
+
+void SimFirmware::TriggerFirmwareRoamEvent(const common::MacAddr& bssid) {
+  SendEventToDriver(0, nullptr, BRCMF_E_ROAM, BRCMF_E_STATUS_NO_NETWORKS, kClientIfidx, 0, 0, 0,
+                    bssid);
+}
+
 // Process an RX CTL message. We simply pass back the results of the previous TX CTL
 // operation, which has been stored in bcdc_response_. In real hardware, we may have to
 // indicate that the TX CTL operation has not completed. In simulated hardware, we perform
