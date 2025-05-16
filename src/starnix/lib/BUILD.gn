@@ -22,6 +22,7 @@ group("tests") {
     "bootreason:tests",
     "ebpf:tests",
     "ebpf_api:tests",
+    "ebpf_loader:tests",
     "expando:tests",
     "extended_pstate:tests",
     "kernel_manager:tests",

@@ -248,3 +248,4 @@ pub const BPF_PSEUDO_CALL: u8 = linux_uapi::BPF_PSEUDO_CALL as u8;
 pub const BPF_PSEUDO_KFUNC_CALL: u8 = linux_uapi::BPF_PSEUDO_KFUNC_CALL as u8;
 
 pub type CbpfInstruction = linux_uapi::sock_filter;
+pub type EbpfMapType = linux_uapi::bpf_map_type;
