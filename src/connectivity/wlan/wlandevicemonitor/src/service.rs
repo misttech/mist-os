@@ -140,6 +140,23 @@ pub(crate) async fn handle_monitor_request(
             let status = into_status_and_opt(result).0;
             responder.send(status.into_raw())?;
         }
+        DeviceMonitorRequest::PowerDown { phy_id, responder } => {
+            let status = power_down(phys, phy_id).await;
+            responder.send(Err(status.into_raw()))?;
+        }
+        DeviceMonitorRequest::PowerUp { phy_id, responder } => {
+            let status = power_up(phys, phy_id).await;
+            responder.send(Err(status.into_raw()))?;
+        }
+        DeviceMonitorRequest::Reset { phy_id, responder } => {
+            let status = reset(phys, phy_id).await;
+            responder.send(Err(status.into_raw()))?;
+        }
+        DeviceMonitorRequest::GetPowerState { phy_id, responder } => {
+            responder.send(
+                get_power_state(phys, phy_id).await.as_ref().map_err(|s| s.into_raw()).copied(),
+            )?;
+        }
         DeviceMonitorRequest::GetClientSme { iface_id, sme_server, responder } => {
             let result = get_client_sme(ifaces, iface_id, sme_server).await;
             responder.send(result.map_err(|e| e.into_raw()))?;
@@ -289,13 +306,51 @@ async fn clear_country(phys: &PhyMap, req: fidl_svc::ClearCountryRequest) -> zx:
     }
 }
 
+async fn power_down(phys: &PhyMap, phy_id: u16) -> zx::Status {
+    let phy = match phys.get(&phy_id) {
+        None => return zx::Status::NOT_FOUND,
+        Some(p) => p,
+    };
+
+    phy_result_to_status(phy_id, "PowerDown", phy.proxy.power_down().await)
+}
+
+async fn power_up(phys: &PhyMap, phy_id: u16) -> zx::Status {
+    let phy = match phys.get(&phy_id) {
+        None => return zx::Status::NOT_FOUND,
+        Some(p) => p,
+    };
+    phy_result_to_status(phy_id, "PowerUp", phy.proxy.power_up().await)
+}
+
+async fn reset(phys: &PhyMap, phy_id: u16) -> zx::Status {
+    let phy = match phys.get(&phy_id) {
+        None => return zx::Status::NOT_FOUND,
+        Some(p) => p,
+    };
+    phy_result_to_status(phy_id, "Reset", phy.proxy.reset().await)
+}
+
+async fn get_power_state(phys: &PhyMap, phy_id: u16) -> Result<bool, zx::Status> {
+    let phy = phys.get(&phy_id).ok_or(Err(zx::Status::NOT_FOUND))?;
+    match phy.proxy.get_power_state().await {
+        Ok(result) => match result {
+            Ok(resp) => Ok(resp),
+            Err(status) => Err(zx::Status::from_raw(status)),
+        },
+        Err(e) => {
+            error!("Error sending 'GetPowerSaveMode' request to phy #{}: {}", phy_id, e);
+            Err(zx::Status::INTERNAL)
+        }
+    }
+}
+
 async fn set_power_save_mode(phys: &PhyMap, req: fidl_svc::SetPowerSaveModeRequest) -> zx::Status {
     let phy_id = req.phy_id;
     let phy = match phys.get(&req.phy_id) {
         None => return zx::Status::NOT_FOUND,
         Some(p) => p,
     };
-
     let phy_req = req.ps_mode;
     match phy.proxy.set_power_save_mode(phy_req).await {
         Ok(status) => zx::Status::from_raw(status),
@@ -577,6 +632,22 @@ fn into_status_and_opt<T>(r: Result<T, zx::Status>) -> (zx::Status, Option<T>) {
     }
 }
 
+fn phy_result_to_status(
+    phy_id: u16,
+    context: &str,
+    result: Result<Result<(), i32>, fidl::Error>,
+) -> zx::Status {
+    match result {
+        Ok(result) => match result {
+            Ok(_) => zx::Status::OK,
+            Err(status) => zx::Status::from_raw(status),
+        },
+        Err(e) => {
+            error!("{} request failed phy#{} : {}", context, phy_id, e);
+            zx::Status::INTERNAL
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1519,6 +1590,393 @@ mod tests {
         );
 
         assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
+    }
+
+    #[fuchsia::test]
+    fn test_power_down_succeeds() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, mut phy_stream) = fake_phy();
+        let phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::PowerDown()
+        let req_fut = super::power_down(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+
+        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+            Poll::Ready(Some(Ok(fidl_dev::PhyRequest::PowerDown { responder }))) => {
+                // Pretend to be a WLAN PHY to return the result.
+                responder.send(Err(zx::Status::OK.into_raw()))
+                    .expect("failed to send the response to PowerDown");
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_power_down_fails() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, mut phy_stream) = fake_phy();
+        let phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::PowerDown()
+        let req_fut = super::power_down(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+
+        let responder = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+            Poll::Ready(Some(Ok(fidl_dev::PhyRequest::PowerDown { responder }))) => responder
+        );
+
+        // Failure case #1: WLAN PHY not responding
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+
+        // Failure case #2: WLAN PHY has not implemented the feature.
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+        responder
+            .send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
+            .expect("failed to send the response to PowerDown");
+        assert_eq!(Poll::Ready(zx::Status::NOT_SUPPORTED), exec.run_until_stalled(&mut req_fut));
+    }
+
+    #[fuchsia::test]
+    fn test_power_down_request_fails() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, phy_stream) = fake_phy();
+        // This will cause the FIDL request to fail.
+        drop(phy_stream);
+        let phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::PowerDown()
+        let req_fut = super::power_down(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        // The future should complete immediately with internal error.
+        assert_eq!(Poll::Ready(zx::Status::INTERNAL), exec.run_until_stalled(&mut req_fut));
+    }
+
+    #[fuchsia::test]
+    fn test_power_down_no_phy_fails() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, _phy_stream) = fake_phy();
+        let mut phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+        // Using a wrong phy id will fail with NOT_FOUND
+        phy_id = 11u16;
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::PowerDown()
+        let req_fut = super::power_down(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        // The future should complete immediately with not found error.
+        assert_eq!(Poll::Ready(zx::Status::NOT_FOUND), exec.run_until_stalled(&mut req_fut));
+    }
+
+    #[fuchsia::test]
+    fn test_power_up_succeeds() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, mut phy_stream) = fake_phy();
+        let phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::PowerUp()
+        let req_fut = super::power_up(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+
+        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+            Poll::Ready(Some(Ok(fidl_dev::PhyRequest::PowerUp { responder }))) => {
+                // Pretend to be a WLAN PHY to return the result.
+                responder.send(Err(zx::Status::OK.into_raw()))
+                    .expect("failed to send the response to PowerUp");
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_power_up_fails() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, mut phy_stream) = fake_phy();
+        let phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::PowerUp()
+        let req_fut = super::power_up(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+
+        let responder = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+            Poll::Ready(Some(Ok(fidl_dev::PhyRequest::PowerUp { responder }))) => responder
+        );
+
+        // Failure case #1: WLAN PHY not responding
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+
+        // Failure case #2: WLAN PHY has not implemented the feature.
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+        let resp = zx::Status::NOT_SUPPORTED.into_raw();
+        responder.send(Err(resp)).expect("failed to send the response to PowerUp");
+        assert_eq!(Poll::Ready(zx::Status::NOT_SUPPORTED), exec.run_until_stalled(&mut req_fut));
+    }
+
+    #[fuchsia::test]
+    fn test_power_up_request_fails() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, phy_stream) = fake_phy();
+        // This will cause the FIDL request to fail.
+        drop(phy_stream);
+        let phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::PowerUp()
+        let req_fut = super::power_up(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        // The future should complete immediately with internal error.
+        assert_eq!(Poll::Ready(zx::Status::INTERNAL), exec.run_until_stalled(&mut req_fut));
+    }
+
+    #[fuchsia::test]
+    fn test_power_up_no_phy_fails() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, _phy_stream) = fake_phy();
+        let mut phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+        // Using a wrong phy id will fail with NOT_FOUND
+        phy_id = 11u16;
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::PowerUp()
+        let req_fut = super::power_up(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        // The future should complete immediately with not found error.
+        assert_eq!(Poll::Ready(zx::Status::NOT_FOUND), exec.run_until_stalled(&mut req_fut));
+    }
+
+    #[fuchsia::test]
+    fn test_reset_succeeds() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, mut phy_stream) = fake_phy();
+        let phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::Reset()
+        let req_fut = super::reset(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+
+        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+            Poll::Ready(Some(Ok(fidl_dev::PhyRequest::Reset { responder }))) => {
+                // Pretend to be a WLAN PHY to return the result.
+                responder.send(Err(zx::Status::OK.into_raw()))
+                    .expect("failed to send the response to Reset");
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_reset_fails() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, mut phy_stream) = fake_phy();
+        let phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::Reset()
+        let req_fut = super::reset(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+
+        let responder = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+            Poll::Ready(Some(Ok(fidl_dev::PhyRequest::Reset { responder }))) => responder
+        );
+
+        // Failure case #1: WLAN PHY not responding
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+
+        // Failure case #2: WLAN PHY has not implemented the feature.
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+        let resp = zx::Status::NOT_SUPPORTED.into_raw();
+        responder.send(Err(resp)).expect("failed to send the response to Reset");
+        assert_eq!(Poll::Ready(zx::Status::NOT_SUPPORTED), exec.run_until_stalled(&mut req_fut));
+    }
+
+    #[fuchsia::test]
+    fn test_reset_request_fails() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, phy_stream) = fake_phy();
+        // This will cause the FIDL request to fail.
+        drop(phy_stream);
+        let phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::Reset()
+        let req_fut = super::reset(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        // The future should complete immediately with internal error.
+        assert_eq!(Poll::Ready(zx::Status::INTERNAL), exec.run_until_stalled(&mut req_fut));
+    }
+
+    #[fuchsia::test]
+    fn test_reset_no_phy_fails() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, _phy_stream) = fake_phy();
+        let mut phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+        // Using a wrong phy id will fail with NOT_FOUND
+        phy_id = 11u16;
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::Reset()
+        let req_fut = super::reset(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        // The future should complete immediately with not found error.
+        assert_eq!(Poll::Ready(zx::Status::NOT_FOUND), exec.run_until_stalled(&mut req_fut));
+    }
+
+    #[fuchsia::test]
+    fn test_get_power_state_succeeds() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+
+        let (phy, mut phy_stream) = fake_phy();
+        let phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::GetPowerState()
+        let req_fut = super::get_power_state(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+
+        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+            Poll::Ready(Some(Ok(fidl_dev::PhyRequest::GetPowerState { responder }))) => {
+                // Pretend to be a WLAN PHY to return the result.
+                responder.send(
+                    Ok(true)
+                ).expect("failed to send the response to GetPowerState");
+            }
+        );
+
+        assert_eq!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Ok(true)));
+    }
+
+    #[fuchsia::test]
+    fn test_get_power_state_fails() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, mut phy_stream) = fake_phy();
+        let phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::GetPowerState()
+        let req_fut = super::get_power_state(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
+
+        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+            Poll::Ready(Some(Ok(fidl_dev::PhyRequest::GetPowerState { responder }))) => {
+                // Pretend to be a WLAN PHY to return the result.
+                // Right now the returned country code is not optional, so we just return garbage.
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
+                    .expect("failed to send the response to GetPowerState");
+            }
+        );
+
+        assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
+    }
+
+    #[fuchsia::test]
+    fn test_get_power_state_request_fails() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, phy_stream) = fake_phy();
+
+        // This will cause the FIDL request to fail.
+        drop(phy_stream);
+        let phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::GetPowerState()
+        let req_fut = super::get_power_state(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+
+        // The future should complete immediately with internal error.
+        assert_eq!(Poll::Ready(Err(zx::Status::INTERNAL)), exec.run_until_stalled(&mut req_fut));
+    }
+
+    #[fuchsia::test]
+    fn test_get_power_state_no_phy_fails() {
+        // Setup environment
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (phy, _phy_stream) = fake_phy();
+
+        let mut phy_id = 10u16;
+        test_values.phys.insert(phy_id, phy);
+        // Using a wrong phy id will fail with NOT_FOUND
+        phy_id = 11u16;
+
+        // Initiate a QueryPhy request. The returned future should not be able
+        // to produce a result immediately
+        // Issue service.fidl::GetPowerState()
+        let req_fut = super::get_power_state(&test_values.phys, phy_id);
+        let mut req_fut = pin!(req_fut);
+
+        // The future should complete immediately with internal error.
+        assert_eq!(Poll::Ready(Err(zx::Status::NOT_FOUND)), exec.run_until_stalled(&mut req_fut));
     }
 
     #[fuchsia::test]
