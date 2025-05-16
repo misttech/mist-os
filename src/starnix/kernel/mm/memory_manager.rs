@@ -8,6 +8,7 @@ use crate::mm::{
     MappingFlags, MappingName, MlockPinFlavor, MlockShadowProcess, PrivateFutexKey, UserFault,
     UserFaultRegistration, VmsplicePayload, VmsplicePayloadSegment, VMEX_RESOURCE,
 };
+use crate::security;
 use crate::signals::{SignalDetail, SignalInfo};
 use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
 use crate::vfs::aio::AioContext;
@@ -1366,6 +1367,7 @@ impl MemoryManagerState {
 
     fn protect(
         &mut self,
+        current_task: &CurrentTask,
         addr: UserAddress,
         length: usize,
         prot_flags: ProtectionFlags,
@@ -1418,6 +1420,13 @@ impl MemoryManagerState {
         // TODO: We should check the max_access flags on all the mappings in this range.
         //       There are cases where max_access is more restrictive than the Zircon rights
         //       we hold on the underlying VMOs.
+
+        // TODO(https://fxbug.dev/411617451): `mprotect` should apply the protection flags
+        // until it encounters a mapping that doesn't allow it, rather than not apply the protection
+        // flags at all if a single mapping doesn't allow it.
+        for (_range, mapping) in self.mappings.range(prot_range.clone()) {
+            security::file_mprotect(current_task, mapping, prot_flags)?;
+        }
 
         // Make one call to mprotect to update all the zircon protections.
         // SAFETY: This is safe because the vmar belongs to a different process.
@@ -3831,6 +3840,7 @@ impl MemoryManager {
 
     pub fn protect(
         &self,
+        current_task: &CurrentTask,
         addr: UserAddress,
         length: usize,
         prot_flags: ProtectionFlags,
@@ -3838,7 +3848,7 @@ impl MemoryManager {
         // Hold the lock throughout the operation to uphold memory manager's invariants.
         // See mm/README.md.
         let mut state = self.state.write();
-        state.protect(addr, length, prot_flags)
+        state.protect(current_task, addr, length, prot_flags)
     }
 
     pub fn madvise(
@@ -5669,7 +5679,7 @@ mod tests {
         assert!(ma.write_memory(addr, &bytes).is_ok());
         mm.state
             .write()
-            .protect(second_map, *PAGE_SIZE as usize, ProtectionFlags::empty())
+            .protect(ma, second_map, *PAGE_SIZE as usize, ProtectionFlags::empty())
             .unwrap();
         assert_eq!(
             ma.read_memory_partial_to_vec(addr, bytes.len()).unwrap().len(),
@@ -5786,7 +5796,7 @@ mod tests {
 
         let mapped_addr = map_memory_growsdown(&mut locked, &current_task, *PAGE_SIZE);
 
-        mm.protect(mapped_addr, *PAGE_SIZE as usize, ProtectionFlags::READ).unwrap();
+        mm.protect(&current_task, mapped_addr, *PAGE_SIZE as usize, ProtectionFlags::READ).unwrap();
 
         assert_matches!(
             mm.extend_growsdown_mapping_to_address((mapped_addr - *PAGE_SIZE).unwrap(), true),

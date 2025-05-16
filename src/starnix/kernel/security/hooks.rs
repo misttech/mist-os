@@ -8,7 +8,7 @@ use super::{
 };
 use crate::bpf::program::Program;
 use crate::bpf::BpfMap;
-use crate::mm::{MappingOptions, ProtectionFlags};
+use crate::mm::{Mapping, MappingOptions, ProtectionFlags};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
@@ -72,6 +72,22 @@ impl From<Access> for PermissionFlags {
             permissions |= PermissionFlags::EXEC;
         }
         permissions
+    }
+}
+
+impl From<ProtectionFlags> for PermissionFlags {
+    fn from(protection_flags: ProtectionFlags) -> Self {
+        let mut flags = PermissionFlags::empty();
+        if protection_flags.contains(ProtectionFlags::READ) {
+            flags |= PermissionFlags::READ;
+        }
+        if protection_flags.contains(ProtectionFlags::WRITE) {
+            flags |= PermissionFlags::WRITE;
+        }
+        if protection_flags.contains(ProtectionFlags::EXEC) {
+            flags |= PermissionFlags::EXEC;
+        }
+        flags
     }
 }
 
@@ -253,7 +269,7 @@ pub struct FsNodeSecurityXattr {
 /// Corresponds to the `mmap_file()` LSM hook.
 pub fn mmap_file(
     current_task: &CurrentTask,
-    file: &Option<FileHandle>,
+    file: Option<&FileHandle>,
     protection_flags: ProtectionFlags,
     options: MappingOptions,
 ) -> Result<(), Errno> {
@@ -266,6 +282,20 @@ pub fn mmap_file(
             protection_flags,
             options,
         )
+    })
+}
+
+/// Checks whether `current_task` is allowed to request setting the memory protection of
+/// `mapping` to `prot`.
+/// Corresponds to the `file_mprotect` LSM hook.
+pub fn file_mprotect(
+    current_task: &CurrentTask,
+    mapping: &Mapping,
+    prot: ProtectionFlags,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.file_mprotect");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::file::file_mprotect(security_server, current_task, mapping, prot)
     })
 }
 

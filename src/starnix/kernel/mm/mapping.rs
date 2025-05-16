@@ -480,7 +480,6 @@ impl MappingFlags {
         mapping_flags | Self::from_bits_truncate(prot_flags.access_flags().bits() as u16)
     }
 
-    #[cfg(any(feature = "alternate_anon_allocs", test))]
     pub fn options(&self) -> MappingOptions {
         MappingOptions::from_bits_truncate(self.bits() >> 3)
     }

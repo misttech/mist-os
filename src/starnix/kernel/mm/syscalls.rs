@@ -159,7 +159,7 @@ where
         track_stub!(TODO("https://fxbug.dev/406377606"), "MAP_LOCKED");
     }
 
-    security::mmap_file(current_task, &file, prot_flags, options)?;
+    security::mmap_file(current_task, file.as_ref(), prot_flags, options)?;
 
     if flags & MAP_ANONYMOUS != 0 {
         trace_duration!(CATEGORY_STARNIX_MM, c"AnonymousMmap");
@@ -200,7 +200,12 @@ pub fn sys_mprotect(
         track_stub!(TODO("https://fxbug.dev/322874672"), "mprotect parse protection", prot);
         errno!(EINVAL)
     })?;
-    current_task.mm().ok_or_else(|| errno!(EINVAL))?.protect(addr, length, prot_flags)?;
+    current_task.mm().ok_or_else(|| errno!(EINVAL))?.protect(
+        current_task,
+        addr,
+        length,
+        prot_flags,
+    )?;
     Ok(())
 }
 

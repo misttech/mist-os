@@ -1254,6 +1254,8 @@ class_permission_enum! {
         // keep-sorted start
         /// Permission to dynamically transition a process to a different security domain.
         DynTransition("dyntransition"),
+        /// Permission to execute arbitrary code from the heap.
+        ExecHeap("execheap"),
         /// Permission to execute arbitrary code from memory.
         ExecMem("execmem"),
         /// Permission to fork the current running process.
