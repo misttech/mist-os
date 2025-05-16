@@ -278,7 +278,6 @@ tracing_subscriber_visibility = [
   # At this time we are not enforcing restrictions on ffx and related code.
   "//src/developer/ffx/config:*",
   "//src/developer/ffx/lib/logging/*",
-  "//tools/funnel:*",
 
   # At this time we are not enforcing restrictions on the below.
   "//third_party/*",

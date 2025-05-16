@@ -17,6 +17,7 @@ use discovery::{
     wait_for_devices, DiscoverySources, FastbootConnectionState, TargetEvent, TargetState,
 };
 use futures::{Stream, StreamExt};
+use log::LevelFilter;
 use signal_hook::consts::signal::*;
 use signal_hook::iterator::Signals;
 use std::collections::HashMap;
@@ -26,7 +27,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use target::{TargetInfo, TargetMode};
 use timeout::timeout;
-use tracing_subscriber::filter::LevelFilter;
 
 mod errors;
 mod logging;
@@ -36,7 +36,7 @@ mod target;
 mod update;
 
 fn default_log_level() -> LevelFilter {
-    LevelFilter::ERROR
+    LevelFilter::Error
 }
 
 fn default_repository_ports() -> Vec<u32> {
