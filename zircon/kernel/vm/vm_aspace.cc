@@ -695,20 +695,8 @@ zx_status_t VmAspace::AccessedFault(vaddr_t va) {
   VM_KTRACE_DURATION(2, "VmAspace::AccessedFault", ("va", ktrace::Pointer{va}));
   // There are no permissions etc associated with accessed bits so we can skip any vmar walking and
   // just let the hardware aspace walk for the virtual address.
-  // Similar to a page fault, multiple additional pages in the page table will be marked active to
-  // amortize the cost of accessed faults. This reduces the accuracy of page age information, at the
-  // gain of performance due to reduced number of faults. Given this accessed fault path is meant to
-  // just be a fastpath of the page fault path, using the same count and strategy as a page fault at
-  // least provides consistency of the trade off of page age accuracy and fault frequency.
   va = ROUNDDOWN(va, PAGE_SIZE);
-  const uint64_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(va);
-  // Find the minimum between the size of this mapping and the end of the page table.
-  const uint64_t max_mark = ktl::min(next_pt_base, base_ + size_);
-  // Convert this into a number of pages, limiting to the max lookup pages for consistency with the
-  // page fault path.
-  static constexpr uint64_t kMaxPages = 16;
-  const uint64_t max_pages = ktl::min((max_mark - va) / PAGE_SIZE, kMaxPages);
-  return arch_aspace_.MarkAccessed(va, max_pages);
+  return arch_aspace_.MarkAccessed(va, 1);
 }
 
 void VmAspace::Dump(bool verbose) const {
