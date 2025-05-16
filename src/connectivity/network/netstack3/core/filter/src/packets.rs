@@ -15,8 +15,8 @@ use packet::records::options::OptionSequenceBuilder;
 use packet::{
     Buf, Buffer, BufferAlloc, BufferMut, BufferProvider, BufferViewMut, EitherSerializer, EmptyBuf,
     GrowBufferMut, InnerSerializer, Nested, PacketConstraints, ParsablePacket, ParseBuffer,
-    ParseMetadata, ReusableBuffer, SerializeError, Serializer, SliceBufViewMut,
-    TruncatingSerializer,
+    ParseMetadata, PartialSerializeResult, PartialSerializer, ReusableBuffer, SerializeError,
+    Serializer, SliceBufViewMut, TruncatingSerializer,
 };
 use packet_formats::icmp::mld::{
     MulticastListenerDone, MulticastListenerQuery, MulticastListenerQueryV2,
@@ -316,6 +316,7 @@ pub trait MaybeIcmpErrorMut<I: FilterIpExt> {
 /// A serializer that may also be a valid transport layer packet.
 pub trait TransportPacketSerializer<I: FilterIpExt>:
     Serializer
+    + PartialSerializer
     + MaybeTransportPacket
     + MaybeTransportPacketMut<I>
     + MaybeIcmpErrorPayload<I>
@@ -327,6 +328,7 @@ impl<I, S> TransportPacketSerializer<I> for S
 where
     I: FilterIpExt,
     S: Serializer
+        + PartialSerializer
         + MaybeTransportPacket
         + MaybeTransportPacketMut<I>
         + MaybeIcmpErrorPayload<I>
@@ -983,6 +985,47 @@ impl<I: FilterIpExt, S: TransportPacketSerializer<I>> IpPacket<I> for TxPacket<'
 
     fn icmp_error_mut<'a>(&'a mut self) -> Self::IcmpErrorMut<'a> {
         self.serializer
+    }
+}
+
+/// Implements `PartialSerializer` for a reference to a `PartialSerializer`
+/// implementation. It's not possible to provide a blanket implementation for
+/// references directly (i.e. for `&S`) since it would conflict with the
+/// implementation for `FragmentedBuffer`.
+pub struct PartialSerializeRef<'a, S> {
+    reference: &'a S,
+}
+
+impl<'a, S: PartialSerializer> PartialSerializer for PartialSerializeRef<'a, S> {
+    fn partial_serialize(
+        &self,
+        outer: PacketConstraints,
+        buffer: &mut [u8],
+    ) -> Result<PartialSerializeResult, SerializeError<Never>> {
+        self.reference.partial_serialize(outer, buffer)
+    }
+}
+
+/// Value used in place of TTL in a partially-serialized TxPacket.
+const TX_PACKET_NO_TTL: u8 = 0;
+
+/// `TxPacket` is used for eBPF CGROUP_EGRESS filters. At that level the packet
+/// is not fragmented yet, so we don't have a final packet serializer, but the
+/// eBPF filters want to see a serialized packet. We provide `PartialSerialize`,
+/// which allows to serialize just the packet headers - that's enough for most
+/// eBPF programs. TTL is not known here, so the field is set to 64.
+impl<I: FilterIpExt, S: TransportPacketSerializer<I> + PartialSerializer> PartialSerializer
+    for TxPacket<'_, I, S>
+{
+    fn partial_serialize(
+        &self,
+        outer: PacketConstraints,
+        buffer: &mut [u8],
+    ) -> Result<PartialSerializeResult, SerializeError<Never>> {
+        let packet_builder =
+            I::PacketBuilder::new(self.src_addr, self.dst_addr, TX_PACKET_NO_TTL, self.protocol);
+        Nested::new(PartialSerializeRef { reference: self.serializer }, packet_builder)
+            .partial_serialize(outer, buffer)
     }
 }
 
@@ -2069,6 +2112,18 @@ impl<I: IpExt, B: BufferMut> Serializer for RawIpBody<I, B> {
         alloc: A,
     ) -> Result<BB, SerializeError<A::Error>> {
         self.body.serialize_new_buf(outer, alloc)
+    }
+}
+
+impl<I: IpExt, B: BufferMut> PartialSerializer for RawIpBody<I, B> {
+    fn partial_serialize(
+        &self,
+        _outer: PacketConstraints,
+        buffer: &mut [u8],
+    ) -> Result<PartialSerializeResult, SerializeError<Never>> {
+        let bytes_to_copy = core::cmp::min(self.body.len(), buffer.len());
+        buffer[..bytes_to_copy].copy_from_slice(&self.body.as_ref()[..bytes_to_copy]);
+        Ok(PartialSerializeResult { bytes_written: bytes_to_copy, total_size: self.body.len() })
     }
 }
 
@@ -3177,7 +3232,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
-    use packet::{InnerPacketBuilder as _, ParseBufferMut};
+    use packet::{InnerPacketBuilder as _, ParseBufferMut, PartialSerializer};
     use packet_formats::icmp::IcmpZeroCode;
     use packet_formats::tcp::TcpSegmentBuilder;
     use test_case::{test_case, test_matrix};
@@ -3199,6 +3254,8 @@ mod tests {
     const WINDOW_SIZE: u16 = 3u16;
 
     trait Protocol {
+        const HEADER_SIZE: usize;
+
         type Serializer<'a, I: FilterIpExt>: TransportPacketSerializer<I, Buffer: packet::ReusableBuffer>
             + MaybeTransportPacketMut<I>
             + Debug
@@ -3266,6 +3323,8 @@ mod tests {
     struct Udp;
 
     impl Protocol for Udp {
+        const HEADER_SIZE: usize = 8;
+
         type Serializer<'a, I: FilterIpExt> =
             Nested<InnerSerializer<&'a [u8], EmptyBuf>, UdpPacketBuilder<I::Addr>>;
 
@@ -3360,6 +3419,8 @@ mod tests {
     struct Tcp;
 
     impl Protocol for Tcp {
+        const HEADER_SIZE: usize = 20;
+
         type Serializer<'a, I: FilterIpExt> =
             Nested<InnerSerializer<&'a [u8], EmptyBuf>, TcpSegmentBuilder<I::Addr>>;
 
@@ -3389,6 +3450,8 @@ mod tests {
     struct IcmpEchoRequest;
 
     impl Protocol for IcmpEchoRequest {
+        const HEADER_SIZE: usize = 8;
+
         type Serializer<'a, I: FilterIpExt> = Nested<
             InnerSerializer<&'a [u8], EmptyBuf>,
             IcmpPacketBuilder<I, icmp::IcmpEchoRequest>,
@@ -3417,6 +3480,8 @@ mod tests {
     struct IcmpEchoReply;
 
     impl Protocol for IcmpEchoReply {
+        const HEADER_SIZE: usize = 8;
+
         type Serializer<'a, I: FilterIpExt> =
             Nested<InnerSerializer<&'a [u8], EmptyBuf>, IcmpPacketBuilder<I, icmp::IcmpEchoReply>>;
 
@@ -4456,5 +4521,50 @@ mod tests {
             expected_serializer.serialize_vec_outer().unwrap().unwrap_b().into_inner();
 
         assert_eq!(bytes, expected_bytes);
+    }
+
+    #[ip_test(I)]
+    #[test_case(Udp)]
+    #[test_case(Tcp)]
+    #[test_case(IcmpEchoRequest)]
+    fn tx_packet_partial_serialize<I: TestIpExt, P: Protocol>(_proto: P) {
+        const DATA: &[u8] = b"Packet Body";
+        let mut body =
+            P::make_serializer_with_ports_data::<I>(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, DATA);
+        let packet = TxPacket::<I, _>::new(I::SRC_IP, I::DST_IP, P::proto::<I>(), &mut body);
+
+        let mut buf = [0u8; 128];
+        let result = PartialSerializer::partial_serialize(
+            &packet,
+            PacketConstraints::UNCONSTRAINED,
+            &mut buf,
+        )
+        .unwrap();
+
+        let whole_packet =
+            P::make_serializer_with_ports_data::<I>(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, DATA)
+                .encapsulate(I::PacketBuilder::new(I::SRC_IP, I::DST_IP, TX_PACKET_NO_TTL, P::proto::<I>()))
+                .serialize_vec_outer()
+                .expect("serialize packet")
+                .unwrap_b()
+                .into_inner();
+
+        assert_eq!(result.total_size, whole_packet.len());
+        assert_eq!(result.bytes_written, I::MIN_HEADER_LENGTH + P::HEADER_SIZE);
+
+        // Count the number of bytes that are different in the partially
+        // serialized packet.
+        let num_bytes_differ = buf[..result.bytes_written]
+            .iter()
+            .zip(whole_packet[..result.bytes_written].iter())
+            .map(|(a, b)| if a != b { 1 } else { 0 })
+            .sum::<usize>();
+
+        // Partial serializer doesn't calculate packet checksum. IPv6 header
+        // doesn't contain a checksum, but IPv4 header and transport layer
+        // headers contain 2 bytes for checksum each. Only these bytes may
+        // differ from a fully-serialized packet.
+        let checksum_bytes = I::map_ip((), |()| 4, |()| 2);
+        assert!(num_bytes_differ <= checksum_bytes);
     }
 }

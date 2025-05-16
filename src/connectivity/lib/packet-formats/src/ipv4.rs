@@ -21,7 +21,8 @@ use packet::records::RecordsIter;
 use packet::{
     BufferAlloc, BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
     GrowBufferMut, InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints,
-    ParsablePacket, ParseMetadata, ReusableBuffer, SerializeError, SerializeTarget, Serializer,
+    ParsablePacket, ParseMetadata, PartialPacketBuilder, ReusableBuffer, SerializeError,
+    SerializeTarget, Serializer,
 };
 use zerocopy::byteorder::network_endian::U16;
 use zerocopy::{
@@ -876,6 +877,20 @@ where
     }
 }
 
+impl<'a, I> PartialPacketBuilder for Ipv4PacketBuilderWithOptions<'a, I>
+where
+    I: Iterator + Clone,
+    I::Item: Borrow<Ipv4Option<'a>>,
+{
+    fn partial_serialize(&self, body_len: usize, header: &mut [u8]) {
+        let Ipv4PacketBuilderWithOptions { prefix_builder, options } = self;
+        prefix_builder.partial_serialize(body_len, header);
+        let options_slice = &mut header[IPV4_MIN_HDR_LEN..];
+        assert_eq!(options_slice.len(), self.aligned_options_len());
+        options.serialize_into(options_slice);
+    }
+}
+
 impl<'a, I> IpPacketBuilder<Ipv4> for Ipv4PacketBuilderWithOptions<'a, I>
 where
     I: Default + Debug + Clone + Iterator<Item: Borrow<Ipv4Option<'a>>>,
@@ -983,17 +998,10 @@ impl Ipv4PacketBuilder {
     pub fn read_df_flag(&self) -> bool {
         (self.flags & (1 << DF_FLAG_OFFSET)) != 0
     }
-}
 
-impl PacketBuilder for Ipv4PacketBuilder {
-    fn constraints(&self) -> PacketConstraints {
-        PacketConstraints::new(IPV4_MIN_HDR_LEN, 0, 0, (1 << 16) - 1 - IPV4_MIN_HDR_LEN)
-    }
-
-    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
-        let total_len = target.header.len() + body.len();
-        assert_eq!(target.header.len() % 4, 0);
-        let ihl: u8 = u8::try_from(target.header.len() / 4).expect("Header too large");
+    fn get_header_prefix(&self, header_len: usize, total_len: usize) -> HeaderPrefix {
+        assert_eq!(header_len % 4, 0);
+        let ihl: u8 = u8::try_from(header_len / 4).expect("Header too large");
 
         // As Per [RFC 6864 Section 2]:
         //
@@ -1013,7 +1021,7 @@ impl PacketBuilder for Ipv4PacketBuilder {
             0
         };
 
-        let mut hdr_prefix = HeaderPrefix::new(
+        HeaderPrefix::new(
             ihl,
             self.dscp_and_ecn,
             {
@@ -1033,13 +1041,32 @@ impl PacketBuilder for Ipv4PacketBuilder {
             [0, 0], // header checksum
             self.src_ip,
             self.dst_ip,
-        );
+        )
+    }
+}
 
+impl PacketBuilder for Ipv4PacketBuilder {
+    fn constraints(&self) -> PacketConstraints {
+        PacketConstraints::new(IPV4_MIN_HDR_LEN, 0, 0, (1 << 16) - 1 - IPV4_MIN_HDR_LEN)
+    }
+
+    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
+        let header_len = target.header.len();
+        let total_len = header_len + body.len();
+        let mut hdr_prefix = self.get_header_prefix(header_len, total_len);
         let options = &target.header[HDR_PREFIX_LEN..];
         let checksum = compute_header_checksum(hdr_prefix.as_bytes(), options);
         hdr_prefix.hdr_checksum = checksum;
         let mut header = &mut target.header;
         header.write_obj_front(&hdr_prefix).expect("too few bytes for IPv4 header prefix");
+    }
+}
+
+impl PartialPacketBuilder for Ipv4PacketBuilder {
+    fn partial_serialize(&self, body_len: usize, mut header: &mut [u8]) {
+        let total_len = header.len() + body_len;
+        let hdr_prefix = self.get_header_prefix(header.len(), total_len);
+        (&mut header).write_obj_front(&hdr_prefix).expect("too few bytes for IPv4 header prefix");
     }
 }
 

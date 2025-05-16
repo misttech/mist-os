@@ -24,7 +24,7 @@ use packet::records::Records;
 use packet::{
     BufferView, BufferViewMut, ByteSliceInnerPacketBuilder, EmptyBuf, FragmentedBytesMut, FromRaw,
     InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints, ParsablePacket,
-    ParseMetadata, SerializeTarget, Serializer,
+    ParseMetadata, PartialPacketBuilder, SerializeTarget, Serializer,
 };
 use zerocopy::byteorder::network_endian::{U16, U32};
 use zerocopy::{
@@ -919,6 +919,18 @@ impl<A: IpAddress, O: InnerPacketBuilder> PacketBuilder for TcpSegmentBuilderWit
     }
 }
 
+impl<A: IpAddress, O: InnerPacketBuilder> PartialPacketBuilder
+    for TcpSegmentBuilderWithOptions<A, O>
+{
+    fn partial_serialize(&self, body_len: usize, mut buffer: &mut [u8]) {
+        self.prefix_builder.partial_serialize(body_len, &mut buffer[..HDR_PREFIX_LEN]);
+
+        let opt_len = self.aligned_options_len();
+        let options = (&mut buffer).take_back_zero(opt_len).expect("too few bytes for TCP options");
+        self.options.serialize(options)
+    }
+}
+
 // NOTE(joshlf): In order to ensure that the checksum is always valid, we don't
 // expose any setters for the fields of the TCP segment; the only way to set
 // them is via TcpSegmentBuilder. This, combined with checksum validation
@@ -1050,16 +1062,9 @@ impl<A: IpAddress> TcpSegmentBuilder<A> {
     pub fn set_dst_port(&mut self, port: NonZeroU16) {
         self.dst_port = Some(port);
     }
-}
 
-impl<A: IpAddress> PacketBuilder for TcpSegmentBuilder<A> {
-    fn constraints(&self) -> PacketConstraints {
-        PacketConstraints::new(HDR_PREFIX_LEN, 0, 0, core::usize::MAX)
-    }
-
-    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
-        let hdr_len = target.header.len();
-        let total_len = hdr_len + body.len() + target.footer.len();
+    fn serialize_header(&self, header: &mut [u8]) {
+        let hdr_len = header.len();
 
         debug_assert_eq!(hdr_len % 4, 0, "header length isn't a multiple of 4: {}", hdr_len);
         let mut data_offset_reserved_flags = self.data_offset_reserved_flags;
@@ -1071,7 +1076,7 @@ impl<A: IpAddress> PacketBuilder for TcpSegmentBuilder<A> {
         // write the checksum back into the header. To avoid this, we re-slice
         // header before calling `write_obj_front`; the re-slice will be
         // consumed, but `target.header` is unaffected.
-        (&mut &mut target.header[..])
+        (&mut &mut header[..])
             .write_obj_front(&HeaderPrefix::new(
                 self.src_port.map_or(0, NonZeroU16::get),
                 self.dst_port.map_or(0, NonZeroU16::get),
@@ -1086,6 +1091,18 @@ impl<A: IpAddress> PacketBuilder for TcpSegmentBuilder<A> {
                 0,
             ))
             .expect("too few bytes for TCP header prefix");
+    }
+}
+
+impl<A: IpAddress> PacketBuilder for TcpSegmentBuilder<A> {
+    fn constraints(&self) -> PacketConstraints {
+        PacketConstraints::new(HDR_PREFIX_LEN, 0, 0, core::usize::MAX)
+    }
+
+    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
+        self.serialize_header(target.header);
+
+        let body_len = body.len();
 
         #[rustfmt::skip]
         let checksum = compute_transport_checksum_serialize(
@@ -1098,10 +1115,16 @@ impl<A: IpAddress> PacketBuilder for TcpSegmentBuilder<A> {
         .unwrap_or_else(|| {
             panic!(
                 "total TCP segment length of {} bytes overflows length field of pseudo-header",
-                total_len
+                target.header.len() + body_len + target.footer.len(),
             )
         });
         target.header[CHECKSUM_RANGE].copy_from_slice(&checksum[..]);
+    }
+}
+
+impl<A: IpAddress> PartialPacketBuilder for TcpSegmentBuilder<A> {
+    fn partial_serialize(&self, _body_len: usize, buffer: &mut [u8]) {
+        self.serialize_header(buffer)
     }
 }
 

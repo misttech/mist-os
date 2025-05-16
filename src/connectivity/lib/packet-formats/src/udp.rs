@@ -18,7 +18,7 @@ use net_types::ip::{Ip, IpAddress, IpVersionMarker};
 use packet::{
     BufferView, BufferViewMut, ByteSliceInnerPacketBuilder, EmptyBuf, FragmentedBytesMut, FromRaw,
     InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints, ParsablePacket,
-    ParseMetadata, SerializeTarget, Serializer,
+    ParseMetadata, PartialPacketBuilder, SerializeTarget, Serializer,
 };
 use zerocopy::byteorder::network_endian::U16;
 use zerocopy::{
@@ -538,6 +538,38 @@ impl<A: IpAddress> UdpPacketBuilder<A> {
     pub fn set_dst_port(&mut self, port: NonZeroU16) {
         self.dst_port = Some(port);
     }
+
+    fn serialize_header(&self, body_len: usize, mut buffer: &mut [u8]) {
+        // See for details: https://en.wikipedia.org/wiki/User_Datagram_Protocol#Packet_structure
+
+        let total_len = buffer.len() + body_len;
+
+        // `write_obj_front` consumes the extent of the receiving slice, but
+        // that behavior is undesirable here: at the end of this method, we
+        // write the checksum back into the header. To avoid this, we re-slice
+        // header before calling `write_obj_front`; the re-slice will be
+        // consumed, but `target.header` is unaffected.
+        (&mut buffer)
+            .write_obj_front(&Header {
+                src_port: U16::new(self.src_port.map_or(0, NonZeroU16::get)),
+                dst_port: U16::new(self.dst_port.map_or(0, NonZeroU16::get)),
+                length: U16::new(total_len.try_into().unwrap_or_else(|_| {
+                    if A::Version::VERSION.is_v6() {
+                        // See comment in `constraints()`.
+                        0u16
+                    } else {
+                        panic!(
+                            "total UDP packet length of {total_len} bytes \
+                            overflows 16-bit length field of UDP header"
+                        )
+                    }
+                })),
+                // Initialize the checksum to 0 so that we will get the correct
+                // value when we compute it below.
+                checksum: [0, 0],
+            })
+            .expect("too few bytes for UDP header");
+    }
 }
 
 impl<A: IpAddress> PacketBuilder for UdpPacketBuilder<A> {
@@ -560,32 +592,7 @@ impl<A: IpAddress> PacketBuilder for UdpPacketBuilder<A> {
     }
 
     fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
-        // See for details: https://en.wikipedia.org/wiki/User_Datagram_Protocol#Packet_structure
-
-        let total_len = target.header.len() + body.len() + target.footer.len();
-
-        // `write_obj_front` consumes the extent of the receiving slice, but
-        // that behavior is undesirable here: at the end of this method, we
-        // write the checksum back into the header. To avoid this, we re-slice
-        // header before calling `write_obj_front`; the re-slice will be
-        // consumed, but `target.header` is unaffected.
-        (&mut &mut target.header[..]).write_obj_front(&Header {
-            src_port: U16::new(self.src_port.map_or(0, NonZeroU16::get)),
-            dst_port: U16::new(self.dst_port.map_or(0, NonZeroU16::get)),
-            length: U16::new(total_len.try_into().unwrap_or_else(|_| {
-                if A::Version::VERSION.is_v6() {
-                    // See comment in max_body_len
-                    0u16
-                } else {
-                    panic!(
-                    "total UDP packet length of {} bytes overflows 16-bit length field of UDP header",
-                    total_len)
-                }
-            })),
-            // Initialize the checksum to 0 so that we will get the correct
-            // value when we compute it below.
-            checksum: [0, 0],
-        }).expect("too few bytes for UDP header");
+        self.serialize_header(body.len(), target.header);
 
         let mut checksum = compute_transport_checksum_serialize(
             self.src_ip,
@@ -594,16 +601,18 @@ impl<A: IpAddress> PacketBuilder for UdpPacketBuilder<A> {
             target,
             body,
         )
-        .unwrap_or_else(|| {
-            panic!(
-                "total UDP packet length of {} bytes overflows length field of pseudo-header",
-                total_len
-            )
-        });
+        .unwrap(); // Not expected to fail since we were able to serialize the packet.
+
         if checksum == [0, 0] {
             checksum = [0xFF, 0xFF];
         }
         target.header[CHECKSUM_RANGE].copy_from_slice(&checksum[..]);
+    }
+}
+
+impl<A: IpAddress> PartialPacketBuilder for UdpPacketBuilder<A> {
+    fn partial_serialize(&self, body_len: usize, buffer: &mut [u8]) {
+        self.serialize_header(body_len, buffer);
     }
 }
 

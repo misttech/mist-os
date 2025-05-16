@@ -10,7 +10,7 @@ use netstack3_base::{
     InstantBindingsTypes, IpDeviceAddr, IpDeviceAddressIdContext, Marks, RngContext,
     StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TxMetadataBindingsTypes,
 };
-
+use packet::PartialSerializer;
 use packet_formats::ip::IpExt;
 
 use crate::matchers::InterfaceProperties;
@@ -128,7 +128,7 @@ pub enum SocketEgressFilterResult {
 /// Trait for a socket operations filter.
 pub trait SocketOpsFilter<D: StrongDeviceIdentifier, T> {
     /// Called on every outgoing packet originated from a local socket.
-    fn on_egress<I: FilterIpExt, P: IpPacket<I>>(
+    fn on_egress<I: FilterIpExt, P: IpPacket<I> + PartialSerializer>(
         &self,
         packet: &P,
         device: &D,

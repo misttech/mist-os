@@ -39,7 +39,8 @@ use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv
 use packet::records::options::{Options, OptionsImpl};
 use packet::{
     AsFragmentedByteSlice, BufferView, FragmentedByteSlice, FragmentedBytesMut, FromRaw,
-    PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
+    PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, PartialPacketBuilder,
+    SerializeTarget,
 };
 use zerocopy::byteorder::network_endian::U16;
 use zerocopy::{
@@ -771,6 +772,41 @@ impl<I: IcmpIpExt, M: IcmpMessage<I>> IcmpPacketBuilder<I, M> {
     pub fn set_dst_ip(&mut self, addr: I::Addr) {
         self.dst_ip = addr;
     }
+
+    fn serialize_header(
+        &self,
+        mut header: &mut [u8],
+        message_body: Option<FragmentedBytesMut<'_, '_>>,
+    ) {
+        use packet::BufferViewMut;
+
+        // Implements BufferViewMut, giving us take_obj_xxx_zero methods.
+        let mut prefix = &mut header;
+
+        // SECURITY: Use _zero constructors to ensure we zero memory to prevent
+        // leaking information from packets previously stored in this buffer.
+        let mut header =
+            prefix.take_obj_front_zero::<Header<M>>().expect("too few bytes for ICMP message");
+        header.prefix.set_msg_type(M::TYPE);
+        header.prefix.code = self.code.into();
+        header.message = self.msg;
+
+        if let Some(message_body) = message_body {
+            assert!(
+                M::EXPECTS_BODY || message_body.is_empty(),
+                "body provided for message that doesn't take a body"
+            );
+            let checksum =
+                compute_checksum_fragmented(&header, &message_body, self.src_ip, self.dst_ip)
+                    .unwrap_or_else(|| {
+                        panic!(
+                    "total ICMP packet length of {} overflows 32-bit length field of pseudo-header",
+                    Ref::bytes(&header).len() + message_body.len(),
+                )
+                    });
+            header.prefix.checksum = checksum;
+        }
+    }
 }
 
 // TODO(joshlf): Figure out a way to split body and non-body message types by
@@ -798,31 +834,13 @@ impl<I: IcmpIpExt, M: IcmpMessage<I>> PacketBuilder for IcmpPacketBuilder<I, M> 
         target: &mut SerializeTarget<'_>,
         message_body: FragmentedBytesMut<'_, '_>,
     ) {
-        use packet::BufferViewMut;
+        self.serialize_header(target.header, Some(message_body));
+    }
+}
 
-        // implements BufferViewMut, giving us take_obj_xxx_zero methods
-        let mut prefix = &mut target.header;
-
-        assert!(
-            M::EXPECTS_BODY || message_body.is_empty(),
-            "body provided for message that doesn't take a body"
-        );
-        // SECURITY: Use _zero constructors to ensure we zero memory to prevent
-        // leaking information from packets previously stored in this buffer.
-        let mut header =
-            prefix.take_obj_front_zero::<Header<M>>().expect("too few bytes for ICMP message");
-        header.prefix.set_msg_type(M::TYPE);
-        header.prefix.code = self.code.into();
-        header.message = self.msg;
-        let checksum =
-            compute_checksum_fragmented(&header, &message_body, self.src_ip, self.dst_ip)
-                .unwrap_or_else(|| {
-                    panic!(
-                    "total ICMP packet length of {} overflows 32-bit length field of pseudo-header",
-                    Ref::bytes(&header).len() + message_body.len(),
-                )
-                });
-        header.prefix.checksum = checksum;
+impl<I: IcmpIpExt, M: IcmpMessage<I>> PartialPacketBuilder for IcmpPacketBuilder<I, M> {
+    fn partial_serialize(&self, _body_len: usize, buffer: &mut [u8]) {
+        self.serialize_header(buffer, None);
     }
 }
 

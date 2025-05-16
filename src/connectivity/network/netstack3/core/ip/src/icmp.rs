@@ -27,8 +27,8 @@ use netstack3_base::{
 };
 use netstack3_filter::{FilterIpExt, TransportPacketSerializer};
 use packet::{
-    BufferMut, InnerPacketBuilder as _, ParsablePacket as _, ParseBuffer, Serializer,
-    TruncateDirection, TruncatingSerializer,
+    BufferMut, InnerPacketBuilder as _, ParsablePacket as _, ParseBuffer, PartialSerializer,
+    Serializer, TruncateDirection, TruncatingSerializer,
 };
 use packet_formats::icmp::ndp::options::{NdpOption, NdpOptionBuilder};
 use packet_formats::icmp::ndp::{
@@ -1172,7 +1172,7 @@ pub fn send_ndp_packet<BC, CC, S>(
 ) -> Result<(), IpSendFrameError<S>>
 where
     CC: IpLayerHandler<Ipv6, BC>,
-    S: Serializer,
+    S: Serializer + PartialSerializer,
     S::Buffer: BufferMut,
 {
     macro_rules! send {

@@ -50,7 +50,7 @@ use netstack3_ip::{
     IpDeviceEgressStateContext, IpDeviceIngressStateContext, IpLayerIpExt, IpSasHandler,
     IpSendFrameError, Ipv4PresentAddressStatus, DEFAULT_TTL,
 };
-use packet::{EmptyBuf, InnerPacketBuilder, Serializer};
+use packet::{EmptyBuf, InnerPacketBuilder, PartialSerializer, Serializer};
 use packet_formats::icmp::ndp::options::{NdpNonce, NdpOptionBuilder};
 use packet_formats::icmp::ndp::{OptionSequenceBuilder, RouterSolicitation};
 use packet_formats::icmp::IcmpZeroCode;
@@ -1051,7 +1051,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
     }
 
     fn send_rs_packet<
-        S: Serializer<Buffer = EmptyBuf>,
+        S: Serializer<Buffer = EmptyBuf> + PartialSerializer,
         F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,
     >(
         &mut self,

@@ -816,6 +816,13 @@ pub struct Nested<I, O> {
 }
 
 impl<I, O> Nested<I, O> {
+    /// Creates a new `Nestable` instance with the `outer` wrapping the
+    /// `inner`. Normally `outer` should be a `PacketBuilder` and `inner`
+    /// should implement either `Serializer` or `PartialSerializer`.
+    pub fn new(inner: I, outer: O) -> Nested<I, O> {
+        Nested { inner, outer }
+    }
+
     /// Consumes this `Nested` and returns the inner object, discarding the
     /// outer one.
     #[inline]
@@ -1879,6 +1886,129 @@ impl<I: Serializer, O: PacketBuilder> Serializer for Nested<I, O> {
         let mut buf = self.inner.serialize_new_buf(outer, alloc)?;
         GrowBufferMut::serialize(&mut buf, &self.outer);
         Ok(buf)
+    }
+}
+
+/// A packet builder used for partial packet serialization.
+pub trait PartialPacketBuilder: PacketBuilder {
+    /// Serializes the header to the specified `buffer`.
+    ///
+    /// Checksums (if any) should not calculated. The corresponding fields
+    /// should be set to 0.
+    ///
+    /// `body_len` specifies size of the packet body wrapped by this
+    /// `PacketBuilder`. It is supplied so the correct packet size can be
+    /// written in the header.
+    fn partial_serialize(&self, body_len: usize, buffer: &mut [u8]);
+}
+
+impl PartialPacketBuilder for () {
+    fn partial_serialize(&self, _body_len: usize, _buffer: &mut [u8]) {}
+}
+
+/// Result returned by `PartialSerializer::partial_serialize`.
+#[derive(Debug, Eq, PartialEq)]
+pub struct PartialSerializeResult {
+    // Number of bytes written to the output buffer.
+    pub bytes_written: usize,
+
+    // Size of the whole packet.
+    pub total_size: usize,
+}
+
+/// A serializer that supports partial serialization.
+///
+/// Partial serialization allows to serialize only packet headers without
+/// calculating packet checksums (if any).
+pub trait PartialSerializer: Sized {
+    /// Serializes the head of the packet to the specified `buffer`.
+    ///
+    /// If the packet contains network or transport level headers that fit in
+    /// the provided buffer then they will be serialized. Complete or partial
+    /// body may be copied to the output buffer as well, depending on the
+    /// serializer type.
+    ///
+    /// `PartialSerializeResult.bytes_written` indicates how many bytes were
+    /// actually serialized.
+    fn partial_serialize(
+        &self,
+        outer: PacketConstraints,
+        buffer: &mut [u8],
+    ) -> Result<PartialSerializeResult, SerializeError<Never>>;
+}
+
+impl<B: GrowBuffer + ShrinkBuffer> PartialSerializer for B {
+    fn partial_serialize(
+        &self,
+        _outer: PacketConstraints,
+        _buffer: &mut [u8],
+    ) -> Result<PartialSerializeResult, SerializeError<Never>> {
+        Ok(PartialSerializeResult { bytes_written: 0, total_size: self.len() })
+    }
+}
+
+impl<B: GrowBuffer + ShrinkBuffer> PartialSerializer for TruncatingSerializer<B> {
+    fn partial_serialize(
+        &self,
+        outer: PacketConstraints,
+        _buffer: &mut [u8],
+    ) -> Result<PartialSerializeResult, SerializeError<Never>> {
+        let total_size =
+            cmp::max(outer.min_body_len(), cmp::min(self.buffer().len(), outer.max_body_len()));
+        Ok(PartialSerializeResult { bytes_written: 0, total_size })
+    }
+}
+
+impl<I: InnerPacketBuilder, B: GrowBuffer + ShrinkBuffer> PartialSerializer
+    for InnerSerializer<I, B>
+{
+    fn partial_serialize(
+        &self,
+        outer: PacketConstraints,
+        _buffer: &mut [u8],
+    ) -> Result<PartialSerializeResult, SerializeError<Never>> {
+        Ok(PartialSerializeResult {
+            bytes_written: 0,
+            total_size: cmp::max(self.inner().bytes_len(), outer.min_body_len()),
+        })
+    }
+}
+
+impl<A: Serializer + PartialSerializer, B: Serializer + PartialSerializer> PartialSerializer
+    for EitherSerializer<A, B>
+{
+    fn partial_serialize(
+        &self,
+        outer: PacketConstraints,
+        buffer: &mut [u8],
+    ) -> Result<PartialSerializeResult, SerializeError<Never>> {
+        match self {
+            EitherSerializer::A(s) => s.partial_serialize(outer, buffer),
+            EitherSerializer::B(s) => s.partial_serialize(outer, buffer),
+        }
+    }
+}
+
+impl<I: PartialSerializer, O: PartialPacketBuilder> PartialSerializer for Nested<I, O> {
+    fn partial_serialize(
+        &self,
+        outer: PacketConstraints,
+        buffer: &mut [u8],
+    ) -> Result<PartialSerializeResult, SerializeError<Never>> {
+        let header_constraints = self.outer.constraints();
+        let Some(constraints) = outer.try_encapsulate(&header_constraints) else {
+            return Err(SerializeError::SizeLimitExceeded);
+        };
+
+        let header_len = header_constraints.header_len();
+        let inner_buf = buffer.get_mut(header_len..).unwrap_or(&mut []);
+        let mut result = self.inner.partial_serialize(constraints, inner_buf)?;
+        if header_len <= buffer.len() {
+            self.outer.partial_serialize(result.total_size, &mut buffer[..header_len]);
+            result.bytes_written += header_len;
+        }
+        result.total_size += header_len + header_constraints.footer_len();
+        Ok(result)
     }
 }
 

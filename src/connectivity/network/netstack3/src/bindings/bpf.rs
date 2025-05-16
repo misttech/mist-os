@@ -21,6 +21,7 @@ use netstack3_core::filter::{FilterIpExt, IpPacket, SocketEgressFilterResult, So
 use netstack3_core::routes::Marks;
 use netstack3_core::sync::{Mutex, RwLock};
 use netstack3_core::TxMetadata;
+use packet::PartialSerializer;
 use std::collections::{hash_map, HashMap};
 use std::mem::offset_of;
 use std::sync::{Arc, LazyLock, Weak};
@@ -356,7 +357,7 @@ impl CgroupSkbProgram {
         Ok(Self { program })
     }
 
-    fn run<I: FilterIpExt, P: IpPacket<I>>(
+    fn run<I: FilterIpExt, P: IpPacket<I> + PartialSerializer>(
         &self,
         _packet: &P,
         _device: &DeviceId<BindingsCtx>,
@@ -524,7 +525,7 @@ impl EbpfManager {
 }
 
 impl SocketOpsFilter<DeviceId<BindingsCtx>, TxMetadata<BindingsCtx>> for &EbpfManager {
-    fn on_egress<I: FilterIpExt, P: IpPacket<I>>(
+    fn on_egress<I: FilterIpExt, P: IpPacket<I> + PartialSerializer>(
         &self,
         packet: &P,
         device: &DeviceId<BindingsCtx>,
