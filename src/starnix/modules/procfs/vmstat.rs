@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::PAGE_SIZE;
-use crate::task::KernelStats;
-use crate::vfs::{DynamicFile, DynamicFileBuf, DynamicFileSource, FsNodeOps};
-
+use starnix_core::mm::PAGE_SIZE;
+use starnix_core::task::KernelStats;
+use starnix_core::vfs::{DynamicFile, DynamicFileBuf, DynamicFileSource, FsNodeOps};
 use starnix_logging::log_error;
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
-
 use std::sync::Arc;
 
 #[derive(Clone)]

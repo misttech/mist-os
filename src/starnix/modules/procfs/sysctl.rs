@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::proc::sys_net::{
+use crate::sys_net::{
     ProcSysNetIpv4Conf, ProcSysNetIpv4Neigh, ProcSysNetIpv6Conf, ProcSysNetIpv6Neigh,
 };
-use crate::security;
-use crate::task::{ptrace_get_scope, ptrace_set_scope, CurrentTask, SeccompAction};
-use crate::vfs::stub_bytes_file::StubBytesFile;
-use crate::vfs::{
+use starnix_core::security;
+use starnix_core::task::{ptrace_get_scope, ptrace_set_scope, CurrentTask, SeccompAction};
+use starnix_core::vfs::stub_bytes_file::StubBytesFile;
+use starnix_core::vfs::{
     fs_args, inotify, parse_unsigned_file, BytesFile, BytesFileOps, FileSystemHandle, FsNodeHandle,
     FsNodeInfo, FsNodeOps, FsString, StaticDirectoryBuilder,
 };

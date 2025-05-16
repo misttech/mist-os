@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::DeviceMode;
-use crate::task::CurrentTask;
-use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
-
+use starnix_core::device::DeviceMode;
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 use starnix_uapi::device_type::{DeviceType, MISC_MAJOR};
 use starnix_uapi::errors::Errno;
-
 use std::borrow::Cow;
 
 #[derive(Clone, Debug)]

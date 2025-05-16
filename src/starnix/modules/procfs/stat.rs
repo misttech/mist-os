@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::KernelStats;
-use crate::vfs::{DynamicFile, DynamicFileBuf, DynamicFileSource, FsNodeOps};
+use starnix_core::task::KernelStats;
+use starnix_core::vfs::{DynamicFile, DynamicFileBuf, DynamicFileSource, FsNodeOps};
 use starnix_logging::log_error;
 use starnix_types::time::duration_to_scheduler_clock;
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
-use std::time::SystemTime;
-
 use std::sync::Arc;
+use std::time::SystemTime;
 
 #[derive(Clone)]
 pub struct StatFile {

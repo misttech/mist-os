@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{CurrentTask, EventHandler, SyslogAccess, WaitCanceler, Waiter};
-use crate::vfs::{
+use starnix_core::task::{CurrentTask, EventHandler, SyslogAccess, WaitCanceler, Waiter};
+use starnix_core::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, FileObject, FileOps, FileSystemHandle,
     FsNodeHandle, FsNodeInfo, InputBuffer, OutputBuffer, SimpleFileNode,
 };

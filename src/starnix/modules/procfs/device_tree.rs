@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::CurrentTask;
-use crate::vfs::{FileSystemHandle, FsNodeHandle, StaticDirectoryBuilder};
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::{FileSystemHandle, FsNodeHandle, StaticDirectoryBuilder};
 
 pub fn device_tree_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mut directory = StaticDirectoryBuilder::new(fs);

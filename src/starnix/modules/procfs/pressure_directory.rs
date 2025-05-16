@@ -2,15 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{
-    CurrentTask, EventHandler, Kernel, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter,
-};
-use crate::vfs::buffers::InputBuffer;
-use crate::vfs::{
-    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNodeHandle, FsNodeOps,
-    SimpleFileNode, StaticDirectoryBuilder,
-};
 use fidl_fuchsia_starnix_psi::{
     PsiProviderGetMemoryPressureStatsResponse, PsiProviderSynchronousProxy,
     PsiProviderWatchMemoryStallRequest,
@@ -18,6 +9,15 @@ use fidl_fuchsia_starnix_psi::{
 use fuchsia_async::{OnSignals, WakeupTime};
 use fuchsia_component::client::connect_to_protocol_sync;
 use futures::{select, FutureExt};
+use starnix_core::task::{
+    CurrentTask, EventHandler, Kernel, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter,
+};
+use starnix_core::vfs::buffers::InputBuffer;
+use starnix_core::vfs::{
+    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, DynamicFile, DynamicFileBuf,
+    DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNodeHandle, FsNodeOps,
+    SimpleFileNode, StaticDirectoryBuilder,
+};
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
     FileOpsCore, Locked, MemoryPressureMonitor, MemoryPressureMonitorClientState, OrderedMutex,

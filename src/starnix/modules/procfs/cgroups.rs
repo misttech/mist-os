@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::CurrentTask;
-use crate::vfs::{BytesFile, FileSystemHandle, FsNodeHandle, FsNodeInfo};
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::{BytesFile, FileSystemHandle, FsNodeHandle, FsNodeInfo};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::mode;
 

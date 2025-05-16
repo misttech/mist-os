@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{Kernel, TaskStateCode};
-use crate::vfs::{DynamicFile, DynamicFileBuf, DynamicFileSource, FsNodeOps};
+use starnix_core::task::{Kernel, TaskStateCode};
+use starnix_core::vfs::{DynamicFile, DynamicFileBuf, DynamicFileSource, FsNodeOps};
 use starnix_logging::track_stub;
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;

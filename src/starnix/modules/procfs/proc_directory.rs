@@ -2,40 +2,39 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::proc::cgroups::cgroups_file;
-use crate::fs::proc::config_gz::ConfigFile;
-use crate::fs::proc::cpuinfo::CpuinfoFile;
-use crate::fs::proc::device_tree::device_tree_directory;
-use crate::fs::proc::devices::DevicesFile;
-use crate::fs::proc::kmsg::kmsg_file;
-use crate::fs::proc::loadavg::LoadavgFile;
-use crate::fs::proc::meminfo::MeminfoFile;
-use crate::fs::proc::misc::MiscFile;
-use crate::fs::proc::mounts_symlink::MountsSymlink;
-use crate::fs::proc::pid_directory::pid_directory;
-use crate::fs::proc::pressure_directory::pressure_directory;
-use crate::fs::proc::self_symlink::SelfSymlink;
-use crate::fs::proc::stat::StatFile;
-use crate::fs::proc::swaps::SwapsFile;
-use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
-use crate::fs::proc::sysrq::SysRqNode;
-use crate::fs::proc::thread_self::ThreadSelfSymlink;
-use crate::fs::proc::uid_cputime::uid_cputime_directory;
-use crate::fs::proc::uid_io::uid_io_directory;
-use crate::fs::proc::uid_procstat::uid_procstat_directory;
-use crate::fs::proc::uptime::UptimeFile;
-use crate::fs::proc::vmstat::VmStatFile;
-use crate::fs::proc::zoneinfo::ZoneInfoFile;
-use crate::task::CurrentTask;
-use crate::vfs::stub_empty_file::StubEmptyFile;
-use crate::vfs::{
+use crate::cgroups::cgroups_file;
+use crate::config_gz::ConfigFile;
+use crate::cpuinfo::CpuinfoFile;
+use crate::device_tree::device_tree_directory;
+use crate::devices::DevicesFile;
+use crate::kmsg::kmsg_file;
+use crate::loadavg::LoadavgFile;
+use crate::meminfo::MeminfoFile;
+use crate::misc::MiscFile;
+use crate::mounts_symlink::MountsSymlink;
+use crate::pid_directory::pid_directory;
+use crate::pressure_directory::pressure_directory;
+use crate::self_symlink::SelfSymlink;
+use crate::stat::StatFile;
+use crate::swaps::SwapsFile;
+use crate::sysctl::{net_directory, sysctl_directory};
+use crate::sysrq::SysRqNode;
+use crate::thread_self::ThreadSelfSymlink;
+use crate::uid_cputime::uid_cputime_directory;
+use crate::uid_io::uid_io_directory;
+use crate::uid_procstat::uid_procstat_directory;
+use crate::uptime::UptimeFile;
+use crate::vmstat::VmStatFile;
+use crate::zoneinfo::ZoneInfoFile;
+use maplit::btreemap;
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::stub_empty_file::StubEmptyFile;
+use starnix_core::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
     unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, FileObject, FileOps,
     FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget,
     SimpleFileNode,
 };
-
-use maplit::btreemap;
 use starnix_logging::{bug_ref, track_stub, BugRef};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
@@ -45,6 +44,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
 use starnix_uapi::{errno, off_t, pid_t};
 use std::collections::BTreeMap;
+use std::ops::Deref;
 use std::sync::Arc;
 
 /// `ProcDirectory` represents the top-level directory in `procfs`.
@@ -58,9 +58,20 @@ pub struct ProcDirectory {
     nodes: BTreeMap<&'static FsStr, FsNodeHandle>,
 }
 
+#[derive(Clone)]
+pub struct ProcDirectoryNode(Arc<ProcDirectory>);
+
+impl Deref for ProcDirectoryNode {
+    type Target = ProcDirectory;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl ProcDirectory {
     /// Returns a new `ProcDirectory` exposing information about `kernel`.
-    pub fn new(current_task: &CurrentTask, fs: &FileSystemHandle) -> Arc<ProcDirectory> {
+    pub fn new(current_task: &CurrentTask, fs: &FileSystemHandle) -> ProcDirectoryNode {
         let kernel = current_task.kernel();
         // First add all the nodes that are always present in the top-level proc directory.
         let mut nodes = btreemap! {
@@ -122,7 +133,7 @@ impl ProcDirectory {
             nodes.insert("pressure".into(), pressure_directory);
         }
 
-        Arc::new(ProcDirectory { nodes })
+        ProcDirectoryNode(Arc::new(ProcDirectory { nodes }))
     }
 }
 
@@ -167,7 +178,7 @@ fn symlink_file(
     fs.create_node(current_task, ops, FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()))
 }
 
-impl FsNodeOps for Arc<ProcDirectory> {
+impl FsNodeOps for ProcDirectoryNode {
     fs_node_impl_dir_readonly!();
 
     fn create_file_ops(

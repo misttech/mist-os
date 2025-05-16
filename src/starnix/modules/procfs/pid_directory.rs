@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, PAGE_SIZE};
-use crate::security;
-use crate::task::{
+use itertools::Itertools;
+use regex::Regex;
+use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, PAGE_SIZE};
+use starnix_core::security;
+use starnix_core::task::{
     path_from_root, CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup,
     ThreadGroupKey,
 };
-use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::stub_empty_file::StubEmptyFile;
-use crate::vfs::{
+use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
+use starnix_core::vfs::stub_empty_file::StubEmptyFile;
+use starnix_core::vfs::{
     default_seek, emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
     fileops_impl_noop_sync, fs_node_impl_dir_readonly, parse_i32_file, parse_unsigned_file,
     serialize_for_file, unbounded_seek, BytesFile, BytesFileOps, CallbackSymlinkNode,
@@ -19,9 +21,6 @@ use crate::vfs::{
     FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget, SimpleFileNode,
     StaticDirectoryBuilder, SymlinkTarget, VecDirectory, VecDirectoryEntry,
 };
-
-use itertools::Itertools;
-use regex::Regex;
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::ownership::{OwnedRef, TempRef, WeakRef};
@@ -38,9 +37,8 @@ use starnix_uapi::{
 };
 use std::borrow::Cow;
 use std::ffi::CString;
-use std::ops::Range;
+use std::ops::{Deref, Range};
 use std::sync::{Arc, LazyLock};
-
 /// Loads entries for the `scope` of a task.
 fn task_entries(scope: TaskEntryScope) -> Vec<(FsString, FileMode)> {
     // NOTE: keep entries in sync with `TaskDirectory::lookup()`.
@@ -103,6 +101,17 @@ pub struct TaskDirectory {
     inode_range: Range<ino_t>,
 }
 
+#[derive(Clone)]
+struct TaskDirectoryNode(Arc<TaskDirectory>);
+
+impl Deref for TaskDirectoryNode {
+    type Target = TaskDirectory;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl TaskDirectory {
     fn new(
         current_task: &CurrentTask,
@@ -114,17 +123,17 @@ impl TaskDirectory {
         let task_weak = WeakRef::from(task);
         fs.create_node(
             current_task,
-            Arc::new(TaskDirectory {
+            TaskDirectoryNode(Arc::new(TaskDirectory {
                 task_weak,
                 scope,
                 inode_range: fs.allocate_node_id(task_entries(scope).len()),
-            }),
+            })),
             FsNodeInfo::new_factory(mode!(IFDIR, 0o777), creds),
         )
     }
 }
 
-impl FsNodeOps for Arc<TaskDirectory> {
+impl FsNodeOps for TaskDirectoryNode {
     fs_node_impl_dir_readonly!();
 
     fn create_file_ops(

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::CurrentTask;
-use crate::vfs::stub_bytes_file::StubBytesFile;
-use crate::vfs::{
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::stub_bytes_file::StubBytesFile;
+use starnix_core::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
     unbounded_seek, DirectoryEntryType, DirentSink, FileObject, FileOps, FsNode, FsNodeHandle,
     FsNodeOps, FsStr, SeekTarget, StaticDirectoryBuilder,

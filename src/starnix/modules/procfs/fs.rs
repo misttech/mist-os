@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::proc_directory::ProcDirectory;
-use crate::task::CurrentTask;
-use crate::vfs::{
+use crate::proc_directory::ProcDirectory;
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::{
     CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr,
 };
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{statfs, PROC_SUPER_MAGIC};
-use std::sync::Arc;
 
 struct ProcFsHandle(FileSystemHandle);
 
@@ -30,8 +29,10 @@ pub fn proc_fs(
 }
 
 /// `ProcFs` is a filesystem that exposes runtime information about a `Kernel` instance.
+#[derive(Debug, Clone)]
 struct ProcFs;
-impl FileSystemOps for Arc<ProcFs> {
+
+impl FileSystemOps for ProcFs {
     fn statfs(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
@@ -49,7 +50,7 @@ impl ProcFs {
     /// Creates a new instance of `ProcFs` for the given `kernel`.
     pub fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Uncached, Arc::new(ProcFs), options)
+        let fs = FileSystem::new(kernel, CacheMode::Uncached, ProcFs, options)
             .expect("procfs constructed with valid options");
         fs.set_root(ProcDirectory::new(current_task, &fs));
         fs
