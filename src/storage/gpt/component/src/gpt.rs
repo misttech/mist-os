@@ -1376,13 +1376,12 @@ mod tests {
             fio::PERM_READABLE,
         );
 
-        // Open a session that shifts all block offsets by one.  The apparent range of the partition
-        // should be [0..512) bytes (which corresponds to [512..1024) in the partition), because
-        // bytes [512..1024) would be mapped to [1024..1536) which exceeds the partition's limit.
         let part_block =
             connect_to_named_protocol_at_dir_root::<fblock::BlockMarker>(&part_dir, "volume")
                 .expect("Failed to open Block service");
-        let info = part_block.get_info().await.expect("FIDL error").expect("get_info failed");
+
+        // Attempting to open a session with an offset map that extends past the end of the device
+        // should fail.
         let (session, server_end) = fidl::endpoints::create_proxy::<fblock::SessionMarker>();
         part_block
             .open_session_with_offset_map(
@@ -1395,23 +1394,21 @@ mod tests {
                 }]),
             )
             .expect("FIDL error");
+        session.get_fifo().await.expect_err("Session should be closed");
 
-        let client = Arc::new(RemoteBlockClient::from_session(info, session).await.unwrap());
-        let mut buffer = vec![0xaa; 512];
-        client.flush().await.expect("Flush should succeed");
-        client
-            .read_at(MutableBufferSlice::Memory(&mut buffer), 0)
-            .await
-            .expect("Read should succeed");
-        client.write_at(BufferSlice::Memory(&buffer), 0).await.expect("Write should succeed");
-        client
-            .read_at(MutableBufferSlice::Memory(&mut buffer), 512)
-            .await
-            .expect_err("Read past end should fail");
-        client
-            .write_at(BufferSlice::Memory(&buffer), 512)
-            .await
-            .expect_err("Write past end should fail");
+        let (session, server_end) = fidl::endpoints::create_proxy::<fblock::SessionMarker>();
+        part_block
+            .open_session_with_offset_map(
+                server_end,
+                None,
+                Some(&[fblock::BlockOffsetMapping {
+                    source_block_offset: 0,
+                    target_block_offset: 0,
+                    length: 3,
+                }]),
+            )
+            .expect("FIDL error");
+        session.get_fifo().await.expect_err("Session should be closed");
 
         runner.shutdown().await;
     }

@@ -32,6 +32,15 @@ pub enum DeviceInfo {
 }
 
 impl DeviceInfo {
+    fn block_count(&self) -> Option<u64> {
+        match self {
+            Self::Block(BlockInfo { block_count, .. }) => Some(*block_count),
+            Self::Partition(PartitionInfo { block_range, .. }) => {
+                block_range.as_ref().map(|range| range.end - range.start)
+            }
+        }
+    }
+
     fn max_transfer_blocks(&self) -> Option<NonZero<u32>> {
         match self {
             Self::Block(BlockInfo { max_transfer_blocks, .. }) => max_transfer_blocks.clone(),
@@ -141,6 +150,7 @@ pub struct BlockServer<SM> {
 }
 
 /// A single entry in `[OffsetMap]`.
+#[derive(Debug)]
 pub struct BlockOffsetMapping {
     source_block_offset: u64,
     target_block_offset: u64,
@@ -365,14 +375,20 @@ impl<SM: SessionManager> BlockServer<SM> {
                         session.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
                         return Ok(None);
                     }
-                    let initial_mapping = match initial_mappings.unwrap().pop().unwrap().try_into()
-                    {
-                        Ok(m) => m,
-                        Err(status) => {
-                            session.close_with_epitaph(status)?;
+                    let initial_mapping: BlockOffsetMapping =
+                        match initial_mappings.unwrap().pop().unwrap().try_into() {
+                            Ok(m) => m,
+                            Err(status) => {
+                                session.close_with_epitaph(status)?;
+                                return Ok(None);
+                            }
+                        };
+                    if let Some(max) = info.block_count() {
+                        if initial_mapping.target_block_offset + initial_mapping.length > max {
+                            session.close_with_epitaph(zx::Status::INVALID_ARGS)?;
                             return Ok(None);
                         }
-                    };
+                    }
                     return Ok(Some(self.session_manager.clone().open_session(
                         session.into_stream(),
                         OffsetMap::new(initial_mapping, info.max_transfer_blocks()),
@@ -1056,7 +1072,7 @@ mod tests {
         DeviceInfo::Partition(PartitionInfo {
             device_flags: fblock::Flag::READONLY,
             max_transfer_blocks: None,
-            block_range: Some(12..34),
+            block_range: Some(0..100),
             type_guid: [1; 16],
             instance_guid: [2; 16],
             name: "foo".to_string(),
