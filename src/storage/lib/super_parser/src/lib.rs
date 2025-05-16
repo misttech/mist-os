@@ -30,6 +30,7 @@ fn round_up_to_alignment(x: u32, alignment: u32) -> Result<u32, Error> {
 // TODO(https://fxbug.dev/404952286): Add fuzzer to check for arithmetic overflows.
 
 /// Struct to help interpret the deserialized "super" metadata.
+#[derive(Debug)]
 pub struct Metadata {
     geometry: MetadataGeometry,
     header: MetadataHeader,
@@ -40,9 +41,8 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub async fn load_from_device(device: FakeDevice) -> Result<Self, Error> {
-        let geometry = Self::parse_metadata_geometry(&device).await.unwrap();
-        // TODO(https://fxbug.dev/404952286): read backup geometry if needed.
+    pub async fn load_from_device(device: &FakeDevice) -> Result<Self, Error> {
+        let geometry = Self::load_metadata_geometry(&device).await?;
 
         let header = Self::parse_metadata_header(&device).await.unwrap();
 
@@ -135,15 +135,33 @@ impl Metadata {
         Ok(Self { geometry, header, partitions, extents, partition_groups, block_devices })
     }
 
-    async fn parse_metadata_geometry(device: &FakeDevice) -> Result<MetadataGeometry, Error> {
+    // Load and validate geometry information from a block device that holds logical partitions.
+    async fn load_metadata_geometry(device: &FakeDevice) -> Result<MetadataGeometry, Error> {
+        // Read the primary geometry
+        match Self::parse_metadata_geometry(&device, PARTITION_RESERVED_BYTES).await {
+            Ok(geometry) => Ok(geometry),
+            Err(_) => {
+                // Try the backup geometry
+                Self::parse_metadata_geometry(
+                    &device,
+                    PARTITION_RESERVED_BYTES + METADATA_GEOMETRY_RESERVED_SIZE,
+                )
+                .await
+            }
+        }
+    }
+
+    // Read and validates the metadata geometry. The offset provided will be rounded up to the
+    // nearest block alignment.
+    async fn parse_metadata_geometry(
+        device: &FakeDevice,
+        offset: u32,
+    ) -> Result<MetadataGeometry, Error> {
         let buffer_len =
             round_up_to_alignment(METADATA_GEOMETRY_RESERVED_SIZE, device.block_size())?;
         let mut buffer = device.allocate_buffer(buffer_len as usize).await;
-        ensure!(
-            PARTITION_RESERVED_BYTES % device.block_size() == 0,
-            "Read offsets must be block aligned."
-        );
-        device.read(PARTITION_RESERVED_BYTES as u64, buffer.as_mut()).await?;
+        let aligned_offset = round_up_to_alignment(offset, device.block_size())?;
+        device.read(aligned_offset as u64, buffer.as_mut()).await?;
         let full_buffer = buffer.as_slice();
         let (metadata_geometry, _remainder) =
             MetadataGeometry::read_from_prefix(full_buffer).unwrap();
@@ -210,8 +228,8 @@ mod tests {
     fn open_image(path: &Path) -> FakeDevice {
         // If image changes at the file path, need to update the `verify_*` functions below that
         // verifies the parser.
-        let image = zstd::Decoder::new(std::fs::File::open(path).expect("open file failed"))
-            .expect("decompress image failed");
+        let file = std::fs::File::open(path).expect("open file failed");
+        let image = zstd::Decoder::new(file).expect("decompress image failed");
         FakeDevice::from_image(image, BLOCK_SIZE).expect("create fake block device failed")
     }
 
@@ -308,7 +326,8 @@ mod tests {
     async fn test_parsing_metadata() {
         let device = open_image(std::path::Path::new(IMAGE_PATH));
 
-        let super_partition = Metadata::load_from_device(device).await.expect("open device failed");
+        let super_partition =
+            Metadata::load_from_device(&device).await.expect("failed to load super metatata.");
 
         verify_geometry(&super_partition).expect("incorrect geometry");
         verify_header(&super_partition).expect("incorrect header");
@@ -316,5 +335,48 @@ mod tests {
         verify_extents_table(&super_partition).expect("incorrect extents table");
         verify_partition_groups_table(&super_partition).expect("incorrect partition groups table");
         verify_block_devices_table(&super_partition).expect("incorrect block devices table");
+        device.close().await.expect("failed to close device");
+    }
+
+    #[fuchsia::test]
+    async fn test_parsing_metadata_with_invalid_primary_geometry() {
+        let device = open_image(std::path::Path::new(IMAGE_PATH));
+
+        // Corrupt the primary geometry bytes.
+        {
+            let offset = round_up_to_alignment(PARTITION_RESERVED_BYTES, device.block_size())
+                .expect("failed to round to nearest block");
+            let buf_len =
+                round_up_to_alignment(METADATA_GEOMETRY_RESERVED_SIZE, device.block_size())
+                    .expect("failed to round to nearest block");
+            let mut buf = device.allocate_buffer(buf_len as usize).await;
+            buf.as_mut_slice().fill(0xaa as u8);
+            device.write(offset as u64, buf.as_ref()).await.expect("failed to write to device");
+        }
+
+        let super_partition =
+            Metadata::load_from_device(&device).await.expect("failed to load super metatata.");
+        verify_geometry(&super_partition).expect("incorrect geometry");
+    }
+
+    #[fuchsia::test]
+    async fn test_parsing_metadata_with_invalid_primary_and_backup_geometry() {
+        let device = open_image(std::path::Path::new(IMAGE_PATH));
+
+        // Corrupt the primary and backup geometry bytes.
+        {
+            let offset = round_up_to_alignment(PARTITION_RESERVED_BYTES, device.block_size())
+                .expect("failed to round to nearest block");
+            let buf_len =
+                round_up_to_alignment(2 * METADATA_GEOMETRY_RESERVED_SIZE, device.block_size())
+                    .expect("failed to round to nearest block");
+            let mut buf = device.allocate_buffer(buf_len as usize).await;
+            buf.as_mut_slice().fill(0xaa as u8);
+            device.write(offset as u64, buf.as_ref()).await.expect("failed to write to device");
+        }
+
+        Metadata::load_from_device(&device)
+            .await
+            .expect_err("passed loading super metatata unexpectedly");
     }
 }
