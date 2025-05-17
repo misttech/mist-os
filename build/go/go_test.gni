@@ -31,6 +31,11 @@ import("//build/testing/host_test.gni")
 #     host tests. See //build/testing/test_spec.gni for more details.
 #     Type: list of scopes.
 #
+#   package_deps
+#     Optional: the `fuchsia_package` dependencies needed by this test at runtime.
+#     See //build/testing/test_spec.gni for more details.
+#     Type: list of labels.
+#
 #   timeout:
 #     Optional: override default timeout. Only applies to host tests.
 #     Values must be valid Go durations such as "300ms", "-1.5h" or "2h45m".

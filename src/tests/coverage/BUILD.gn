@@ -278,10 +278,10 @@ go_test("clang_coverage_tests_on_target") {
   non_go_deps = [
     ":clang_coverage_test_deps($host_toolchain)",
     ":clang_coverage_test_deps_on_target($host_toolchain)",
-    ":clang_coverage_test_package_on_target($target_toolchain)",
     "//src/developer/ffx:test_data($host_toolchain)",
     "//src/developer/ffx/plugins/test:ffx_test_tool_test_data($host_toolchain)",
   ]
+  package_deps = [ ":clang_coverage_test_package_on_target" ]
 
   # Declare this test as a host-target interaction test, so that Fuchsia
   # should be running in an emulator before this test starts on the host.
@@ -337,11 +337,11 @@ go_test("rust_coverage_tests_on_target") {
   non_go_deps = [
     ":rust_coverage_test_deps($host_toolchain)",
     ":rust_coverage_test_deps_on_target($host_toolchain)",
-    ":rust_coverage_test_package_on_target($target_toolchain)",
     "//build/rust:prebuilt_toolchain_host_test_data($host_toolchain)",
     "//src/developer/ffx:test_data($host_toolchain)",
     "//src/developer/ffx/plugins/test:ffx_test_tool_test_data($host_toolchain)",
   ]
+  package_deps = [ ":rust_coverage_test_package_on_target" ]
 
   # Declare this test as a host-target interaction test, so that Fuchsia
   # should be running in an emulator before this test starts on the host.
