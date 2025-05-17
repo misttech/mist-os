@@ -323,7 +323,7 @@ impl ConnectDisconnectLogger {
             payload: MetricEventPayload::Count(1),
         });
 
-        if should_log_disconnect_for_mobile_device(info) {
+        if info.disconnect_source.should_log_for_mobile_device() {
             metric_events.push(MetricEvent {
                 metric_id: metrics::DISCONNECT_OCCURRENCE_FOR_MOBILE_DEVICE_METRIC_ID,
                 event_codes: vec![],
@@ -337,28 +337,11 @@ impl ConnectDisconnectLogger {
             payload: MetricEventPayload::IntegerValue(info.connected_duration.into_millis()),
         });
 
-        let cobalt_disconnect_reason_code = match info.disconnect_source {
-            fidl_sme::DisconnectSource::Ap(cause) | fidl_sme::DisconnectSource::Mlme(cause) => {
-                cause.reason_code.into_primitive()
-            }
-            fidl_sme::DisconnectSource::User(reason) => reason as u16,
-        };
-        // This `max_event_code: 1000` is set in the metrics registry, but doesn't show up in the
-        // generated bindings.
-        let reason_code_max: u16 = 1000;
-        let cobalt_disconnect_reason_code =
-            std::cmp::min(cobalt_disconnect_reason_code, reason_code_max);
-        use metrics::ConnectivityWlanMetricDimensionDisconnectSource as C;
-        let cobalt_disconnect_source = match info.disconnect_source {
-            fidl_sme::DisconnectSource::Ap(..) => C::Ap,
-            fidl_sme::DisconnectSource::User(..) => C::User,
-            fidl_sme::DisconnectSource::Mlme(..) => C::Mlme,
-        };
         metric_events.push(MetricEvent {
             metric_id: metrics::DISCONNECT_BREAKDOWN_BY_REASON_CODE_METRIC_ID,
             event_codes: vec![
-                u32::from(cobalt_disconnect_reason_code),
-                cobalt_disconnect_source as u32,
+                u32::from(info.disconnect_source.cobalt_reason_code()),
+                info.disconnect_source.as_cobalt_disconnect_source() as u32,
             ],
             payload: MetricEventPayload::Count(1),
         });
@@ -403,18 +386,6 @@ impl ConnectDisconnectLogger {
         if !metric_events.is_empty() {
             log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_suspend_imminent");
         }
-    }
-}
-
-fn should_log_disconnect_for_mobile_device(info: &DisconnectInfo) -> bool {
-    match info.disconnect_source {
-        fidl_sme::DisconnectSource::Ap(_) => true,
-        fidl_sme::DisconnectSource::Mlme(cause)
-            if cause.reason_code != fidl_ieee80211::ReasonCode::MlmeLinkFailed =>
-        {
-            true
-        }
-        _ => false,
     }
 }
 
@@ -517,6 +488,52 @@ impl ConnectDisconnectTimeSeries {
     }
     fn log_disconnect_sources(&self, data: u64) {
         self.disconnect_sources.fold_or_log_error(Timed::now(data));
+    }
+}
+
+pub trait DisconnectSourceExt {
+    fn should_log_for_mobile_device(&self) -> bool;
+    fn cobalt_reason_code(&self) -> u16;
+    fn as_cobalt_disconnect_source(
+        &self,
+    ) -> metrics::ConnectivityWlanMetricDimensionDisconnectSource;
+}
+
+impl DisconnectSourceExt for fidl_sme::DisconnectSource {
+    fn should_log_for_mobile_device(&self) -> bool {
+        match self {
+            fidl_sme::DisconnectSource::Ap(_) => true,
+            fidl_sme::DisconnectSource::Mlme(cause)
+                if cause.reason_code != fidl_ieee80211::ReasonCode::MlmeLinkFailed =>
+            {
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn cobalt_reason_code(&self) -> u16 {
+        let cobalt_disconnect_reason_code = match self {
+            fidl_sme::DisconnectSource::Ap(cause) | fidl_sme::DisconnectSource::Mlme(cause) => {
+                cause.reason_code.into_primitive()
+            }
+            fidl_sme::DisconnectSource::User(reason) => *reason as u16,
+        };
+        // This `max_event_code: 1000` is set in the metrics registry, but doesn't show up in the
+        // generated bindings.
+        const REASON_CODE_MAX: u16 = 1000;
+        std::cmp::min(cobalt_disconnect_reason_code, REASON_CODE_MAX)
+    }
+
+    fn as_cobalt_disconnect_source(
+        &self,
+    ) -> metrics::ConnectivityWlanMetricDimensionDisconnectSource {
+        use metrics::ConnectivityWlanMetricDimensionDisconnectSource as DS;
+        match self {
+            fidl_sme::DisconnectSource::Ap(..) => DS::Ap,
+            fidl_sme::DisconnectSource::User(..) => DS::User,
+            fidl_sme::DisconnectSource::Mlme(..) => DS::Mlme,
+        }
     }
 }
 
