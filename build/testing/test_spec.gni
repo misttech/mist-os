@@ -447,7 +447,13 @@ template("test_spec") {
 
     _manifest_entries = []
     _manifest_inputs = []
-    foreach(package_target, invoker.package_deps) {
+    _package_deps_with_toolchain = []
+    foreach(package_dep, invoker.package_deps) {
+      _package_deps_with_toolchain +=
+          [ get_label_info(package_dep, "label_no_toolchain") +
+            "(${target_toolchain})" ]
+    }
+    foreach(package_target, _package_deps_with_toolchain) {
       _package_out_dir = get_label_info(package_target, "target_out_dir")
       _package_name = get_label_info(package_target, "name")
       _manifest_path =
@@ -458,14 +464,14 @@ template("test_spec") {
     }
     generated_file(pkg_manifest_deps_target_name) {
       forward_variables_from(invoker, [ "testonly" ])
-      deps = invoker.package_deps
+      deps = _package_deps_with_toolchain
       outputs = [ pkg_manifest_deps_file ]
       output_conversion = "json"
       contents = _manifest_entries
     }
     pkg_manifest_deps_inputs_name = "${target_name}.pkg_manifest_deps.inputs"
     group_with_inputs(pkg_manifest_deps_inputs_name) {
-      deps = invoker.package_deps
+      deps = _package_deps_with_toolchain
       inputs = _manifest_inputs
     }
     target_name_deps += [

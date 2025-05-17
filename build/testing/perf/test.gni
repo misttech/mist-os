@@ -35,8 +35,10 @@ performance_testing_environments = [
 #     Type: list(string)
 #     Default: empty list
 #
-#   target_deps (optional)
-#     Fuchsia dependencies to bring into the build graph that the test needs.
+#   package_deps (optional)
+#     Fuchsia package dependencies to bring into the build graph that
+#     the test needs, which are passed through to the test_spec.
+#     See //build/testing/test_spec.gni for more details.
 #     Type: list(string)
 #     Default: empty list
 #
@@ -168,11 +170,6 @@ template("python_perf_test") {
 
     if (defined(invoker.expected_metric_names_filepaths)) {
       deps += [ ":${target_name}_test_verify($host_toolchain)" ]
-    }
-    if (defined(invoker.target_deps)) {
-      foreach(target_dep, invoker.target_deps) {
-        deps += [ "${target_dep}($target_toolchain)" ]
-      }
     }
   }
 }
@@ -306,8 +303,6 @@ template("fuchsia_component_perf_test") {
       "//third_party/mobly",
     ]
 
-    # TODO(https://fxbug.dev/407117303): Add this to package_deps after
-    # fixing some tests that don't pass in the exact package target.
-    target_deps = [ invoker.package ]
+    package_deps = [ invoker.package ]
   }
 }

@@ -18,19 +18,12 @@ if (is_host) {
       vim3_env,
       nuc11_env,
     ]
+    package_deps = [ "//src/ui/examples:flatland-examples" ]
   }
-}
-
-group("test_user_input") {
-  testonly = true
-  public_deps = [
-    ":user_input_test($host_toolchain)",
-    "//src/ui/examples:flatland-examples($target_toolchain)",
-  ]
 }
 
 # Group containing all of the session affordances functional test cases and its dependencies.
 group("tests") {
   testonly = true
-  public_deps = [ ":test_user_input" ]
+  public_deps = [ ":user_input_test($host_toolchain)" ]
 }

@@ -17,6 +17,10 @@ if (is_host) {
       "//src/developer/ffx/tools/profiler:ffx_profiler_host_tool",
       "//src/developer/ffx/tools/profiler:ffx_profiler_test_data",
     ]
+    package_deps = [
+      "//src/performance/experimental/profiler/tests:gtest_target",
+      "//src/performance/experimental/profiler/tests/demo_target",
+    ]
     environments = [
       # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
       aemu_env,
@@ -26,19 +30,7 @@ if (is_host) {
   }
 }
 
-# Adding to a mobly test dep adds it to the host dependencies, but we want our packages to profile built for the target.
-group("package_deps") {
-  testonly = true
-  deps = [
-    "//src/performance/experimental/profiler/tests:gtest_target",
-    "//src/performance/experimental/profiler/tests/demo_target",
-  ]
-}
-
 group("e2e_tests") {
   testonly = true
-  deps = [
-    ":cpu_profiler($host_toolchain)",
-    ":package_deps($target_toolchain)",
-  ]
+  deps = [ ":cpu_profiler($host_toolchain)" ]
 }

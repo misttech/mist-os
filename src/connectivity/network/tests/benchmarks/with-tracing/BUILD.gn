@@ -14,22 +14,22 @@ if (is_host) {
       skip_netstack2 = target_cpu == "riscv64"
     }
     environments = performance_testing_environments
+    package_deps = [
+      "//src/connectivity/network/tests/benchmarks/socket-loopback:loopback-socket-benchmarks-with-tracing-pkg-netstack3",
+      "//src/connectivity/network/tests/benchmarks/socket-tun:tun-socket-benchmarks-tests-netstack3",
+    ]
+
+    # The Go runtime on Fuchsia does not support RISC-V.
+    if (target_cpu != "riscv64") {
+      package_deps += [
+        "//src/connectivity/network/tests/benchmarks/socket-loopback:loopback-socket-benchmarks-with-tracing-pkg-netstack2",
+        "//src/connectivity/network/tests/benchmarks/socket-tun:tun-socket-benchmarks-tests-netstack2",
+      ]
+    }
   }
 }
 
 group("benchmarks") {
   testonly = true
-  deps = [
-    ":netstack_benchmarks_with_tracing_test($host_toolchain)",
-    "//src/connectivity/network/tests/benchmarks/socket-loopback:loopback-socket-benchmarks-with-tracing-pkg-netstack3",
-    "//src/connectivity/network/tests/benchmarks/socket-tun:tun-socket-benchmarks-tests-netstack3",
-  ]
-
-  # The Go runtime on Fuchsia does not support RISC-V.
-  if (target_cpu != "riscv64") {
-    deps += [
-      "//src/connectivity/network/tests/benchmarks/socket-loopback:loopback-socket-benchmarks-with-tracing-pkg-netstack2",
-      "//src/connectivity/network/tests/benchmarks/socket-tun:tun-socket-benchmarks-tests-netstack2",
-    ]
-  }
+  deps = [ ":netstack_benchmarks_with_tracing_test($host_toolchain)" ]
 }

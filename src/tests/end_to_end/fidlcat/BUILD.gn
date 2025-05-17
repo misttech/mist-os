@@ -19,6 +19,10 @@ if (is_host) {
       "//src/developer/ffx:test_data",
       "//src/developer/ffx/plugins/debug:ffx_debug_plugin_tool_test_data",
     ]
+    package_deps = [
+      "//src/developer/debug/debug_agent",
+      "//src/testing/fidl/echo_realm_placeholder",
+    ]
 
     # Runs on "main" builders (try and ci) in QEMU environments, but only on x64, as we don't
     # support running host test on arm64 host.

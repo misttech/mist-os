@@ -20,7 +20,7 @@ python_perf_test("power_framework_benchmarks") {
     "//src/performance/lib/trace_processing",
   ]
 
-  target_deps = [ "//src/power/bench:integration" ]
+  package_deps = [ "//src/power/bench:package" ]
 }
 
 group("tests") {

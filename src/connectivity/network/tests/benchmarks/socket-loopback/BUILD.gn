@@ -273,7 +273,8 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan &&
   _starnix_runs = 120
   benchmark_test_configs += [
     {
-      package = ":loopback-socket-benchmarks-starnix"
+      package = ":loopback-socket-benchmarks-starnix-pkg"
+      package_name = "loopback-socket-benchmarks-starnix"
       runs = _starnix_runs
       test_type = "starnix"
       tests = [
@@ -285,7 +286,8 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan &&
       ]
     },
     {
-      package = ":loopback-socket-benchmarks-starnix-with-netstack3"
+      package = ":loopback-socket-benchmarks-starnix-with-netstack3-pkg"
+      package_name = "loopback-socket-benchmarks-starnix-with-netstack3"
       runs = _starnix_runs
       test_type = "starnix"
       tests = [
@@ -297,7 +299,8 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan &&
       ]
     },
     {
-      package = ":loopback-socket-benchmarks-starnix-with-fake-netstack"
+      package = ":loopback-socket-benchmarks-starnix-with-fake-netstack-pkg"
+      package_name = "loopback-socket-benchmarks-starnix-with-fake-netstack"
       runs = _starnix_runs
       test_type = "starnix"
       tests = [
@@ -325,6 +328,9 @@ foreach(test_config, benchmark_test_configs) {
   foreach(test, test_config.tests) {
     fuchsia_component_perf_test(test.name) {
       package = test_config.package
+      if (defined(test_config.package_name)) {
+        package_name = test_config.package_name
+      }
       component_name = test.component
       expected_metric_names_filepath = test.expected_metric_names_filepath
       test_component_args = [

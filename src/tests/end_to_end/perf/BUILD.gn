@@ -24,6 +24,7 @@ python_perf_test("perftest_trace_events_test") {
     "//src/performance/lib/trace_processing",
     "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
   ]
+  package_deps = [ "//src/tests/microbenchmarks:fuchsia_microbenchmarks" ]
 }
 
 python_perf_test("tracing_microbenchmarks_test") {
@@ -41,8 +42,8 @@ python_perf_test("tracing_microbenchmarks_test") {
     "//src/performance/lib/perf_publish",
     "//src/performance/lib/trace_processing",
   ]
-  target_deps = [
-    "//src/lib/trace/rust/bench",
+  package_deps = [
+    "//src/lib/trace/rust/bench:rust_trace_events_benchmarks",
     "//src/tests/microbenchmarks:fuchsia_microbenchmarks",
   ]
 }

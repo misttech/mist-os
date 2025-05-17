@@ -87,9 +87,9 @@ foreach(test_config, _test_configs) {
     data_package_name = "test_data"
     data_sources = [ "${root_out_dir}/iperf3" ]
 
-    target_deps = [ "//third_party/iperf:iperf3_pkg" ]
+    package_deps = [ "//third_party/iperf:iperf3_pkg" ]
     if (test_config.direction == "loopback") {
-      target_deps += [ "//src/connectivity/network/tests/benchmarks/iperf-hermetic:iperf-benchmark" ]
+      package_deps += [ "//src/connectivity/network/tests/benchmarks/iperf-hermetic:iperf-benchmark" ]
     }
 
     params = test_config
