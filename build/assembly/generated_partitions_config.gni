@@ -206,6 +206,28 @@ template("generated_partitions_config") {
       }
       _partitions += [ _vbmeta_r ]
     }
+    if (defined(invoker.dtbo_a) && invoker.dtbo_a != "") {
+      _dtbo_a = {
+        name = invoker.dtbo_a
+        type = "Dtbo"
+        slot = "A"
+        if (defined(invoker.dtbo_a_size)) {
+          size = invoker.dtbo_a_size
+        }
+      }
+      _partitions += [ _dtbo_a ]
+    }
+    if (defined(invoker.dtbo_b) && invoker.dtbo_b != "") {
+      _dtbo_b = {
+        name = invoker.dtbo_b
+        type = "Dtbo"
+        slot = "B"
+        if (defined(invoker.dtbo_b_size)) {
+          size = invoker.dtbo_b_size
+        }
+      }
+      _partitions += [ _dtbo_b ]
+    }
     if (defined(invoker.fvm) && invoker.fvm != "") {
       _fvm = {
         name = invoker.fvm
