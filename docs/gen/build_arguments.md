@@ -1038,7 +1038,7 @@ This should never be set as a build argument.
 }
   hwasan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.hwasan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.hwasan.a"
@@ -1056,7 +1056,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -1105,7 +1105,7 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.lsan.a"
@@ -1118,7 +1118,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   ubsan = {
@@ -1721,7 +1721,7 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.lsan.a"
@@ -1874,6 +1874,7 @@ The overall compilation mode to use.  The valid values are:
  * `balanced`: some optimizations, but prioritizing compilation speed over
                 runtime performance.
  * `release`: all the optimizations, used for product releases.
+LINT.IfChange
 
 **Current value for `target_cpu = "arm64"`:** `"release"`
 
@@ -1881,7 +1882,7 @@ From //out/not-default/args.gn:5
 
 **Overridden from the default:** `""`
 
-From //build/config/compilation_modes.gni:18
+From //build/config/compilation_modes.gni:19
 
 **Current value for `target_cpu = "riscv64"`:** `"release"`
 
@@ -1889,7 +1890,7 @@ From //out/not-default/args.gn:5
 
 **Overridden from the default:** `""`
 
-From //build/config/compilation_modes.gni:18
+From //build/config/compilation_modes.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"release"`
 
@@ -1897,7 +1898,7 @@ From //out/not-default/args.gn:5
 
 **Overridden from the default:** `""`
 
-From //build/config/compilation_modes.gni:18
+From //build/config/compilation_modes.gni:19
 
 ### compilation_settings_overrides
 
@@ -1919,7 +1920,7 @@ mode (above).
 
 **Current value (from the default):** `{ }`
 
-From //build/config/compilation_modes.gni:35
+From //build/config/compilation_modes.gni:38
 
 ### compress_debuginfo
 
@@ -3348,10 +3349,11 @@ For example, `fx build //sdk:final_fuchsia_idk`.
 To override the set of CPU architectures, see `idk_buildable_cpus`.
 
 Do not use the `platform_version` member directly.
+LINT.IfChange
 
 **Current value (from the default):** `[16, 23, 25, 26, 27, "NEXT"]`
 
-From //build/config/fuchsia/platform_version.gni:43
+From //build/config/fuchsia/platform_version.gni:44
 
 ### idk_buildable_cpus
 
@@ -3365,10 +3367,11 @@ includes the IDK/SDK in exchange for reduced coverage of target CPU
 architecture support. For example, `fx build //sdk:final_fuchsia_idk`.
 
 To override the set of API levels, see `idk_buildable_api_levels`.
+LINT.IfChange
 
 **Current value (from the default):** `["arm64", "riscv64", "x64"]`
 
-From //build/sdk/config.gni:67
+From //build/sdk/config.gni:68
 
 ### include_account_in_fvm
 
@@ -3441,7 +3444,7 @@ Debug build.
 
 **Current value (from the default):** `""`
 
-From //build/config/compilation_modes.gni:55
+From //build/config/compilation_modes.gni:58
 
 ### is_multi_product_build
 
@@ -5440,15 +5443,16 @@ you'll also build SDK host tools for linux arm64.
 
 **Current value (from the default):** `false`
 
-From //sdk/config.gni:13
+From //sdk/config.gni:16
 
 ### sdk_id
 
 Identifier for the Core SDK.
+LINT.IfChange
 
 **Current value (from the default):** `"28.99991231.0.1"`
 
-From //sdk/config.gni:7
+From //sdk/config.gni:8
 
 ### sdk_inside_sub_build
 
@@ -6117,11 +6121,12 @@ From //build/config/BUILDCONFIG.gn:96
 
 Truncate the date in the build_info to midnight UTC, and replace the commit
 hash with one that's synthesized from that date.
-LINT.IfChange
+This is not meant to be used outside this directory. It is only in this .gni
+file so that //build/bazel:gn_build_variables_for_bazel can access it.
 
 **Current value (from the default):** `false`
 
-From //build/info/BUILD.gn:13
+From //build/info/info.gni:23
 
 ### tsan_default_options
 
