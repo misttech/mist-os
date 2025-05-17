@@ -12,19 +12,19 @@ constexpr const char kCompatibleProp[] = "compatible";
 
 bool DriverVisitor::is_match(
     const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties) {
-  auto property = properties.find(kCompatibleProp);
-  if (property == properties.end()) {
+  if (!properties.contains(kCompatibleProp)) {
     return false;
   }
 
-  // Make sure value is a string.
-  if (property->second.AsStringList() == std::nullopt) {
+  const devicetree::PropertyValue& compat_pv = properties.at(kCompatibleProp);
+  std::optional compat_string = compat_pv.AsStringList();
+  if (!compat_string.has_value()) {
     FDF_SLOG(WARNING, "Node has invalid compatible property",
-             KV("prop_len", property->second.AsBytes().size()));
+             KV("prop_len", compat_pv.AsBytes().size()));
     return false;
   }
 
-  return compatible_matcher_(property->second.AsStringList().value());
+  return compatible_matcher_(compat_string.value());
 }
 
 zx::result<> DriverVisitor::Visit(Node& node, const devicetree::PropertyDecoder& decoder) {
