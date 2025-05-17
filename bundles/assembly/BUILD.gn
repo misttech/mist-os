@@ -4945,7 +4945,7 @@ assembly_input_bundle("kernel_serial_legacy") {
 assembly_input_bundle("kernel_anonymous_memory_compression") {
   kernel_cmdline = [
     "kernel.compression.strategy=lz4",
-    "kernel.compression.storage-strategy=tri_page",
+    "kernel.compression.storage-strategy=slot",
     "kernel.compression.reclaim_anonymous=true",
     "kernel.compression.reclaim_zero_forks=true",
     "kernel.compression.at_memory_pressure=true",

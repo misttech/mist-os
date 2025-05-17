@@ -6,7 +6,7 @@
 ?kernel.compression.at_memory_pressure=true
 ?kernel.compression.reclaim_anonymous=true
 ?kernel.compression.reclaim_zero_forks=true
-?kernel.compression.storage-strategy=tri_page
+?kernel.compression.storage-strategy=slot
 ?kernel.compression.strategy=lz4
 ?kernel.cprng-reseed-require.jitterentropy=false
 ?kernel.cprng-reseed-require.jitterentropy=true

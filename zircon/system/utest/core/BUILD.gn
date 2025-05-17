@@ -260,7 +260,7 @@ if (is_fuchsia) {
       "kernel.enable-debugging-syscalls=true",
       "kernel.test.ram.reserve=0x8000",
       "kernel.compression.strategy=lz4",
-      "kernel.compression.storage-strategy=tri_page",
+      "kernel.compression.storage-strategy=slot",
       "kernel.compression.reclaim_anonymous=true",
       "kernel.compression.reclaim_zero_forks=true",
       "kernel.ppb.borrow-in-supplypages=true",
