@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use ffx_e2e_emu::IsolatedEmulator;
+use log::info;
 use std::io::Write;
 use std::path::PathBuf;
 use tempfile::NamedTempFile;
-use tracing::info;
 
 #[fuchsia::test(logging_minimum_severity = "TRACE")]
 async fn profiler_symbolize_data() {
@@ -48,6 +48,7 @@ async fn profiler_symbolize_data() {
         "function: \"print_symbolize_data_bin::get_function_addr::to_be_symbolized_5()\","
     ));
     assert!(read_data_string.contains("zx_channel_create\","));
+    emu.stop().await;
 }
 
 async fn run_print_symbolize_data(emu: &IsolatedEmulator) -> String {
