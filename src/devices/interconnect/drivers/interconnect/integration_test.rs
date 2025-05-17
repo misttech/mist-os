@@ -29,9 +29,9 @@ async fn test_interconnect_driver() -> Result<()> {
     let (node_iter, node_iter_server) = create_endpoints();
     manager.get_node_info(
         &[
-            "dev.fake_interconnect.path_a".to_owned(),
-            "dev.fake_interconnect.path_b".to_owned(),
-            "dev.fake_interconnect.path_c".to_owned(),
+            "dev.fake_interconnect.path_a-0".to_owned(),
+            "dev.fake_interconnect.path_b-1".to_owned(),
+            "dev.fake_interconnect.path_c-2".to_owned(),
         ],
         node_iter_server,
         true,

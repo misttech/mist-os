@@ -127,22 +127,23 @@ impl Driver for InterconnectDriver {
         let graph = Arc::new(Mutex::new(graph));
         let mut children = BTreeMap::new();
         for path in paths {
-            let name = path.name().to_string();
+            let name = format!("{}-{}", path.name(), path.id());
+            let name_clone = name.clone();
             let offer = ZirconServiceOffer::new()
-                .add_default_named(&mut outgoing, path.name(), move |req| {
+                .add_default_named(&mut outgoing, &name, move |req| {
                     let icc::PathServiceRequest::Path(service) = req;
-                    (service, name.clone())
+                    (service, name_clone.clone())
                 })
                 .build();
 
-            let node_args = NodeBuilder::new(path.name())
+            let node_args = NodeBuilder::new(&name)
                 .add_property(bind_fuchsia::BIND_INTERCONNECT_PATH_ID, path.id().0)
                 .add_offer(offer)
                 .build();
             let controller = node.add_child(node_args).await?;
             let graph = graph.clone();
             let device = device.clone();
-            children.insert(path.name().to_string(), Child { path, graph, controller, device });
+            children.insert(name.clone(), Child { path, graph, controller, device });
         }
         // TODO(b/405206028): Initialize all nodes to initial bus bandwidths.
 
