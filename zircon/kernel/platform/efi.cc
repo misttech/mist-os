@@ -201,16 +201,19 @@ zx_status_t InitEfiServices(uint64_t efi_system_table) {
         if (!(desc->Attribute & EFI_MEMORY_RUNTIME)) {
           return ZX_OK;
         }
-        uint arch_mmu_flags = ARCH_MMU_FLAG_PERM_RWX_MASK;
+
         // UEFI v2.9, section 4.6, "EFI_MEMORY_ATTRIBUTES_TABLE" says that only RUNTIME, RO and XP
         // are allowed to be set.
-        if (desc->Attribute & EFI_MEMORY_RO) {
-          arch_mmu_flags &= ~ARCH_MMU_FLAG_PERM_WRITE;
+        //
+        // We assume double-negatives apply sensibly: "not read-only" implies
+        // writable and "not execute-protected" implies executable.
+        uint arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ;
+        if ((desc->Attribute & EFI_MEMORY_RO) == 0) {
+          arch_mmu_flags |= ARCH_MMU_FLAG_PERM_WRITE;
         }
-        if (desc->Attribute & EFI_MEMORY_XP) {
-          arch_mmu_flags &= ~ARCH_MMU_FLAG_PERM_EXECUTE;
+        if ((desc->Attribute & EFI_MEMORY_XP) == 0) {
+          arch_mmu_flags |= ARCH_MMU_FLAG_PERM_EXECUTE;
         }
-
         if (desc->Type == EfiMemoryMappedIO) {
           arch_mmu_flags |= ARCH_MMU_FLAG_UNCACHED_DEVICE;
         }
