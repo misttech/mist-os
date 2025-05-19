@@ -6,7 +6,7 @@
 
 use crate::execution_scope::ExecutionScope;
 use crate::node::Node;
-use crate::object_request::ObjectRequestRef;
+use crate::object_request::{ObjectRequestRef, ToObjectRequest as _};
 use crate::protocols::ProtocolsExt;
 use fidl_fuchsia_io as fio;
 use std::future::{ready, Future};
@@ -329,4 +329,12 @@ pub fn serve(
     } else {
         file.open(scope, protocols.to_file_options()?, object_request)
     }
+}
+
+/// Serve the provided file object on a new execution scope with `flags`.
+pub fn serve_proxy(file: Arc<impl FileLike>, flags: fio::Flags) -> fio::FileProxy {
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>();
+    let request = flags.to_object_request(server);
+    request.handle(|request| serve(file, ExecutionScope::new(), &flags, request));
+    proxy
 }

@@ -3,18 +3,12 @@
 // found in the LICENSE file.
 
 use super::SimpleFile;
-use crate::execution_scope::ExecutionScope;
-use crate::file::test_utils::*;
 use crate::{
-    assert_close, assert_event, assert_get_attr, assert_read, assert_read_at,
-    assert_read_fidl_err_closed, assert_seek, assert_truncate_err, assert_write_err,
-    assert_write_fidl_err_closed, clone_as_file_assert_err, clone_get_proxy_assert,
-    ToObjectRequest,
+    assert_close, assert_get_attr, assert_read, assert_read_at, assert_seek, assert_truncate_err,
+    assert_write_err, file,
 };
 use assert_matches::assert_matches;
-use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
-use fuchsia_async::TestExecutor;
 use futures::StreamExt;
 use zx_status::Status;
 
@@ -45,298 +39,163 @@ fn read_only_types() {
     SimpleFile::read_only(&runtime_bytes);
 }
 
-#[test]
-fn read_only_read_static() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(b"Read only test"),
-        |proxy| async move {
-            assert_read!(proxy, "Read only test");
-            assert_close!(proxy);
-        },
-    );
+#[fuchsia::test]
+async fn read_only_read() {
+    let file = SimpleFile::read_only(b"Read only test");
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE);
+    assert_read!(proxy, "Read only test");
+    assert_close!(proxy);
 }
 
-#[test]
-fn read_only_read_owned() {
+#[fuchsia::test]
+async fn read_only_read_owned() {
     let bytes = String::from("Run-time value");
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(bytes),
-        |proxy| async move {
-            assert_read!(proxy, "Run-time value");
-            assert_close!(proxy);
-        },
+    let file = SimpleFile::read_only(bytes);
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE);
+    assert_read!(proxy, "Run-time value");
+    assert_close!(proxy);
+}
+
+#[fuchsia::test]
+async fn read_only_ignore_inherit_flag() {
+    let file = SimpleFile::read_only(b"Content");
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE | fio::Flags::PERM_INHERIT_WRITE);
+    assert_read!(proxy, "Content");
+    assert_write_err!(proxy, "Can write", Status::BAD_HANDLE);
+    assert_close!(proxy);
+}
+
+#[fuchsia::test]
+async fn read_only_read_with_describe() {
+    let file = SimpleFile::read_only(b"Read only test");
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION);
+    assert_matches!(
+        proxy.take_event_stream().next().await,
+        Some(Ok(fio::FileEvent::OnRepresentation { .. }))
     );
 }
 
-#[test]
-fn read_only_read() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(b"Read only test"),
-        |proxy| async move {
-            assert_read!(proxy, "Read only test");
-            assert_close!(proxy);
-        },
+#[fuchsia::test]
+async fn read_only_write_is_not_supported() {
+    let file = SimpleFile::read_only(b"Read only test");
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE | fio::PERM_WRITABLE);
+    assert_matches!(
+        proxy.take_event_stream().next().await,
+        Some(Err(fidl::Error::ClientChannelClosed { status: Status::ACCESS_DENIED, .. }))
     );
 }
 
-#[test]
-fn read_only_ignore_posix_flag() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE,
-        SimpleFile::read_only(b"Content"),
-        |proxy| async move {
-            assert_read!(proxy, "Content");
-            assert_write_err!(proxy, "Can write", Status::BAD_HANDLE);
-            assert_close!(proxy);
-        },
+#[fuchsia::test]
+async fn read_at_0() {
+    let file = SimpleFile::read_only(b"Whole file content");
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE);
+    assert_read_at!(proxy, 0, "Whole file content");
+    assert_close!(proxy);
+}
+
+#[fuchsia::test]
+async fn read_at_overlapping() {
+    let file = SimpleFile::read_only(b"Content of the file");
+    //                                 0         1
+    //                                 0123456789012345678
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE);
+    assert_read_at!(proxy, 3, "tent of the");
+    assert_read_at!(proxy, 11, "the file");
+    assert_close!(proxy);
+}
+
+#[fuchsia::test]
+async fn read_mixed_with_read_at() {
+    let file = SimpleFile::read_only(b"Content of the file");
+    //                                 0         1
+    //                                 0123456789012345678
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE);
+    assert_read!(proxy, "Content");
+    assert_read_at!(proxy, 3, "tent of the");
+    assert_read!(proxy, " of the ");
+    assert_read_at!(proxy, 11, "the file");
+    assert_read!(proxy, "file");
+    assert_close!(proxy);
+}
+
+#[fuchsia::test]
+async fn seek_valid_positions() {
+    let file = SimpleFile::read_only(b"Long file content");
+    //                     0         1
+    //                     01234567890123456
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE);
+    assert_seek!(proxy, 5, Start);
+    assert_read!(proxy, "file");
+    assert_seek!(proxy, 1, Current, Ok(10));
+    assert_read!(proxy, "content");
+    assert_seek!(proxy, -12, End, Ok(5));
+    assert_read!(proxy, "file content");
+    assert_close!(proxy);
+}
+#[fuchsia::test]
+async fn seek_valid_beyond_size() {
+    let file = SimpleFile::read_only(b"Content");
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE);
+    assert_seek!(proxy, 20, Start);
+    assert_close!(proxy);
+}
+
+#[fuchsia::test]
+async fn seek_triggers_overflow() {
+    let file = SimpleFile::read_only(b"File size and contents don't matter for this test");
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE);
+    assert_seek!(proxy, i64::MAX, Start);
+    assert_seek!(proxy, i64::MAX, Current, Ok(u64::MAX - 1));
+    assert_seek!(proxy, 2, Current, Err(Status::OUT_OF_RANGE));
+    assert_close!(proxy);
+}
+
+#[fuchsia::test]
+async fn seek_invalid_before_0() {
+    let file = SimpleFile::read_only(b"Seek position is unaffected");
+    //                     0        1         2
+    //                     12345678901234567890123456
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE);
+    assert_seek!(proxy, -10, Current, Err(Status::OUT_OF_RANGE));
+    assert_read!(proxy, "Seek");
+    assert_seek!(proxy, -10, Current, Err(Status::OUT_OF_RANGE));
+    assert_read!(proxy, " position");
+    assert_seek!(proxy, -100, End, Err(Status::OUT_OF_RANGE));
+    assert_read!(proxy, " is unaffected");
+    assert_close!(proxy);
+}
+
+#[fuchsia::test]
+async fn seek_empty_file() {
+    let file = SimpleFile::read_only(b"");
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE);
+    assert_seek!(proxy, 0, Start);
+    assert_close!(proxy);
+}
+
+#[fuchsia::test]
+async fn truncate_read_only_file_fails() {
+    let file = SimpleFile::read_only(b"Read-only content");
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE);
+    assert_truncate_err!(proxy, 10, Status::BAD_HANDLE);
+    assert_close!(proxy);
+}
+
+#[fuchsia::test]
+async fn get_attr_read_only() {
+    let file = SimpleFile::read_only(b"Content");
+    let proxy = file::serve_proxy(file, fio::PERM_READABLE);
+    assert_get_attr!(
+        proxy,
+        fio::NodeAttributes {
+            mode: fio::MODE_TYPE_FILE | S_IRUSR,
+            id: fio::INO_UNKNOWN,
+            content_size: 7,
+            storage_size: 7,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        }
     );
-}
-
-#[test]
-fn read_only_read_with_describe() {
-    let exec = TestExecutor::new();
-    let scope = ExecutionScope::new();
-
-    let server = SimpleFile::read_only(b"Read only test");
-
-    run_client(exec, || async move {
-        let (proxy, server_end) = create_proxy::<fio::FileMarker>();
-
-        let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
-        flags
-            .to_object_request(server_end)
-            .handle(|object_request| vfs::file::serve(server, scope, &flags, object_request));
-
-        assert_event!(proxy, fio::FileEvent::OnOpen_ { s, info }, {
-            assert_eq!(s, zx_status::Status::OK.into_raw());
-            let info = *info.expect("Empty fio::NodeInfoDeprecated");
-            assert!(matches!(
-                info,
-                fio::NodeInfoDeprecated::File(fio::FileObject { event: None, stream: None }),
-            ));
-        });
-    });
-}
-
-#[test]
-fn read_only_write_is_not_supported() {
-    let exec = TestExecutor::new();
-    let scope = ExecutionScope::new();
-
-    let server = SimpleFile::read_only(b"Read only test");
-
-    run_client(exec, || async move {
-        let (proxy, server_end) = create_proxy::<fio::FileMarker>();
-
-        let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-        flags
-            .to_object_request(server_end)
-            .handle(|object_request| vfs::file::serve(server, scope, &flags, object_request));
-
-        let mut event_stream = proxy.take_event_stream();
-        assert_matches!(
-            event_stream.next().await,
-            Some(Err(fidl::Error::ClientChannelClosed { status: Status::ACCESS_DENIED, .. }))
-        );
-    });
-}
-
-#[test]
-fn read_at_0() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(b"Whole file content"),
-        |proxy| async move {
-            assert_read_at!(proxy, 0, "Whole file content");
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn read_at_overlapping() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(b"Content of the file"),
-        //                 0         1
-        //                 0123456789012345678
-        |proxy| async move {
-            assert_read_at!(proxy, 3, "tent of the");
-            assert_read_at!(proxy, 11, "the file");
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn read_mixed_with_read_at() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(b"Content of the file"),
-        //                 0         1
-        //                 0123456789012345678
-        |proxy| async move {
-            assert_read!(proxy, "Content");
-            assert_read_at!(proxy, 3, "tent of the");
-            assert_read!(proxy, " of the ");
-            assert_read_at!(proxy, 11, "the file");
-            assert_read!(proxy, "file");
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn seek_valid_positions() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(b"Long file content"),
-        //                 0         1
-        //                 01234567890123456
-        |proxy| async move {
-            assert_seek!(proxy, 5, Start);
-            assert_read!(proxy, "file");
-            assert_seek!(proxy, 1, Current, Ok(10));
-            assert_read!(proxy, "content");
-            assert_seek!(proxy, -12, End, Ok(5));
-            assert_read!(proxy, "file content");
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn seek_valid_beyond_size() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(b"Content"),
-        |proxy| async move {
-            assert_seek!(proxy, 20, Start);
-        },
-    );
-}
-
-#[test]
-fn seek_triggers_overflow() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(b"File size and contents don't matter for this test"),
-        |proxy| async move {
-            assert_seek!(proxy, i64::MAX, Start);
-            assert_seek!(proxy, i64::MAX, Current, Ok(u64::MAX - 1));
-            assert_seek!(proxy, 2, Current, Err(Status::OUT_OF_RANGE));
-        },
-    );
-}
-
-#[test]
-fn seek_invalid_before_0() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(
-            b"Seek position is unaffected",
-            // 0        1         2
-            // 12345678901234567890123456
-        ),
-        |proxy| async move {
-            assert_seek!(proxy, -10, Current, Err(Status::OUT_OF_RANGE));
-            assert_read!(proxy, "Seek");
-            assert_seek!(proxy, -10, Current, Err(Status::OUT_OF_RANGE));
-            assert_read!(proxy, " position");
-            assert_seek!(proxy, -100, End, Err(Status::OUT_OF_RANGE));
-            assert_read!(proxy, " is unaffected");
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn seek_empty_file() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(b""),
-        |proxy| async move {
-            assert_seek!(proxy, 0, Start);
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn seek_allowed_beyond_size() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(
-            b"Long content",
-            // 0        1
-            // 12345678901
-        ),
-        |proxy| async move {
-            assert_seek!(proxy, 100, Start);
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn truncate_read_only_file() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(b"Read-only content"),
-        |proxy| async move {
-            assert_truncate_err!(proxy, 10, Status::BAD_HANDLE);
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn get_attr_read_only() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(b"Content"),
-        |proxy| async move {
-            assert_get_attr!(
-                proxy,
-                fio::NodeAttributes {
-                    mode: fio::MODE_TYPE_FILE | S_IRUSR,
-                    id: fio::INO_UNKNOWN,
-                    content_size: 7,
-                    storage_size: 7,
-                    link_count: 1,
-                    creation_time: 0,
-                    modification_time: 0,
-                }
-            );
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn clone_cannot_increase_access() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_only(b"Initial content"),
-        |first_proxy| async move {
-            assert_read!(first_proxy, "Initial content");
-            assert_write_err!(first_proxy, "Write attempt", Status::BAD_HANDLE);
-
-            let second_proxy = clone_as_file_assert_err!(
-                &first_proxy,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DESCRIBE,
-                Status::ACCESS_DENIED
-            );
-
-            assert_read_fidl_err_closed!(second_proxy);
-            assert_write_fidl_err_closed!(second_proxy, "Write attempt");
-
-            assert_close!(first_proxy);
-        },
-    );
+    assert_close!(proxy);
 }

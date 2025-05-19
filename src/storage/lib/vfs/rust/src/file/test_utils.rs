@@ -12,8 +12,6 @@ use futures::Future;
 use std::sync::Arc;
 
 #[cfg(target_os = "fuchsia")]
-use crate::test_utils::run::AsyncServerClientTestParams;
-#[cfg(target_os = "fuchsia")]
 use zx_status::Status;
 
 pub use run::run_client;
@@ -29,21 +27,6 @@ pub fn run_server_client<GetClientRes>(
     GetClientRes: Future<Output = ()>,
 {
     run::run_server_client::<fio::FileMarker, _, _>(flags, server, get_client)
-}
-
-/// A thin wrapper around [`run::test_server_client()`] that sets the `Marker` to be
-/// [`FileMarker`], and providing explicit type for the `get_client` closure argument.  This makes
-/// it possible for the caller not to provide explicit types.
-#[cfg(target_os = "fuchsia")]
-pub fn test_server_client<'test_refs, GetClientRes>(
-    flags: fio::OpenFlags,
-    server: Arc<dyn DirectoryEntry>,
-    get_client: impl FnOnce(fio::FileProxy) -> GetClientRes + 'test_refs,
-) -> AsyncServerClientTestParams<'test_refs, fio::FileMarker>
-where
-    GetClientRes: Future<Output = ()> + 'test_refs,
-{
-    run::test_server_client::<fio::FileMarker, _, _>(flags, server, get_client)
 }
 
 /// Possible errors for the [`assert_vmo_content()`] function.

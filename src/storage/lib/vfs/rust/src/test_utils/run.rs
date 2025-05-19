@@ -78,30 +78,6 @@ impl<'test_refs> TestController<'test_refs> {
     fn new(exec: TestExecutor, client: Pin<Box<dyn Future<Output = ()> + 'test_refs>>) -> Self {
         Self { exec, client }
     }
-
-    /// Runs the client test code until it is stalled.  Will panic if the test code runs to
-    /// completion.
-    #[cfg(target_os = "fuchsia")]
-    pub fn run_until_stalled(&mut self) {
-        // TODO: How to limit the execution time?  run_until_stalled() does not trigger timers, so
-        // I can not do this:
-        //
-        //   let timeout = zx::MonotonicDuration::from_millis(300);
-        //   let client = self.client.on_timeout(
-        //       timeout.after_now(),
-        //       || panic!("Test did not finish in {}ms", timeout.millis()));
-
-        let res = self.exec.run_until_stalled(&mut self.client);
-        assert_eq!(res, Poll::Pending, "Test was not expected to complete");
-    }
-
-    /// Runs the client test code to completion.  As this will consume the controller, this method
-    /// can only be called last.  Note that the controller will effectively run this methods for
-    /// you when it is dropped, if you do not do it explicitly.
-    #[cfg(target_os = "fuchsia")]
-    pub fn run_until_complete(self) {
-        // [`Drop::drop`] will actually do the final execution, when `self` is dropped.
-    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -198,16 +174,6 @@ impl<'test_refs, Marker> AsyncServerClientTestParams<'test_refs, Marker>
 where
     Marker: ProtocolMarker,
 {
-    #[cfg(target_os = "fuchsia")]
-    pub fn coordinator(
-        mut self,
-        get_coordinator: impl FnOnce(TestController<'_>) + 'test_refs,
-    ) -> Self {
-        assert!(self.coordinator.is_none(), "`coordinator` is already set");
-        self.coordinator = Some(Box::new(get_coordinator));
-        self
-    }
-
     /// Runs the test based on the parameters specified in the [`test_server_client`] and other
     /// method calls.
     pub fn run(self) {
