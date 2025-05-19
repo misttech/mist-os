@@ -108,7 +108,7 @@ impl PeerTask {
                         .ok_or_else(|| format_err!("FIDL Peer protocol request stream closed for peer {}", self.peer_id))?;
                     let peer_handler_request = peer_handler_request_result?;
 
-                    self.handle_peer_handler_request(peer_handler_request)?;
+                    self.handle_peer_handler_request(peer_handler_request);
                 }
                 at_response_result_option = self.at_connection.next() => {
                 // TODO(https://fxbug.dev/127362) Filter unsolicited AT messages.
@@ -181,10 +181,7 @@ impl PeerTask {
         }
     }
 
-    fn handle_peer_handler_request(
-        &mut self,
-        peer_handler_request: fidl_hfp::PeerHandlerRequest,
-    ) -> Result<()> {
+    fn handle_peer_handler_request(&mut self, peer_handler_request: fidl_hfp::PeerHandlerRequest) {
         // TODO(b/321278917) Refactor this method to be testable. Maybe move it to calls.rs
         // TODO(fxbug.dev/136796) asynchronously respond to requests when a procedure completes.
         let (command_from_hf, responder) = match peer_handler_request {
@@ -221,10 +218,18 @@ impl PeerTask {
                 );
                 (CommandFromHf::CallActionRedialLast, responder)
             }
-            _ => {
-                return Err(format_err!(
-                    "Unimplemented peer handle request {peer_handler_request:?}"
-                ))
+            fidl_hfp::PeerHandlerRequest::WatchNextCall { responder } => {
+                self.calls.handle_watch_next_call(responder);
+                // TODO(b/321278917) Clean up this control flow.
+                return;
+            }
+            other => {
+                error!(
+                    "Unimplemented PeerHandler FIDL request {:?} for peer {:}",
+                    other, self.peer_id
+                );
+                // TODO(b/321278917) Clean up this control flow.
+                return;
             }
         };
 
@@ -236,8 +241,6 @@ impl PeerTask {
         }
 
         self.procedure_manager.enqueue(ProcedureInput::CommandFromHf(command_from_hf));
-
-        Ok(())
     }
 
     fn handle_at_response(&mut self, at_response: AtResponse) {
