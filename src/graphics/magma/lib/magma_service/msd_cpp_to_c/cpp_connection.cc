@@ -39,4 +39,12 @@ std::unique_ptr<msd::Context> CppConnection::CreateContext() {
   return std::make_unique<CppContext>(msd_context);
 }
 
+std::unique_ptr<msd::Context> CppConnection::CreateContext2(uint64_t priority) {
+  struct MsdContext* msd_context = msd_connection_create_context2(connection_, priority);
+  if (!msd_context)
+    return MAGMA_DRETP(nullptr, "msd_connection_create_context2 failed");
+
+  return std::make_unique<CppContext>(msd_context);
+}
+
 }  // namespace msd

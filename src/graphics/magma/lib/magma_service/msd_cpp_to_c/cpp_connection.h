@@ -21,6 +21,7 @@ class CppConnection : public msd::Connection {
   void ReleaseBuffer(msd::Buffer& buffer, bool shutting_down) override;
 
   std::unique_ptr<msd::Context> CreateContext() override;
+  std::unique_ptr<msd::Context> CreateContext2(uint64_t priority) override;
 
  private:
   struct MsdConnection* connection_;
