@@ -44,9 +44,25 @@ pub unsafe trait FifoReadBuffer<T> {
     fn as_mut_ptr(&mut self) -> *mut T;
 }
 
+impl<T: FifoEntry, const N: usize> FifoWriteBuffer<T> for [T; N] {
+    fn as_slice(&self) -> &[T] {
+        self
+    }
+}
+
 impl<T: FifoEntry> FifoWriteBuffer<T> for [T] {
     fn as_slice(&self) -> &[T] {
         self
+    }
+}
+
+unsafe impl<T: FifoEntry, const N: usize> FifoReadBuffer<T> for [T; N] {
+    fn count(&self) -> usize {
+        N
+    }
+
+    fn as_mut_ptr(&mut self) -> *mut T {
+        self.as_mut_slice().as_mut_ptr()
     }
 }
 

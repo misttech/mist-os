@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 
+#include <array>
 #include <span>
 #include <unordered_set>
 
@@ -57,29 +58,33 @@ class TestInterface : public Interface {
   }
 
   void OnRequests(std::span<Request> requests) override {
-    for (const Request& request : requests) {
-      switch (request.operation.tag) {
-        case Operation::Tag::Read:
-          EXPECT_EQ(
-              request.vmo->write(&data_[request.operation.read.device_block_offset * kBlockSize],
-                                 request.operation.read.vmo_offset,
-                                 request.operation.read.block_count * kBlockSize),
-              ZX_OK);
-          break;
+    // Process the requests on a different thread to make sure we support that.
+    std::vector<Request> reqs(requests.begin(), requests.end());
+    std::thread([this, requests = std::move(reqs)] {
+      for (const Request& request : requests) {
+        switch (request.operation.tag) {
+          case Operation::Tag::Read:
+            EXPECT_EQ(
+                request.vmo->write(&data_[request.operation.read.device_block_offset * kBlockSize],
+                                   request.operation.read.vmo_offset,
+                                   request.operation.read.block_count * kBlockSize),
+                ZX_OK);
+            break;
 
-        case Operation::Tag::Write:
-          EXPECT_EQ(
-              request.vmo->read(&data_[request.operation.write.device_block_offset * kBlockSize],
-                                request.operation.write.vmo_offset,
-                                request.operation.write.block_count * kBlockSize),
-              ZX_OK);
-          break;
+          case Operation::Tag::Write:
+            EXPECT_EQ(
+                request.vmo->read(&data_[request.operation.write.device_block_offset * kBlockSize],
+                                  request.operation.write.vmo_offset,
+                                  request.operation.write.block_count * kBlockSize),
+                ZX_OK);
+            break;
 
-        default:
-          ZX_PANIC("Unexpected operation");
+          default:
+            ZX_PANIC("Unexpected operation");
+        }
+        server_->SendReply(request.request_id, zx::ok());
       }
-      server_->SendReply(request.request_id, zx::ok());
-    }
+    }).detach();
   }
 
  private:

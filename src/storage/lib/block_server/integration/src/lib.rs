@@ -8,6 +8,7 @@ use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
 use std::num::NonZero;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use test_case::test_case;
 use zx::HandleBased as _;
 use {fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync};
 
@@ -166,8 +167,6 @@ async fn test_request_splitting_client_fn(
     reader.read_entries(&mut response).await.unwrap();
     assert_eq!(response.status, zx::sys::ZX_OK);
     assert_eq!(response.group, 1);
-
-    std::mem::drop(proxy);
 }
 
 #[fuchsia::test]
@@ -217,6 +216,111 @@ async fn test_request_splitting_cpp_server() {
     ramdisk.connect(server.into_channel().into()).expect("Failed to connect to ramdisk");
 
     test_request_splitting_client_fn(proxy, None).await;
+
+    ramdisk.destroy_and_wait_for_removal().await.unwrap();
+}
+
+enum Ramdisk {
+    V1,
+    V2,
+}
+
+#[test_case(Ramdisk::V1; "v1")]
+#[test_case(Ramdisk::V2; "v2")]
+#[fuchsia::test]
+async fn test_group_with_close(version: Ramdisk) {
+    let (proxy, server) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
+
+    let builder = ramdevice_client::RamdiskClientBuilder::new(BLOCK_SIZE as u64, NUM_BLOCKS);
+    let ramdisk = match version {
+        Ramdisk::V1 => builder,
+        Ramdisk::V2 => builder.use_v2(),
+    }
+    .build()
+    .await
+    .expect("Failed to create ramdisk");
+    ramdisk.connect(server.into_channel().into()).expect("Failed to connect to ramdisk");
+
+    let (session_proxy, server) = fidl::endpoints::create_proxy();
+
+    proxy.open_session(server).unwrap();
+
+    let vmo1 = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
+    let vmo_id1 = session_proxy
+        .attach_vmo(vmo1.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+
+    let vmo2 = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
+    let vmo_id2 = session_proxy
+        .attach_vmo(vmo2.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+
+    let mut fifo = fasync::Fifo::<_, BlockFifoRequest>::from_fifo(
+        session_proxy.get_fifo().await.unwrap().unwrap(),
+    );
+    let (mut reader, mut writer) = fifo.async_io();
+
+    writer
+        .write_entries(&[
+            BlockFifoRequest {
+                command: BlockFifoCommand {
+                    opcode: BlockOpcode::Read.into_primitive(),
+                    flags: BlockIoFlag::GROUP_ITEM.bits(),
+                    ..Default::default()
+                },
+                group: 7,
+                vmoid: vmo_id1.id,
+                length: 1,
+                ..Default::default()
+            },
+            BlockFifoRequest {
+                command: BlockFifoCommand {
+                    opcode: BlockOpcode::Read.into_primitive(),
+                    flags: (BlockIoFlag::GROUP_ITEM | BlockIoFlag::GROUP_LAST).bits(),
+                    ..Default::default()
+                },
+                group: 7,
+                reqid: 10,
+                vmoid: vmo_id2.id,
+                length: 1,
+                ..Default::default()
+            },
+            BlockFifoRequest {
+                command: BlockFifoCommand {
+                    opcode: BlockOpcode::CloseVmo.into_primitive(),
+                    ..Default::default()
+                },
+                reqid: 11,
+                vmoid: vmo_id1.id,
+                ..Default::default()
+            },
+            BlockFifoRequest {
+                command: BlockFifoCommand {
+                    opcode: BlockOpcode::CloseVmo.into_primitive(),
+                    ..Default::default()
+                },
+                reqid: 12,
+                vmoid: vmo_id2.id,
+                ..Default::default()
+            },
+        ])
+        .await
+        .unwrap();
+
+    let mut responses = 0;
+    for _ in 0..3 {
+        let mut response = BlockFifoResponse::default();
+        reader.read_entries(&mut response).await.unwrap();
+        assert_eq!(response.status, zx::sys::ZX_OK);
+        assert!(response.reqid >= 10 && response.reqid < 13);
+        let bit = 1 << (response.reqid - 10);
+        assert_eq!(responses & bit, 0);
+        responses |= bit;
+    }
 
     ramdisk.destroy_and_wait_for_removal().await.unwrap();
 }

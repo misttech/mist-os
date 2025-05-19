@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use super::{
-    DecodeResult, IntoSessionManager, OffsetMap, Operation, RequestTracking, SessionHelper,
+    ActiveRequests, DecodedRequest, IntoSessionManager, OffsetMap, Operation, RequestId,
+    SessionHelper, TraceFlowId,
 };
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
@@ -13,7 +14,6 @@ use fuchsia_async::{self as fasync, EHandle};
 use fuchsia_sync::{Condvar, Mutex};
 use futures::stream::{AbortHandle, Abortable};
 use futures::TryStreamExt;
-use slab::Slab;
 use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 use std::ffi::{c_char, c_void, CStr};
@@ -23,19 +23,10 @@ use std::sync::{Arc, Weak};
 use zx::{self as zx, AsHandleRef as _};
 use {fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume};
 
-/// We internally keep track of active requests, so that when the server is torn down, we can
-/// deallocate all of the resources for pending requests.
-struct ActiveRequest {
-    session: Arc<Session>,
-    request_tracking: RequestTracking,
-    // Retain a stronng reference to the VMO the request targets while it is active.
-    _vmo: Option<Arc<zx::Vmo>>,
-}
-
 pub struct SessionManager {
     callbacks: Callbacks,
     open_sessions: Mutex<HashMap<usize, Weak<Session>>>,
-    active_requests: Mutex<Slab<ActiveRequest>>,
+    active_requests: ActiveRequests<Arc<Session>>,
     condvar: Condvar,
     mbox: ExecutorMailbox,
     info: super::DeviceInfo,
@@ -45,34 +36,12 @@ unsafe impl Send for SessionManager {}
 unsafe impl Sync for SessionManager {}
 
 impl SessionManager {
-    fn start_request(
-        &self,
-        session: Arc<Session>,
-        request_tracking: RequestTracking,
-        operation: Operation,
-        vmo: Option<Arc<zx::Vmo>>,
-    ) -> Request {
-        let mut active_requests = self.active_requests.lock();
-        let vacant = active_requests.vacant_entry();
-        let request = Request {
-            request_id: RequestId(vacant.key()),
-            operation,
-            trace_flow_id: request_tracking.trace_flow_id,
-            vmo: UnownedVmo(
-                vmo.as_ref().map(|vmo| vmo.raw_handle()).unwrap_or(zx::sys::ZX_HANDLE_INVALID),
-            ),
-        };
-        vacant.insert(ActiveRequest { session, request_tracking, _vmo: vmo });
-        request
-    }
-
     fn complete_request(&self, request_id: RequestId, status: zx::Status) {
-        let request = self
-            .active_requests
-            .lock()
-            .try_remove(request_id.0)
-            .unwrap_or_else(|| panic!("Invalid request id {}", request_id.0));
-        request.session.send_reply(request.request_tracking, status);
+        if let Some((session, response)) =
+            self.active_requests.complete_and_take_response(request_id, status)
+        {
+            session.send_response(response);
+        }
     }
 
     fn terminate(&self) {
@@ -94,6 +63,8 @@ impl SessionManager {
 }
 
 impl super::SessionManager for SessionManager {
+    type Session = Arc<Session>;
+
     async fn on_attach_vmo(self: Arc<Self>, _vmo: &Arc<zx::Vmo>) -> Result<(), zx::Status> {
         Ok(())
     }
@@ -138,6 +109,10 @@ impl super::SessionManager for SessionManager {
     async fn get_info(&self) -> Result<Cow<'_, super::DeviceInfo>, zx::Status> {
         Ok(Cow::Borrowed(&self.info))
     }
+
+    fn active_requests(&self) -> &ActiveRequests<Arc<Session>> {
+        &self.active_requests
+    }
 }
 
 impl Drop for SessionManager {
@@ -179,15 +154,11 @@ impl Callbacks {
 #[allow(dead_code)]
 pub struct UnownedVmo(zx::sys::zx_handle_t);
 
-#[repr(transparent)]
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
-pub struct RequestId(usize);
-
 #[repr(C)]
 pub struct Request {
     pub request_id: RequestId,
     pub operation: Operation,
-    pub trace_flow_id: Option<NonZero<u64>>,
+    pub trace_flow_id: TraceFlowId,
     pub vmo: UnownedVmo,
 }
 
@@ -210,12 +181,13 @@ struct SessionQueue {
 pub const MAX_REQUESTS: usize = super::FIFO_MAX_REQUESTS;
 
 impl Session {
-    fn run(&self) {
+    fn run(self: &Arc<Self>) {
         self.fifo_loop();
         self.abort_handle.abort();
+        self.helper.drop_active_requests(|s| Arc::ptr_eq(s, self));
     }
 
-    fn fifo_loop(&self) {
+    fn fifo_loop(self: &Arc<Self>) {
         let mut requests = [MaybeUninit::uninit(); MAX_REQUESTS];
 
         loop {
@@ -266,65 +238,63 @@ impl Session {
         }
     }
 
-    fn handle_requests<'a>(&self, requests: impl Iterator<Item = &'a mut BlockFifoRequest>) {
+    fn handle_requests<'a>(
+        self: &Arc<Self>,
+        requests: impl Iterator<Item = &'a mut BlockFifoRequest>,
+    ) {
         let mut c_requests: [MaybeUninit<Request>; MAX_REQUESTS] =
             unsafe { MaybeUninit::uninit().assume_init() };
         let mut count = 0;
-        let this = self
-            .manager
-            .open_sessions
-            .lock()
-            .get(&(self as *const _ as usize))
-            .and_then(Weak::upgrade)
-            .unwrap();
         for request in requests {
-            let mut in_split = false;
-            loop {
-                if count >= MAX_REQUESTS {
-                    unsafe {
-                        (self.manager.callbacks.on_requests)(
-                            self.manager.callbacks.context,
-                            c_requests[0].as_mut_ptr(),
-                            count,
-                        );
-                    }
-                    count = 0;
+            match self.helper.decode_fifo_request(self.clone(), request) {
+                Ok(DecodedRequest { operation: Operation::CloseVmo, request_id, .. }) => {
+                    self.complete_request(request_id, zx::Status::OK);
                 }
-                match self.helper.decode_fifo_request(request, in_split) {
-                    DecodeResult::Ok(decoded_request) => {
-                        if let Operation::CloseVmo = decoded_request.operation {
-                            self.send_reply(decoded_request.request_tracking, zx::Status::OK);
+                Ok(mut request) => loop {
+                    match self.helper.map_request(request) {
+                        Ok((
+                            DecodedRequest { request_id, operation, trace_flow_id, vmo },
+                            remainder,
+                        )) => {
+                            // We are handing out unowned references to the VMO here.  This is safe
+                            // because the VMO bin holds references to any closed VMOs until all
+                            // preceding operations have finished.
+                            c_requests[count].write(Request {
+                                request_id,
+                                operation,
+                                trace_flow_id,
+                                vmo: UnownedVmo(
+                                    vmo.as_ref()
+                                        .map(|vmo| vmo.raw_handle())
+                                        .unwrap_or(zx::sys::ZX_HANDLE_INVALID),
+                                ),
+                            });
+                            count += 1;
+                            if count == MAX_REQUESTS {
+                                unsafe {
+                                    (self.manager.callbacks.on_requests)(
+                                        self.manager.callbacks.context,
+                                        c_requests[0].as_mut_ptr(),
+                                        count,
+                                    );
+                                }
+                                count = 0;
+                            }
+                            if let Some(r) = remainder {
+                                request = r;
+                            } else {
+                                break;
+                            }
+                        }
+                        Err(Some(response)) => {
+                            self.send_response(response);
                             break;
                         }
-                        let c_request = self.manager.start_request(
-                            this.clone(),
-                            decoded_request.request_tracking,
-                            decoded_request.operation,
-                            decoded_request.vmo,
-                        );
-                        c_requests[count].write(c_request);
-                        count += 1;
-                        break;
+                        Err(None) => break,
                     }
-                    DecodeResult::Split(decoded_request) => {
-                        let c_request = self.manager.start_request(
-                            this.clone(),
-                            decoded_request.request_tracking,
-                            decoded_request.operation,
-                            decoded_request.vmo,
-                        );
-                        c_requests[count].write(c_request);
-                        count += 1;
-                        in_split = true;
-                    }
-                    DecodeResult::InvalidRequest(tracking, status) => {
-                        self.send_reply(tracking, status);
-                        break;
-                    }
-                    DecodeResult::IgnoreRequest => {
-                        break;
-                    }
-                }
+                },
+                Err(None) => {}
+                Err(Some(response)) => self.send_response(response),
             }
         }
         if count > 0 {
@@ -338,11 +308,11 @@ impl Session {
         }
     }
 
-    fn send_reply(&self, tracking: RequestTracking, status: zx::Status) {
-        let response = match self.helper.finish_fifo_request(tracking, status) {
-            Some(response) => response,
-            None => return,
-        };
+    fn complete_request(&self, request_id: RequestId, status: zx::Status) {
+        self.manager.complete_request(request_id, status);
+    }
+
+    fn send_response(&self, response: BlockFifoResponse) {
         let mut queue = self.queue.lock();
         if queue.responses.is_empty() {
             match self.fifo.write_one(&response) {
@@ -474,7 +444,7 @@ pub unsafe extern "C" fn block_server_new(
     let session_manager = Arc::new(SessionManager {
         callbacks,
         open_sessions: Mutex::default(),
-        active_requests: Mutex::new(Slab::with_capacity(MAX_REQUESTS)),
+        active_requests: ActiveRequests::default(),
         condvar: Condvar::new(),
         mbox: ExecutorMailbox::new(),
         info: partition_info.to_rust(),
@@ -591,7 +561,9 @@ pub unsafe extern "C" fn block_server_serve(block_server: *const BlockServer, ha
 /// `session` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn block_server_session_run(session: &Session) {
+    let session = Arc::from_raw(session);
     session.run();
+    let _ = Arc::into_raw(session);
 }
 
 /// # Safety
