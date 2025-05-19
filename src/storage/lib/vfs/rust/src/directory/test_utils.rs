@@ -21,7 +21,7 @@ pub mod reexport {
 }
 
 use crate::directory::entry::DirectoryEntry;
-use crate::test_utils::run::{self, AsyncServerClientTestParams};
+use crate::test_utils::run;
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use fidl_fuchsia_io as fio;
@@ -30,7 +30,7 @@ use std::convert::TryInto as _;
 use std::io::Write;
 use std::sync::Arc;
 
-pub use run::{run_client, test_client};
+pub use run::run_client;
 
 /// A thin wrapper around [`run::run_server_client()`] that sets the `Marker` to be
 /// [`DirectoryMarker`], and providing explicit type for the `get_client` closure argument.  This
@@ -43,20 +43,6 @@ pub fn run_server_client<GetClientRes>(
     GetClientRes: Future<Output = ()>,
 {
     run::run_server_client::<fio::DirectoryMarker, _, _>(flags, server, get_client)
-}
-
-/// A thin wrapper around [`run::test_server_client()`] that sets the `Marker` to be
-/// [`DirectoryMarker`], and providing explicit type for the `get_client` closure argument.  This
-/// makes it possible for the caller not to provide explicit types.
-pub fn test_server_client<'test_refs, GetClientRes>(
-    flags: fio::OpenFlags,
-    server: Arc<dyn DirectoryEntry>,
-    get_client: impl FnOnce(fio::DirectoryProxy) -> GetClientRes + 'test_refs,
-) -> AsyncServerClientTestParams<'test_refs, fio::DirectoryMarker>
-where
-    GetClientRes: Future<Output = ()> + 'test_refs,
-{
-    run::test_server_client::<fio::DirectoryMarker, _, _>(flags, server, get_client)
 }
 
 /// A helper to build the "expected" output for a `ReadDirents` call from the Directory protocol in

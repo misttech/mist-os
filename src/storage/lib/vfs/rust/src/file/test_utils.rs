@@ -5,14 +5,18 @@
 //! Common utilities used by pseudo-file related tests.
 
 use crate::directory::entry::DirectoryEntry;
-use crate::test_utils::run::{self, AsyncServerClientTestParams};
+use crate::test_utils::run;
 
 use fidl_fuchsia_io as fio;
 use futures::Future;
 use std::sync::Arc;
+
+#[cfg(target_os = "fuchsia")]
+use crate::test_utils::run::AsyncServerClientTestParams;
+#[cfg(target_os = "fuchsia")]
 use zx_status::Status;
 
-pub use run::{run_client, test_client};
+pub use run::run_client;
 
 /// A thin wrapper around [`run::run_server_client()`] that sets the `Marker` to be
 /// [`FileMarker`], and providing explicit type for the `get_client` closure argument.  This makes
@@ -30,6 +34,7 @@ pub fn run_server_client<GetClientRes>(
 /// A thin wrapper around [`run::test_server_client()`] that sets the `Marker` to be
 /// [`FileMarker`], and providing explicit type for the `get_client` closure argument.  This makes
 /// it possible for the caller not to provide explicit types.
+#[cfg(target_os = "fuchsia")]
 pub fn test_server_client<'test_refs, GetClientRes>(
     flags: fio::OpenFlags,
     server: Arc<dyn DirectoryEntry>,
@@ -42,6 +47,7 @@ where
 }
 
 /// Possible errors for the [`assert_vmo_content()`] function.
+#[cfg(target_os = "fuchsia")]
 pub enum AssertVmoContentError {
     /// Failure returned from the `vmo.get_content_size()` call.
     GetContentSizeFailed(Status),

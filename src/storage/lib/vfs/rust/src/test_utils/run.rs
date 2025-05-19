@@ -98,6 +98,7 @@ impl<'test_refs> TestController<'test_refs> {
     /// Runs the client test code to completion.  As this will consume the controller, this method
     /// can only be called last.  Note that the controller will effectively run this methods for
     /// you when it is dropped, if you do not do it explicitly.
+    #[cfg(target_os = "fuchsia")]
     pub fn run_until_complete(self) {
         // [`Drop::drop`] will actually do the final execution, when `self` is dropped.
     }
@@ -197,8 +198,7 @@ impl<'test_refs, Marker> AsyncServerClientTestParams<'test_refs, Marker>
 where
     Marker: ProtocolMarker,
 {
-    field_setter!(exec, TestExecutor);
-
+    #[cfg(target_os = "fuchsia")]
     pub fn coordinator(
         mut self,
         get_coordinator: impl FnOnce(TestController<'_>) + 'test_refs,
@@ -236,15 +236,6 @@ where
 
 impl<'test_refs> AsyncClientTestParams<'test_refs> {
     field_setter!(exec, TestExecutor);
-
-    pub fn coordinator(
-        mut self,
-        get_coordinator: impl FnOnce(TestController<'_>) + 'test_refs,
-    ) -> Self {
-        assert!(self.coordinator.is_none(), "`coordinator` is already set");
-        self.coordinator = Some(Box::new(get_coordinator));
-        self
-    }
 
     /// Runs the test based on the parameters specified in the [`test_server_client`] and other
     /// method calls.

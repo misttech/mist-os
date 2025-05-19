@@ -12,8 +12,9 @@ use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use std::sync::Arc;
 
+#[cfg(test)]
 #[macro_use]
-pub mod test_utils;
+pub(crate) mod test_utils;
 
 pub mod common;
 

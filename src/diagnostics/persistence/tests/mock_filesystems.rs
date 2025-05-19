@@ -10,7 +10,6 @@ use futures::prelude::*;
 use tempfile::TempDir;
 use vfs::file::vmo::read_only;
 use vfs::pseudo_directory;
-use vfs::test_utils::assertions::reexport::StreamExt;
 
 pub(crate) async fn create_config_data(builder: &RealmBuilder) -> Result<ChildRef, Error> {
     let config_data_dir = pseudo_directory! {
