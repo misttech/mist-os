@@ -17,8 +17,12 @@ pub mod test;
 
 // Individual procedures
 pub mod audio_connection_setup;
+
 pub mod codec_connection_setup;
 use codec_connection_setup::CodecConnectionSetupProcedure;
+
+pub mod hang_up;
+use hang_up::HangUpProcedure;
 
 pub mod initiate_call;
 use initiate_call::InitiateCallProcedure;
@@ -128,6 +132,10 @@ impl ProcedureInputT<ProcedureOutput> for ProcedureInput {
                 Some(Box::new(InitiateCallProcedure::new()))
             }
 
+            ProcedureInput::CommandFromHf(CommandFromHf::HangUpCall) => {
+                Some(Box::new(HangUpProcedure::new()))
+            }
+
             _ => None,
         }
     }
@@ -139,7 +147,8 @@ impl ProcedureInputT<ProcedureOutput> for ProcedureInput {
             | at_resp!(Bcs)
             | ProcedureInput::CommandFromHf(CommandFromHf::CallActionDialFromNumber { .. })
             | ProcedureInput::CommandFromHf(CommandFromHf::CallActionDialFromMemory { .. })
-            | ProcedureInput::CommandFromHf(CommandFromHf::CallActionRedialLast) => true,
+            | ProcedureInput::CommandFromHf(CommandFromHf::CallActionRedialLast)
+            | ProcedureInput::CommandFromHf(CommandFromHf::HangUpCall) => true,
             _ => false,
         }
     }

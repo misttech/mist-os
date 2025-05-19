@@ -33,19 +33,86 @@ use fidl_fuchsia_bluetooth_hfp::{
     NextCall, PeerHandlerWatchNextCallResponder,
 };
 use fuchsia_bluetooth::types::PeerId;
+use fuchsia_sync::Mutex;
 use futures::stream::FusedStream;
 use futures::{Stream, StreamExt};
 use log::{debug, error, info, warn};
+use std::collections::VecDeque;
 use std::fmt;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
 use crate::one_to_one::OneToOneMatcher;
 use crate::peer::ag_indicators::CallIndicator;
 use crate::peer::procedure::{CommandFromHf, ProcedureInput};
 
+use shutdown_state::ShutdownState;
+
+/// Information sent to the responder method for the WatchNextCall hanging get matcher.
+#[derive(Debug)]
+struct WatchCallResponderInfo {
+    #[allow(unused)]
+    peer_id: PeerId, // For logging
+    #[allow(unused)]
+    call_index: Option<CallIndex>, // For logging
+    call_state: CallState,                     // Sent to the hanging get
+    shutdown_state: Arc<Mutex<ShutdownState>>, // For updating whether the Terminated state has been sent
+}
+
 type ResponderResult = Result<(), fidl::Error>;
-type WatchStateMatcher = OneToOneMatcher<CallState, CallWatchStateResponder, ResponderResult>;
+type WatchStateMatcher =
+    OneToOneMatcher<WatchCallResponderInfo, CallWatchStateResponder, ResponderResult>;
+
+mod shutdown_state {
+    /// Records the state of various events that need to occur before we can stop awaiting on a
+    /// Call's Stream implementation. We want to guarantee that we've both received a
+    /// +CIEV(call = 0) from the peer and either sent a State::Terminated to the FIDL client or
+    /// gotten an error because the client has already closed the channel.
+    ///
+    /// Additionally we need to guarantee that we send the peer AT+CHUP at most once, even in the
+    /// case of an error.
+    #[derive(Debug, Default)]
+    pub struct ShutdownState {
+        received_call_none: bool,
+        sent_terminated: bool,
+        received_fidl_error: bool,
+
+        // Records whether we have sent an AT+CHUP to the peer.  This prevents an issue where we have
+        // already sent the hang up command and the FIDL client closes the channel.  In that case,
+        // we would naively send the hang up command on a FIDL error.  Recording that we have already
+        // done so will prevent us from doing it twice.
+        sent_hang_up: bool,
+    }
+
+    impl ShutdownState {
+        /// Can we stop awaiting on this Call's Stream.
+        pub fn is_complete(&self) -> bool {
+            self.received_call_none && (self.sent_terminated || self.received_fidl_error)
+        }
+
+        /// Should we send a AT+CHUP when requested to by the client.
+        pub fn can_send_hang_up(&self) -> bool {
+            !self.sent_hang_up && !self.received_call_none
+        }
+
+        pub fn received_call_none(&mut self) {
+            self.received_call_none = true;
+        }
+
+        pub fn sent_terminated(&mut self) {
+            self.sent_terminated = true;
+        }
+
+        pub fn received_fidl_error(&mut self) {
+            self.received_fidl_error = true;
+        }
+
+        pub fn sent_hang_up(&mut self) {
+            self.sent_hang_up = true;
+        }
+    }
+}
 
 /// This struct contains information about individual calls and methods to
 /// manipulate that state.  Additionally, it acts as a stream of `ProcedureInput`
@@ -67,13 +134,19 @@ struct Call {
 
     watch_state_hanging_get_matcher: WatchStateMatcher,
     waker: Option<Waker>,
+
+    shutdown_state: Arc<Mutex<ShutdownState>>,
 }
 
 fn respond_to_watch_call_state(
-    state: CallState,
+    info: WatchCallResponderInfo,
     responder: CallWatchStateResponder,
 ) -> Result<(), fidl::Error> {
-    responder.send(state)
+    if info.call_state == CallState::Terminated {
+        info.shutdown_state.lock().sent_terminated();
+    }
+    debug!("Sending {:?}", info);
+    responder.send(info.call_state)
 }
 
 impl Call {
@@ -94,6 +167,7 @@ impl Call {
             request_stream: MaybeStream::default(),
             watch_state_hanging_get_matcher,
             waker: None,
+            shutdown_state: Default::default(),
         }
     }
 
@@ -121,8 +195,14 @@ impl Call {
         );
 
         self.state = Some(new_state);
+        let watch_call_responder_info = WatchCallResponderInfo {
+            peer_id: self.peer_id,
+            call_index: self.call_index,
+            call_state: new_state,
+            shutdown_state: self.shutdown_state.clone(),
+        };
+        self.watch_state_hanging_get_matcher.enqueue_left(watch_call_responder_info);
 
-        self.watch_state_hanging_get_matcher.enqueue_left(new_state);
         // Make sure the stream is pumped to deliver this new state to a WatchState responder.
         self.awaken();
     }
@@ -143,16 +223,32 @@ impl Call {
         // Stream impl poll_next which immediately pumps the matcher.
     }
 
+    fn maybe_hang_up(&mut self) -> Poll<Option<Result<ProcedureInput, Error>>> {
+        let mut shutdown_state = self.shutdown_state.lock();
+        if !shutdown_state.can_send_hang_up() {
+            debug!(
+                "Not sending hang up for peer {:} for call {:?}.",
+                self.peer_id, self.call_index
+            );
+            Poll::Pending
+        } else {
+            info!("Sending hang up for peer {:} for call {:?}.", self.peer_id, self.call_index);
+            shutdown_state.sent_hang_up();
+            Poll::Ready(Some(Ok(ProcedureInput::CommandFromHf(CommandFromHf::HangUpCall))))
+        }
+    }
+
     // Must not be called with a WatchState or a SendDtmfCode request.
-    fn call_request_to_procedure_input(call_request: CallRequest) -> ProcedureInput {
+    fn call_request_to_procedure_input(
+        &mut self,
+        call_request: CallRequest,
+    ) -> Poll<Option<Result<ProcedureInput, Error>>> {
         match call_request {
             // TODO(https://fxbug.dev/135119) Handle multiple calls
             CallRequest::RequestHold { control_handle: _ } => unimplemented!(),
             // TODO(https://fxbug.dev/135119) Handle multiple calls
             CallRequest::RequestActive { control_handle: _ } => unimplemented!(),
-            CallRequest::RequestTerminate { control_handle: _ } => {
-                ProcedureInput::CommandFromHf(CommandFromHf::HangUpCall)
-            }
+            CallRequest::RequestTerminate { control_handle: _ } => self.maybe_hang_up(),
             // TODO(https://fxbug.dev/134161) Implement transfers.
             CallRequest::RequestTransferAudio { control_handle: _ } => unimplemented!(),
             _ => panic!("Unexpected Call request {:?}", call_request),
@@ -230,7 +326,16 @@ impl Stream for Call {
         let poll = match call_request {
             Poll::Pending => Poll::Pending, // Stream contained nothing, but has registered waker
             Poll::Ready(None) => Poll::Ready(None), // Stream was terminated
-            Poll::Ready(Some(Err(error))) => Poll::Ready(Some(Err(error.into()))), // FIDL error, which is converted to anyhow
+            Poll::Ready(Some(Err(error))) =>
+            // FIDL error indicates sending a hang up command.
+            {
+                info!(
+                    "FIDL error on Call request stream for call {:?} with peer {:}: {:?}",
+                    self.call_index, self.peer_id, error
+                );
+                self.shutdown_state.lock().received_fidl_error();
+                self.maybe_hang_up()
+            }
             Poll::Ready(Some(Ok(CallRequest::WatchState { responder }))) => {
                 self.handle_watch_state(responder);
                 Poll::Pending
@@ -242,8 +347,7 @@ impl Stream for Call {
                 Poll::Pending
             }
             Poll::Ready(Some(Ok(state_update_request))) => {
-                let procedure_input = Self::call_request_to_procedure_input(state_update_request);
-                Poll::Ready(Some(Ok(procedure_input)))
+                self.call_request_to_procedure_input(state_update_request)
             }
         };
 
@@ -258,7 +362,11 @@ impl Stream for Call {
             self.watch_state_hanging_get_matcher.poll_next_unpin(context)
         {
             if let Err(err) = result {
-                return Poll::Ready(Some(Err(err.into())));
+                info!(
+                    "FIDL error responding to WatchState for call {:?} with peer {:}: {:?}",
+                    self.call_index, self.peer_id, err
+                );
+                return self.maybe_hang_up();
             }
         }
 
@@ -275,6 +383,9 @@ type NextCallMatcher =
 pub struct Calls {
     peer_id: PeerId,
     call_list: CallList<Call>,
+    // Calls for which a +CIEV(call = 0) has been received but which are still responding to a
+    // WatchCallState request.
+    terminated_calls: VecDeque<Call>,
     watch_next_call_hanging_get_matcher: NextCallMatcher,
     waker: Option<Waker>,
 }
@@ -292,6 +403,7 @@ impl Calls {
         Self {
             peer_id,
             call_list: CallList::default(),
+            terminated_calls: VecDeque::new(),
             watch_next_call_hanging_get_matcher,
             waker: None,
         }
@@ -351,7 +463,7 @@ impl Calls {
             // TODO(https://fxbug.dev/135119) Handle multiple calls.
             CallIndicator::CallHeld(_) => {
                 error!(
-                    "Receeived indicator {:?} for peer {:} but call holding unimplemented.",
+                    "Received indicator {:?} for peer {:} but call holding unimplemented.",
                     indicator, self.peer_id
                 );
                 None
@@ -386,24 +498,23 @@ impl Calls {
         match call_option {
             Some(call) => {
                 call.set_state(new_state);
-                self.possibly_respond_to_watch_next_call(call_index)
+                self.possibly_respond_to_watch_next_call(call_index);
+                if new_state == CallState::Terminated {
+                    self.handle_state_terminated(call_index);
+                }
             }
             None => warn!(
                 "No call found for for peer {:} at index {:} while setting state to {:?}",
                 self.peer_id, call_index, new_state
             ),
         }
+    }
 
-        if new_state == CallState::Terminated {
-            debug!("Removing call {:?} for peer {:}.", call_index, self.peer_id);
-            let remove_option = self.call_list.remove(call_index);
-            if let None = remove_option {
-                warn!(
-                    "Removed call {:?} for peer {:} but no call was present.",
-                    call_index, self.peer_id
-                );
-            }
-        }
+    fn handle_state_terminated(&mut self, call_index: CallIndex) {
+        debug!("Removing call {:?} for peer {:}.", call_index, self.peer_id);
+        let removed = self.call_list.remove(call_index).expect("Removed call should exist.");
+        removed.shutdown_state.lock().received_call_none();
+        self.terminated_calls.push_back(removed);
     }
 
     // TODO(https://fxbug.dev/135158) Handle setting phone numbers.
@@ -474,7 +585,19 @@ impl Stream for Calls {
             }
         }
 
-        // TODO(https://fxbug.dev/135119) Handle multiple calls.
+        for call in &mut self.terminated_calls {
+            // Pump the stream for the terminated call.  This will cause the Terminated state to be
+            // sent to the FIDL client if there is a WatchNextState hanging get outstanding.  Since
+            // the peer believes the call is terminated, we can ignore any ProcedureInputs yielded
+            // by this stream caused by incoming FIDL requests.
+            while let Poll::Ready(_) = call.poll_next_unpin(context) {}
+        }
+
+        // Now that we've run every terminated call, we can filter out those that have successfully reported
+        // their state to the FIDL client or had an error.
+        self.terminated_calls.retain(|call| !call.shutdown_state.lock().is_complete());
+
+        // TODO(http://fxbug.dev/135119) Handle multiple calls.
         let call_index = 1; // Calls are 1-indexed
         let call_option = self.call_list.get_mut(call_index);
         let call = match call_option {
@@ -573,6 +696,33 @@ mod test {
             .expect("watch_state hanging")
             .expect("FIDL error on watch_state");
         assert_eq!(state, CallState::OngoingActive);
+
+        // Pass through hang up indicator
+        call_proxy.request_terminate().expect("Request terminated");
+
+        // Get hangup input
+        let procedure_input_option = calls.next().now_or_never();
+        assert_matches!(
+            procedure_input_option,
+            Some(Some(Ok(ProcedureInput::CommandFromHf(CommandFromHf::HangUpCall))))
+        );
+
+        // Try again, but this time it shouldn't go through, since we've already requested a hangup
+        call_proxy.request_terminate().expect("Request terminated");
+        let procedure_input_option = calls.next().now_or_never();
+        assert_matches!(procedure_input_option, None);
+
+        // Hang up
+        calls.set_call_state_by_indicator(CallIndicator::Call(call_indicators::Call::None));
+
+        let watch_state_fut = call_proxy.watch_state();
+        // Pump stream to respond to WatchState
+        let _procedure_input_option = calls.next().now_or_never();
+        let state = watch_state_fut
+            .now_or_never()
+            .expect("watch_state second call hanging")
+            .expect("FIDL error on watch_state");
+        assert_eq!(state, CallState::Terminated);
     }
 
     #[fuchsia::test]
