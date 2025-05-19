@@ -31,21 +31,7 @@ validate_json("test_json_validator_with_comments") {
 }
 
 if (is_host) {
-  # The valico-based JSON validator tool is a Bazel root host target.
-  # To find its path relative to the Ninja build directory, and corresponding
-  # GN dependency, scan the list of Bazel root targets.
-  import("//build/bazel/bazel_root_targets.gni")
-  _valico_validator_label = "//build/tools/json_validator:json_validator_valico"
-  _valico_validator_path = ""
-  _valico_validator_target = ""
-  foreach(_root_target, resolved_bazel_root_targets) {
-    if (_root_target.bazel_label == _valico_validator_label) {
-      _valico_validator_path = _root_target.ninja_output
-      _valico_validator_target = _root_target.gn_label
-    }
-  }
-  assert(_valico_validator_path != "",
-         "Cannot find ${_valico_validator_label} in Bazel root targets list!")
+  valico_validator_path = "$root_out_dir/json_validator_valico"
 
   host_test_data("test_json_validator_valico_data") {
     sources = [
@@ -53,16 +39,16 @@ if (is_host) {
       "test_document_with_comments.json",
       "test_schema.json",
       "test_schema_with_ref.json",
-      _valico_validator_path,
+      valico_validator_path,
     ]
   }
 
   host_test("test_json_validator_valico") {
     binary_path = "json_validator_valico_test.sh"
-    deps = [ _valico_validator_target ]
+    deps = [ "//build/tools/json_validator:json_validator_valico" ]
     data_deps = [ ":test_json_validator_valico_data" ]
     args = [
-      rebase_path(_valico_validator_path, root_build_dir),
+      rebase_path(valico_validator_path, root_build_dir),
       rebase_path(".", root_build_dir),
     ]
   }

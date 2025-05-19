@@ -90,12 +90,7 @@ subbuild("ctf_subbuild") {
   target_cpu = target_cpu
   build_dir_prefix = ctf_output_directory
   extra_deps = [
-    # Some host tools required by the sub-build are Bazel artifacts.
-    # Since Bazel cannot be invoked from sub-builds, ensure they are generated first.
-    "//build/bazel:bazel_root_host_targets",
-
-    # Catch changes in source tests.
-    "//sdk/ctf/tests:ctf-tests",
+    "//sdk/ctf/tests:ctf-tests",  # Catch changes in source tests.
   ]
   metadata = {
     ctf_artifacts = [ "${ctf_output_directory}/cts/package_archives.json" ]

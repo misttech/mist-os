@@ -230,7 +230,6 @@ group("non_hermetic_deps") {
     "//build/bazel/bazel_sdk/tests:*",
     "//build/bazel/examples/*",
     "//build/bazel/tests/*",
-    "//build/tools/json_validator:*",
     "//sdk/lib/driver/devicetree/*",
     "//src:*",
     "//src/devices/block/drivers/aml-sdmmc:*",
