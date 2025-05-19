@@ -4,6 +4,7 @@
 
 use anyhow::{format_err, Result};
 use async_helpers::maybe_stream::MaybeStream;
+use async_utils::stream::FutureMap;
 use bt_hfp::{audio, sco};
 use fidl::endpoints::{ControlHandle, RequestStream, Responder};
 use fuchsia_bluetooth::profile::ProtocolDescriptor;
@@ -13,7 +14,6 @@ use futures::stream::{FusedStream, FuturesUnordered};
 use futures::{select, FutureExt, StreamExt};
 use log::{debug, info, warn};
 use profile_client::{ProfileClient, ProfileEvent};
-use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -57,8 +57,7 @@ where
     /// Stream of incoming HandsFree FIDL protocol Requests
     hands_free_request_maybe_stream: MaybeStream<fidl_hfp::HandsFreeRequestStream>,
     /// A collection of discovered and/or connected Bluetooth peers that support the AG role.
-    // TODO(https://fxbug.dev/42082435) Convert this to a FutureMap and await peer tasks finishing and clean up.
-    peers: HashMap<PeerId, Peer>,
+    peers: FutureMap<PeerId, Peer>,
     // TODO(fxb/127364) Update HangingGet with peer, and delete this which just keeps the proxy
     // around to make tests pass.
     peer_handler_proxies: Vec<fidl_hfp::PeerHandlerProxy>,
@@ -84,7 +83,7 @@ where
         let hands_free_connection_stream = hands_free_connection_stream;
         let hands_free_request_maybe_stream = MaybeStream::default();
         let audio_control = Arc::new(Mutex::new(audio_control));
-        let peers = HashMap::new();
+        let peers = FutureMap::new();
         Self {
             hf_features,
             profile_client,
@@ -138,6 +137,13 @@ where
                             MaybeStream::take(&mut self.hands_free_request_maybe_stream);
                     }
                 }
+                finished_peer_option = self.peers.next() => {
+                    if let Some(finished_peer) = finished_peer_option {
+                        info!("Peer task for peer {:?} finished.", finished_peer);
+                        // Peer is automatically removed by FutureMap on completion.
+                    }
+                    // Otherwise the map is empty.
+                }
             }
         }
     }
@@ -145,14 +151,14 @@ where
     fn handle_profile_event(&mut self, event: ProfileEvent) -> Result<()> {
         let peer_id = event.peer_id();
 
-        let peer = self.peers.entry(peer_id).or_insert_with(|| {
-            Peer::new(
+        let peer = self.peers.inner().entry(peer_id).or_insert_with(|| {
+            Box::pin(Peer::new(
                 peer_id,
                 self.hf_features,
                 self.profile_proxy.clone(),
                 self.sco_connector.clone(),
                 self.audio_control.clone(),
-            )
+            ))
         });
 
         match event {
@@ -212,7 +218,7 @@ where
     ) {
         debug!("Handle search results timer expired for peer {:?}", peer_id);
 
-        let peer_result = self.peers.get_mut(&peer_id);
+        let peer_result = self.peers.inner().get_mut(&peer_id);
 
         let peer_handler_proxy_result = match peer_result {
             None => {
@@ -255,7 +261,7 @@ where
             control_handle.shutdown_with_epitaph(zx::Status::ALREADY_BOUND);
         } else {
             self.hands_free_request_maybe_stream.set(stream);
-            // TODO(fxb/127364) Update HangingGet with all peers.  Make sure to set the new PeerProxy
+            // TODO(http://fxbug.dev/127364) Update HangingGet with all peers.  Make sure to set the new PeerProxy
             // on each peer.  Be careful of races between the new PeerProxy and any old ones
         }
     }

@@ -44,7 +44,7 @@ impl PeerTask {
         rfcomm: Channel,
         sco_connector: sco::Connector,
         audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
-    ) -> fasync::Task<()> {
+    ) -> fasync::Task<PeerId> {
         let procedure_manager = ProcedureManager::new(peer_id, hf_features);
         let at_connection = at_connection::Connection::new(peer_id, rfcomm);
         let calls = Calls::new(peer_id);
@@ -72,13 +72,16 @@ impl PeerTask {
         fasync_task
     }
 
-    pub async fn run(mut self) {
+    pub async fn run(mut self) -> PeerId {
         info!(peer:% = self.peer_id; "Starting task.");
+
         let result = (&mut self).run_inner().await;
         match result {
             Ok(_) => info!(peer:% =self.peer_id; "Successfully finished task."),
             Err(err) => warn!(peer:% = self.peer_id, error:% = err; "Finished task with error"),
         }
+
+        self.peer_id
     }
 
     async fn run_inner(&mut self) -> Result<()> {
@@ -102,7 +105,7 @@ impl PeerTask {
                     drop(sco_state);
 
                     let peer_handler_request_result = peer_handler_request_result_option
-                        .ok_or_else(||format_err!("FIDL Peer protocol request stream closed for peer {}", self.peer_id))?;
+                        .ok_or_else(|| format_err!("FIDL Peer protocol request stream closed for peer {}", self.peer_id))?;
                     let peer_handler_request = peer_handler_request_result?;
 
                     self.handle_peer_handler_request(peer_handler_request)?;

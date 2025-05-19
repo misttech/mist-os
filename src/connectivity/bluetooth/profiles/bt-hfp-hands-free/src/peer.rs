@@ -9,8 +9,12 @@ use fidl::endpoints::create_proxy_and_stream;
 use fuchsia_bluetooth::profile::ProtocolDescriptor;
 use fuchsia_bluetooth::types::{Channel, PeerId};
 use fuchsia_sync::Mutex;
-use log::{info, warn};
+use futures::FutureExt;
+use log::{debug, info, warn};
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll, Waker};
 use {
     fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
     fidl_fuchsia_bluetooth_hfp as fidl_hfp, fuchsia_async as fasync,
@@ -42,7 +46,23 @@ pub struct Peer {
     /// or FIDL APIs.
     /// This value is None if there is no RFCOMM channel present.
     /// If set, there is no guarantee that the RFCOMM channel is open.
-    task: Option<fasync::Task<()>>,
+    task: Option<fasync::Task<PeerId>>,
+    waker: Option<Waker>,
+}
+
+impl Future for Peer {
+    type Output = PeerId;
+
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.task.as_mut() {
+            None => {
+                debug!("Task for peer {} polled without async task set.", self.peer_id);
+                self.waker = Some(context.waker().clone());
+                Poll::Pending
+            }
+            Some(task) => task.poll_unpin(context),
+        }
+    }
 }
 
 impl Peer {
@@ -53,7 +73,15 @@ impl Peer {
         sco_connector: sco::Connector,
         audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
     ) -> Self {
-        Self { peer_id, hf_features, profile_proxy, sco_connector, audio_control, task: None }
+        Self {
+            peer_id,
+            hf_features,
+            profile_proxy,
+            sco_connector,
+            audio_control,
+            task: None,
+            waker: None,
+        }
     }
 
     /// Handle a PeerConnected ProfileEvent.  This creates a new peer task, so return the
@@ -75,8 +103,15 @@ impl Peer {
             self.audio_control.clone(),
         );
         self.task = Some(task);
+        self.awaken();
 
         peer_handler_proxy
+    }
+
+    fn awaken(&mut self) {
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
+        }
     }
 
     /// Handle a SearchResult ProfileEvent.  If a new peer task is created, return the
@@ -113,6 +148,7 @@ impl Peer {
             self.audio_control.clone(),
         );
         self.task = Some(task);
+        self.awaken();
 
         Ok(Some(peer_handler_proxy))
     }

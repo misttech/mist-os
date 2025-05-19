@@ -33,9 +33,13 @@ async fn main() {
     let fut = async {
         select! {
             repl_result = repl_fut =>
-               if let Err(err) = repl_result {println!("REPL error: {:?}", err)},
+                if let Err(err) = repl_result {
+                    println!("REPL error: {:?}", err)
+                },
             hands_free_result = hands_free_fut =>
-               if let Err(err) = hands_free_result {println!("FIDL error: {:?}", err)},
+                if let Err(err) = hands_free_result {
+                    println!("FIDL error: {:?}", err)
+                }
         }
     };
 
