@@ -5,6 +5,7 @@
 use crate::{common, ExtractProductPackageArgs, HybridProductArgs, ProductArgs};
 
 use anyhow::{Context, Result};
+use assembly_config_schema::release_info::{ProductReleaseInfo, ReleaseInfo};
 use assembly_config_schema::AssemblyConfig;
 use assembly_container::AssemblyContainer;
 use camino::Utf8PathBuf;
@@ -13,11 +14,22 @@ use fuchsia_pkg::{PackageBuilder, PackageManifest};
 pub fn new(args: &ProductArgs) -> Result<()> {
     let mut config = AssemblyConfig::from_config_path(&args.config)?;
 
-    // Copy the version information from product.build_info.
-    config.product.release_version = Some(common::get_release_version(
-        &None,
-        &config.product.build_info.as_ref().map(|b| b.version.clone()),
-    )?);
+    config.product.release_info = Some(ProductReleaseInfo {
+        info: ReleaseInfo {
+            name: match config.product.build_info {
+                Some(ref value) => value.name.clone(),
+                // TODO(https://fxbug.dev/418249336): Make
+                // product.build_info.name a required field.
+                None => "unknown".to_string(),
+            },
+            repository: common::get_release_repository(&args.repo, &args.repo_file)?,
+            version: common::get_release_version(
+                &None,
+                &config.product.build_info.as_ref().map(|b| b.version.clone()),
+            )?,
+        },
+        pibs: vec![],
+    });
 
     // Build systems generally don't add package names to the config, so it
     // serializes index numbers in place of package names by default.
@@ -134,11 +146,17 @@ mod tests {
         });
         serde_json::to_writer(&config_file, &config_value).unwrap();
 
-        let args = ProductArgs { config: config_path, output: product_path.clone(), depfile: None };
+        let args = ProductArgs {
+            config: config_path,
+            repo: None,
+            repo_file: None,
+            output: product_path.clone(),
+            depfile: None,
+        };
         let _ = new(&args);
         let config = AssemblyConfig::from_dir(product_path).unwrap();
         let expected = "fake_version".to_string();
-        assert_eq!(expected, config.product.release_version.unwrap());
+        assert_eq!(expected, config.product.release_info.unwrap().info.version);
     }
 
     #[test]
@@ -159,11 +177,17 @@ mod tests {
         });
         serde_json::to_writer(&config_file, &config_value).unwrap();
 
-        let args = ProductArgs { config: config_path, output: product_path.clone(), depfile: None };
+        let args = ProductArgs {
+            config: config_path,
+            repo: None,
+            repo_file: None,
+            output: product_path.clone(),
+            depfile: None,
+        };
         let _ = new(&args);
         let config = AssemblyConfig::from_dir(product_path).unwrap();
         let expected = "unversioned".to_string();
-        assert_eq!(expected, config.product.release_version.unwrap());
+        assert_eq!(expected, config.product.release_info.unwrap().info.version);
     }
 
     #[test]

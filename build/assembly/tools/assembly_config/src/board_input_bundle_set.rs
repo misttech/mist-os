@@ -4,6 +4,7 @@
 
 use crate::{common, BoardInputBundleSetArgs};
 use anyhow::Result;
+use assembly_config_schema::release_info::ReleaseInfo;
 use assembly_config_schema::{BoardInputBundle, BoardInputBundleEntry, BoardInputBundleSet};
 use assembly_container::{AssemblyContainer, DirectoryPathBuf};
 use std::collections::BTreeMap;
@@ -21,9 +22,14 @@ pub fn new(args: &BoardInputBundleSetArgs) -> Result<()> {
         })
         .collect::<Result<BTreeMap<String, BoardInputBundleEntry>>>()?;
     let set = BoardInputBundleSet {
-        name,
+        name: name.clone(),
         board_input_bundles,
-        release_version: Some(common::get_release_version(&args.version, &args.version_file)?),
+        release_version: None,
+        release_info: Some(ReleaseInfo {
+            name,
+            version: common::get_release_version(&args.version, &args.version_file)?,
+            repository: common::get_release_repository(&args.repo, &args.repo_file)?,
+        }),
     };
     set.write_to_dir(&args.output, args.depfile.as_ref())?;
     Ok(())

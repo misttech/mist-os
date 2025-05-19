@@ -93,6 +93,14 @@ struct ProductArgs {
     #[argh(option)]
     config: Utf8PathBuf,
 
+    /// name of repository where this product is released.
+    #[argh(option)]
+    repo: Option<String>,
+
+    /// path to a file containing the repository information.
+    #[argh(option)]
+    repo_file: Option<Utf8PathBuf>,
+
     /// the directory to write the product config to.
     #[argh(option)]
     output: Utf8PathBuf,
@@ -204,6 +212,14 @@ struct BoardInputBundleArgs {
     #[argh(option)]
     version_file: Option<Utf8PathBuf>,
 
+    /// name of repository where this board is released.
+    #[argh(option)]
+    repo: Option<String>,
+
+    /// path to a file containing the repository information.
+    #[argh(option)]
+    repo_file: Option<Utf8PathBuf>,
+
     /// a depfile to write.
     #[argh(option)]
     depfile: Option<Utf8PathBuf>,
@@ -237,6 +253,14 @@ struct BoardArgs {
     #[argh(option)]
     version_file: Option<Utf8PathBuf>,
 
+    /// name of repository where this board is released.
+    #[argh(option)]
+    repo: Option<String>,
+
+    /// path to a file containing the repository information.
+    #[argh(option)]
+    repo_file: Option<Utf8PathBuf>,
+
     /// a depfile to write.
     #[argh(option)]
     depfile: Option<Utf8PathBuf>,
@@ -261,6 +285,14 @@ struct BoardInputBundleSetArgs {
     /// path to a file containing the release version that this BIB matches.
     #[argh(option)]
     version_file: Option<Utf8PathBuf>,
+
+    /// name of repository where this board is released.
+    #[argh(option)]
+    repo: Option<String>,
+
+    /// path to a file containing the repository information.
+    #[argh(option)]
+    repo_file: Option<Utf8PathBuf>,
 
     /// the directory to write the board config to.
     #[argh(option)]

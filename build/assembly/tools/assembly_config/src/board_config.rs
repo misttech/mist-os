@@ -5,6 +5,7 @@
 use crate::{common, BoardArgs, HybridBoardArgs};
 
 use anyhow::Result;
+use assembly_config_schema::release_info::{BoardReleaseInfo, ReleaseInfo};
 use assembly_config_schema::{BoardInformation, BoardInputBundleSet};
 use assembly_container::{AssemblyContainer, DirectoryPathBuf};
 use std::collections::BTreeMap;
@@ -16,8 +17,6 @@ pub fn new(args: &BoardArgs) -> Result<()> {
         let directory = DirectoryPathBuf(board_input_bundle.clone());
         config.input_bundles.insert(key, directory);
     }
-
-    config.release_version = Some(common::get_release_version(&args.version, &args.version_file)?);
 
     // Build systems do not know the name of the BIBs, so they serialize index
     // numbers in place of BIB names by default. We add the BIB names in now,
@@ -35,13 +34,26 @@ pub fn new(args: &BoardArgs) -> Result<()> {
         })
         .collect::<Result<BTreeMap<String, BoardInputBundleSet>>>()?;
 
+    let mut bib_sets_info: Vec<ReleaseInfo> = vec![];
     // Add all the BIBs from the BIB sets.
     for (set_name, set) in bib_sets {
+        if let Some(info) = set.release_info {
+            bib_sets_info.push(info.clone());
+        }
         for (bib_name, bib_entry) in set.board_input_bundles {
             let bib_ref = BibReference::FromBibSet { set: set_name.clone(), name: bib_name };
             config.input_bundles.insert(bib_ref.to_string(), bib_entry.path);
         }
     }
+
+    config.release_info = Some(BoardReleaseInfo {
+        info: ReleaseInfo {
+            name: config.name.clone(),
+            repository: common::get_release_repository(&args.repo, &args.repo_file)?,
+            version: common::get_release_version(&args.version, &args.version_file)?,
+        },
+        bib_sets: bib_sets_info,
+    });
 
     config.write_to_dir(&args.output, args.depfile.as_ref())?;
     Ok(())
@@ -161,6 +173,7 @@ mod tests {
             )]
             .into(),
             release_version: None,
+            release_info: None,
         };
         bib_set.write_to_dir(&bib_set_path, None::<Utf8PathBuf>).unwrap();
 
@@ -186,10 +199,12 @@ mod tests {
         assert_eq!(expected, bib.kernel_boot_args);
     }
 
-    fn new_board_with_version_or_version_file(
+    fn new_board_with_version_repo_fields(
         tmp_path: Utf8PathBuf,
         version: Option<String>,
         version_file: Option<Utf8PathBuf>,
+        repo: Option<String>,
+        repo_file: Option<Utf8PathBuf>,
     ) -> (Result<(), anyhow::Error>, Utf8PathBuf, Utf8PathBuf) {
         let config_file = NamedTempFile::new().unwrap();
         let config_path = Utf8PathBuf::from_path_buf(config_file.path().to_path_buf()).unwrap();
@@ -217,6 +232,7 @@ mod tests {
             )]
             .into(),
             release_version: None,
+            release_info: None,
         };
         bib_set.write_to_dir(&bib_set_path, None::<Utf8PathBuf>).unwrap();
 
@@ -229,6 +245,8 @@ mod tests {
             output: board_path.clone(),
             version,
             version_file,
+            repo,
+            repo_file,
             depfile: None,
         };
         (new(&args), board_path, bib_set_path)
@@ -238,28 +256,31 @@ mod tests {
     fn test_new_board_unversioned() {
         let tmp_dir = tempdir().unwrap();
         let tmp_path = Utf8PathBuf::from_path_buf(tmp_dir.path().to_path_buf()).unwrap();
-        let (_, board_path, _) = new_board_with_version_or_version_file(tmp_path, None, None);
+        let (_, board_path, _) =
+            new_board_with_version_repo_fields(tmp_path, None, None, None, None);
 
         // Ensure the Board config has the correct version string.
         let board = BoardInformation::from_dir(board_path).unwrap();
         let expected = "unversioned".to_string();
-        assert_eq!(expected, board.release_version.unwrap());
+        assert_eq!(expected, board.release_info.unwrap().info.version);
     }
 
     #[test]
     fn test_new_board_version_string() {
         let tmp_dir = tempdir().unwrap();
         let tmp_path = Utf8PathBuf::from_path_buf(tmp_dir.path().to_path_buf()).unwrap();
-        let (_, board_path, _) = new_board_with_version_or_version_file(
+        let (_, board_path, _) = new_board_with_version_repo_fields(
             tmp_path,
             Some("fake_version".to_string()),
+            None,
+            None,
             None,
         );
 
         // Ensure the Board config has the correct version string.
         let board = BoardInformation::from_dir(board_path).unwrap();
         let expected = "fake_version".to_string();
-        assert_eq!(expected, board.release_version.unwrap());
+        assert_eq!(expected, board.release_info.unwrap().info.version);
     }
 
     #[test]
@@ -272,12 +293,61 @@ mod tests {
         version_file.unwrap().write_all("fake_version".as_bytes()).unwrap();
 
         let (_, board_path, _) =
-            new_board_with_version_or_version_file(tmp_path, None, Some(version_file_path));
+            new_board_with_version_repo_fields(tmp_path, None, Some(version_file_path), None, None);
 
         // Ensure the Board config has the correct version string.
         let board = BoardInformation::from_dir(board_path).unwrap();
         let expected = "fake_version".to_string();
-        assert_eq!(expected, board.release_version.unwrap());
+        assert_eq!(expected, board.release_info.unwrap().info.version);
+    }
+
+    #[test]
+    fn test_new_board_unknown_repository() {
+        let tmp_dir = tempdir().unwrap();
+        let tmp_path = Utf8PathBuf::from_path_buf(tmp_dir.path().to_path_buf()).unwrap();
+        let (_, board_path, _) =
+            new_board_with_version_repo_fields(tmp_path, None, None, None, None);
+
+        // Ensure the Board config has the correct repository string.
+        let board = BoardInformation::from_dir(board_path).unwrap();
+        let expected = "unknown".to_string();
+        assert_eq!(expected, board.release_info.unwrap().info.repository);
+    }
+
+    #[test]
+    fn test_new_board_repository_string() {
+        let tmp_dir = tempdir().unwrap();
+        let tmp_path = Utf8PathBuf::from_path_buf(tmp_dir.path().to_path_buf()).unwrap();
+        let (_, board_path, _) = new_board_with_version_repo_fields(
+            tmp_path,
+            None,
+            None,
+            Some("fake_repository".to_string()),
+            None,
+        );
+
+        // Ensure the Board config has the correct repository string.
+        let board = BoardInformation::from_dir(board_path).unwrap();
+        let expected = "fake_repository".to_string();
+        assert_eq!(expected, board.release_info.unwrap().info.repository);
+    }
+
+    #[test]
+    fn test_new_board_repository_file() {
+        let tmp_dir = tempdir().unwrap();
+        let tmp_path = Utf8PathBuf::from_path_buf(tmp_dir.path().to_path_buf()).unwrap();
+
+        let repo_file_path = tmp_path.join("repo.txt");
+        let repo_file = File::create(&repo_file_path);
+        repo_file.unwrap().write_all("fake_repository".as_bytes()).unwrap();
+
+        let (_, board_path, _) =
+            new_board_with_version_repo_fields(tmp_path, None, None, None, Some(repo_file_path));
+
+        // Ensure the Board config has the correct repository string.
+        let board = BoardInformation::from_dir(board_path).unwrap();
+        let expected = "fake_repository".to_string();
+        assert_eq!(expected, board.release_info.unwrap().info.repository);
     }
 
     #[test]
@@ -298,7 +368,8 @@ mod tests {
         let board_path = tmp_path.join("my_board");
         let board = BoardInformation {
             name: "my_board".to_string(),
-            release_version: Some("fake_version".to_string()),
+            release_version: None,
+            release_info: None,
             hardware_info: Default::default(),
             provided_features: Default::default(),
             devicetree: Default::default(),
@@ -332,6 +403,7 @@ mod tests {
             )]
             .into(),
             release_version: None,
+            release_info: None,
         };
         bib_set.write_to_dir(&bib_set_path, None::<Utf8PathBuf>).unwrap();
 

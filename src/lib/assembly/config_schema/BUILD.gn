@@ -100,6 +100,7 @@ rustc_library("config_schema") {
     "src/platform_config/usb_config.rs",
     "src/platform_config/virtualization_config.rs",
     "src/product_config.rs",
+    "src/release_info.rs",
   ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }

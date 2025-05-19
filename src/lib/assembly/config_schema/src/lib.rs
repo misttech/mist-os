@@ -13,6 +13,7 @@ pub mod developer_overrides;
 pub mod image_assembly_config;
 pub mod platform_config;
 pub mod product_config;
+pub mod release_info;
 
 pub use assembly_config::AssemblyConfig;
 pub use board_config::{BoardInformation, BoardInputBundle, BoardProvidedConfig};

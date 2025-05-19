@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::common::{PackageDetails, PackagedDriverDetails};
 use crate::platform_config::sysmem_config::BoardSysmemConfig;
+use crate::release_info::{BoardReleaseInfo, ReleaseInfo};
 use anyhow::Result;
 use assembly_constants::Arm64DebugDapSoc;
 use assembly_container::{assembly_container, AssemblyContainer, DirectoryPathBuf, WalkPaths};
@@ -111,11 +112,18 @@ pub struct BoardInformation {
     pub tee_trusted_app_guids: Vec<uuid::Uuid>,
 
     /// Release version that this board config corresponds to.
-    /// TODO(https://fxbug.dev/397489730): Make this a mandatory field
-    /// once these changes have rolled into all downstream repositories.
+    /// TODO(https://fxbug.dev/416239346): Remove once all downstream
+    /// repositories start using release_info below.
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub release_version: Option<String>,
+
+    /// Release information about this assembly container artifact.
+    /// TODO(https://fxbug.dev/416239346): Make this a mandatory field
+    /// once these changes have rolled into all downstream repositories.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_info: Option<BoardReleaseInfo>,
 }
 
 /// This struct defines board-provided data for the 'fuchsia.hwinfo.Board' fidl
@@ -189,11 +197,18 @@ pub struct BoardInputBundle {
     pub configuration: Option<BoardProvidedConfig>,
 
     /// Release version that this board config corresponds to.
-    /// TODO: https://fxbug.dev/397489730 - Make this a mandatory field
-    /// once these changes have rolled into all downstream repositories.
+    /// TODO(https://fxbug.dev/416239346): Remove once all downstream
+    /// repositories start using release_info below.
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub release_version: Option<String>,
+
+    /// Release information about this assembly container artifact.
+    /// TODO(https://fxbug.dev/416239346): Make this a mandatory field
+    /// once these changes have rolled into all downstream repositories.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_info: Option<ReleaseInfo>,
 }
 
 /// This struct defines board-provided configuration for platform services and
@@ -516,7 +531,7 @@ mod test {
                 "development_support": {
                     "enable_debug_access_port_for_soc": "amlogic-t931g",
                 }
-            }
+            },
         });
         serde_json::to_writer(config_file, &json).unwrap();
         let resolved = BoardInformation::from_dir(&dir_path).unwrap();

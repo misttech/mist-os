@@ -12,6 +12,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::common::{path_schema, vec_path_schema, DriverDetails};
+use crate::release_info::ProductReleaseInfo;
 
 /// The Product-provided configuration details.
 #[derive(Debug, Default, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
@@ -73,11 +74,18 @@ pub struct ProductConfig {
     pub bootfs_files_package: Option<Utf8PathBuf>,
 
     /// Release version that this product config corresponds to.
-    /// TODO(https://fxbug.dev/397489730): Make this a mandatory field
-    /// once these changes have rolled into all downstream repositories.
+    /// TODO(https://fxbug.dev/416239346): Remove once all downstream
+    /// repositories start using release_info below.
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub release_version: Option<String>,
+
+    /// Release information about this assembly container artifact.
+    /// TODO(https://fxbug.dev/416239346): Make this a mandatory field
+    /// once these changes have rolled into all downstream repositories.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_info: Option<ProductReleaseInfo>,
 }
 
 /// Packages provided by the product, to add to the assembled images.
@@ -718,7 +726,7 @@ mod tests {
         let serialized = serde_json::to_value(product_config).unwrap();
         let expected = serde_json::json!(
             {
-                "tee": "no_tee"
+                "tee": "no_tee",
             }
         );
         assert_eq!(serialized, expected);
@@ -734,12 +742,13 @@ mod tests {
                     "global_platform": {
                         "clients": []
                     }
-                }
+                },
             }
         );
         assert_eq!(serialized, expected);
 
-        let product_config = ProductConfig { tee: Tee::Proprietary(ProprietaryTee { tee_manager_url: String::from("fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm") }), ..Default::default() };
+        let product_config = ProductConfig { tee: Tee::Proprietary(ProprietaryTee { tee_manager_url: String::from("fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm") }),
+            ..Default::default() };
         let serialized = serde_json::to_value(product_config).unwrap();
         let expected = serde_json::json!(
             {
@@ -747,7 +756,7 @@ mod tests {
                     "proprietary": {
                         "tee_manager_url": "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm"
                     }
-                }
+                },
             }
         );
         assert_eq!(serialized, expected);
