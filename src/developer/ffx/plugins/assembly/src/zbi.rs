@@ -5,10 +5,10 @@
 use crate::base_package::BasePackage;
 
 use anyhow::{anyhow, Context, Result};
+use assembled_system::{AssembledSystem, Image};
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_constants::BootfsDestination;
 use assembly_images_config::Zbi;
-use assembly_manifest::{AssemblyManifest, Image};
 use assembly_package_list::{PackageList, WritablePackageList};
 use assembly_tool::Tool;
 use assembly_util::{InsertUniqueExt, MapEntry};
@@ -22,7 +22,7 @@ use zbi::ZbiBuilder;
 #[allow(clippy::too_many_arguments)]
 pub fn construct_zbi(
     zbi_tool: Box<dyn Tool>,
-    assembly_manifest: &mut AssemblyManifest,
+    assembled_system: &mut AssembledSystem,
     gendir: impl AsRef<Utf8Path>,
     product: &ImageAssemblyConfig,
     zbi_config: &Zbi,
@@ -131,9 +131,7 @@ pub fn construct_zbi(
     // Only add the unsigned ZBI to the images manifest if we will not be signing the ZBI.
     let zbi_path_relative = path_relative_from_current_dir(zbi_path)?;
     if zbi_config.postprocessing_script.is_none() {
-        assembly_manifest
-            .images
-            .push(Image::ZBI { path: zbi_path_relative.clone(), signed: false });
+        assembled_system.images.push(Image::ZBI { path: zbi_path_relative.clone(), signed: false });
     }
 
     Ok(zbi_path_relative)
@@ -143,7 +141,7 @@ pub fn construct_zbi(
 /// the bootloaders, then perform that task here.
 pub fn vendor_sign_zbi(
     signing_tool: Box<dyn Tool>,
-    assembly_manifest: &mut AssemblyManifest,
+    assembled_system: &mut AssembledSystem,
     gendir: impl AsRef<Utf8Path>,
     zbi_config: &Zbi,
     zbi: impl AsRef<Utf8Path>,
@@ -178,7 +176,7 @@ pub fn vendor_sign_zbi(
         copy(&signed_path, &output_zbi_path).context("Copy signed zbi")?;
     }
 
-    assembly_manifest.images.push(Image::ZBI { path: output_zbi_path.clone(), signed: true });
+    assembled_system.images.push(Image::ZBI { path: output_zbi_path.clone(), signed: true });
     Ok(output_zbi_path)
 }
 
@@ -187,11 +185,11 @@ mod tests {
     use super::{construct_zbi, vendor_sign_zbi};
 
     use crate::base_package::BasePackage;
+    use assembled_system::AssembledSystem;
     use assembly_config_schema::ImageAssemblyConfig;
     use assembly_constants::BootfsDestination;
     use assembly_file_relative_path::FileRelativePathBuf;
     use assembly_images_config::{PostProcessingScript, Zbi, ZbiCompression};
-    use assembly_manifest::AssemblyManifest;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::{ToolCommandLog, ToolProvider};
     use camino::{Utf8Path, Utf8PathBuf};
@@ -250,11 +248,11 @@ mod tests {
         let tools = FakeToolProvider::default();
         let zbi_tool = tools.get_tool("zbi").unwrap();
 
-        let mut assembly_manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
         construct_zbi(
             zbi_tool,
-            &mut assembly_manifest,
+            &mut assembled_system,
             dir,
             &product_config,
             &zbi_config,
@@ -276,11 +274,11 @@ mod tests {
         let tools = FakeToolProvider::default();
         let zbi_tool = tools.get_tool("zbi").unwrap();
 
-        let mut assembly_manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
         construct_zbi(
             zbi_tool,
-            &mut assembly_manifest,
+            &mut assembled_system,
             dir,
             &product_config,
             &zbi_config,
@@ -349,10 +347,10 @@ mod tests {
         // Sign the zbi.
         let tools = FakeToolProvider::default();
         let signing_tool = tools.get_tool("fake").unwrap();
-        let mut assembly_manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
         let signed_zbi_path =
-            vendor_sign_zbi(signing_tool, &mut assembly_manifest, dir, &zbi, &zbi_path).unwrap();
+            vendor_sign_zbi(signing_tool, &mut assembled_system, dir, &zbi, &zbi_path).unwrap();
         assert_eq!(signed_zbi_path, expected_output);
 
         let expected_commands: ToolCommandLog = serde_json::from_value(json!({

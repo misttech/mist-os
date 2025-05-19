@@ -6,7 +6,7 @@
 
 use anyhow::{Context, Result};
 use argh::FromArgs;
-use assembly_manifest::{AssemblyManifest, Image};
+use assembled_system::{AssembledSystem, Image};
 use camino::Utf8PathBuf;
 use sdk_metadata::ProductBundle;
 
@@ -201,7 +201,7 @@ impl GenerateBuildArchive {
         }
 
         // Write the images manifest with the rebased image paths.
-        let images_manifest = AssemblyManifest {
+        let images_manifest = AssembledSystem {
             images,
             board_name: product_bundle.partitions.hardware_revision.clone(),
         };

@@ -97,7 +97,7 @@ if (is_fuchsia) {
     board_config = "$target_out_dir/board_config.json"
 
     assembly_outdir = "$target_out_dir/assembly"
-    assembly_manifest = "$assembly_outdir/images.json"
+    assembled_system = "$assembly_outdir/images.json"
     zbi = "$assembly_outdir/assembly.zbi"
     qemu_kernel = qemu_boot_shim.path
 
@@ -154,7 +154,7 @@ if (is_fuchsia) {
       ":version",
     ]
     partitions = ":partitions"
-    system_a = files.assembly_manifest
+    system_a = files.assembled_system
     system_a_contents = [
       files.qemu_kernel,
       files.zbi,

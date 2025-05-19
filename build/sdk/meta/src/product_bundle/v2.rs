@@ -20,7 +20,7 @@
 //! downloaded on another machine).
 
 use anyhow::{anyhow, Context, Result};
-use assembly_manifest::Image;
+use assembled_system::Image;
 use assembly_partitions_config::PartitionsConfig;
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_merkle::Hash;

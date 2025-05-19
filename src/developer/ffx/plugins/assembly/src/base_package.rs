@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
+use assembled_system::{AssembledSystem, Image};
 use assembly_base_package::BasePackageBuilder;
 use assembly_config_schema::ImageAssemblyConfig;
-use assembly_manifest::{AssemblyManifest, Image};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_hash::Hash;
 use fuchsia_merkle::MerkleTree;
@@ -21,7 +21,7 @@ pub struct BasePackage {
 }
 
 pub fn construct_base_package(
-    assembly_manifest: &mut AssemblyManifest,
+    assembled_system: &mut AssembledSystem,
     gendir: impl AsRef<Utf8Path>,
     name: impl AsRef<str>,
     product: &ImageAssemblyConfig,
@@ -67,7 +67,7 @@ pub fn construct_base_package(
     std::fs::write(merkle_path, hex::encode(base_merkle.as_bytes()))?;
 
     let base_package_path_relative = path_relative_from_current_dir(base_package_path)?;
-    assembly_manifest.images.push(Image::BasePackage(base_package_path_relative));
+    assembled_system.images.push(Image::BasePackage(base_package_path_relative));
     Ok(BasePackage { merkle: base_merkle, manifest_path: build_results.manifest_path })
 }
 
@@ -95,9 +95,9 @@ mod tests {
         product_config.cache.push(cache_manifest);
 
         // Construct the base package.
-        let mut assembly_manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
-        construct_base_package(&mut assembly_manifest, dir, "system_image", &product_config)
+        let mut assembled_system =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        construct_base_package(&mut assembled_system, dir, "system_image", &product_config)
             .unwrap();
 
         // Read the base package, and assert the contents are correct.
@@ -130,9 +130,9 @@ mod tests {
         product_config.cache.push(cache_manifest);
 
         // Construct the base package.
-        let mut assembly_manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
-        construct_base_package(&mut assembly_manifest, dir, "system_image", &product_config)
+        let mut assembled_system =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        construct_base_package(&mut assembled_system, dir, "system_image", &product_config)
             .unwrap();
 
         // Read the base package, and assert the contents are correct.

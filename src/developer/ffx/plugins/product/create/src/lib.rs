@@ -6,8 +6,8 @@
 //! images and packages, and can be used to emulate, flash, or update a product.
 
 use anyhow::{ensure, Context, Result};
+use assembled_system::{AssembledSystem, BlobfsContents, Image, PackagesMetadata};
 use assembly_container::AssemblyContainer;
-use assembly_manifest::{AssemblyManifest, BlobfsContents, Image, PackagesMetadata};
 use assembly_partitions_config::{PartitionImageMapper, PartitionsConfig, Slot as PartitionSlot};
 use assembly_tool::{SdkToolProvider, ToolProvider};
 use assembly_update_package::{Slot, UpdatePackageBuilder};
@@ -96,15 +96,15 @@ pub async fn pb_create_with_sdk_version(
 
     let partitions = load_partitions_config(&cmd.partitions, &cmd.out_dir.join("partitions"))?;
     let (system_a, packages_a) =
-        load_assembly_manifest(&cmd.system_a, &cmd.out_dir.join("system_a"))?;
+        load_assembled_system(&cmd.system_a, &cmd.out_dir.join("system_a"))?;
     let (system_b, _packages_b) =
-        load_assembly_manifest(&cmd.system_b, &cmd.out_dir.join("system_b"))?;
+        load_assembled_system(&cmd.system_b, &cmd.out_dir.join("system_b"))?;
     let (system_r, packages_r) =
-        load_assembly_manifest(&cmd.system_r, &cmd.out_dir.join("system_r"))?;
+        load_assembled_system(&cmd.system_r, &cmd.out_dir.join("system_r"))?;
 
     // We must assert that the board_name for the system of images matches the hardware_revision in
     // the partitions config, otherwise OTAs may not work.
-    let ensure_system_board = |system: &AssemblyManifest| -> Result<()> {
+    let ensure_system_board = |system: &AssembledSystem| -> Result<()> {
         if partitions.hardware_revision != "" {
             ensure!(
                 &system.board_name == &partitions.hardware_revision,
@@ -314,19 +314,19 @@ fn load_partitions_config(
     config.write_to_dir(out_dir, None::<Utf8PathBuf>)
 }
 
-/// Open and parse an AssemblyManifest from a path, copying the images into `out_dir`.
+/// Open and parse an AssembledSystem from a path, copying the images into `out_dir`.
 /// Returns None if the given path is None.
-fn load_assembly_manifest(
+fn load_assembled_system(
     path: &Option<Utf8PathBuf>,
     out_dir: impl AsRef<Utf8Path>,
-) -> Result<(Option<AssemblyManifest>, Vec<(Option<Utf8PathBuf>, PackageManifest)>)> {
+) -> Result<(Option<AssembledSystem>, Vec<(Option<Utf8PathBuf>, PackageManifest)>)> {
     let out_dir = out_dir.as_ref();
 
     if let Some(path) = path {
         // Make sure `out_dir` is created.
         std::fs::create_dir_all(&out_dir).context("Creating the out_dir")?;
 
-        let manifest = AssemblyManifest::try_load_from(path)
+        let system = AssembledSystem::try_load_from(path)
             .with_context(|| format!("Loading assembly manifest: {}", path))?;
 
         // Filter out the base package, and the blobfs contents.
@@ -345,7 +345,7 @@ fn load_assembly_manifest(
         let mut has_zbi = false;
         let mut has_vbmeta = false;
         let mut has_dtbo = false;
-        for image in manifest.images.into_iter() {
+        for image in system.images.into_iter() {
             match image {
                 Image::BasePackage(..) => {}
                 Image::Fxfs { path, contents } => {
@@ -398,10 +398,7 @@ fn load_assembly_manifest(
             new_images.push(image);
         }
 
-        Ok((
-            Some(AssemblyManifest { images: new_images, board_name: manifest.board_name }),
-            packages,
-        ))
+        Ok((Some(AssembledSystem { images: new_images, board_name: system.board_name }), packages))
     } else {
         Ok((None, vec![]))
     }
@@ -477,13 +474,13 @@ mod test {
     }
 
     #[test]
-    fn test_load_assembly_manifest() {
+    fn test_load_assembled_system() {
         let temp = TempDir::new().unwrap();
         let tempdir = Utf8Path::from_path(temp.path()).unwrap();
         let pb_dir = tempdir.join("pb");
 
         let manifest_path = tempdir.join("manifest.json");
-        AssemblyManifest { images: Default::default(), board_name: "my_board".into() }
+        AssembledSystem { images: Default::default(), board_name: "my_board".into() }
             .write(&manifest_path)
             .unwrap();
 
@@ -491,14 +488,14 @@ mod test {
         let mut error_file = File::create(&error_path).unwrap();
         error_file.write_all("error".as_bytes()).unwrap();
 
-        let (parsed, packages) = load_assembly_manifest(&Some(manifest_path), &pb_dir).unwrap();
+        let (parsed, packages) = load_assembled_system(&Some(manifest_path), &pb_dir).unwrap();
         assert!(parsed.is_some());
         assert_eq!(packages, Vec::new());
 
-        let error = load_assembly_manifest(&Some(error_path), &pb_dir);
+        let error = load_assembled_system(&Some(error_path), &pb_dir);
         assert!(error.is_err());
 
-        let (none, _) = load_assembly_manifest(&None, &pb_dir).unwrap();
+        let (none, _) = load_assembled_system(&None, &pb_dir).unwrap();
         assert!(none.is_none());
     }
 
@@ -571,7 +568,7 @@ mod test {
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
         let system_path = tempdir.join("system.json");
-        AssemblyManifest { images: Default::default(), board_name: "my_board".into() }
+        AssembledSystem { images: Default::default(), board_name: "my_board".into() }
             .write(&system_path)
             .unwrap();
 
@@ -633,7 +630,7 @@ mod test {
 
         let system_path = tempdir.join("system.json");
         let mut manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
         manifest.images = vec![
             Image::ZBI { path: Utf8PathBuf::from("path1"), signed: false },
             Image::ZBI { path: Utf8PathBuf::from("path2"), signed: true },
@@ -680,7 +677,7 @@ mod test {
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
         let system_path = tempdir.join("system.json");
-        AssemblyManifest { images: Default::default(), board_name: "my_board".into() }
+        AssembledSystem { images: Default::default(), board_name: "my_board".into() }
             .write(&system_path)
             .unwrap();
 

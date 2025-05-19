@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 //! FFX plugin for the paths of a group of artifacts inside product bundle.
-use assembly_manifest::Image;
+use assembled_system::Image;
 use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_config::EnvironmentContext;

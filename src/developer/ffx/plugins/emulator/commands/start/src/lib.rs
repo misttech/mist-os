@@ -565,7 +565,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_manifest::Image;
+    use assembled_system::Image;
     use assembly_partitions_config::PartitionsConfig;
     use camino::{Utf8Path, Utf8PathBuf};
     use emulator_instance::{LogLevel, RuntimeConfig};

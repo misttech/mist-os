@@ -7,7 +7,7 @@
 //! to a minimum, while improving our ability to fully test the conversion code.
 
 use anyhow::{anyhow, bail, Result};
-use assembly_manifest::Image;
+use assembled_system::Image;
 use emulator_instance::{
     DeviceConfig, DiskImage, EmulatorConfiguration, GuestConfig, PortMapping, VirtualCpu,
 };
@@ -103,7 +103,7 @@ fn convert_v2_bundle_to_configs(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_manifest::BlobfsContents;
+    use assembled_system::BlobfsContents;
     use assembly_partitions_config::{BootloaderPartition, PartitionsConfig};
     use camino::Utf8PathBuf;
     use sdk_metadata::virtual_device::{Cpu, Hardware};

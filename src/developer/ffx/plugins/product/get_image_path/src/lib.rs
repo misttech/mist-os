@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 //! FFX plugin for get a path of the image inside product bundle.
-use assembly_manifest::Image;
+use assembled_system::Image;
 use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_config::EnvironmentContext;
@@ -162,8 +162,8 @@ impl PbGetImagePathTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assembled_system::BlobfsContents;
     use assembly_container::AssemblyContainer;
-    use assembly_manifest::BlobfsContents;
     use assembly_partitions_config::PartitionsConfig;
     use ffx_config::ConfigLevel;
     use ffx_writer::{Format, TestBuffers};

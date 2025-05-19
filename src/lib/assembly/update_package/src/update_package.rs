@@ -4,9 +4,9 @@
 
 use ::update_package::{ImageMetadata, ImagePackagesManifest};
 use anyhow::{anyhow, bail, Context, Result};
+use assembled_system::{AssembledSystem, Image};
 use assembly_blob_size::BlobSizeCalculator;
 use assembly_images_config::BlobfsLayout;
-use assembly_manifest::{AssemblyManifest, Image};
 use assembly_partitions_config::{PartitionsConfig, RecoveryStyle};
 use assembly_tool::ToolProvider;
 use assembly_update_packages_manifest::UpdatePackagesManifest;
@@ -73,15 +73,15 @@ pub struct UpdatePackageBuilder {
 /// A set of images to be updated in a particular slot.
 pub enum Slot {
     /// A or B slots.
-    Primary(AssemblyManifest),
+    Primary(AssembledSystem),
 
     /// R slot.
-    Recovery(AssemblyManifest),
+    Recovery(AssembledSystem),
 }
 
 impl Slot {
     /// Get the image manifest.
-    fn manifest(&self) -> &AssemblyManifest {
+    fn manifest(&self) -> &AssembledSystem {
         match self {
             Slot::Primary(m) => m,
             Slot::Recovery(m) => m,
@@ -294,7 +294,7 @@ impl UpdatePackageBuilder {
         }
         let mut firmware_images = Vec::<FirmwareImage>::new();
 
-        let mut assembly_manifest = ImagePackagesManifest::builder();
+        let mut assembled_system = ImagePackagesManifest::builder();
 
         // Generate the update_images_fuchsia package.
         let mut builder = self.make_subpackage_builder("images_fuchsia")?;
@@ -318,7 +318,7 @@ impl UpdatePackageBuilder {
 
             let (url, manifest) = builder.build()?;
             package_manifests.push(manifest);
-            assembly_manifest.fuchsia_package(
+            assembled_system.fuchsia_package(
                 zbi.metadata(url.clone())?,
                 vbmeta.map(|vbmeta| vbmeta.metadata(url)).transpose()?,
             );
@@ -361,7 +361,7 @@ impl UpdatePackageBuilder {
                     let (url, manifest) = builder.build()?;
                     package_manifests.push(manifest);
 
-                    assembly_manifest.recovery_package(
+                    assembled_system.recovery_package(
                         zbi.metadata(url.clone())?,
                         vbmeta.map(|vbmeta| vbmeta.metadata(url)).transpose()?,
                     );
@@ -407,13 +407,13 @@ impl UpdatePackageBuilder {
                 );
             }
 
-            assembly_manifest.firmware_package(firmware);
+            assembled_system.firmware_package(firmware);
         } else {
             let (_, manifest) = builder.build()?;
             package_manifests.push(manifest);
         }
 
-        let assembly_manifest = assembly_manifest.build();
+        let assembled_system = assembled_system.build();
 
         // Generate the update package itself.
         let mut builder = self.make_subpackage_builder("")?;
@@ -424,7 +424,7 @@ impl UpdatePackageBuilder {
         )?;
         builder.package.add_contents_as_blob(
             "images.json",
-            to_string(&assembly_manifest)?,
+            to_string(&assembled_system)?,
             &self.gendir,
         )?;
         builder.package.add_contents_as_blob(
@@ -516,7 +516,7 @@ mod tests {
         let fake_zbi_tmp = NamedTempFile::new().unwrap();
         let fake_zbi = Utf8Path::from_path(fake_zbi_tmp.path()).unwrap();
 
-        builder.add_slot_images(Slot::Primary(AssemblyManifest {
+        builder.add_slot_images(Slot::Primary(AssembledSystem {
             images: vec![Image::ZBI { path: fake_zbi.to_path_buf(), signed: true }],
             board_name: "my_board".into(),
         }));
@@ -658,7 +658,7 @@ mod tests {
         let fake_zbi = Utf8Path::from_path(fake_zbi_tmp.path()).unwrap();
         let fake_dtbo = Utf8Path::from_path(fake_dtbo_tmp.path()).unwrap();
 
-        builder.add_slot_images(Slot::Primary(AssemblyManifest {
+        builder.add_slot_images(Slot::Primary(AssembledSystem {
             images: vec![
                 Image::ZBI { path: fake_zbi.to_path_buf(), signed: true },
                 Image::Dtbo(fake_dtbo.to_path_buf()),
@@ -673,7 +673,7 @@ mod tests {
         let fake_recovery_vbmeta_tmp = NamedTempFile::new().unwrap();
         let fake_recovery_vbmeta = Utf8Path::from_path(fake_recovery_vbmeta_tmp.path()).unwrap();
 
-        builder.add_slot_images(Slot::Recovery(AssemblyManifest {
+        builder.add_slot_images(Slot::Recovery(AssembledSystem {
             images: vec![
                 Image::ZBI { path: fake_recovery_zbi.to_path_buf(), signed: true },
                 Image::VBMeta(fake_recovery_vbmeta.to_path_buf()),
@@ -868,7 +868,7 @@ mod tests {
         let fake_recovery_vbmeta_tmp = NamedTempFile::new().unwrap();
         let fake_recovery_vbmeta = Utf8Path::from_path(fake_recovery_vbmeta_tmp.path()).unwrap();
 
-        builder.add_slot_images(Slot::Recovery(AssemblyManifest {
+        builder.add_slot_images(Slot::Recovery(AssembledSystem {
             images: vec![
                 Image::ZBI { path: fake_recovery_zbi.to_path_buf(), signed: true },
                 Image::VBMeta(fake_recovery_vbmeta.to_path_buf()),

@@ -5,7 +5,7 @@
 use crate::operations::size_check::breakdown::{SizeBreakdown, SizeResult};
 use crate::operations::size_check::visualization::generate_visualization;
 use anyhow::{format_err, Context, Result};
-use assembly_manifest::{AssemblyManifest, BlobfsContents, Image};
+use assembled_system::{AssembledSystem, BlobfsContents, Image};
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_assembly_args::{AuthMode, ProductSizeCheckArgs};
 use serde_json::json;
@@ -20,17 +20,17 @@ const RESOURCES_CREEP_BUDGET: &u64 = &2097152; // 2.0 MiB
 
 /// Verifies that the product budget is not exceeded.
 pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> {
-    let assembly_manifest = if args.assembly_manifest.starts_with("gs://") {
+    let assembled_system = if args.assembly_manifest.starts_with("gs://") {
         let (bucket, object) = split_gs_url(args.assembly_manifest.as_str())?;
         let output_path = gcs_download(bucket, object, args.auth.clone())
             .await
             .context("download assembly manifest")?;
-        AssemblyManifest::try_load_from(output_path)?
+        AssembledSystem::try_load_from(output_path)?
     } else {
-        AssemblyManifest::try_load_from(&args.assembly_manifest)?
+        AssembledSystem::try_load_from(&args.assembly_manifest)?
     };
 
-    let blobfs_contents = match extract_blob_contents(&assembly_manifest) {
+    let blobfs_contents = match extract_blob_contents(&assembled_system) {
         Some(contents) => contents,
         None => {
             log::info!("No blobfs image was found in {}", args.assembly_manifest);
@@ -56,18 +56,18 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
     }
 
     if let Some(base_assembly_manifest) = args.base_assembly_manifest {
-        let other_assembly_manifest = if base_assembly_manifest.starts_with("gs://") {
+        let other_assembled_system = if base_assembly_manifest.starts_with("gs://") {
             let (bucket, object) = split_gs_url(base_assembly_manifest.as_str())?;
             let output_path = gcs_download(bucket, object, args.auth)
                 .await
                 .context("download base assembly manifest")?;
-            AssemblyManifest::try_load_from(output_path)?
+            AssembledSystem::try_load_from(output_path)?
         } else {
-            AssemblyManifest::try_load_from(&base_assembly_manifest)?
+            AssembledSystem::try_load_from(&base_assembly_manifest)?
         };
 
         let other_blobfs_contents =
-            extract_blob_contents(&other_assembly_manifest).ok_or_else(|| {
+            extract_blob_contents(&other_assembled_system).ok_or_else(|| {
                 format_err!(
                     "Attempted to diff with {} which does not contain a blobfs image",
                     base_assembly_manifest
@@ -159,8 +159,8 @@ async fn gcs_download(bucket: &str, object: &str, auth_mode: AuthMode) -> Result
 }
 
 /// Extracts the blob contents from the images manifest.
-fn extract_blob_contents(assembly_manifest: &AssemblyManifest) -> Option<&BlobfsContents> {
-    for image in &assembly_manifest.images {
+fn extract_blob_contents(assembled_system: &AssembledSystem) -> Option<&BlobfsContents> {
+    for image in &assembled_system.images {
         match image {
             Image::BlobFS { contents, .. } => {
                 return Some(contents);
@@ -197,7 +197,7 @@ fn create_gerrit_report(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_manifest::{PackageMetadata, PackageSetMetadata, PackagesMetadata};
+    use assembled_system::{PackageMetadata, PackageSetMetadata, PackagesMetadata};
     use serde_json::json;
 
     #[test]
@@ -213,16 +213,16 @@ mod tests {
             },
             maximum_contents_size: Some(1234),
         };
-        let mut assembly_manifest = AssemblyManifest {
+        let mut assembled_system = AssembledSystem {
             images: vec![Image::VBMeta("a/b/c".into()), Image::FVM("x/y/z".into())],
             board_name: "my_board".into(),
         };
-        assert_eq!(extract_blob_contents(&assembly_manifest), None);
-        assembly_manifest
+        assert_eq!(extract_blob_contents(&assembled_system), None);
+        assembled_system
             .images
             .push(Image::BlobFS { path: "path/to/blob.blk".into(), contents: blobfs_contents });
         let blobfs_contents =
-            extract_blob_contents(&assembly_manifest).expect("blobfs contents is found");
+            extract_blob_contents(&assembled_system).expect("blobfs contents is found");
         assert_eq!(blobfs_contents.maximum_contents_size, Some(1234));
         Ok(())
     }

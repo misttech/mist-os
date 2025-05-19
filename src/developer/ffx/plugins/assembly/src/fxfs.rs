@@ -5,10 +5,10 @@
 use crate::base_package::BasePackage;
 
 use anyhow::{Context, Result};
+use assembled_system::BlobfsContents;
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_fxfs::FxfsBuilder;
 use assembly_images_config::Fxfs;
-use assembly_manifest::BlobfsContents;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::HashMap;
 
@@ -79,9 +79,9 @@ pub async fn construct_fxfs(
 mod tests {
     use super::{construct_fxfs, ConstructedFxfs};
     use crate::base_package::construct_base_package;
+    use assembled_system::AssembledSystem;
     use assembly_config_schema::ImageAssemblyConfig;
     use assembly_images_config::Fxfs;
-    use assembly_manifest::AssemblyManifest;
     use camino::{Utf8Path, Utf8PathBuf};
     use serde_json::json;
     use std::fs::File;
@@ -154,10 +154,10 @@ mod tests {
         product_config.cache.push(cache_manifest);
 
         // Construct the base package.
-        let mut assembly_manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
         let base_package =
-            construct_base_package(&mut assembly_manifest, dir, "system_image", &product_config)
+            construct_base_package(&mut assembled_system, dir, "system_image", &product_config)
                 .unwrap();
 
         let size_byteses = vec![None, Some(32 * 1024 * 1024)];

@@ -7,8 +7,8 @@
 //! Reading and writing a manifest specifying all the images generated as part
 //! of Image Assembly.
 
-mod assembly_manifest;
+mod assembled_system;
 
-pub use assembly_manifest::{
-    AssemblyManifest, BlobfsContents, Image, PackageMetadata, PackageSetMetadata, PackagesMetadata,
+pub use assembled_system::{
+    AssembledSystem, BlobfsContents, Image, PackageMetadata, PackageSetMetadata, PackagesMetadata,
 };

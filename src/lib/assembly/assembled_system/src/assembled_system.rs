@@ -15,9 +15,9 @@ use utf8_path::path_relative_from;
 /// A manifest containing a list of images produced by the Image Assembler.
 ///
 /// ```
-/// use assembly_manifest::AssemblyManifest;
+/// use assembled_system::AssembledSystem;
 ///
-/// let manifest = AssemblyManifest {
+/// let manifest = AssembledSystem {
 ///     images: vec![
 ///         Image::ZBI {
 ///             path: "path/to/fuchsia.zbi",
@@ -34,7 +34,7 @@ use utf8_path::path_relative_from;
 /// ```
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct AssemblyManifest {
+pub struct AssembledSystem {
     /// List of images in the manifest.
     pub images: Vec<Image>,
     /// The board name that these images can be OTA'd to, which will be used to create an update
@@ -45,7 +45,7 @@ pub struct AssemblyManifest {
     pub board_name: String,
 }
 
-/// Private helper for serializing the AssemblyManifest. An AssemblyManifest cannot be deserialized
+/// Private helper for serializing the AssembledSystem. An AssembledSystem cannot be deserialized
 /// without going through `try_from_path` in order to require that we use this helper
 /// which ensure that the paths get relativized/derelativized properly
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -54,7 +54,7 @@ struct SerializationHelper {
     board_name: String,
 }
 
-/// An item in the AssemblyManifest.
+/// An item in the AssembledSystem.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Image {
     /// Base Package.
@@ -165,11 +165,11 @@ impl Image {
     }
 }
 
-impl AssemblyManifest {
+impl AssembledSystem {
     /// Return a new Assembly Manifest with all the paths relativized to a
     /// target path
-    fn relativize(mut self, base_path: impl AsRef<Utf8Path>) -> Result<AssemblyManifest> {
-        // Change the images list in-place so fields can be added to the AssemblyManifest without
+    fn relativize(mut self, base_path: impl AsRef<Utf8Path>) -> Result<AssembledSystem> {
+        // Change the images list in-place so fields can be added to the AssembledSystem without
         // changing this method
         let mut images = Vec::default();
         for image in self.images {
@@ -215,10 +215,10 @@ impl AssemblyManifest {
         Ok(self)
     }
 
-    /// Return a new Assembly manifest with all the paths made joined to the
+    /// Return a new AssembledSystem with all the paths made joined to the
     /// provided directory where the manifest is located
-    fn derelativize(mut self, manifest_dir: impl AsRef<Utf8Path>) -> Result<AssemblyManifest> {
-        // Change the images list in-place so fields can be added to the AssemblyManifest without
+    fn derelativize(mut self, manifest_dir: impl AsRef<Utf8Path>) -> Result<AssembledSystem> {
+        // Change the images list in-place so fields can be added to the AssembledSystem without
         // changing this method
         let mut images = Vec::default();
         for image in self.images {
@@ -260,12 +260,12 @@ impl AssemblyManifest {
         Ok(self)
     }
 
-    /// Load an AssemblyManifest from a path on disk, handling path
+    /// Load an AssembledSystem from a path on disk, handling path
     /// relativization
     pub fn try_load_from(path: impl AsRef<Utf8Path>) -> Result<Self> {
         let deserialized: SerializationHelper = assembly_util::read_config(path.as_ref())?;
         let manifest =
-            AssemblyManifest { images: deserialized.images, board_name: deserialized.board_name };
+            AssembledSystem { images: deserialized.images, board_name: deserialized.board_name };
         manifest.derelativize(path.as_ref().parent().context("Invalid path")?)
     }
 
@@ -275,7 +275,7 @@ impl AssemblyManifest {
     pub fn write(self, path: impl AsRef<Utf8Path>) -> Result<()> {
         let path = path.as_ref();
         // Relativize the paths in the Assembly Manifest
-        let assembly_manifest =
+        let assembled_system =
             self.relativize(path.parent().with_context(|| format!("Invalid output path {path}"))?)?;
 
         // Write the images manifest.
@@ -283,8 +283,8 @@ impl AssemblyManifest {
         serde_json::to_writer_pretty(
             images_json,
             &SerializationHelper {
-                images: assembly_manifest.images,
-                board_name: assembly_manifest.board_name,
+                images: assembled_system.images,
+                board_name: assembled_system.board_name,
             },
         )
         .context("Writing assembly manifest")?;
@@ -297,12 +297,12 @@ impl AssemblyManifest {
     pub fn write_old(self, path: impl AsRef<Utf8Path>) -> Result<()> {
         let path = path.as_ref();
         // Relativize the paths in the Assembly Manifest
-        let assembly_manifest =
+        let assembled_system =
             self.relativize(path.parent().with_context(|| format!("Invalid output path {path}"))?)?;
 
         // Write the images manifest.
         let images_json = File::create(path).context("Creating assembly manifest")?;
-        serde_json::to_writer_pretty(images_json, &assembly_manifest.images)
+        serde_json::to_writer_pretty(images_json, &assembled_system.images)
             .context("Writing assembly manifest")?;
         Ok(())
     }
@@ -661,7 +661,7 @@ mod tests {
 
     #[test]
     fn relativize() {
-        let manifest = AssemblyManifest {
+        let manifest = AssembledSystem {
             images: vec![
                 Image::BasePackage("base.far".into()),
                 Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
@@ -683,7 +683,7 @@ mod tests {
 
     #[test]
     fn relativize_fxfs() {
-        let manifest = AssemblyManifest {
+        let manifest = AssembledSystem {
             images: vec![
                 Image::BasePackage("base.far".into()),
                 Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
@@ -703,7 +703,7 @@ mod tests {
 
     #[test]
     fn derelativize() {
-        let manifest = AssemblyManifest {
+        let manifest = AssembledSystem {
             images: vec![
                 Image::BasePackage("base.far".into()),
                 Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
@@ -725,7 +725,7 @@ mod tests {
 
     #[test]
     fn derelativize_fxfs() {
-        let manifest = AssemblyManifest {
+        let manifest = AssembledSystem {
             images: vec![
                 Image::BasePackage("base.far".into()),
                 Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
@@ -745,7 +745,7 @@ mod tests {
 
     #[test]
     fn serialize() {
-        let manifest = AssemblyManifest {
+        let manifest = AssembledSystem {
             images: vec![
                 Image::BasePackage("path/to/base.far".into()),
                 Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: true },
@@ -772,7 +772,7 @@ mod tests {
 
     #[test]
     fn serialize_fxfs() {
-        let manifest = AssemblyManifest {
+        let manifest = AssembledSystem {
             images: vec![
                 Image::BasePackage("path/to/base.far".into()),
                 Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: true },
@@ -800,7 +800,7 @@ mod tests {
 
     #[test]
     fn serialize_unsigned_zbi() {
-        let manifest = AssemblyManifest {
+        let manifest = AssembledSystem {
             images: vec![Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: false }],
             board_name: "my_board".into(),
         };
@@ -828,7 +828,7 @@ mod tests {
 
     #[test]
     fn deserialize() {
-        let manifest: AssemblyManifest = generate_test_manifest();
+        let manifest: AssembledSystem = generate_test_manifest();
         assert_eq!(manifest.board_name, "my_board".to_string());
         assert_eq!(manifest.images.len(), 9);
 
@@ -857,7 +857,7 @@ mod tests {
 
     #[test]
     fn deserialize_fxfs() {
-        let manifest: AssemblyManifest = generate_test_manifest_fxfs();
+        let manifest: AssembledSystem = generate_test_manifest_fxfs();
         assert_eq!(manifest.board_name, "my_board".to_string());
         assert_eq!(manifest.images.len(), 7);
 
@@ -914,7 +914,7 @@ mod tests {
             "board_name": "my_board",
         });
 
-        let expected = AssemblyManifest {
+        let expected = AssembledSystem {
             images: vec![Image::ZBI { path: "path/to/my.zbi".into(), signed: false }],
             board_name: "my_board".into(),
         };
@@ -940,7 +940,7 @@ mod tests {
             "board_name": "my_board",
         });
 
-        let expected = AssemblyManifest {
+        let expected = AssembledSystem {
             images: vec![Image::VBMeta("path/to/my.vbmeta".into())],
             board_name: "my_board".into(),
         };
@@ -966,7 +966,7 @@ mod tests {
             "board_name": "my_board",
         });
 
-        let expected = AssemblyManifest {
+        let expected = AssembledSystem {
             images: vec![Image::QemuKernel("path/to/my-qemu-kernel.bin".into())],
             board_name: "my_board".into(),
         };
@@ -1126,8 +1126,8 @@ mod tests {
         )
     }
 
-    fn generate_test_manifest() -> AssemblyManifest {
-        AssemblyManifest {
+    fn generate_test_manifest() -> AssembledSystem {
+        AssembledSystem {
             images: serde_json::from_value::<SerializationHelper>(generate_test_value())
                 .unwrap()
                 .images,
@@ -1135,8 +1135,8 @@ mod tests {
         }
     }
 
-    fn generate_test_manifest_fxfs() -> AssemblyManifest {
-        AssemblyManifest {
+    fn generate_test_manifest_fxfs() -> AssembledSystem {
+        AssembledSystem {
             images: serde_json::from_value::<SerializationHelper>(generate_test_value_fxfs())
                 .unwrap()
                 .images,

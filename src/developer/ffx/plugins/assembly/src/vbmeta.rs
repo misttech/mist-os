@@ -5,15 +5,15 @@
 use crate::extra_hash_descriptor::ExtraHashDescriptor;
 use crate::vfs::{FilesystemProvider, RealFilesystemProvider};
 use anyhow::{Context, Result};
+use assembled_system::{AssembledSystem, Image};
 use assembly_images_config::{VBMeta, VBMetaDescriptor};
-use assembly_manifest::{AssemblyManifest, Image};
 use camino::{Utf8Path, Utf8PathBuf};
 use std::path::Path;
 use utf8_path::path_relative_from_current_dir;
 use vbmeta::{HashDescriptor, Key, Salt, VBMeta as VBMetaImage};
 
 pub fn construct_vbmeta(
-    assembly_manifest: &mut AssemblyManifest,
+    assembled_system: &mut AssembledSystem,
     outdir: impl AsRef<Utf8Path>,
     vbmeta_config: &VBMeta,
     zbi: impl AsRef<Path>,
@@ -39,7 +39,7 @@ pub fn construct_vbmeta(
         .with_context(|| format!("writing vbmeta: {}", &vbmeta_path))?;
     let vbmeta_path_relative = path_relative_from_current_dir(&vbmeta_path)
         .with_context(|| format!("calculating relative path for: {}", &vbmeta_path))?;
-    assembly_manifest.images.push(Image::VBMeta(vbmeta_path_relative.clone()));
+    assembled_system.images.push(Image::VBMeta(vbmeta_path_relative.clone()));
     Ok(vbmeta_path_relative)
 }
 
@@ -97,8 +97,8 @@ mod tests {
 
     use crate::vfs::mock::MockFilesystemProvider;
 
+    use assembled_system::AssembledSystem;
     use assembly_images_config::VBMeta;
-    use assembly_manifest::AssemblyManifest;
     use camino::Utf8Path;
     use tempfile::tempdir;
     use utf8_path::path_relative_from_current_dir;
@@ -125,10 +125,10 @@ mod tests {
         let zbi_path = dir.join("fuchsia.zbi");
         std::fs::write(&zbi_path, "fake zbi").unwrap();
 
-        let mut assembly_manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
         let vbmeta_path =
-            construct_vbmeta(&mut assembly_manifest, dir, &vbmeta_config, zbi_path).unwrap();
+            construct_vbmeta(&mut assembled_system, dir, &vbmeta_config, zbi_path).unwrap();
         assert_eq!(
             vbmeta_path,
             path_relative_from_current_dir(dir.join("fuchsia.vbmeta")).unwrap()

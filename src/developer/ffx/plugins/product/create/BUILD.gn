@@ -25,7 +25,7 @@ ffx_plugin("ffx_product_create") {
     "//src/developer/ffx/lib/fastboot/flash_manifest:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/writer:lib",
-    "//src/lib/assembly/assembly_manifest",
+    "//src/lib/assembly/assembled_system",
     "//src/lib/assembly/container",
     "//src/lib/assembly/partitions_config",
     "//src/lib/assembly/tool",

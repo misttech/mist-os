@@ -6,10 +6,10 @@ use crate::base_package::BasePackage;
 use crate::blobfs::construct_blobfs;
 
 use anyhow::{Context, Result};
+use assembled_system::{AssembledSystem, Image};
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_fvm::{Filesystem, FilesystemAttributes, FvmBuilder, FvmType, NandFvmBuilder};
 use assembly_images_config::{Fvm, FvmFilesystem, FvmOutput, SparseFvm};
-use assembly_manifest::{AssemblyManifest, Image};
 use assembly_tool::ToolProvider;
 use camino::{Utf8Path, Utf8PathBuf};
 use log::info;
@@ -30,7 +30,7 @@ use utf8_path::path_relative_from_current_dir;
 pub fn construct_fvm(
     gendir: impl AsRef<Utf8Path>,
     tools: &impl ToolProvider,
-    assembly_manifest: &mut AssemblyManifest,
+    assembled_system: &mut AssembledSystem,
     assembly_config: &ImageAssemblyConfig,
     fvm_config: Fvm,
     compress_blobfs: bool,
@@ -40,7 +40,7 @@ pub fn construct_fvm(
     let mut builder = MultiFvmBuilder::new(
         gendir,
         assembly_config,
-        assembly_manifest,
+        assembled_system,
         compress_blobfs,
         fvm_config.slice_size,
         include_account,
@@ -68,7 +68,7 @@ pub struct MultiFvmBuilder<'a> {
     /// The image assembly config.
     assembly_config: &'a ImageAssemblyConfig,
     /// The manifest of images to add new FVMs to.
-    assembly_manifest: &'a mut AssemblyManifest,
+    assembled_system: &'a mut AssembledSystem,
     /// Whether blobfs should be compressed.
     compress_blobfs: bool,
     /// The size of a slice for the FVM.
@@ -94,7 +94,7 @@ impl<'a> MultiFvmBuilder<'a> {
     pub fn new(
         gendir: impl AsRef<Utf8Path>,
         assembly_config: &'a ImageAssemblyConfig,
-        assembly_manifest: &'a mut AssemblyManifest,
+        assembled_system: &'a mut AssembledSystem,
         compress_blobfs: bool,
         slice_size: u64,
         include_account: bool,
@@ -105,7 +105,7 @@ impl<'a> MultiFvmBuilder<'a> {
             outputs: Vec::new(),
             gendir: gendir.as_ref().to_path_buf(),
             assembly_config,
-            assembly_manifest,
+            assembled_system,
             compress_blobfs,
             slice_size,
             include_account,
@@ -138,7 +138,7 @@ impl<'a> MultiFvmBuilder<'a> {
         Ok(())
     }
 
-    /// Build a single FVM output, and always add the result to the |assembly_manifest|.
+    /// Build a single FVM output, and always add the result to the |assembled_system|.
     fn build_output_and_add_to_manifest(
         &mut self,
         tools: &impl ToolProvider,
@@ -149,7 +149,7 @@ impl<'a> MultiFvmBuilder<'a> {
     }
 
     /// Build a single FVM output, and let the caller choose whether to add it to the
-    /// |assembly_manifest|.
+    /// |assembled_system|.
     fn build_output(
         &mut self,
         tools: &impl ToolProvider,
@@ -183,11 +183,11 @@ impl<'a> MultiFvmBuilder<'a> {
                     let path_relative = path_relative_from_current_dir(path)?;
                     let image = match config.name.as_str() {
                         // Even though this is a standard FVM, people expect it to find it using
-                        // the fvm.fastboot key in the AssemblyManifest.
+                        // the fvm.fastboot key in the AssembledSystem.
                         "fvm.fastboot" => Image::FVMFastboot(path_relative),
                         _ => Image::FVM(path_relative),
                     };
-                    self.assembly_manifest.images.push(image);
+                    self.assembled_system.images.push(image);
                 }
             }
             FvmOutput::Sparse(config) => {
@@ -212,7 +212,7 @@ impl<'a> MultiFvmBuilder<'a> {
                 builder.build()?;
                 if add_to_manifest {
                     let path_relative = path_relative_from_current_dir(path)?;
-                    self.assembly_manifest.images.push(Image::FVMSparse(path_relative));
+                    self.assembled_system.images.push(Image::FVMSparse(path_relative));
                 }
             }
             FvmOutput::Nand(config) => {
@@ -246,7 +246,7 @@ impl<'a> MultiFvmBuilder<'a> {
 
                 if add_to_manifest {
                     let path_relative = path_relative_from_current_dir(output)?;
-                    self.assembly_manifest.images.push(Image::FVMFastboot(path_relative));
+                    self.assembled_system.images.push(Image::FVMFastboot(path_relative));
                 }
             }
         }
@@ -272,7 +272,7 @@ impl<'a> MultiFvmBuilder<'a> {
                     .build_filesystem(tools, params)
                     .with_context(|| format!("Building filesystem: {name}"))?;
                 if let Some(image) = image {
-                    self.assembly_manifest.images.push(image);
+                    self.assembled_system.images.push(image);
                 }
                 self.filesystems
                     .insert(name.clone(), FilesystemEntry::Filesystem(filesystem.clone()));
@@ -329,12 +329,12 @@ mod tests {
     use super::MultiFvmBuilder;
 
     use crate::base_package::BasePackage;
+    use assembled_system::AssembledSystem;
     use assembly_config_schema::image_assembly_config::ImageAssemblyConfig;
     use assembly_images_config::{
         BlobFS, BlobfsLayout, EmptyData, FvmFilesystem, FvmOutput, NandFvm, Reserved, SparseFvm,
         StandardFvm,
     };
-    use assembly_manifest::AssemblyManifest;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::{ToolCommandLog, ToolProvider};
     use camino::{Utf8Path, Utf8PathBuf};
@@ -350,8 +350,8 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembly_manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
         let base_package =
             BasePackage { merkle: [0u8; 32].into(), manifest_path: Utf8PathBuf::default() };
         let include_account = false;
@@ -360,7 +360,7 @@ mod tests {
         let mut builder = MultiFvmBuilder::new(
             dir,
             &assembly_config,
-            &mut assembly_manifest,
+            &mut assembled_system,
             compress_blobfs,
             slice_size,
             include_account,
@@ -383,8 +383,8 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembly_manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
         let base_package =
             BasePackage { merkle: [0u8; 32].into(), manifest_path: Utf8PathBuf::default() };
         let include_account = false;
@@ -393,7 +393,7 @@ mod tests {
         let mut builder = MultiFvmBuilder::new(
             dir,
             &assembly_config,
-            &mut assembly_manifest,
+            &mut assembled_system,
             compress_blobfs,
             slice_size,
             include_account,
@@ -434,8 +434,8 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembly_manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
         let base_package =
             BasePackage { merkle: [0u8; 32].into(), manifest_path: Utf8PathBuf::default() };
         let include_account = false;
@@ -444,7 +444,7 @@ mod tests {
         let mut builder = MultiFvmBuilder::new(
             dir,
             &assembly_config,
-            &mut assembly_manifest,
+            &mut assembled_system,
             compress_blobfs,
             slice_size,
             include_account,
@@ -542,8 +542,8 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembly_manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
 
         let base_package_path = dir.join("base.far");
         let mut base_package_file = File::create(&base_package_path).unwrap();
@@ -569,7 +569,7 @@ mod tests {
         let mut builder = MultiFvmBuilder::new(
             dir,
             &assembly_config,
-            &mut assembly_manifest,
+            &mut assembled_system,
             compress_blobfs,
             slice_size,
             include_account,
@@ -641,8 +641,8 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembly_manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
 
         let base_package_path = dir.join("base.far");
         let mut base_package_file = File::create(&base_package_path).unwrap();
@@ -668,7 +668,7 @@ mod tests {
         let mut builder = MultiFvmBuilder::new(
             dir,
             &assembly_config,
-            &mut assembly_manifest,
+            &mut assembled_system,
             compress_blobfs,
             slice_size,
             include_account,

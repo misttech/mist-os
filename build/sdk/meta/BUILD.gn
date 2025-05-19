@@ -63,7 +63,7 @@ if (is_host) {
     edition = "2021"
 
     deps = [
-      "//src/lib/assembly/assembly_manifest",
+      "//src/lib/assembly/assembled_system",
       "//src/lib/assembly/partitions_config",
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//src/sys/pkg/lib/fuchsia-repo",
