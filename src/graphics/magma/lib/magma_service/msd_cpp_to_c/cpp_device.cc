@@ -78,11 +78,8 @@ void CppDevice::SetPowerState(int64_t power_state, fit::callback<void(magma_stat
   {
     std::lock_guard<std::mutex> lock(device_callback_mutex_);
 
-    // TODO(b/389723723) - remove this once msd_driver_set_power_state implemented
-    if (true) {
-      completer(MAGMA_DRET_MSG(MAGMA_STATUS_UNIMPLEMENTED, "SetPowerState not implemented"));
-      return;
-    }
+    msd_device_set_power_state(device_, power_state, SetPowerStateCallback::Callback,
+                               callback->GetContext());
 
     device_callback_set_.emplace(callback.get(), std::move(callback));
   }
