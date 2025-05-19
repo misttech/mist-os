@@ -34,6 +34,10 @@ const uint ARCH_MMU_FLAG_INVALID = (1u << 7);  // Indicates that flags are not s
 const uint ARCH_ASPACE_FLAG_KERNEL = (1u << 0);
 const uint ARCH_ASPACE_FLAG_GUEST = (1u << 1);
 
+constexpr bool arch_mmu_flags_uncached(uint mmu_flags) {
+  return (mmu_flags & (ARCH_MMU_FLAG_UNCACHED | ARCH_MMU_FLAG_UNCACHED_DEVICE)) != 0;
+}
+
 // per arch base class api to encapsulate the mmu routines on an aspace
 //
 // Beyond construction/destruction lifetimes users of this object must ensure that none of the

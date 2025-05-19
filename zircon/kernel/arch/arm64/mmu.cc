@@ -1455,6 +1455,9 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
   if (!(mmu_flags & ARCH_MMU_FLAG_PERM_READ)) {
     return ZX_ERR_INVALID_ARGS;
   }
+  if ((mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) && arch_mmu_flags_uncached(mmu_flags)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
 
   // paddr and vaddr must be aligned.
   DEBUG_ASSERT(IS_PAGE_ALIGNED(vaddr));
@@ -1541,6 +1544,9 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
   }
 
   if (!(mmu_flags & ARCH_MMU_FLAG_PERM_READ)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if ((mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) && arch_mmu_flags_uncached(mmu_flags)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1662,6 +1668,9 @@ zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags
   }
 
   if (!(mmu_flags & ARCH_MMU_FLAG_PERM_READ)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if ((mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) && arch_mmu_flags_uncached(mmu_flags)) {
     return ZX_ERR_INVALID_ARGS;
   }
 

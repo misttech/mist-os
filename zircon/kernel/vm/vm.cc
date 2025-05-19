@@ -65,7 +65,7 @@ constexpr uint32_t ToVmarFlags(PhysMapping::Permissions perms) {
 }
 
 constexpr uint ToArchMmuFlags(PhysMapping::Permissions perms) {
-  uint flags = 0;
+  uint flags = ARCH_MMU_FLAG_CACHED;
   if (perms.readable()) {
     flags |= ARCH_MMU_FLAG_PERM_READ;
   }
