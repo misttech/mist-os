@@ -3,26 +3,27 @@
 // found in the LICENSE file.
 
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
-use linux_uapi::arch32::{
+use starnix_logging::track_stub;
+use starnix_sync::{FileOpsCore, Locked, RwLock, Unlocked};
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::arch32::{
     PERF_EVENT_IOC_DISABLE, PERF_EVENT_IOC_ENABLE, PERF_EVENT_IOC_ID,
     PERF_EVENT_IOC_MODIFY_ATTRIBUTES, PERF_EVENT_IOC_PAUSE_OUTPUT, PERF_EVENT_IOC_PERIOD,
     PERF_EVENT_IOC_QUERY_BPF, PERF_EVENT_IOC_REFRESH, PERF_EVENT_IOC_RESET, PERF_EVENT_IOC_SET_BPF,
     PERF_EVENT_IOC_SET_FILTER, PERF_EVENT_IOC_SET_OUTPUT,
 };
-use linux_uapi::{
-    perf_event_attr, perf_event_read_format_PERF_FORMAT_GROUP,
-    perf_event_read_format_PERF_FORMAT_ID, perf_event_read_format_PERF_FORMAT_LOST,
-    perf_event_read_format_PERF_FORMAT_TOTAL_TIME_ENABLED,
-    perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING, pid_t,
-};
-use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, Locked, RwLock, Unlocked};
-use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserRef;
-use starnix_uapi::{error, uapi};
+use starnix_uapi::{
+    error, perf_event_attr, perf_event_read_format_PERF_FORMAT_GROUP,
+    perf_event_read_format_PERF_FORMAT_ID, perf_event_read_format_PERF_FORMAT_LOST,
+    perf_event_read_format_PERF_FORMAT_TOTAL_TIME_ENABLED,
+    perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING, pid_t, uapi,
+};
+use zx::sys::zx_system_get_page_size;
 
 static READ_FORMAT_ID_GENERATOR: AtomicU64 = AtomicU64::new(0);
 
@@ -206,9 +207,82 @@ impl FileOps for PerfEventFile {
                     TODO("https://fxbug.dev/404941053"),
                     "[perf_event_open] implement remaining ioctl() calls"
                 );
-                return error!(EINVAL);
+                return error!(ENOSYS);
             }
             _ => error!(ENOTTY),
+        }
+    }
+
+    // Gets called when mmap() is called.
+    fn get_memory(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        length: Option<usize>,
+        _prot: ProtectionFlags,
+    ) -> Result<Arc<MemoryObject>, Errno> {
+        let buffer_size: u64 = length.unwrap_or(0) as u64;
+        if buffer_size == 0 {
+            return error!(EINVAL);
+        }
+        let vmo_object: Result<zx::Vmo, zx::Status> = zx::Vmo::create(buffer_size);
+        let vmo = match vmo_object {
+            Ok(vmo) => vmo,
+            Err(status) => {
+                if status == zx::Status::NO_MEMORY {
+                    return error!(ENOMEM);
+                }
+                return error!(EINVAL);
+            }
+        };
+
+        // Write metadata page. Currently we hardcode everything just to get something E2E working.
+        let mut metadata = Vec::<u8>::new();
+        // version
+        metadata.extend(1_u32.to_ne_bytes());
+        // compat version
+        metadata.extend(2_u32.to_ne_bytes());
+        // lock
+        metadata.extend(2_u32.to_ne_bytes());
+        // index
+        metadata.extend(2_u32.to_ne_bytes());
+        // offset
+        metadata.extend(19337_i64.to_ne_bytes());
+        // time_enabled
+        metadata.extend(606868_u64.to_ne_bytes());
+        // time_running
+        metadata.extend(622968_u64.to_ne_bytes());
+        // capabilities
+        metadata.extend(30_u64.to_ne_bytes());
+        // All the fields between pmc_width and reserved (inclusive).
+        metadata.extend(vec![0; 976].as_slice());
+        // data_head
+        metadata.extend(0_u64.to_ne_bytes());
+        // data_tail
+        metadata.extend(0_u64.to_ne_bytes());
+        // data_offset. Don't mind the unsafe block.
+        // https://fuchsia.dev/reference/syscalls/system_get_page_size#errors
+        // says it cannot fail, but rust compiler needs it.
+        let page_size: u64 = unsafe { zx_system_get_page_size() } as u64;
+        metadata.extend(page_size.to_ne_bytes());
+        // data_size
+        metadata.extend(((buffer_size - page_size) as u64).to_ne_bytes());
+        // The remaining metadata are not defined for now.
+
+        let result = vmo.write(&metadata, 0 /* This is the offset, not the length to write */);
+        match result {
+            Ok(()) => {
+                let memory = MemoryObject::RingBuf(vmo);
+                return Ok(Arc::new(memory));
+            }
+            Err(_) => {
+                track_stub!(
+                    TODO("https://fxbug.dev/416323134"),
+                    "[perf_event_open] handle get_memory() errors"
+                );
+                return error!(EINVAL);
+            }
         }
     }
 
@@ -299,9 +373,19 @@ pub fn sys_perf_event_open(
     });
     // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
     let file_handle = Anon::new_private_file(current_task, file, OpenFlags::RDWR, "[perf_event]");
-    let file_descriptor = current_task.add_file(file_handle, FdFlags::empty());
+    let file_descriptor: Result<FdNumber, Errno> =
+        current_task.add_file(file_handle, FdFlags::empty());
 
-    Ok(file_descriptor?.into())
+    match file_descriptor {
+        Ok(fd) => Ok(fd.into()),
+        Err(_) => {
+            track_stub!(
+                TODO("https://fxbug.dev/402453955"),
+                "[perf_event_open] implement remaining error handling"
+            );
+            error!(EMFILE)
+        }
+    }
 }
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
@@ -312,7 +396,8 @@ mod arch32 {
 #[cfg(feature = "arch32")]
 pub use arch32::*;
 
-use crate::mm::MemoryAccessorExt;
+use crate::mm::memory::MemoryObject;
+use crate::mm::{MemoryAccessorExt, ProtectionFlags};
 use crate::task::CurrentTask;
 use crate::vfs::{Anon, FdFlags, FdNumber, FileObject, FileOps, InputBuffer, OutputBuffer};
 use crate::{fileops_impl_nonseekable, fileops_impl_noop_sync};

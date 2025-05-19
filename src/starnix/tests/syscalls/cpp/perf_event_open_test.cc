@@ -71,9 +71,10 @@ perf_event_attr attr_with_read_format(uint64_t read_format, uint64_t disabled) {
 }
 
 // Write wrapper because there isn't one per the man7 page.
-long sys_perf_event_open(perf_event_attr* attr, int32_t pid, int32_t cpu, int group_fd,
-                         unsigned long flags) {
-  return syscall(__NR_perf_event_open, attr, pid, cpu, group_fd, flags);
+int32_t sys_perf_event_open(perf_event_attr* attr, int32_t pid, int32_t cpu, int group_fd,
+                            unsigned long flags) {
+  // Explicitly cast to int32_t because perf_event_open() returns `int`. Also, `FdNumber` is i32.
+  return static_cast<int32_t>(syscall(__NR_perf_event_open, attr, pid, cpu, group_fd, flags));
 }
 
 TEST(PerfEventOpenTest, ValidInputsSucceed) {
@@ -103,7 +104,7 @@ TEST(PerfEventOpenTest, ReadEventWithTimeEnabledSucceeds) {
   perf_event_attr attr = attr_with_read_format(read_format);
 
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor =
+    int32_t file_descriptor =
         sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
     EXPECT_NE(file_descriptor, -1);
 
@@ -132,7 +133,7 @@ TEST(PerfEventOpenTest, ReadEventWithTimeRunningSucceeds) {
   perf_event_attr attr = attr_with_read_format(read_format);
 
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor =
+    int32_t file_descriptor =
         sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
     EXPECT_NE(file_descriptor, -1);
 
@@ -162,7 +163,7 @@ TEST(PerfEventOpenTest, ReadEventWithPerfFormatIdSucceeds) {
     uint64_t ids[3];
 
     for (uint64_t i = 0; i < 3; i++) {
-      long file_descriptor =
+      int32_t file_descriptor =
           sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
       EXPECT_NE(file_descriptor, -1);
 
@@ -185,7 +186,7 @@ TEST(PerfEventOpenTest, ReadEventWithTimeEnabledAndRunningSucceeds) {
   perf_event_attr attr = attr_with_read_format(read_format);
 
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor =
+    int32_t file_descriptor =
         sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
     EXPECT_NE(file_descriptor, -1);
 
@@ -212,8 +213,8 @@ TEST(PerfEventOpenTest, ReadEventWithTimeEnabledAndRunningSucceeds) {
 
 TEST(PerfEventOpenTest, ReadEventWithBufferTooSmallFails) {
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
-                                               example_group_fd, example_flags);
+    int32_t file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
+                                                  example_group_fd, example_flags);
     EXPECT_NE(file_descriptor, -1);
 
     // Create buffer that is too small for the read() call to put stuff in. read() should
@@ -230,7 +231,7 @@ TEST(PerfEventOpenTest, WhenDisabledEventCountShouldBeZero) {
   if (test_helper::HasSysAdmin()) {
     perf_event_attr attr = {0, 0, 0, {}, 0, 0, 1};
 
-    long file_descriptor =
+    int32_t file_descriptor =
         sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
 
     char buffer[8];
@@ -249,8 +250,8 @@ TEST(PerfEventOpenTest, WhenDisabledEventCountShouldBeZero) {
 // When enabled is passed in the initial attr params.
 TEST(PerfEventOpenTest, WhenEnabledEventCountShouldBeOne) {
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
-                                               example_group_fd, example_flags);
+    int32_t file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
+                                                  example_group_fd, example_flags);
 
     char buffer[8];
     uint64_t read_length = syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
@@ -266,8 +267,8 @@ TEST(PerfEventOpenTest, WhenEnabledEventCountShouldBeOne) {
 
 TEST(PerfEventOpenTest, SettingIoctlDisabledCallWorks) {
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
-                                               example_group_fd, example_flags);
+    int32_t file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
+                                                  example_group_fd, example_flags);
 
     EXPECT_NE(syscall(__NR_ioctl, file_descriptor, PERF_EVENT_IOC_DISABLE), -1);
   }
@@ -275,16 +276,16 @@ TEST(PerfEventOpenTest, SettingIoctlDisabledCallWorks) {
 
 TEST(PerfEventOpenTest, SettingIoctlEnabledCallWorks) {
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
-                                               example_group_fd, example_flags);
+    int32_t file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
+                                                  example_group_fd, example_flags);
     EXPECT_NE(syscall(__NR_ioctl, file_descriptor, PERF_EVENT_IOC_ENABLE), -1);
   }
 }
 
 TEST(PerfEventOpenTest, WhenResetAndDisabledEventCountShouldBeZero) {
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
-                                               example_group_fd, example_flags);
+    int32_t file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
+                                                  example_group_fd, example_flags);
 
     char buffer[8];
     syscall(__NR_read, file_descriptor, buffer,
@@ -327,7 +328,7 @@ TEST(PerfEventOpenTest, WhenDisabledTimeRunningAndTimeEnabledAreCorrect) {
   perf_event_attr attr = attr_with_read_format(read_format);
 
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor =
+    int32_t file_descriptor =
         sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
 
     char buffer[24];
@@ -365,7 +366,7 @@ TEST(PerfEventOpenTest, WhenEnabledTimeRunningIsCorrect) {
   perf_event_attr attr = attr_with_read_format(read_format);
 
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor =
+    int32_t file_descriptor =
         sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
     char buffer[16];
     read_format_data_time_running data;
@@ -400,7 +401,7 @@ TEST(PerfEventOpenTest, WhenEnabledTimeEnabledIsCorrect) {
   perf_event_attr attr = attr_with_read_format(read_format);
 
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor =
+    int32_t file_descriptor =
         sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
     char buffer[16];
     read_format_data data;
@@ -430,7 +431,7 @@ TEST(PerfEventOpenTest, WhenDisabledTotalTimeRunningAndEnabledAreZero) {
   if (test_helper::HasSysAdmin()) {
     uint64_t read_format = PERF_FORMAT_TOTAL_TIME_RUNNING | PERF_FORMAT_TOTAL_TIME_ENABLED;
     perf_event_attr attr = attr_with_read_format(read_format, 1);
-    long file_descriptor =
+    int32_t file_descriptor =
         sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
 
     printf("This is an event\n");
@@ -455,7 +456,7 @@ TEST(PerfEventOpenTest, MultipleDisablesDoesNotChangeTime) {
   if (test_helper::HasSysAdmin()) {
     uint64_t read_format = PERF_FORMAT_TOTAL_TIME_RUNNING;
     perf_event_attr attr = attr_with_read_format(read_format, 1);
-    long file_descriptor =
+    int32_t file_descriptor =
         sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
 
     EXPECT_NE(syscall(__NR_ioctl, file_descriptor, PERF_EVENT_IOC_DISABLE), -1);
@@ -476,8 +477,8 @@ TEST(PerfEventOpenTest, MultipleDisablesDoesNotChangeTime) {
 
 TEST(PerfEventOpenTest, ReadingFirstEightBytesCanReturnCountAsALong) {
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
-                                               example_group_fd, example_flags);
+    int32_t file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
+                                                  example_group_fd, example_flags);
 
     // Both char buffer[8] (tested in previous tests) and long long (8 bytes) should work.
     long long count;
@@ -498,7 +499,7 @@ TEST(PerfEventOpenTest, CountingCPUClockSucceeds) {
     attr.config = PERF_COUNT_SW_CPU_CLOCK;
     attr.disabled = 1;
 
-    long file_descriptor =
+    int32_t file_descriptor =
         sys_perf_event_open(&attr, example_pid, -1, example_group_fd, example_flags);
     EXPECT_NE(file_descriptor, -1);
 
@@ -516,8 +517,71 @@ TEST(PerfEventOpenTest, CountingCPUClockSucceeds) {
     // because real value hasn't been implemented. When running on host, it will give
     // a real number (~6000-10000). Update this when we get a real instruction count.
     EXPECT_GT(count, -1);
-
     EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
+  }
+}
+
+/* Below are sampling tests */
+
+// Valid attributes for sampling. On Linux for the first sampling event you'll get something like:
+// perf_event_header { type = 9, size = 16, misc = 2 }.
+perf_event_attr example_sampling_attr() {
+  perf_event_attr attr;
+  memset(&attr, 0, sizeof(attr));
+  attr.type = PERF_TYPE_HARDWARE;
+  attr.size = sizeof(attr);
+  attr.config = PERF_COUNT_HW_INSTRUCTIONS;
+  attr.sample_period = 10;  // Elects sampling instead of counting. "1 sample per 10 events".
+  attr.sample_type = PERF_SAMPLE_TIME;
+  attr.disabled = 0;      // Initiate as enabled.
+  attr.exclude_user = 0;  // Necessary otherwise we get zeros for sampling.
+  attr.exclude_kernel = 1;
+  attr.sample_id_all = 1;
+
+  return attr;
+}
+
+TEST(PerfEventOpenTest, MmapMetadataPageIsRead) {
+  if (test_helper::HasSysAdmin()) {
+    perf_event_attr attr = example_sampling_attr();
+    int32_t file_descriptor =
+        sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
+
+    int num_pages = 2;
+    size_t data_size = num_pages * getpagesize();
+    // Ring buffer size, defined to be 1 + 2^n pages per the docs.
+    size_t buffer_size = getpagesize() + data_size;
+
+    // mmap() returns the address of the mapping. Note you MUST use MAP_SHARED because you're doing
+    // kernel and user stuff. The offset has to be 0 to access the metadata page (first page).
+    void* address = mmap(NULL, buffer_size, PROT_READ, MAP_SHARED, file_descriptor, 0);
+
+    // Address should not be 0xffffffffffffffff.
+    EXPECT_NE(address, MAP_FAILED);
+
+    // Docs say you can close here before reading anything.
+    EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
+
+    char buffer[buffer_size];
+    EXPECT_EQ(buffer_size, sizeof(buffer));
+
+    // Verify metadata page has valid/reasonable info.
+    // Don't need to memcopy. Just read directly.
+    perf_event_mmap_page* metadata = (perf_event_mmap_page*)address;
+    EXPECT_LT(metadata->version, (uint32_t)10);
+    EXPECT_LT(metadata->compat_version, (uint32_t)10);
+    EXPECT_EQ(metadata->lock % 2, (uint32_t)0);
+    EXPECT_NE(metadata->index, (uint32_t)-1);
+    EXPECT_NE(metadata->offset, (int64_t)-1);
+    EXPECT_EQ(metadata->capabilities, (uint64_t)30);
+    EXPECT_EQ(metadata->cap_user_time, (uint64_t)1);
+    EXPECT_GT(metadata->time_enabled, (uint64_t)0);
+    EXPECT_GT(metadata->time_running, (uint64_t)0);
+    // Verify that there is a sample to read, this must be > 0.
+    EXPECT_GE(metadata->data_head, (uint64_t)0);
+    EXPECT_EQ(metadata->data_tail, (uint64_t)0);
+    EXPECT_EQ(metadata->data_offset, (uint64_t)getpagesize());
+    EXPECT_EQ(metadata->data_size, (uint64_t)data_size);
   }
 }
 
