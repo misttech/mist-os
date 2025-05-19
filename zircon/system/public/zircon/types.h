@@ -504,6 +504,11 @@ typedef uint32_t zx_system_event_type_t;
 #define ZX_SYSTEM_EVENT_MEMORY_PRESSURE_NORMAL      ((zx_system_event_type_t)4u)
 #define ZX_SYSTEM_EVENT_IMMINENT_OUT_OF_MEMORY      ((zx_system_event_type_t)5u)
 
+// Specifies a type of stall to be observed with zx_system_watch_memory_stall.
+typedef uint32_t zx_system_memory_stall_type_t;
+#define ZX_SYSTEM_MEMORY_STALL_SOME ((zx_system_memory_stall_type_t)(0u))
+#define ZX_SYSTEM_MEMORY_STALL_FULL ((zx_system_memory_stall_type_t)(1u))
+
 // Used in channel_read_etc.
 typedef struct zx_handle_info {
     zx_handle_t handle;

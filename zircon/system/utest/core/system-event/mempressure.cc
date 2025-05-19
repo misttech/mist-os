@@ -5,7 +5,6 @@
 #include <lib/maybe-standalone-test/maybe-standalone.h>
 #include <lib/zx/event.h>
 #include <lib/zx/job.h>
-#include <zircon/syscalls-next.h>
 
 #include <zxtest/zxtest.h>
 
