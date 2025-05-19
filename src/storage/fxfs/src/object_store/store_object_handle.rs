@@ -57,6 +57,22 @@ pub const MAX_XATTR_VALUE_SIZE: usize = 64000;
 pub const EXTENDED_ATTRIBUTE_RANGE_START: u64 = 64;
 pub const EXTENDED_ATTRIBUTE_RANGE_END: u64 = 512;
 
+/// Zeroes blocks in 'buffer' based on `bitmap`, one bit per block from start of buffer.
+fn apply_bitmap_zeroing(
+    block_size: usize,
+    bitmap: &bit_vec::BitVec,
+    mut buffer: MutableBufferRef<'_>,
+) {
+    let buf = buffer.as_mut_slice();
+    debug_assert_eq!(bitmap.len() * block_size, buf.len());
+    for (i, block) in bitmap.iter().enumerate() {
+        if !block {
+            let start = i * block_size;
+            buf[start..start + block_size].fill(0);
+        }
+    }
+}
+
 /// When writing, often the logic should be generic over whether or not checksums are generated.
 /// This provides that and a handy way to convert to the more general ExtentMode that eventually
 /// stores it on disk.
@@ -697,10 +713,6 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         file_offset: u64,
         mut buffer: MutableBufferRef<'_>,
         key_id: u64,
-        // If provided, blocks in the bitmap that are zero will have their contents zeroed out. The
-        // bitmap should be exactly the size of the buffer and aligned to the offset in the extent
-        // the read is starting at.
-        block_bitmap: Option<bit_vec::BitVec>,
     ) -> Result<(), Error> {
         let store = self.store();
         store.device_read_ops.fetch_add(1, Ordering::Relaxed);
@@ -716,17 +728,6 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         };
         if let Some(key) = key {
             key.decrypt(file_offset, buffer.as_mut_slice())?;
-        }
-        if let Some(bitmap) = block_bitmap {
-            let block_size = self.block_size() as usize;
-            let buf = buffer.as_mut_slice();
-            debug_assert_eq!(bitmap.len() * block_size, buf.len());
-            for (i, block) in bitmap.iter().enumerate() {
-                if !block {
-                    let start = i * block_size;
-                    buf[start..start + block_size].fill(0);
-                }
-            }
         }
         Ok(())
     }
@@ -985,7 +986,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                             "R",
                         );
                     }
-                    let (head, tail) = buf.split_at_mut(to_copy);
+                    let (mut head, tail) = buf.split_at_mut(to_copy);
                     let maybe_bitmap = match mode {
                         ExtentMode::OverwritePartial(bitmap) => {
                             let mut read_bitmap = bitmap.clone().split_off(
@@ -996,13 +997,15 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         }
                         _ => None,
                     };
-                    reads.push(self.read_and_decrypt(
-                        device_offset,
-                        offset,
-                        head,
-                        key_id,
-                        maybe_bitmap,
-                    ));
+                    reads.push(async move {
+                        self
+                            .read_and_decrypt(device_offset, offset, head.reborrow(), key_id)
+                            .await?;
+                        if let Some(bitmap) = maybe_bitmap {
+                            apply_bitmap_zeroing(self.block_size() as usize, &bitmap, head);
+                        }
+                        Ok::<(), Error>(())
+                    });
                     buf = tail;
                     if buf.is_empty() {
                         break;
@@ -1031,7 +1034,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                             "RT",
                         );
                     }
-                    self.read_and_decrypt(device_offset, offset, align_buf.as_mut(), key_id, None)
+                    self.read_and_decrypt(device_offset, offset, align_buf.as_mut(), key_id)
                         .await?;
                     buf.as_mut_slice().copy_from_slice(&align_buf.as_slice()[..end_align]);
                     buf = buf.subslice_mut(0..0);
@@ -1112,9 +1115,15 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                             extent_key.range.start,
                             buffer.subslice_mut(offset..end as usize),
                             *key_id,
-                            maybe_bitmap,
                         )
                         .await?;
+                        if let Some(bitmap) = maybe_bitmap {
+                            apply_bitmap_zeroing(
+                                self.block_size() as usize,
+                                &bitmap,
+                                buffer.subslice_mut(offset..end as usize),
+                            );
+                        }
                         last_offset = end;
                         if last_offset >= size {
                             break;
