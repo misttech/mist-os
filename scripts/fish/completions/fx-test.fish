@@ -40,7 +40,7 @@ function __fuchsia_test_completions
         end
 
         # If we have no flags look for both the name and the package_url
-        set -l query '.[].test | .name,.package_url  | select(. != null)'
+        set -l query '.[].test | .name,.package_url,.label | select(. != null)'
         eval $_jq -r '$query' $tests_file
     end
 end
