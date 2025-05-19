@@ -125,6 +125,11 @@ _base_packages = [
     package_target = "//src/fonts/asset_providers:small-open-fonts-collection.asset-provider.package"
   },
 ]
+_cache_packages = [
+  {
+    package_target = "//src/chromium:web_engine_pkg"
+  },
+]
 
 product_assembly_configuration("core") {
   testonly = true
@@ -136,6 +141,7 @@ product_assembly_configuration("core") {
   }
 
   base_packages = _base_packages
+  cache_packages = _cache_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
@@ -150,6 +156,7 @@ product_assembly_configuration("core_with_f2fs") {
   }
 
   base_packages = _base_packages
+  cache_packages = _cache_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
@@ -164,6 +171,7 @@ product_assembly_configuration("core_with_minfs") {
   }
 
   base_packages = _base_packages
+  cache_packages = _cache_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
@@ -178,6 +186,7 @@ product_assembly_configuration("core_with_storage_host") {
   }
 
   base_packages = _base_packages
+  cache_packages = _cache_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
@@ -199,5 +208,6 @@ product_assembly_configuration("core_with_dfv2_fuzzing") {
   }
 
   base_packages = _base_packages
+  cache_packages = _cache_packages
   deps = [ "//build/info:build_info_files" ]
 }

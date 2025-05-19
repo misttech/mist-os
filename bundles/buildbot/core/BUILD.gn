@@ -120,10 +120,6 @@ group("no_e2e_dep") {
     "//src/media/bundles:services",
     "//third_party:tests",
 
-    # Used by tests, which must not themselves add WebEngine to the product.
-    # See https://fxbug.dev/42070261.
-    "//src/chromium:web_engine",
-
     # Used by tests
     "//src/diagnostics/archivist:archivist-for-embedding",
 

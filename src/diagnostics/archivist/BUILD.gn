@@ -253,7 +253,8 @@ fuchsia_package("archivist-for-embedding") {
     ":archivist-for-embedding.bazel_input.archive",
     "//build/bazel/assembly:verify_assembly_configs",
     "//products/terminal:*",
-    "//src/chromium:chromium_test_base_deps",
+    "//src/chromium:*",
+    "//vendor/google/*",
   ]
   deps = [ ":archivist-for-embedding-bundle" ]
 }
