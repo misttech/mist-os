@@ -6,8 +6,8 @@ import("//build/python/python_host_test.gni")
 import("//build/testing/host_test_data.gni")
 
 if (is_host) {
-  python_host_test("monsoon_test") {
-    main_source = "monsoon_test.py"
+  python_host_test("gonk_test") {
+    main_source = "gonk_test.py"
     libraries = [
       "//src/tests/end_to_end/lib/power",
       "//src/performance/lib/trace_processing",
@@ -15,8 +15,8 @@ if (is_host) {
     deps = [ ":runtime_deps" ]
   }
 
-  python_host_test("gonk_test") {
-    main_source = "gonk_test.py"
+  python_host_test("monsoon_test") {
+    main_source = "monsoon_test.py"
     libraries = [
       "//src/tests/end_to_end/lib/power",
       "//src/performance/lib/trace_processing",

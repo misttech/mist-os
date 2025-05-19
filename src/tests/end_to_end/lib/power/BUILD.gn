@@ -13,6 +13,7 @@ python_library("power") {
     "__init__.py",
     "gonk.py",
     "monsoon.py",
+    "sampler.py",
   ]
   library_deps = [ "//src/performance/lib/trace_processing" ]
 }

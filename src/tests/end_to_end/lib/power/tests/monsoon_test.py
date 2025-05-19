@@ -12,7 +12,7 @@ import unittest
 import unittest.mock as mock
 from pathlib import Path
 
-from power import monsoon
+from power import monsoon, sampler
 
 _METRIC_NAME = "M3tr1cN4m3"
 _MEASUREPOWER_PATH = "path/to/power"
@@ -29,7 +29,7 @@ class PowerSamplerTest(unittest.TestCase):
         )
         self.assertFalse(self.expected_csv_output_path.exists())
 
-        self.default_config = monsoon.PowerSamplerConfig(
+        self.default_config = sampler.PowerSamplerConfig(
             output_dir=str(self.output_dir_path),
             metric_name=_METRIC_NAME,
             measurepower_path=None,
@@ -99,10 +99,10 @@ class PowerSamplerTest(unittest.TestCase):
         self.assertEqual(
             power_sampler.extract_samples(),
             [
-                monsoon.Sample("0", "0", "12", None),
-                monsoon.Sample("1000000000", "25", "12", None),
-                monsoon.Sample("2000000000", "100", "12", None),
-                monsoon.Sample("4000000000", "75", "12", None),
+                sampler.Sample("0", "0", "12", None),
+                sampler.Sample("1000000000", "25", "12", None),
+                sampler.Sample("2000000000", "100", "12", None),
+                sampler.Sample("4000000000", "75", "12", None),
             ],
         )
 

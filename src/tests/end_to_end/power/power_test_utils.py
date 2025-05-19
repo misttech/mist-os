@@ -8,11 +8,11 @@
 # Remove this file once internal repo has transitioned to use the new location
 # and naming for this module.
 
-from power import gonk, monsoon
+from power import gonk, monsoon, sampler
 
 # Classes
-PowerSampler = monsoon.PowerSampler
-PowerSamplerConfig = monsoon.PowerSamplerConfig
+PowerSampler = sampler.PowerSampler
+PowerSamplerConfig = sampler.PowerSamplerConfig
 
 # Functions
 create_power_sampler = monsoon.create_power_sampler
