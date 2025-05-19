@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go.fuchsia.dev/fuchsia/tools/botanist/targets"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
@@ -92,41 +91,21 @@ func AddImageDeps(ctx context.Context, s *Shard, buildDir string, images []build
 	if s.Env.TargetsEmulator() {
 		artifactsGroup = "emu"
 	}
-	// TODO(https://fxbug.dev/380130504): Remove once non-sparse images are no longer included
-	// in the product bundle.
-	if s.Env.Dimensions.DeviceType() == "Sorrel" {
-		flashImages, err := targets.GetFastbootFlashImages(ctx, filepath.Join(buildDir, pbPath), ffx.(*ffxutil.FFXInstance))
-		if err != nil {
-			return err
-		}
-		for _, img := range flashImages {
-			if img == nil {
-				continue
-			}
-			rel, err := filepath.Rel(buildDir, img.Path)
-			if err != nil {
-				return fmt.Errorf("failed to get image path relative to the build dir: %w", err)
-			}
-			imageDeps = append(imageDeps, rel)
-		}
-		imageDeps = append(imageDeps, filepath.Join(pbPath, "product_bundle.json"))
-	} else {
-		artifacts, err := ffx.GetPBArtifacts(ctx, filepath.Join(buildDir, pbPath), artifactsGroup)
-		if err != nil {
-			return err
-		}
-		for _, a := range artifacts {
-			imageDeps = append(imageDeps, filepath.Join(pbPath, a))
-		}
-		bootloaderArtifacts, err := ffx.GetPBArtifacts(ctx, filepath.Join(buildDir, pbPath), "bootloader")
-		if err != nil {
-			return err
-		}
-		for _, a := range bootloaderArtifacts {
-			parts := strings.SplitN(a, ":", 2)
-			if parts[0] == "firmware_fat" {
-				imageDeps = append(imageDeps, filepath.Join(pbPath, parts[1]))
-			}
+	artifacts, err := ffx.GetPBArtifacts(ctx, filepath.Join(buildDir, pbPath), artifactsGroup)
+	if err != nil {
+		return err
+	}
+	for _, a := range artifacts {
+		imageDeps = append(imageDeps, filepath.Join(pbPath, a))
+	}
+	bootloaderArtifacts, err := ffx.GetPBArtifacts(ctx, filepath.Join(buildDir, pbPath), "bootloader")
+	if err != nil {
+		return err
+	}
+	for _, a := range bootloaderArtifacts {
+		parts := strings.SplitN(a, ":", 2)
+		if parts[0] == "firmware_fat" {
+			imageDeps = append(imageDeps, filepath.Join(pbPath, parts[1]))
 		}
 	}
 
@@ -140,17 +119,10 @@ func isUsedForTesting(s *Shard, image build.Image, pave bool) bool {
 		// need to get any deps from the images.json.
 		return false
 	}
-	if isFlashingDep(image) {
-		return true
-	}
 	// TODO(https://fxbug.dev/42124288): Remove zedboot/paving images once we switch to flashing.
 	return ((pave && len(image.PaveArgs) != 0) ||
 		(!pave && len(image.NetbootArgs) != 0) ||
 		(len(image.PaveZedbootArgs) != 0) ||
 		(pave && len(image.FastbootFlashArgs) != 0) ||
 		(!pave && len(image.FastbootBootArgs) != 0))
-}
-
-func isFlashingDep(image build.Image) bool {
-	return image.Name == "fastboot"
 }

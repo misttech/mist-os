@@ -12,18 +12,13 @@ import (
 	"io"
 	"net"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"time"
 
 	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	"go.fuchsia.dev/fuchsia/tools/botanist"
-	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
-	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/lib/serial"
 	serialconstants "go.fuchsia.dev/fuchsia/tools/lib/serial/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
@@ -53,10 +48,6 @@ const (
 	// Timeout to observe fastbootIdleSignature before proceeding anyway
 	// after hard power cycle
 	fastbootIdleWaitTimeoutSecs = 10
-
-	// Whether we should place the device in Zedboot if idling in fastboot.
-	// TODO(https://fxbug.dev/42075766): Remove once release branches no longer need this.
-	mustLoadThroughZedboot = false
 
 	// One of the possible InstallMode mode types.
 	// Indicates that the target device is idling in fastboot mode.
@@ -232,7 +223,7 @@ func (t *Device) SSHClient() (*sshutil.Client, error) {
 }
 
 func (t *Device) mustLoadThroughZedboot() bool {
-	return mustLoadThroughZedboot || (t.config.FastbootSernum == "" && t.config.InstallMode != fastbootMode)
+	return t.config.FastbootSernum == "" && t.config.InstallMode != fastbootMode
 }
 
 // Start starts the device target.
@@ -288,90 +279,53 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 		}()
 	}
 
-	// TODO(https://fxbug.dev/355507826): Remove once ffx supports flashing Kola/Sorrel.
-	deviceType := os.Getenv("FUCHSIA_DEVICE_TYPE")
-	useFastbootFlashing := t.config.FastbootSernum != "" && (deviceType == "Kola" || deviceType == "Sorrel")
-
 	// Boot Fuchsia.
 	if t.config.FastbootSernum != "" || t.config.InstallMode == fastbootMode {
-		// Copy images locally, as fastboot does not support flashing
-		// from a remote location.
-		// TODO(rudymathu): Transport these images via isolate for improved caching performance.
-		wd, err := os.Getwd()
-		if err != nil {
-			return err
+		maxAllowedAttempts := 1
+		if t.config.MaxFlashAttempts > maxAllowedAttempts {
+			maxAllowedAttempts = t.config.MaxFlashAttempts
 		}
-		var imgs []bootserver.Image
-		for _, img := range images {
-			img := img
-			if t.neededForFlashing(img) {
-				imgs = append(imgs, img)
-			}
-		}
-		{
-			imgPtrs := make([]*bootserver.Image, len(images))
-			for i := range imgs {
-				imgPtrs = append(imgPtrs, &imgs[i])
-			}
-			if err := copyImagesToDir(ctx, wd, true, imgPtrs...); err != nil {
+		var err error
+		tcpFlash := false
+		target := t.config.FastbootSernum
+		if target == "" {
+			ipv6, err := t.genericFuchsiaTarget.IPv6()
+			if err != nil {
 				return err
 			}
-		}
 
-		if t.mustLoadThroughZedboot() {
-			if err := t.bootZedboot(ctx, imgs); err != nil {
-				return err
-			}
-		} else if useFastbootFlashing {
-			if err := t.fastbootFlash(ctx, pbPath, imgs); err != nil {
-				return err
-			}
+			target = ipv6.String()
+			tcpFlash = true
 		} else {
-			maxAllowedAttempts := 1
-			if t.config.MaxFlashAttempts > maxAllowedAttempts {
-				maxAllowedAttempts = t.config.MaxFlashAttempts
-			}
-			var err error
-			tcpFlash := false
-			target := t.config.FastbootSernum
-			if target == "" {
-				ipv6, err := t.genericFuchsiaTarget.IPv6()
-				if err != nil {
-					return err
+			target = "serial:" + target
+		}
+		for attempt := 1; attempt <= maxAllowedAttempts; attempt++ {
+			logger.Debugf(ctx, "Starting flash attempt %d/%d", attempt, maxAllowedAttempts)
+			// ffx target bootloader boot doesn't work for Sorrel.
+			if t.opts.Netboot && os.Getenv("FUCHSIA_DEVICE_TYPE") != "Sorrel" {
+				if err = t.ffx.BootloaderBoot(ctx, target, pbPath, tcpFlash); err == nil {
+					// If successful, early exit.
+					break
 				}
-
-				target = ipv6.String()
-				tcpFlash = true
 			} else {
-				target = "serial:" + target
-			}
-			for attempt := 1; attempt <= maxAllowedAttempts; attempt++ {
-				logger.Debugf(ctx, "Starting flash attempt %d/%d", attempt, maxAllowedAttempts)
-				if t.opts.Netboot {
-					if err = t.ffx.BootloaderBoot(ctx, target, pbPath, tcpFlash); err == nil {
-						// If successful, early exit.
-						break
-					}
-				} else {
-					if err = t.flash(ctx, pbPath, target, tcpFlash); err == nil {
-						// If successful, early exit.
-						break
-					}
+				if err = t.flash(ctx, pbPath, target, tcpFlash); err == nil {
+					// If successful, early exit.
+					break
 				}
-				if attempt == maxAllowedAttempts {
-					logger.Errorf(ctx, "Flashing attempt %d/%d failed: %s.", attempt, maxAllowedAttempts, err)
-					return err
-				} else {
-					// If not successful, and we have
-					// remaining attempts, try hard
-					// power-cycling the target to recover.
-					logger.Warningf(ctx, "Flashing attempt %d/%d failed: %s.  Attempting hard power cycle.", attempt, maxAllowedAttempts, err)
-					err = t.hardPowerCycleAndPlaceInFastboot(ctx)
-					if err != nil {
-						errWrapped := fmt.Errorf("while hard power cycling and placing device back in fastboot: %w", err)
-						logger.Errorf(ctx, "%s", errWrapped)
-						return errWrapped
-					}
+			}
+			if attempt == maxAllowedAttempts {
+				logger.Errorf(ctx, "Flashing attempt %d/%d failed: %s.", attempt, maxAllowedAttempts, err)
+				return err
+			} else {
+				// If not successful, and we have
+				// remaining attempts, try hard
+				// power-cycling the target to recover.
+				logger.Warningf(ctx, "Flashing attempt %d/%d failed: %s.  Attempting hard power cycle.", attempt, maxAllowedAttempts, err)
+				err = t.hardPowerCycleAndPlaceInFastboot(ctx)
+				if err != nil {
+					errWrapped := fmt.Errorf("while hard power cycling and placing device back in fastboot: %w", err)
+					logger.Errorf(ctx, "%s", errWrapped)
+					return errWrapped
 				}
 			}
 		}
@@ -435,189 +389,9 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 	}
 
 	if serialSocketPath != "" {
-		if err := <-bootedLogChan; err != nil {
-			return err
-		}
-		if t.opts.ExpectsSSH && useFastbootFlashing {
-			if err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(5*time.Second), 5), func() error {
-				return t.provisionSSHKey(ctx)
-			}, nil); err != nil {
-				return err
-			}
-		}
-		return nil
+		return <-bootedLogChan
 	}
 
-	return nil
-}
-
-func getImageByName(imgs []bootserver.Image, name string) *bootserver.Image {
-	for _, img := range imgs {
-		if img.Name == name {
-			return &img
-		}
-	}
-	return nil
-}
-
-// Images are not guaranteed to be uniquely identified by label.
-func getImage(imgs []bootserver.Image, label, typ string) *bootserver.Image {
-	for _, img := range imgs {
-		if img.Label == label && typ == img.Type {
-			return &img
-		}
-	}
-	return nil
-}
-
-func (t *Device) runFastboot(ctx context.Context, fastbootPath string, cmds [][]string) error {
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "fastboot")
-	defer flush()
-	for _, cmdArgs := range cmds {
-		cmdArgs = append([]string{"-s", t.config.FastbootSernum}, cmdArgs...)
-		cmd := exec.CommandContext(ctx, fastbootPath, cmdArgs...)
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
-		logger.Debugf(ctx, "starting: %v", cmd.Args)
-		if err := cmd.Run(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (t *Device) bootZedboot(ctx context.Context, images []bootserver.Image) error {
-	fastboot := getImageByName(images, "exe.linux-x64_fastboot")
-	if fastboot == nil {
-		return errors.New("fastboot not found")
-	}
-	zbi := getImageByName(images, "zbi_zircon-r")
-	vbmeta := getImageByName(images, "vbmeta_zircon-r")
-	logger.Debugf(ctx, "zbi: %s, vbmeta: %s", zbi.Path, vbmeta.Path)
-	zbiContents, err := os.ReadFile(zbi.Path)
-	if err != nil {
-		return err
-	}
-	vbmetaContents, err := os.ReadFile(vbmeta.Path)
-	if err != nil {
-		return err
-	}
-	combinedZBIVBMeta := filepath.Join(filepath.Dir(zbi.Path), "zedboot.combined")
-	err = os.WriteFile(combinedZBIVBMeta, append(zbiContents, vbmetaContents...), 0666)
-	if err != nil {
-		return err
-	}
-	err = t.runFastboot(ctx, fastboot.Path, [][]string{{"boot", combinedZBIVBMeta}})
-	logger.Debugf(ctx, "done booting zedboot")
-	return err
-}
-
-func (t *Device) provisionSSHKey(ctx context.Context) error {
-	logger.Debugf(ctx, "provisioning SSH key")
-	serialSocketPath := t.SerialSocketPath()
-	socket, err := serial.NewSocket(ctx, serialSocketPath)
-	if err != nil {
-		return err
-	}
-	defer socket.Close()
-
-	p, err := os.ReadFile(t.opts.AuthorizedKey)
-	if err != nil {
-		return err
-	}
-	pubkey := string(p)
-	pubkey = strings.TrimSuffix(pubkey, "\n")
-	cmds := []serial.Command{
-		{Cmd: []string{"echo", fmt.Sprintf("\"%s\"", pubkey), ">", "/data/ssh/authorized_keys"}},
-		{Cmd: []string{"cat", "/data/ssh/authorized_keys"}},
-	}
-	if err := serial.RunCommands(ctx, socket, cmds); err != nil {
-		return err
-	}
-	waitChan := make(chan error, 1)
-	go func() {
-		truncCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		_, readErr := iomisc.ReadUntilMatchString(truncCtx, socket, "cat /data/ssh/authorized_keys")
-		if readErr == nil {
-			_, readErr = iomisc.ReadUntilMatchString(truncCtx, socket, pubkey)
-			cancel()
-			if readErr == nil {
-				logger.Infof(ctx, "successfully provisioned SSH key")
-			} else if errors.Is(readErr, truncCtx.Err()) {
-				logger.Warningf(ctx, "ssh key is corrupted")
-			} else {
-				logger.Errorf(ctx, "unexpected error checking for ssh key: %s", readErr)
-			}
-		}
-		waitChan <- readErr
-	}()
-	return <-waitChan
-}
-
-// GetFastbootFlashImages returns the images needed for fastboot flashing.
-func GetFastbootFlashImages(ctx context.Context, pbPath string, ffx *ffxutil.FFXInstance) (map[string]*bootserver.Image, error) {
-	dtbo, err := ffx.GetImageFromPB(ctx, pbPath, "a", "dtbo", "")
-	if err != nil {
-		return nil, fmt.Errorf("GetImageFromPB dtbo: %w", err)
-	}
-	if dtbo == nil {
-		return nil, fmt.Errorf("failed to find dtbo image from product bundle %s", pbPath)
-	}
-
-	zbi, err := ffx.GetImageFromPB(ctx, pbPath, "a", "zbi", "")
-	if err != nil {
-		return nil, fmt.Errorf("GetImageFromPB zbi: %w", err)
-	}
-	if zbi == nil {
-		return nil, fmt.Errorf("failed to find zbi image from product bundle %s", pbPath)
-	}
-
-	fvmImage, err := ffx.GetImageFromPB(ctx, pbPath, "a", "fvm", "")
-	if err != nil {
-		return nil, fmt.Errorf("GetImageFromPB fvm: %w", err)
-	}
-	if fvmImage == nil {
-		fvmImage, err = ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs.fastboot", "")
-		if err != nil {
-			return nil, fmt.Errorf("failed to find fvm image from product bundle %s", pbPath)
-		}
-	}
-	return map[string]*bootserver.Image{"dtbo": dtbo, "zbi": zbi, "fvm": fvmImage}, nil
-}
-
-// fastbootFlash runs fastboot commands directly to flash the device.
-func (t *Device) fastbootFlash(ctx context.Context, pbPath string, images []bootserver.Image) error {
-	fastboot := getImageByName(images, "exe.linux-x64_fastboot")
-	if fastboot == nil {
-		return errors.New("fastboot not found")
-	}
-
-	flashImages, err := GetFastbootFlashImages(ctx, pbPath, t.ffx.FFXInstance)
-	if err != nil {
-		return err
-	}
-	dtbo := flashImages["dtbo"]
-	zbi := flashImages["zbi"]
-	fvmImage := flashImages["fvm"]
-
-	cmd := []string{
-		"flash", "boot_a", zbi.Path,
-		"flash", "boot_b", zbi.Path,
-		"flash", "dtbo_a", dtbo.Path,
-		"flash", "dtbo_b", dtbo.Path,
-	}
-	if fvmImage != nil {
-		cmd = append(cmd, "flash", "super", fvmImage.Path)
-	}
-	if err := t.runFastboot(ctx, fastboot.Path, [][]string{cmd}); err != nil {
-		return err
-	}
-	if err := t.runFastboot(ctx, fastboot.Path, [][]string{{"reboot"}}); err != nil {
-		// The reboot command may run but return an error. Log it, but
-		// continue trying to run tests.
-		logger.Errorf(ctx, "%s", err)
-	}
-	logger.Debugf(ctx, "done flashing")
 	return nil
 }
 
@@ -813,20 +587,4 @@ func parseOutSigners(keyPaths []string) ([]ssh.Signer, error) {
 		signers = append(signers, signer)
 	}
 	return signers, nil
-}
-
-func (t *Device) neededForFlashing(img bootserver.Image) bool {
-	if img.IsFlashable {
-		return true
-	}
-
-	neededImages := []string{
-		"exe.linux-x64_fastboot",
-	}
-	for _, imageName := range neededImages {
-		if img.Name == imageName {
-			return true
-		}
-	}
-	return false
 }
