@@ -2104,9 +2104,15 @@ static const char* thread_state_to_str(enum thread_state state) {
 /**
  * @brief  Dump debugging info about the specified thread.
  */
-void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
+void ThreadDumper::DumpLocked(const Thread* t, const char* match_owner, bool full_dump) {
   if (!t->canary().Valid()) {
     dprintf(INFO, "dump_thread WARNING: thread at %p has bad magic\n", t);
+  }
+
+  char oname[ZX_MAX_NAME_LEN];
+  t->OwnerName(oname);
+  if (match_owner && strcmp(oname, match_owner) != 0) {
+    return;
   }
 
   zx_duration_mono_t runtime = t->scheduler_state().runtime_ns();
@@ -2115,9 +2121,6 @@ void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
         zx_time_sub_time(current_mono_time(), t->scheduler_state().last_started_running());
     runtime = zx_duration_add_duration(runtime, recent);
   }
-
-  char oname[ZX_MAX_NAME_LEN];
-  t->OwnerName(oname);
 
   char profile_str[64]{0};
   if (const SchedulerState::EffectiveProfile& ep = t->scheduler_state().effective_profile();
@@ -2164,13 +2167,13 @@ void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
 
 void Thread::Dump(bool full) const {
   SingleChainLockGuard guard{IrqSaveOption, get_lock(), CLT_TAG("Thread::Dump")};
-  ThreadDumper::DumpLocked(this, full);
+  ThreadDumper::DumpLocked(this, nullptr, full);
 }
 
 /**
  * @brief  Dump debugging info about all threads
  */
-void Thread::DumpAllLocked(bool full) {
+void Thread::DumpAllLocked(const char* match_owner, bool full) {
   for (const Thread& t : thread_list.Get()) {
     if (!t.canary().Valid()) {
       dprintf(INFO, "bad magic on thread struct %p, aborting.\n", &t);
@@ -2180,14 +2183,14 @@ void Thread::DumpAllLocked(bool full) {
 
     {
       SingleChainLockGuard guard{IrqSaveOption, t.get_lock(), CLT_TAG("Thread::DumpAllLocked")};
-      ThreadDumper::DumpLocked(&t, full);
+      ThreadDumper::DumpLocked(&t, match_owner, full);
     }
   }
 }
 
-void Thread::DumpAll(bool full) {
+void Thread::DumpAll(const char* match_owner, bool full) {
   Guard<SpinLock, IrqSave> list_guard{&list_lock_};
-  DumpAllLocked(full);
+  DumpAllLocked(match_owner, full);
 }
 
 void Thread::DumpTid(zx_koid_t tid, bool full) {

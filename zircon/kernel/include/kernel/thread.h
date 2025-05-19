@@ -1179,13 +1179,20 @@ struct Thread : public ChainLockable {
                            thread_trampoline_routine alt_trampoline);
 
   // Public routines used by debugging code to dump thread state.
+
+  // Dump the information of a single thread. If |full| is true then a multi-line verbose dump of
+  // much information is performed, otherwise a single short summary line is dumped.
   void Dump(bool full) const TA_EXCL(get_lock());
-  static void DumpAll(bool full) TA_EXCL(list_lock_);
+  // Finds all threads whose |OwnerName| is the same as |match_owner|, or just all thread if
+  // |match_owner| is nullptr, and call |Dump| on them.
+  static void DumpAll(const char* match_owner, bool full) TA_EXCL(list_lock_);
+  // Finds a thread whose |tid()| matches the provided |tid| and calls |Dump| on it.
   static void DumpTid(zx_koid_t tid, bool full) TA_EXCL(list_lock_);
 
   // Same stuff, but skip the locks when we are panic'ing
   inline void DumpDuringPanic(bool full) const TA_NO_THREAD_SAFETY_ANALYSIS;
-  static inline void DumpAllDuringPanic(bool full) TA_NO_THREAD_SAFETY_ANALYSIS;
+  static inline void DumpAllDuringPanic(const char* match_owner,
+                                        bool full) TA_NO_THREAD_SAFETY_ANALYSIS;
   static inline void DumpTidDuringPanic(zx_koid_t tid, bool full) TA_NO_THREAD_SAFETY_ANALYSIS;
 
   // Internal initialization routines. Eventually, these should be private.
@@ -1791,7 +1798,7 @@ struct Thread : public ChainLockable {
 
   __NO_RETURN void ExitLocked(int retcode) TA_REQ(get_lock());
 
-  static void DumpAllLocked(bool full) TA_REQ(list_lock_);
+  static void DumpAllLocked(const char* match_owner, bool full) TA_REQ(list_lock_);
   static void DumpTidLocked(zx_koid_t tid, bool full) TA_REQ(list_lock_);
 
  private:
@@ -1932,16 +1939,18 @@ void arch_dump_thread(const Thread* t) TA_REQ_SHARED(t->get_lock());
 
 class ThreadDumper {
  public:
-  static void DumpLocked(const Thread* t, bool full) TA_REQ_SHARED(t->get_lock());
+  static void DumpLocked(const Thread* t, const char* match_owner, bool full)
+      TA_REQ_SHARED(t->get_lock());
 };
 
 inline void Thread::DumpDuringPanic(bool full) const TA_NO_THREAD_SAFETY_ANALYSIS {
-  ThreadDumper::DumpLocked(this, full);
+  ThreadDumper::DumpLocked(this, nullptr, full);
 }
 
-inline void Thread::DumpAllDuringPanic(bool full) TA_NO_THREAD_SAFETY_ANALYSIS {
+inline void Thread::DumpAllDuringPanic(const char* match_owner,
+                                       bool full) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Skip grabbing the lock if we are panic'ing
-  DumpAllLocked(full);
+  DumpAllLocked(match_owner, full);
 }
 
 inline void Thread::DumpTidDuringPanic(zx_koid_t tid, bool full) TA_NO_THREAD_SAFETY_ANALYSIS {

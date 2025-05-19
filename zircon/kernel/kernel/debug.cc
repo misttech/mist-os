@@ -43,8 +43,8 @@ static int cmd_thread(int argc, const cmd_args* argv, uint32_t flags) {
   usage:
     printf("%s bt <thread pointer or id>\n", argv[0].str);
     printf("%s dump <thread pointer or id>\n", argv[0].str);
-    printf("%s list\n", argv[0].str);
-    printf("%s list_full\n", argv[0].str);
+    printf("%s list [owner name]\n", argv[0].str);
+    printf("%s list_full [owner name]\n", argv[0].str);
     return -1;
   }
 
@@ -91,17 +91,19 @@ static int cmd_thread(int argc, const cmd_args* argv, uint32_t flags) {
     }
   } else if (!strcmp(argv[1].str, "list")) {
     printf("thread list:\n");
+    const char* match_owner = argc >= 3 ? argv[2].str : nullptr;
     if (flags & CMD_FLAG_PANIC) {
-      Thread::DumpAllDuringPanic(false);
+      Thread::DumpAllDuringPanic(match_owner, false);
     } else {
-      Thread::DumpAll(false);
+      Thread::DumpAll(match_owner, false);
     }
   } else if (!strcmp(argv[1].str, "list_full")) {
     printf("thread list:\n");
+    const char* match_owner = argc >= 3 ? argv[2].str : nullptr;
     if (flags & CMD_FLAG_PANIC) {
-      Thread::DumpAllDuringPanic(true);
+      Thread::DumpAllDuringPanic(match_owner, true);
     } else {
-      Thread::DumpAll(true);
+      Thread::DumpAll(match_owner, true);
     }
   } else {
     printf("invalid args\n");
