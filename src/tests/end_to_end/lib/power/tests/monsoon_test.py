@@ -12,7 +12,7 @@ import unittest
 import unittest.mock as mock
 from pathlib import Path
 
-from power import power_test_utils
+from power import monsoon
 
 _METRIC_NAME = "M3tr1cN4m3"
 _MEASUREPOWER_PATH = "path/to/power"
@@ -29,7 +29,7 @@ class PowerSamplerTest(unittest.TestCase):
         )
         self.assertFalse(self.expected_csv_output_path.exists())
 
-        self.default_config = power_test_utils.PowerSamplerConfig(
+        self.default_config = monsoon.PowerSamplerConfig(
             output_dir=str(self.output_dir_path),
             metric_name=_METRIC_NAME,
             measurepower_path=None,
@@ -42,16 +42,16 @@ class PowerSamplerTest(unittest.TestCase):
     def test_sampler_without_measurepower(self) -> None:
         """Tests that PowerSampler creates zero results when not given a path to a measurepower binary."""
         with mock.patch("os.environ.get", return_value=None):
-            sampler = power_test_utils.create_power_sampler(self.default_config)
+            power_sampler = monsoon.create_power_sampler(self.default_config)
 
         with mock.patch.object(time, "time", return_value=5):
-            sampler.start()
+            power_sampler.start()
 
         with mock.patch.object(time, "time", return_value=10):
-            sampler.stop()
+            power_sampler.stop()
 
-        self.assertFalse(sampler.has_samples())
-        self.assertFalse(sampler.extract_samples())
+        self.assertFalse(power_sampler.has_samples())
+        self.assertFalse(power_sampler.extract_samples())
 
     def test_sampler_with_measurepower(self) -> None:
         """Tests PowerSampler when given a path to a measurepower binary.
@@ -59,7 +59,7 @@ class PowerSamplerTest(unittest.TestCase):
         The sampler should interact with the binary via subprocess.Popen
         and an intermediate csv file.
         """
-        sampler = power_test_utils.create_power_sampler(
+        power_sampler = monsoon.create_power_sampler(
             self.config_width_measurepower_path, fallback_to_stub=False
         )
 
@@ -78,7 +78,7 @@ class PowerSamplerTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            sampler.start()
+            power_sampler.start()
 
             mock_popen.assert_called()
             self.assertEqual(
@@ -93,16 +93,16 @@ class PowerSamplerTest(unittest.TestCase):
             )
 
             mock_proc.wait.return_value = 0
-            sampler.stop()
+            power_sampler.stop()
 
             mock_proc.send_signal.assert_called_with(signal.SIGINT)
         self.assertEqual(
-            sampler.extract_samples(),
+            power_sampler.extract_samples(),
             [
-                power_test_utils.Sample("0", "0", "12", None),
-                power_test_utils.Sample("1000000000", "25", "12", None),
-                power_test_utils.Sample("2000000000", "100", "12", None),
-                power_test_utils.Sample("4000000000", "75", "12", None),
+                monsoon.Sample("0", "0", "12", None),
+                monsoon.Sample("1000000000", "25", "12", None),
+                monsoon.Sample("2000000000", "100", "12", None),
+                monsoon.Sample("4000000000", "75", "12", None),
             ],
         )
 
@@ -116,7 +116,7 @@ class PowerSamplerTest(unittest.TestCase):
         mock_popen: mock.MagicMock,
     ) -> None:
         """Tests the sampler with a measurepower binary path that times out"""
-        sampler = power_test_utils.create_power_sampler(
+        power_sampler = monsoon.create_power_sampler(
             self.config_width_measurepower_path, fallback_to_stub=False
         )
 
@@ -128,14 +128,14 @@ class PowerSamplerTest(unittest.TestCase):
         # # Fake current time:
         mock_time.side_effect = [0, 30, 61]
         with self.assertRaises(TimeoutError):
-            sampler.start()
+            power_sampler.start()
 
         mock_sleep.assert_called_with(1)
 
     def test_create_power_sampler_without_measurepower(self) -> None:
         with mock.patch("os.environ.get", return_value=None):
-            sampler = power_test_utils.create_power_sampler(self.default_config)
-            self.assertIsInstance(sampler, power_test_utils._NoopPowerSampler)
+            power_sampler = monsoon.create_power_sampler(self.default_config)
+            self.assertIsInstance(power_sampler, monsoon._NoopPowerSampler)
 
     def test_create_power_sampler_without_measurepower_without_fallback_to_stub(
         self,
@@ -144,58 +144,56 @@ class PowerSamplerTest(unittest.TestCase):
             with self.assertRaisesRegex(
                 RuntimeError, ".* env variable must be set"
             ):
-                power_test_utils.create_power_sampler(
+                monsoon.create_power_sampler(
                     self.default_config, fallback_to_stub=False
                 )
 
     def test_create_power_sampler_with_measurepower_env_var(self) -> None:
         with mock.patch("os.environ.get", return_value="path/to/power"):
-            sampler = power_test_utils.create_power_sampler(
+            power_sampler = monsoon.create_power_sampler(
                 self.config_width_measurepower_path
             )
-            self.assertIsInstance(sampler, power_test_utils._RealPowerSampler)
+            self.assertIsInstance(power_sampler, monsoon._RealPowerSampler)
 
     def test_weighted_average(self) -> None:
         vals = [3, 2, 3, 4]
         weights = [1, 1, 1, 1]
-        self.assertEqual(power_test_utils.weighted_average(vals, weights), 3)
+        self.assertEqual(monsoon.weighted_average(vals, weights), 3)
 
         vals = [3, 2, 3, 4]
         weights = [1, 2, 3, 4]
         # (3 + 4 + 9 + 16) / 10 = 3.2
-        self.assertEqual(power_test_utils.weighted_average(vals, weights), 3.2)
+        self.assertEqual(monsoon.weighted_average(vals, weights), 3.2)
 
     def test_cross_correlate_arg_max(self) -> None:
         signal = [1, 2, 3, 4, 5, 6]
         feature = [1]
         self.assertEqual(
-            power_test_utils.cross_correlate_arg_max(signal, feature), (6, 5)
+            monsoon.cross_correlate_arg_max(signal, feature), (6, 5)
         )
 
         signal = [1, 2, 3, 4, 5, 6]
         feature = [1, 2]
         self.assertEqual(
-            power_test_utils.cross_correlate_arg_max(signal, feature), (17, 4)
+            monsoon.cross_correlate_arg_max(signal, feature), (17, 4)
         )
 
         signal = [0, 0, 0, 1, 4, 3, 2, 0]
         feature = [1, 4, 3, 2]
         self.assertEqual(
-            power_test_utils.cross_correlate_arg_max(signal, feature), (30, 3)
+            monsoon.cross_correlate_arg_max(signal, feature), (30, 3)
         )
 
         large_signal = list(range(30000))
         large_feature = list(range(20000))
         self.assertEqual(
-            power_test_utils.cross_correlate_arg_max(
-                large_signal, large_feature
-            ),
+            monsoon.cross_correlate_arg_max(large_signal, large_feature),
             (4666366670000, 10000),
         )
 
     def test_normalize(self) -> None:
         signal = [0, 1, 2, 3, 4, 5]
-        normalized = power_test_utils.normalize(signal)
+        normalized = monsoon.normalize(signal)
         expected = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
         self.assertEqual(normalized, expected)
 
@@ -205,7 +203,7 @@ class PowerSamplerTest(unittest.TestCase):
 
         # If we cross correlate without normalizing, we correlate best with the 2s
         self.assertEqual(
-            power_test_utils.cross_correlate_arg_max(signal, feature), (60, 5)
+            monsoon.cross_correlate_arg_max(signal, feature), (60, 5)
         )
 
         # But if we normalize first
@@ -216,9 +214,9 @@ class PowerSamplerTest(unittest.TestCase):
         #
         # which correctly correlates best with the beginning
         self.assertEqual(
-            power_test_utils.cross_correlate_arg_max(
-                power_test_utils.normalize(signal),
-                power_test_utils.normalize(feature),
+            monsoon.cross_correlate_arg_max(
+                monsoon.normalize(signal),
+                monsoon.normalize(feature),
             ),
             (1.0, 0),
         )

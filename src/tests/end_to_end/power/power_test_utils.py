@@ -8,16 +8,15 @@
 # Remove this file once internal repo has transitioned to use the new location
 # and naming for this module.
 
-from power import gonk
-from power import power_test_utils as old_power_test_utils
+from power import gonk, monsoon
 
 # Classes
-PowerSampler = old_power_test_utils.PowerSampler
-PowerSamplerConfig = old_power_test_utils.PowerSamplerConfig
+PowerSampler = monsoon.PowerSampler
+PowerSamplerConfig = monsoon.PowerSamplerConfig
 
 # Functions
-create_power_sampler = old_power_test_utils.create_power_sampler
+create_power_sampler = monsoon.create_power_sampler
 merge_gonk_data = gonk.merge_gonk_data
-merge_power_data = old_power_test_utils.merge_power_data
+merge_power_data = monsoon.merge_power_data
 read_gonk_header = gonk.read_gonk_header
 read_gonk_samples = gonk.read_gonk_samples

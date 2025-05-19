@@ -11,7 +11,7 @@ import re
 from collections.abc import Iterable, Iterator
 from typing import Self, Sequence
 
-from power import power_test_utils
+from power import monsoon
 from trace_processing import trace_model, trace_time
 
 
@@ -232,7 +232,7 @@ def merge_gonk_data(
                 continue
 
             power_samples_for_trace.append(
-                power_test_utils.Sample(
+                monsoon.Sample(
                     timestamp,
                     s.currents[i],
                     s.voltages[i],
@@ -244,7 +244,7 @@ def merge_gonk_data(
             )
 
     # Insert gonk samples with the modified timestamp into the existing trace.
-    power_test_utils._append_power_data(
+    monsoon._append_power_data(
         fxt_path, power_samples_for_trace, starting_ticks=0
     )
 
@@ -259,7 +259,7 @@ def merge_gonk_data_without_gpio(
         n_rails = len(s.voltages)
         for i in range(n_rails):
             power_samples_for_trace.append(
-                power_test_utils.Sample(
+                monsoon.Sample(
                     s.gonk_time.to_epoch_delta().to_nanoseconds(),
                     s.currents[i],
                     s.voltages[i],
@@ -269,6 +269,6 @@ def merge_gonk_data_without_gpio(
                     rail_name=rail_names[i],
                 )
             )
-    power_test_utils._append_power_data(
+    monsoon._append_power_data(
         fxt_path, power_samples_for_trace, starting_ticks=0
     )
