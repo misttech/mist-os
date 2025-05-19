@@ -30,8 +30,6 @@ use std::convert::TryInto as _;
 use std::io::Write;
 use std::sync::Arc;
 
-pub use run::run_client;
-
 /// A thin wrapper around [`run::run_server_client()`] that sets the `Marker` to be
 /// [`DirectoryMarker`], and providing explicit type for the `get_client` closure argument.  This
 /// makes it possible for the caller not to provide explicit types.
