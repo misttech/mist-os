@@ -903,22 +903,25 @@ template("bazel_action") {
     # Below are extra args to Bazel
 
     # Forward GN sanitizer configuration to Bazel
-    if (is_hwasan) {
-      args += [ "--features=hwasan" ]
-    } else if (is_asan) {
-      args += [ "--features=asan" ]
-    }
-    if (is_lsan) {
-      args += [ "--features=lsan" ]
-    }
-    if (is_msan) {
-      args += [ "--features=msan" ]
-    }
-    if (is_tsan) {
-      args += [ "--features=tsan" ]
-    }
-    if (is_ubsan) {
-      args += [ "--features=ubsan" ]
+    # https://fxbug.dev/417952817: For now, only do this for Fuchsia targets.
+    if (!_build_for_host) {
+      if (is_hwasan) {
+        args += [ "--features=hwasan" ]
+      } else if (is_asan) {
+        args += [ "--features=asan" ]
+      }
+      if (is_lsan) {
+        args += [ "--features=lsan" ]
+      }
+      if (is_msan) {
+        args += [ "--features=msan" ]
+      }
+      if (is_tsan) {
+        args += [ "--features=tsan" ]
+      }
+      if (is_ubsan) {
+        args += [ "--features=ubsan" ]
+      }
     }
 
     # Only clang toolchain has coverage support in Bazel at the moment.

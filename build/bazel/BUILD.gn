@@ -7,6 +7,7 @@ import("//build/assembly/sshd_config.gni")
 import("//build/bazel/bazel_action.gni")
 import("//build/bazel/bazel_content_hashes.gni")
 import("//build/bazel/bazel_inputs.gni")
+import("//build/bazel/bazel_root_targets.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/generate_content_hash_file.gni")
 import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
@@ -164,6 +165,25 @@ group("bazel_action_allowlist") {
     "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-bazel-package.bazel_build",
     "//src/ui/input/drivers/adc-buttons:bazel_package.bazel_build",
   ]
+
+  visibility += [ ":bazel_root_host_targets.build" ]
+}
+
+group("bazel_root_targets") {
+  public_deps = [
+    ":bazel_root_host_targets",
+    ":bazel_root_targets_json",
+  ]
+}
+
+build_bazel_root_host_targets("bazel_root_host_targets") {
+  # Nothing to do here
+}
+
+generated_file("bazel_root_targets_json") {
+  outputs = [ "$root_build_dir/bazel_root_targets.json" ]
+  contents = resolved_bazel_root_targets
+  output_conversion = "json"
 }
 
 # Generates a file containing information about the GN build variables

@@ -2388,6 +2388,11 @@ group("root_targets") {
     # the final files in the Bazel workspace.
     "//build/bazel:bazel_content_hashes_json",
 
+    # The bazel_root_targets.json file contains information about all
+    # Bazel root targets and will be used by `fx build @<bazel_label>`
+    # to build them directly without invoking Ninja.
+    "//build/bazel:bazel_root_targets",
+
     # It must be possible to run the versioning scripts without them being part
     # of the default build.
     "//scripts/versioning($host_toolchain)",
