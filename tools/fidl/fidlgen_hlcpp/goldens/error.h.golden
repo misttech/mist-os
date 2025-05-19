@@ -35,7 +35,7 @@ class ExampleFooRequest final {
   static inline ::std::unique_ptr<ExampleFooRequest> New() { return ::std::make_unique<ExampleFooRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ExampleFooRequest* value, size_t _offset);
   zx_status_t Clone(ExampleFooRequest* result) const;
 };
@@ -65,7 +65,7 @@ class Example_foo_Response final {
   static inline ::std::unique_ptr<Example_foo_Response> New() { return ::std::make_unique<Example_foo_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Example_foo_Response* value, size_t _offset);
   zx_status_t Clone(Example_foo_Response* result) const;
 };
@@ -100,7 +100,7 @@ class Example_foo_Result final {
   static inline ::std::unique_ptr<Example_foo_Result> New() { return ::std::make_unique<Example_foo_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Example_foo_Result* value, size_t offset);
   zx_status_t Clone(Example_foo_Result* result) const;
 
@@ -281,7 +281,7 @@ struct CodingTraits<std::unique_ptr<::test::error::Example_foo_Result>> {
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::error::Example_foo_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);

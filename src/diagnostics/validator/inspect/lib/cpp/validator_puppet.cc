@@ -10,20 +10,18 @@
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/component/cpp/service.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/stdcompat/variant.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
 #include <lib/vfs/cpp/service.h>
 
 #include <string>
+#include <variant>
 #include <vector>
 
 #include <diagnostics/validate/cpp/fidl.h>
 
 namespace dv = diagnostics::validate;
 
-using cpp17::get;
-using cpp17::holds_alternative;
 using dv::Action;
 using dv::InitializationParams;
 using dv::LazyAction;
@@ -32,15 +30,16 @@ using dv::ROOT_ID;
 using dv::TestResult;
 using dv::ValueType;
 using inspect::LazyNode;
+using std::get;
+using std::holds_alternative;
 
-using Value =
-    cpp17::variant<cpp17::monostate, inspect::Node, inspect::IntProperty, inspect::UintProperty,
-                   inspect::DoubleProperty, inspect::StringProperty, inspect::ByteVectorProperty,
-                   inspect::BoolProperty, inspect::IntArray, inspect::UintArray,
-                   inspect::DoubleArray, inspect::LinearIntHistogram, inspect::LinearUintHistogram,
-                   inspect::LinearDoubleHistogram, inspect::ExponentialIntHistogram,
-                   inspect::ExponentialUintHistogram, inspect::ExponentialDoubleHistogram,
-                   inspect::StringArray>;
+using Value = std::variant<std::monostate, inspect::Node, inspect::IntProperty,
+                           inspect::UintProperty, inspect::DoubleProperty, inspect::StringProperty,
+                           inspect::ByteVectorProperty, inspect::BoolProperty, inspect::IntArray,
+                           inspect::UintArray, inspect::DoubleArray, inspect::LinearIntHistogram,
+                           inspect::LinearUintHistogram, inspect::LinearDoubleHistogram,
+                           inspect::ExponentialIntHistogram, inspect::ExponentialUintHistogram,
+                           inspect::ExponentialDoubleHistogram, inspect::StringArray>;
 
 class Actor {
  public:

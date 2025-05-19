@@ -58,7 +58,7 @@ struct is_nullable<void> : public std::false_type {};
 // - sizeof(std::optional<int>) == sizeof(struct { bool; int; })
 //
 // TODO(https://fxbug.dev/42123486): fit::nullable does not precisely mirror
-// cpp17::optional. This should be corrected to avoid surprises when switching
+// std::optional. This should be corrected to avoid surprises when switching
 // between the types.
 template <typename T, bool = (is_nullable<T>::value && std::is_constructible_v<T, T&&> &&
                               std::is_assignable_v<T&, T&&>)>
@@ -111,7 +111,7 @@ class nullable final {
   constexpr void swap(nullable& other) { opt_.swap(other.opt_); }
 
  private:
-  cpp17::optional<T> opt_;
+  std::optional<T> opt_;
 };
 
 template <typename T>

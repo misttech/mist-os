@@ -403,11 +403,11 @@ struct NaturalCodingTraits<fidl::basic_ticks<ClockId>, NaturalCodingConstraintEm
 };
 
 template <typename T, typename Constraint>
-struct NaturalCodingTraits<cpp17::optional<std::vector<T>>, Constraint> {
+struct NaturalCodingTraits<std::optional<std::vector<T>>, Constraint> {
   static constexpr size_t kInlineSize = sizeof(fidl_vector_t);
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(NaturalEncoder* encoder, cpp17::optional<std::vector<T>>* value, size_t offset,
+  static void Encode(NaturalEncoder* encoder, std::optional<std::vector<T>>* value, size_t offset,
                      size_t recursion_depth) {
     if (value->has_value()) {
       fidl::internal::NaturalCodingTraits<std::vector<T>, Constraint>::Encode(
@@ -418,7 +418,7 @@ struct NaturalCodingTraits<cpp17::optional<std::vector<T>>, Constraint> {
     vec->count = 0;
     vec->data = reinterpret_cast<char*>(FIDL_ALLOC_ABSENT);
   }
-  static void Decode(NaturalDecoder* decoder, cpp17::optional<std::vector<T>>* value, size_t offset,
+  static void Decode(NaturalDecoder* decoder, std::optional<std::vector<T>>* value, size_t offset,
                      size_t recursion_depth) {
     fidl_vector_t* vec = decoder->template GetPtr<fidl_vector_t>(offset);
     switch (reinterpret_cast<uintptr_t>(vec->data)) {
@@ -591,11 +591,11 @@ struct NaturalCodingTraits<::std::string, Constraint> final {
 };
 
 template <typename Constraint>
-struct NaturalCodingTraits<cpp17::optional<std::string>, Constraint> {
+struct NaturalCodingTraits<std::optional<std::string>, Constraint> {
   static constexpr size_t kInlineSize = sizeof(fidl_string_t);
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(NaturalEncoder* encoder, cpp17::optional<std::string>* value, size_t offset,
+  static void Encode(NaturalEncoder* encoder, std::optional<std::string>* value, size_t offset,
                      size_t recursion_depth) {
     if (value->has_value()) {
       fidl::internal::NaturalCodingTraits<std::string, Constraint>::Encode(encoder, &value->value(),
@@ -606,7 +606,7 @@ struct NaturalCodingTraits<cpp17::optional<std::string>, Constraint> {
     string->size = 0;
     string->data = reinterpret_cast<char*>(FIDL_ALLOC_ABSENT);
   }
-  static void Decode(NaturalDecoder* decoder, cpp17::optional<std::string>* value, size_t offset,
+  static void Decode(NaturalDecoder* decoder, std::optional<std::string>* value, size_t offset,
                      size_t recursion_depth) {
     fidl_string_t* string = decoder->template GetPtr<fidl_string_t>(offset);
     switch (reinterpret_cast<uintptr_t>(string->data)) {

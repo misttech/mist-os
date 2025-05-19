@@ -67,7 +67,7 @@ class State final {
 
   // Obtain a copy-on-write copy of the backing VMO. Generation count
   // will be `kVmoFrozen`.
-  cpp17::optional<zx::vmo> FrozenVmoCopy() const;
+  std::optional<zx::vmo> FrozenVmoCopy() const;
 
   // Obtain a copy of the VMO backing this state.
   //
@@ -362,8 +362,7 @@ class State final {
   zx_status_t WriteStringReferencePayload(Block* block, std::string_view data)
       __TA_REQUIRES(mutex_);
 
-  friend cpp17::optional<std::string> TesterLoadStringReference(const State& state,
-                                                                BlockIndex index);
+  friend std::optional<std::string> TesterLoadStringReference(const State& state, BlockIndex index);
 
   // Mutex wrapping all fields in the state.
   // The mutex is mutable to support locking when reading fields of a

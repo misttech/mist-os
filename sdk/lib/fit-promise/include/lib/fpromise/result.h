@@ -6,11 +6,11 @@
 #define LIB_FPROMISE_RESULT_H_
 
 #include <assert.h>
-#include <lib/stdcompat/variant.h>
 
 #include <new>
 #include <type_traits>
 #include <utility>
+#include <variant>
 
 namespace fpromise {
 
@@ -128,16 +128,16 @@ class result final {
   constexpr result(pending_result) {}
 
   // Creates an ok result.
-  constexpr result(ok_result<V> result) : state_(cpp17::in_place_index<1>, std::move(result)) {}
+  constexpr result(ok_result<V> result) : state_(std::in_place_index<1>, std::move(result)) {}
   template <typename OtherV, typename = std::enable_if_t<std::is_constructible<V, OtherV>::value>>
   constexpr result(ok_result<OtherV> other)
-      : state_(cpp17::in_place_index<1>, fpromise::ok<V>(std::move(other.value))) {}
+      : state_(std::in_place_index<1>, fpromise::ok<V>(std::move(other.value))) {}
 
   // Creates an error result.
-  constexpr result(error_result<E> result) : state_(cpp17::in_place_index<2>, std::move(result)) {}
+  constexpr result(error_result<E> result) : state_(std::in_place_index<2>, std::move(result)) {}
   template <typename OtherE, typename = std::enable_if_t<std::is_constructible<E, OtherE>::value>>
   constexpr result(error_result<OtherE> other)
-      : state_(cpp17::in_place_index<2>, fpromise::error<E>(std::move(other.error))) {}
+      : state_(std::in_place_index<2>, fpromise::error<E>(std::move(other.error))) {}
 
   // Copies another result (if copyable).
   result(const result& other) = default;
@@ -166,23 +166,23 @@ class result final {
   // Asserts that the result's state is |fpromise::result_state::ok|.
   template <typename R = V, typename = std::enable_if_t<!std::is_void<R>::value>>
   constexpr R& value() {
-    return cpp17::get<1>(state_).value;
+    return std::get<1>(state_).value;
   }
   template <typename R = V, typename = std::enable_if_t<!std::is_void<R>::value>>
   constexpr const R& value() const {
-    return cpp17::get<1>(state_).value;
+    return std::get<1>(state_).value;
   }
 
   // Takes the result's value, leaving it in a pending state.
   // Asserts that the result's state is |fpromise::result_state::ok|.
   template <typename R = V, typename = std::enable_if_t<!std::is_void<R>::value>>
   R take_value() {
-    auto value = std::move(cpp17::get<1>(state_).value);
+    auto value = std::move(std::get<1>(state_).value);
     reset();
     return value;
   }
   ok_result<V> take_ok_result() {
-    auto result = std::move(cpp17::get<1>(state_));
+    auto result = std::move(std::get<1>(state_));
     reset();
     return result;
   }
@@ -191,23 +191,23 @@ class result final {
   // Asserts that the result's state is |fpromise::result_state::error|.
   template <typename R = E, typename = std::enable_if_t<!std::is_void<R>::value>>
   constexpr R& error() {
-    return cpp17::get<2>(state_).error;
+    return std::get<2>(state_).error;
   }
   template <typename R = E, typename = std::enable_if_t<!std::is_void<R>::value>>
   constexpr const R& error() const {
-    return cpp17::get<2>(state_).error;
+    return std::get<2>(state_).error;
   }
 
   // Takes the result's error, leaving it in a pending state.
   // Asserts that the result's state is |fpromise::result_state::error|.
   template <typename R = E, typename = std::enable_if_t<!std::is_void<R>::value>>
   R take_error() {
-    auto error = std::move(cpp17::get<2>(state_).error);
+    auto error = std::move(std::get<2>(state_).error);
     reset();
     return error;
   }
   error_result<E> take_error_result() {
-    auto result = std::move(cpp17::get<2>(state_));
+    auto result = std::move(std::get<2>(state_));
     reset();
     return result;
   }
@@ -228,7 +228,7 @@ class result final {
  private:
   void reset() { state_.template emplace<0>(); }
 
-  cpp17::variant<cpp17::monostate, ok_result<V>, error_result<E>> state_;
+  std::variant<std::monostate, ok_result<V>, error_result<E>> state_;
 };
 
 template <typename V, typename E>

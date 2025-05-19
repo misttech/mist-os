@@ -23,7 +23,6 @@ source_set("chromium") {
   deps = [ "//src/lib/fxl" ]
 
   public_deps = [
-    "//sdk/lib/stdcompat",
     "//sdk/lib/syslog/cpp",
     "//src/performance/lib/perfmon",
     "//third_party/modp_b64",

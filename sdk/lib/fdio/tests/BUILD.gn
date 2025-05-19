@@ -116,7 +116,6 @@ test("fdio-test") {
       "//sdk/lib/async-loop:async-loop-default",
       "//sdk/lib/driver_test_realm/simple",
       "//sdk/lib/fdio",
-      "//sdk/lib/stdcompat",
       "//sdk/lib/zxio",
       "//src/connectivity/network/netstack/udp_serde",
       "//src/connectivity/network/tests/socket:util",

@@ -163,7 +163,7 @@ zx::result<> open_netdevice(async_dispatcher_t* dispatcher,
   return zx::ok();
 }
 
-zx::result<> netifc_open(async_dispatcher_t* dispatcher, cpp17::string_view interface,
+zx::result<> netifc_open(async_dispatcher_t* dispatcher, std::string_view interface,
                          fit::callback<void(zx_status_t)> on_error) {
   zx::result status = netifc_discover("/dev", interface);
   if (status.is_error()) {

@@ -42,12 +42,12 @@ class inline_any_impl {
   using not_self_type = ::fit::internal::not_same_type<inline_any_impl, T>;
 
   template <typename T>
-  using fits = cpp17::bool_constant<sizeof(cpp20::remove_cvref_t<T>) <= storage_size &&
-                                    alignof(cpp20::remove_cvref_t<T>) <= storage_alignment>;
+  using fits = std::bool_constant<sizeof(cpp20::remove_cvref_t<T>) <= storage_size &&
+                                  alignof(cpp20::remove_cvref_t<T>) <= storage_alignment>;
 
   template <typename T>
   using is_compatible =
-      cpp17::conjunction<std::is_base_of<I, cpp20::remove_cvref_t<T>>, not_self_type<T>, fits<T>>;
+      std::conjunction<std::is_base_of<I, cpp20::remove_cvref_t<T>>, not_self_type<T>, fits<T>>;
 
  public:
   // Constructs an empty container.
@@ -62,7 +62,7 @@ class inline_any_impl {
 
   template <typename T, typename... Args,
             requires_conditions<std::is_constructible<T, Args...>, is_compatible<T>> = 0>
-  explicit inline_any_impl(cpp17::in_place_type_t<T>, Args&&... args) : op_{get_op_fn<T>()} {
+  explicit inline_any_impl(std::in_place_type_t<T>, Args&&... args) : op_{get_op_fn<T>()} {
     new (&storage_) cpp20::remove_cvref_t<T>(std::forward<Args>(args)...);
   }
 
@@ -174,14 +174,14 @@ class inline_any_impl {
   }
 
   // Asserts that an object is contained, then invokes |visitor| with a reference.
-  template <typename Callable, requires_conditions<cpp17::is_invocable<Callable, I&>> = 0>
+  template <typename Callable, requires_conditions<std::is_invocable<Callable, I&>> = 0>
   decltype(auto) visit(Callable&& visitor) {
     if (op_ != default_op_fn) {
       return std::forward<Callable>(visitor)(*op_(opcode::get_interface, &storage_, nullptr));
     }
     __builtin_abort();
   }
-  template <typename Callable, requires_conditions<cpp17::is_invocable<Callable, const I*>> = 0>
+  template <typename Callable, requires_conditions<std::is_invocable<Callable, const I*>> = 0>
   decltype(auto) visit(Callable&& visitor) const {
     if (op_ != default_op_fn) {
       return std::forward<Callable>(visitor)(op_(opcode::get_interface, &storage_, nullptr));
@@ -190,14 +190,14 @@ class inline_any_impl {
   }
 
   // Asserts that an object is contained, then invokes |visitor| with a pointer.
-  template <typename Callable, requires_conditions<cpp17::is_invocable<Callable, I*>> = 0>
+  template <typename Callable, requires_conditions<std::is_invocable<Callable, I*>> = 0>
   decltype(auto) visit(Callable&& visitor) {
     if (op_ != default_op_fn) {
       return std::forward<Callable>(visitor)(op_(opcode::get_interface, &storage_, nullptr));
     }
     __builtin_abort();
   }
-  template <typename Callable, requires_conditions<cpp17::is_invocable<Callable, const I&>> = 0>
+  template <typename Callable, requires_conditions<std::is_invocable<Callable, const I&>> = 0>
   decltype(auto) visit(Callable&& visitor) const {
     if (op_ != default_op_fn) {
       return std::forward<Callable>(visitor)(*op_(opcode::get_interface, &storage_, nullptr));
@@ -207,7 +207,7 @@ class inline_any_impl {
 
   // Asserts that the stored object type is |T|, then invokes |visitor| with a reference.
   template <typename T, typename Callable,
-            requires_conditions<is_compatible<T>, cpp17::is_invocable<Callable, T&>> = 0>
+            requires_conditions<is_compatible<T>, std::is_invocable<Callable, T&>> = 0>
   decltype(auto) visit_as(Callable&& visitor) {
     if (op_ == get_op_fn<T>()) {
       return std::forward<Callable>(visitor)(reference<T>(&storage_));
@@ -215,7 +215,7 @@ class inline_any_impl {
     __builtin_abort();
   }
   template <typename T, typename Callable,
-            requires_conditions<is_compatible<T>, cpp17::is_invocable<Callable, const T&>> = 0>
+            requires_conditions<is_compatible<T>, std::is_invocable<Callable, const T&>> = 0>
   decltype(auto) visit_as(Callable&& visitor) const {
     if (op_ == get_op_fn<T>()) {
       return std::forward<Callable>(visitor)(const_reference<T>(&storage_));
@@ -225,7 +225,7 @@ class inline_any_impl {
 
   // Asserts that the stored object type is |T|, then invokes |visitor| with a pointer.
   template <typename T, typename Callable,
-            requires_conditions<is_compatible<T>, cpp17::is_invocable<Callable, T*>> = 0>
+            requires_conditions<is_compatible<T>, std::is_invocable<Callable, T*>> = 0>
   decltype(auto) visit_as(Callable&& visitor) {
     if (op_ == get_op_fn<T>()) {
       return std::forward<Callable>(visitor)(pointer<T>(&storage_));
@@ -233,7 +233,7 @@ class inline_any_impl {
     __builtin_abort();
   }
   template <typename T, typename Callable,
-            requires_conditions<is_compatible<T>, cpp17::is_invocable<Callable, const T*>> = 0>
+            requires_conditions<is_compatible<T>, std::is_invocable<Callable, const T*>> = 0>
   decltype(auto) visit_as(Callable&& visitor) const {
     if (op_ == get_op_fn<T>()) {
       return std::forward<Callable>(visitor)(const_pointer<T>(&storage_));

@@ -285,7 +285,7 @@ TEST(InlineAny, Emplace) {
 TEST(InlineAny, InPlaceTag) {
   int receiver = 0;
   {
-    any_dice_roll roll{cpp17::in_place_type_t<four>{}, &receiver};
+    any_dice_roll roll{std::in_place_type_t<four>{}, &receiver};
     EXPECT_EQ(0, receiver);
   }
   EXPECT_EQ(4, receiver);
@@ -366,7 +366,7 @@ TEST(PinnedInlineAny, Emplace) {
 TEST(PinnedInlineAny, InPlaceTag) {
   int receiver = 0;
   {
-    non_movable_any_dice_roll roll{cpp17::in_place_type_t<non_movable_four>{}, &receiver};
+    non_movable_any_dice_roll roll{std::in_place_type_t<non_movable_four>{}, &receiver};
     EXPECT_EQ(0, receiver);
   }
   EXPECT_EQ(4, receiver);

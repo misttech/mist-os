@@ -158,24 +158,24 @@ fbl::String ArgumentValue::ToString() const {
     case ArgumentType::kNull:
       return "null";
     case ArgumentType::kBool:
-      return fbl::StringPrintf("bool(%s)", cpp17::get<Bool>(value_).value ? "true" : "false");
+      return fbl::StringPrintf("bool(%s)", std::get<Bool>(value_).value ? "true" : "false");
     case ArgumentType::kInt32:
-      return fbl::StringPrintf("int32(%" PRId32 ")", cpp17::get<int32_t>(value_));
+      return fbl::StringPrintf("int32(%" PRId32 ")", std::get<int32_t>(value_));
     case ArgumentType::kUint32:
-      return fbl::StringPrintf("uint32(%" PRIu32 ")", cpp17::get<uint32_t>(value_));
+      return fbl::StringPrintf("uint32(%" PRIu32 ")", std::get<uint32_t>(value_));
     case ArgumentType::kInt64:
-      return fbl::StringPrintf("int64(%" PRId64 ")", cpp17::get<int64_t>(value_));
+      return fbl::StringPrintf("int64(%" PRId64 ")", std::get<int64_t>(value_));
     case ArgumentType::kUint64:
-      return fbl::StringPrintf("uint64(%" PRIu64 ")", cpp17::get<uint64_t>(value_));
+      return fbl::StringPrintf("uint64(%" PRIu64 ")", std::get<uint64_t>(value_));
     case ArgumentType::kDouble:
-      return fbl::StringPrintf("double(%f)", cpp17::get<double>(value_));
+      return fbl::StringPrintf("double(%f)", std::get<double>(value_));
     case ArgumentType::kString:
-      return fbl::StringPrintf("string(\"%s\")", cpp17::get<fbl::String>(value_).c_str());
+      return fbl::StringPrintf("string(\"%s\")", std::get<fbl::String>(value_).c_str());
     case ArgumentType::kPointer:
       return fbl::StringPrintf("pointer(%p)",
-                               reinterpret_cast<void*>(cpp17::get<Pointer>(value_).value));
+                               reinterpret_cast<void*>(std::get<Pointer>(value_).value));
     case ArgumentType::kKoid:
-      return fbl::StringPrintf("koid(%" PRIu64 ")", cpp17::get<Koid>(value_).value);
+      return fbl::StringPrintf("koid(%" PRIu64 ")", std::get<Koid>(value_).value);
   }
   ZX_ASSERT(false);
 }
@@ -398,8 +398,8 @@ void LargeRecordData::MoveFrom(trace::LargeRecordData&& other) {
 fbl::String LargeRecordData::ToString() const {
   switch (type_) {
     case LargeRecordType::kBlob:
-      if (cpp17::holds_alternative<BlobEvent>(blob_)) {
-        const auto& data = cpp17::get<BlobEvent>(blob_);
+      if (std::holds_alternative<BlobEvent>(blob_)) {
+        const auto& data = std::get<BlobEvent>(blob_);
         return fbl::StringPrintf(
             "Blob(format: blob_event, category: \"%s\", name: \"%s\", "
             "ts: %" PRIu64
@@ -408,8 +408,8 @@ fbl::String LargeRecordData::ToString() const {
             data.category.c_str(), data.name.c_str(), data.timestamp,
             data.process_thread.ToString().c_str(), FormatArgumentList(data.arguments).c_str(),
             data.blob_size, PreviewBlobData<8, 8>(data.blob, data.blob_size).c_str());
-      } else if (cpp17::holds_alternative<BlobAttachment>(blob_)) {
-        const auto& data = cpp17::get<BlobAttachment>(blob_);
+      } else if (std::holds_alternative<BlobAttachment>(blob_)) {
+        const auto& data = std::get<BlobAttachment>(blob_);
         return fbl::StringPrintf(
             "Blob(format: blob_attachment, category: \"%s\", name: \"%s\", "
             "size: %" PRIu64 ", preview: %s)",

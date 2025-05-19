@@ -156,15 +156,15 @@ class Reader {
                    std::vector<uint8_t>* buf) const;
 
   // Helper to load a std::string from either a NAME or STRING_REFERENCE.
-  cpp17::optional<std::string> GetAndValidateName(BlockIndex index);
+  std::optional<std::string> GetAndValidateName(BlockIndex index);
 
   // Helper to interpret the given block as a NAME block and return a
   // copy of the name contents.
-  static cpp17::optional<std::string> LoadName(const Block* block);
+  static std::optional<std::string> LoadName(const Block* block);
 
   // Helper to interpret the given block as a STRING_REFERENCE and return
   // a copy of the canonical value.
-  cpp17::optional<std::string> LoadStringReference(const Block* block) const;
+  std::optional<std::string> LoadStringReference(const Block* block) const;
 
   // Contents of the read VMO.
   Snapshot snapshot_;
@@ -173,7 +173,7 @@ class Reader {
   std::unordered_map<BlockIndex, ParsedNode> parsed_nodes_;
 };
 
-cpp17::optional<std::string> Reader::LoadName(const Block* const block) {
+std::optional<std::string> Reader::LoadName(const Block* const block) {
   if (!block) {
     return {};
   }
@@ -188,7 +188,7 @@ cpp17::optional<std::string> Reader::LoadName(const Block* const block) {
   return std::string(block->payload_ptr(), len);
 }
 
-cpp17::optional<std::string> Reader::LoadStringReference(const Block* const block) const {
+std::optional<std::string> Reader::LoadStringReference(const Block* const block) const {
   if (!block) {
     return {};
   }
@@ -215,7 +215,7 @@ cpp17::optional<std::string> Reader::LoadStringReference(const Block* const bloc
   return std::string{buffer.cbegin(), buffer.cend()};
 }
 
-cpp17::optional<std::string> Reader::GetAndValidateName(BlockIndex index) {
+std::optional<std::string> Reader::GetAndValidateName(BlockIndex index) {
   const auto* const block = internal::GetBlock(&snapshot_, index);
   if (!block) {
     return {};

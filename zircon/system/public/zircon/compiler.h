@@ -91,7 +91,7 @@
 // Having a separate __WARN_UNUSED_CONSTRUCTOR allows us to hide the attribute
 // only on constructors on old versions of GCC.
 #if defined(__cplusplus)
-#if __cplusplus >= 201703L && (defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 10)))
+#if defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 10))
 #define __WARN_UNUSED_CONSTRUCTOR [[nodiscard]]
 #else
 #define __WARN_UNUSED_CONSTRUCTOR
@@ -298,7 +298,7 @@
 //       break;
 //   }
 //
-#if defined(__cplusplus) && __cplusplus >= 201703L
+#if defined(__cplusplus)
 #define __FALLTHROUGH [[fallthrough]]
 #elif defined(__cplusplus) && defined(__clang__)
 #define __FALLTHROUGH [[clang::fallthrough]]

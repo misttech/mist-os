@@ -64,10 +64,10 @@ class GrowableSlab {
 
   // Inserts `value` on the slab, using a key from the available pool.
   // Returns a valid `KeyType` if there was an available slot to put `value` in.
-  [[nodiscard]] cpp17::optional<KeyType> Push(T&& value) {
+  [[nodiscard]] std::optional<KeyType> Push(T&& value) {
     KeyType key = free_list_.head;
     if (Insert(key, std::move(value)) != ZX_OK) {
-      return cpp17::optional<KeyType>();
+      return std::optional<KeyType>();
     }
     return key;
   }
@@ -104,12 +104,12 @@ class GrowableSlab {
 
   // Erases the value at `key`, freeing the slot and returning the stored value.
   // `Erase` returns a valid `T` if `key` pointed to an occupied slot.
-  cpp17::optional<T> Erase(KeyType key) {
+  std::optional<T> Erase(KeyType key) {
     auto* slot = GetOccupiedSlot(key);
     if (!slot) {
-      return cpp17::optional<T>();
+      return std::optional<T>();
     }
-    cpp17::optional<T> ret(std::move(slot->value.value()));
+    std::optional<T> ret(std::move(slot->value.value()));
     slot->value.reset();
 
     ListRemove(&used_list_, key);
@@ -139,7 +139,7 @@ class GrowableSlab {
     Slot(const Slot& other) = delete;
     KeyType next;
     KeyType prev;
-    cpp17::optional<T> value;
+    std::optional<T> value;
   };
 
   class Iterator {

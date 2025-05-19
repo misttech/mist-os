@@ -27,9 +27,9 @@ namespace fuchsia_mem_ext {
 //
 // Returns an error if a backing store cannot be created or the name cannot be set.
 zx::result<fuchsia::mem::Data> CreateWithData(cpp20::span<const uint8_t> data,
-                                              cpp17::string_view vmo_name = "");
+                                              std::string_view vmo_name = "");
 zx::result<fuchsia::mem::Data> CreateWithData(std::vector<uint8_t> data,
-                                              cpp17::string_view vmo_name = "");
+                                              std::string_view vmo_name = "");
 
 // Creates a new instance of Data with a copy of the data referred to by |data|
 // using a |size_threshold| to determine if the data should be stored inline.
@@ -40,9 +40,9 @@ zx::result<fuchsia::mem::Data> CreateWithData(std::vector<uint8_t> data,
 // set, or if |size_threshold| exceeds the limits of a single channel message.
 zx::result<fuchsia::mem::Data> CreateWithData(cpp20::span<const uint8_t> data,
                                               size_t size_threshold,
-                                              cpp17::string_view vmo_name = "");
+                                              std::string_view vmo_name = "");
 zx::result<fuchsia::mem::Data> CreateWithData(std::vector<uint8_t> data, size_t size_threshold,
-                                              cpp17::string_view vmo_name = "");
+                                              std::string_view vmo_name = "");
 
 // Extracts the data from |data| and returns it to the caller. Consumes |data|.
 //

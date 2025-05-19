@@ -133,8 +133,8 @@ void pw_log_fuchsia_impl(int level, const char* module_name, const char* file_na
   }
 
   ::fuchsia_syslog::LogBuffer buffer;
-  buffer.BeginRecord(fuchsia_severity, cpp17::string_view(file_name), line_number,
-                     cpp17::string_view(message), log_state.socket().borrow(), /*dropped_count=*/0,
+  buffer.BeginRecord(fuchsia_severity, std::string_view(file_name), line_number,
+                     std::string_view(message), log_state.socket().borrow(), /*dropped_count=*/0,
                      process_koid, thread_koid);
   buffer.WriteKeyValue("tag", module_name);
   buffer.FlushRecord();

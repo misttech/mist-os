@@ -111,13 +111,9 @@ class error {
   E value_;
 };
 
-#if __cplusplus >= 201703L
-
 // Deduction guide to simplify single argument error expressions in C++17.
 template <typename T>
 error(T) -> error<T>;
-
-#endif
 
 // Returns fit::error<E> for the given value, where E is deduced from the argument type. This
 // utility is a C++14 compatible alternative to the C++17 deduction guide above.
@@ -187,15 +183,11 @@ class success<> {
   constexpr success& operator=(success&&) = default;
 };
 
-#if __cplusplus >= 201703L
-
 // Deduction guides to simplify zero and single argument success expressions in C++17.
 success() -> success<>;
 
 template <typename T>
 success(T) -> success<T>;
-
-#endif
 
 // Returns fit::success<T> for the given value, where T is deduced from the argument type. This
 // utility is a C++14 compatible alternative to the C++17 deduction guide above.
@@ -235,14 +227,14 @@ template <typename E, typename T>
 class [[nodiscard]] result<E, T> {
   static_assert(!::fit::internal::is_success_v<E>,
                 "fit::success may not be used as the error type of fit::result!");
-  static_assert(!cpp17::is_same_v<failed, std::decay_t<T>>,
+  static_assert(!std::is_same_v<failed, std::decay_t<T>>,
                 "fit::failed may not be used as a value type of fit::result!");
 
   template <typename U>
-  using not_same = cpp17::negation<std::is_same<result, U>>;
+  using not_same = std::negation<std::is_same<result, U>>;
 
   struct none {};
-  using failed_or_none = std::conditional_t<cpp17::is_same_v<failed, E>, failed, none>;
+  using failed_or_none = std::conditional_t<std::is_same_v<failed, E>, failed, none>;
 
  public:
   using error_type = E;
@@ -482,11 +474,11 @@ class [[nodiscard]] result<E> {
                 "fit::success may not be used as the error type of fit::result!");
 
   template <typename U>
-  using not_same = cpp17::negation<std::is_same<result, U>>;
+  using not_same = std::negation<std::is_same<result, U>>;
 
   template <size_t>
   struct none {};
-  using failure_or_none = std::conditional_t<cpp17::is_same_v<failed, E>, failed, none<1>>;
+  using failure_or_none = std::conditional_t<std::is_same_v<failed, E>, failed, none<1>>;
 
  public:
   using error_type = E;

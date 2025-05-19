@@ -4,9 +4,9 @@
 
 #include <fuchsia/diagnostics/cpp/fidl.h>
 #include <fuchsia/logger/cpp/fidl.h>
-#include <lib/stdcompat/optional.h>
 
 #include <cinttypes>
+#include <optional>
 
 #include <gtest/gtest.h>
 #include <src/lib/diagnostics/accessor2logger/log_message.h>
@@ -172,22 +172,22 @@ struct ValidationTestCase {
   std::string input;
 
   // If set, check that the conversion function returned this error instead of a vector.
-  cpp17::optional<std::string> expected_overall_error = cpp17::nullopt;
+  std::optional<std::string> expected_overall_error = std::nullopt;
 
   // If set, assert on the exact number of messages returned.
-  cpp17::optional<int> expected_count = cpp17::nullopt;
+  std::optional<int> expected_count = std::nullopt;
 
   // If set, assert that message has the given error.
-  cpp17::optional<std::string> expected_error = cpp17::nullopt;
+  std::optional<std::string> expected_error = std::nullopt;
 
   // If set, assert that message is OK and matches the given value.
-  cpp17::optional<std::string> expected_message = cpp17::nullopt;
+  std::optional<std::string> expected_message = std::nullopt;
 
   // If set, assert that message is OK and tags match the given value.
-  cpp17::optional<std::vector<std::string>> expected_tags = cpp17::nullopt;
+  std::optional<std::vector<std::string>> expected_tags = std::nullopt;
 
   // If set, assert that message is OK and dropped logs match the given value.
-  cpp17::optional<uint32_t> dropped_logs = cpp17::nullopt;
+  std::optional<uint32_t> dropped_logs = std::nullopt;
 };
 
 void RunValidationCases(std::vector<ValidationTestCase> cases) {

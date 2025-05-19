@@ -10,6 +10,7 @@
 #include <lib/fit/function.h>
 #include <lib/fpromise/promise.h>
 
+#include <exception>
 #include <memory>
 
 #include "src/lib/fxl/memory/weak_ptr.h"

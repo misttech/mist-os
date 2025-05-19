@@ -4,6 +4,7 @@
 
 #include "src/developer/debug/zxdb/client/system.h"
 
+#include <lib/stdcompat/functional.h>
 #include <lib/syslog/cpp/log_settings.h>
 
 #include <algorithm>

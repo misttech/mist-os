@@ -18,7 +18,7 @@ template <>
 struct CodingTraits<::fidl::internal::FrameworkErr> {
   static constexpr size_t kInlineSize = sizeof(::fidl::internal::FrameworkErr);
   static void Encode(Encoder* encoder, ::fidl::internal::FrameworkErr* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     int32_t underlying = static_cast<int32_t>(*value);
     ::fidl::Encode(encoder, &underlying, offset);

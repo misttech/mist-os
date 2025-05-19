@@ -11,7 +11,6 @@
 
 #include <lib/fit/function.h>
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/optional.h>
 
 #include <array>
 #include <functional>

@@ -64,30 +64,30 @@ std::string NameFromDictionaryRef(const DictionaryRef& ref) {
 }  // namespace
 
 fuchsia::component::decl::Ref ConvertToFidl(Ref ref) {
-  if (auto child_ref = cpp17_get_if<ChildRef>(&ref)) {
+  if (auto child_ref = std::get_if<ChildRef>(&ref)) {
     fuchsia::component::decl::ChildRef result;
     result.name = std::string(child_ref->name);
     return fuchsia::component::decl::Ref::WithChild(std::move(result));
   }
-  if (auto _ = cpp17_get_if<ParentRef>(&ref)) {
+  if (auto _ = std::get_if<ParentRef>(&ref)) {
     return fuchsia::component::decl::Ref::WithParent(fuchsia::component::decl::ParentRef());
   }
-  if (auto collection_ref = cpp17_get_if<CollectionRef>(&ref)) {
+  if (auto collection_ref = std::get_if<CollectionRef>(&ref)) {
     fuchsia::component::decl::CollectionRef result;
     result.name = std::string(collection_ref->name);
     return fuchsia::component::decl::Ref::WithCollection(std::move(result));
   }
-  if (auto _ = cpp17_get_if<FrameworkRef>(&ref)) {
+  if (auto _ = std::get_if<FrameworkRef>(&ref)) {
     return fuchsia::component::decl::Ref::WithFramework(fuchsia::component::decl::FrameworkRef());
   }
-  if (auto _ = cpp17_get_if<VoidRef>(&ref)) {
+  if (auto _ = std::get_if<VoidRef>(&ref)) {
     return fuchsia::component::decl::Ref::WithVoidType(fuchsia::component::decl::VoidRef());
   }
-  if (auto _ = cpp17_get_if<SelfRef>(&ref)) {
+  if (auto _ = std::get_if<SelfRef>(&ref)) {
     return fuchsia::component::decl::Ref::WithSelf(fuchsia::component::decl::SelfRef());
   }
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  if (auto dictionary_ref = cpp17_get_if<DictionaryRef>(&ref)) {
+  if (auto dictionary_ref = std::get_if<DictionaryRef>(&ref)) {
     fuchsia::component::decl::CapabilityRef result;
     result.name = NameFromDictionaryRef(*dictionary_ref);
     return fuchsia::component::decl::Ref::WithCapability(std::move(result));
@@ -98,7 +98,7 @@ fuchsia::component::decl::Ref ConvertToFidl(Ref ref) {
 }
 
 fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
-  if (auto protocol = cpp17_get_if<Protocol>(&capability)) {
+  if (auto protocol = std::get_if<Protocol>(&capability)) {
     fuchsia::component::test::Protocol fidl_capability;
 
     fidl_capability.set_name(std::string(protocol->name));
@@ -112,7 +112,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 
     return fuchsia::component::test::Capability::WithProtocol(std::move(fidl_capability));
   }
-  if (auto service = cpp17_get_if<Service>(&capability)) {
+  if (auto service = std::get_if<Service>(&capability)) {
     fuchsia::component::test::Service fidl_capability;
 
     fidl_capability.set_name(std::string(service->name));
@@ -125,7 +125,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 
     return fuchsia::component::test::Capability::WithService(std::move(fidl_capability));
   }
-  if (auto directory = cpp17_get_if<Directory>(&capability)) {
+  if (auto directory = std::get_if<Directory>(&capability)) {
     fuchsia::component::test::Directory fidl_capability;
 
     fidl_capability.set_name(std::string(directory->name));
@@ -141,7 +141,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 
     return fuchsia::component::test::Capability::WithDirectory(std::move(fidl_capability));
   }
-  if (auto storage = cpp17_get_if<Storage>(&capability)) {
+  if (auto storage = std::get_if<Storage>(&capability)) {
     fuchsia::component::test::Storage fidl_capability;
 
     fidl_capability.set_name(std::string(storage->name));
@@ -151,7 +151,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 
     return fuchsia::component::test::Capability::WithStorage(std::move(fidl_capability));
   }
-  if ([[maybe_unused]] auto dictionary = cpp17_get_if<Dictionary>(&capability)) {
+  if ([[maybe_unused]] auto dictionary = std::get_if<Dictionary>(&capability)) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(26)
     fuchsia::component::test::Dictionary fidl_capability;
 
@@ -165,7 +165,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     ZX_PANIC("Dictionary capabilities are not supported in this API level.");
 #endif
   }
-  if ([[maybe_unused]] auto config = cpp17_get_if<Config>(&capability)) {
+  if ([[maybe_unused]] auto config = std::get_if<Config>(&capability)) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(20)
     fuchsia::component::test::Config fidl_capability;
 
@@ -179,7 +179,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 #endif
   }
 
-  if ([[maybe_unused]] auto resolver = cpp17_get_if<Resolver>(&capability)) {
+  if ([[maybe_unused]] auto resolver = std::get_if<Resolver>(&capability)) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(24)
     fuchsia::component::test::Resolver fidl_capability;
 
@@ -196,7 +196,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 #endif
   }
 
-  if ([[maybe_unused]] auto runner = cpp17_get_if<Runner>(&capability)) {
+  if ([[maybe_unused]] auto runner = std::get_if<Runner>(&capability)) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(24)
     fuchsia::component::test::Runner fidl_capability;
 

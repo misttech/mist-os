@@ -17,7 +17,6 @@ source_set("chromium") {
   ]
   public_deps = [
     "../..:vaapi_utils",
-    "//sdk/lib/stdcompat",
     "//src/media/lib/codec_impl",
     "//src/media/third_party/chromium_media",
     "//third_party/intel/libva/fuchsia:headers",

@@ -241,9 +241,9 @@ class SynchronizedDispatcher final : public Dispatcher {
   //
   // ZX_ERR_BAD_STATE: Dispatchers are currently not allowed to be created, such as when a driver
   // is being shutdown by its driver host.
-  static zx::result<SynchronizedDispatcher> Create(Options options, cpp17::string_view name,
+  static zx::result<SynchronizedDispatcher> Create(Options options, std::string_view name,
                                                    ShutdownHandler shutdown_handler,
-                                                   cpp17::string_view scheduler_role = {}) {
+                                                   std::string_view scheduler_role = {}) {
     ZX_ASSERT_MSG((options.value & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
                       FDF_DISPATCHER_OPTION_SYNCHRONIZED,
                   "options.value=%u, needs to have FDF_DISPATCHER_OPTION_SYNCHRONIZED",
@@ -321,9 +321,9 @@ class UnsynchronizedDispatcher final : public Dispatcher {
   //
   // ZX_ERR_BAD_STATE: Dispatchers are currently not allowed to be created, such as when a driver
   // is being shutdown by its driver host.
-  static zx::result<UnsynchronizedDispatcher> Create(Options options, cpp17::string_view name,
+  static zx::result<UnsynchronizedDispatcher> Create(Options options, std::string_view name,
                                                      ShutdownHandler shutdown_handler,
-                                                     cpp17::string_view scheduler_role = {}) {
+                                                     std::string_view scheduler_role = {}) {
     ZX_ASSERT_MSG((options.value & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
                       FDF_DISPATCHER_OPTION_UNSYNCHRONIZED,
                   "options.value=%u, needs to have FDF_DISPATCHER_OPTION_UNSYNCHRONIZED",

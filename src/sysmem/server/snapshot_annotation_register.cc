@@ -12,7 +12,7 @@ SnapshotAnnotationRegister::SnapshotAnnotationRegister(async_dispatcher_t* dispa
 }
 
 void SnapshotAnnotationRegister::AssertRunningSynchronized() {
-  ZX_ASSERT(cpp17::holds_alternative<std::monostate>(synchronization_checker_.is_synchronized()));
+  ZX_ASSERT(std::holds_alternative<std::monostate>(synchronization_checker_.is_synchronized()));
 }
 
 void SnapshotAnnotationRegister::SetServiceDirectory(

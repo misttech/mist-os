@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_encapsulatedstructs_Int8Int32Table;
 const fidl_type_t* Int8Int32::FidlType = &test_encapsulatedstructs_Int8Int32Table;
 
 void Int8Int32::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                       cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                       std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<Int8Int32>::value) {
     memcpy(_encoder->template GetPtr<Int8Int32>(_offset), this, sizeof(Int8Int32));
   } else {
@@ -48,7 +48,7 @@ extern "C" const fidl_type_t test_encapsulatedstructs_Int16Int8Table;
 const fidl_type_t* Int16Int8::FidlType = &test_encapsulatedstructs_Int16Int8Table;
 
 void Int16Int8::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                       cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                       std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<Int16Int8>::value) {
     memcpy(_encoder->template GetPtr<Int16Int8>(_offset), this, sizeof(Int16Int8));
   } else {
@@ -80,7 +80,7 @@ extern "C" const fidl_type_t test_encapsulatedstructs_ArrayInt16Int8Table;
 const fidl_type_t* ArrayInt16Int8::FidlType = &test_encapsulatedstructs_ArrayInt16Int8Table;
 
 void ArrayInt16Int8::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                            cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                            std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ArrayInt16Int8>::value) {
     memcpy(_encoder->template GetPtr<ArrayInt16Int8>(_offset), this, sizeof(ArrayInt16Int8));
   } else {
@@ -107,7 +107,7 @@ extern "C" const fidl_type_t test_encapsulatedstructs_StructPaddingTestStructTab
 const fidl_type_t* StructPaddingTestStruct::FidlType = &test_encapsulatedstructs_StructPaddingTestStructTable;
 
 void StructPaddingTestStruct::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<StructPaddingTestStruct>::value) {
     memcpy(_encoder->template GetPtr<StructPaddingTestStruct>(_offset), this, sizeof(StructPaddingTestStruct));
   } else {
@@ -146,7 +146,7 @@ extern "C" const fidl_type_t test_encapsulatedstructs_NonInlineStructTestStructT
 const fidl_type_t* NonInlineStructTestStruct::FidlType = &test_encapsulatedstructs_NonInlineStructTestStructTable;
 
 void NonInlineStructTestStruct::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                       cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                       std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<NonInlineStructTestStruct>::value) {
     memcpy(_encoder->template GetPtr<NonInlineStructTestStruct>(_offset), this, sizeof(NonInlineStructTestStruct));
   } else {
@@ -182,7 +182,7 @@ extern "C" const fidl_type_t test_encapsulatedstructs_TopLevelStructTable;
 const fidl_type_t* TopLevelStruct::FidlType = &test_encapsulatedstructs_TopLevelStructTable;
 
 void TopLevelStruct::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                            cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                            std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<TopLevelStruct>::value) {
     memcpy(_encoder->template GetPtr<TopLevelStruct>(_offset), this, sizeof(TopLevelStruct));
   } else {

@@ -14,13 +14,13 @@ class TestDispatcherBuilder {
   // Creates an unmanaged synchronized dispatcher. This dispatcher is not ran on the managed driver
   // runtime thread pool.
   static zx::result<fdf::SynchronizedDispatcher> CreateUnmanagedSynchronizedDispatcher(
-      const void* driver, fdf::SynchronizedDispatcher::Options options, cpp17::string_view name,
+      const void* driver, fdf::SynchronizedDispatcher::Options options, std::string_view name,
       fdf::Dispatcher::ShutdownHandler shutdown_handler);
 
   // Creates an unmanaged unsynchronized dispatcher. This dispatcher is not ran on the managed
   // driver runtime thread pool.
   static zx::result<fdf::UnsynchronizedDispatcher> CreateUnmanagedUnsynchronizedDispatcher(
-      const void* driver, fdf::UnsynchronizedDispatcher::Options options, cpp17::string_view name,
+      const void* driver, fdf::UnsynchronizedDispatcher::Options options, std::string_view name,
       fdf::Dispatcher::ShutdownHandler shutdown_handler);
 };
 

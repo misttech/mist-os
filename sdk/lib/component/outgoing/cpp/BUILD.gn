@@ -34,7 +34,6 @@ sdk_source_set("cpp") {
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
-    "//sdk/lib/stdcompat",
     "//sdk/lib/svc",
     "//zircon/system/ulib/zx",
   ]

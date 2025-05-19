@@ -33,7 +33,6 @@ sdk_source_set("cpp") {
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/images/cpp",
-    "//sdk/lib/stdcompat",
     "//zircon/system/ulib/syslog",
     "//zircon/system/ulib/zx",
   ]

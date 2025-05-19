@@ -31,7 +31,7 @@ class BootstrapThreadImpl : public fidl::WireServer<fuchsia_lowpan_bootstrap::Th
   // |request| and |dispatcher| are needed for BindServer call.
   zx_status_t Bind(fidl::ServerEnd<fuchsia_lowpan_bootstrap::Thread> request,
                    async_dispatcher_t* dispatcher,
-                   cpp17::optional<const fbl::RefPtr<fs::PseudoDir>> svc_dir);
+                   std::optional<const fbl::RefPtr<fs::PseudoDir>> svc_dir);
 
   // Implementation of the fuchsia.lowpan.bootstrap.Thread interface.
   void ImportSettings(ImportSettingsRequestView request,
@@ -59,10 +59,10 @@ class BootstrapThreadImpl : public fidl::WireServer<fuchsia_lowpan_bootstrap::Th
 
   // A reference back to the Binding that this class is bound to, which is used
   // to send events to the client.
-  cpp17::optional<fidl::ServerBindingRef<fuchsia_lowpan_bootstrap::Thread>> binding_;
+  std::optional<fidl::ServerBindingRef<fuchsia_lowpan_bootstrap::Thread>> binding_;
 
   // If set, this is used to call RemoveEntry when closing down FIDL
-  cpp17::optional<fbl::RefPtr<fs::PseudoDir>> svc_dir_;
+  std::optional<fbl::RefPtr<fs::PseudoDir>> svc_dir_;
 };
 
 }  // namespace Fuchsia

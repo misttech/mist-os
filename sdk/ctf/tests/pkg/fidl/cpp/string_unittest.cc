@@ -4,7 +4,7 @@
 
 #include "lib/fidl/cpp/string.h"
 
-#include <lib/stdcompat/string_view.h>
+#include <string_view>
 
 #include <zxtest/zxtest.h>
 
@@ -55,10 +55,10 @@ TEST(StringPtr, Conversions) {
     EXPECT_EQ(kWorld, *world);
   }
 
-  // cpp17::string_view.
+  // std::string_view.
   {
-    constexpr cpp17::string_view kHello = "hello";
-    constexpr cpp17::string_view kWorld = "world";
+    constexpr std::string_view kHello = "hello";
+    constexpr std::string_view kWorld = "world";
 
     StringPtr hello = kHello;
     EXPECT_TRUE(hello.has_value());

@@ -113,9 +113,9 @@ this example `0b111`):
 
 * `explicit constexpr FileMode(uint16_t)`: Constructs a value from an underlying
   primitive value, preserving any unknown bit members.
-* `constexpr static cpp17::optional<FileMode> TryFrom(uint16_t value)`: Constructs
+* `constexpr static std::optional<FileMode> TryFrom(uint16_t value)`: Constructs
   an instance of the bits from an underlying primitive value if the value does
-  not contain any unknown members, and returns `cpp17::nullopt` otherwise.
+  not contain any unknown members, and returns `std::nullopt` otherwise.
 * `constexpr static FileMode TruncatingUnknown(uint16_t value)`: Constructs an
   instance of the bits from an underlying primitive value, clearing any unknown
   members.

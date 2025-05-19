@@ -50,23 +50,23 @@ class TreeServerSendPreference {
 
   /// Send a live VMO.
   static constexpr TreeServerSendPreference Live() {
-    return TreeServerSendPreference(Type::Live, cpp17::nullopt);
+    return TreeServerSendPreference(Type::Live, std::nullopt);
   }
 
   /// Send a true copy of the VMO.
   static constexpr TreeServerSendPreference DeepCopy() {
-    return TreeServerSendPreference(Type::DeepCopy, cpp17::nullopt);
+    return TreeServerSendPreference(Type::DeepCopy, std::nullopt);
   }
 
   constexpr Type PrimaryBehavior() { return primary_send_type_; }
-  constexpr cpp17::optional<Type> FailureBehavior() { return failure_behavior_; }
+  constexpr std::optional<Type> FailureBehavior() { return failure_behavior_; }
 
  private:
-  explicit constexpr TreeServerSendPreference(Type primary, cpp17::optional<Type> failure)
+  explicit constexpr TreeServerSendPreference(Type primary, std::optional<Type> failure)
       : primary_send_type_(primary), failure_behavior_(failure) {}
 
   const Type primary_send_type_ = Type::Frozen;
-  const cpp17::optional<Type> failure_behavior_ = Type::Live;
+  const std::optional<Type> failure_behavior_ = Type::Live;
 };
 
 struct TreeHandlerSettings {

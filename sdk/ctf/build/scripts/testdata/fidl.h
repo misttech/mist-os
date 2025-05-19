@@ -168,7 +168,7 @@ class Value final {
   static inline ::std::unique_ptr<Value> New() { return ::std::make_unique<Value>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Value* value, size_t offset);
   zx_status_t Clone(Value* result) const;
 
@@ -300,7 +300,7 @@ class Argument final {
   static inline ::std::unique_ptr<Argument> New() { return ::std::make_unique<Argument>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Argument* value, size_t _offset);
   zx_status_t Clone(Argument* result) const;
 };
@@ -329,7 +329,7 @@ class Record final {
   static inline ::std::unique_ptr<Record> New() { return ::std::make_unique<Record>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Record* value, size_t _offset);
   zx_status_t Clone(Record* result) const;
 };
@@ -372,7 +372,7 @@ struct CodingTraits<std::unique_ptr<::fuchsia::diagnostics::stream::Value>> {
 
   static void Encode(Encoder* encoder,
                      std::unique_ptr<::fuchsia::diagnostics::stream::Value>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);

@@ -6,7 +6,6 @@
 #include <lib/fidl/internal.h>
 #include <lib/fidl/visitor.h>
 #include <lib/fidl/walker.h>
-#include <lib/stdcompat/variant.h>
 #include <lib/utf-utils/utf-utils.h>
 #include <stdalign.h>
 #include <zircon/assert.h>
@@ -16,6 +15,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <variant>
 
 #ifdef __Fuchsia__
 #include <zircon/syscalls.h>

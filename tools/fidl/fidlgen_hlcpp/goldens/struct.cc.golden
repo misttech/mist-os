@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_struct_SimpleTable;
 const fidl_type_t* Simple::FidlType = &test_struct_SimpleTable;
 
 void Simple::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                    cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                    std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<Simple>::value) {
     memcpy(_encoder->template GetPtr<Simple>(_offset), this, sizeof(Simple));
   } else {
@@ -48,7 +48,7 @@ extern "C" const fidl_type_t test_struct_BasicStructTable;
 const fidl_type_t* BasicStruct::FidlType = &test_struct_BasicStructTable;
 
 void BasicStruct::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<BasicStruct>::value) {
     memcpy(_encoder->template GetPtr<BasicStruct>(_offset), this, sizeof(BasicStruct));
   } else {

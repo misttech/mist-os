@@ -37,19 +37,19 @@ struct arrow_operator {
   static constexpr const T* forward(const T& value) { return &value; }
 };
 template <typename T>
-struct arrow_operator<T, std::enable_if_t<cpp17::is_pointer_v<T>>> {
+struct arrow_operator<T, std::enable_if_t<std::is_pointer_v<T>>> {
   static constexpr T& forward(T& value) { return value; }
   static constexpr const T& forward(const T& value) { return value; }
 };
 template <typename T>
-struct arrow_operator<T, cpp17::void_t<decltype(std::declval<T>().operator->())>> {
+struct arrow_operator<T, std::void_t<decltype(std::declval<T>().operator->())>> {
   static constexpr T& forward(T& value) { return value; }
   static constexpr const T& forward(const T& value) { return value; }
 };
 
 // Concept helper for constructor, method, and operator overloads.
 template <typename... Conditions>
-using requires_conditions = std::enable_if_t<cpp17::conjunction_v<Conditions...>, bool>;
+using requires_conditions = std::enable_if_t<std::conjunction_v<Conditions...>, bool>;
 
 // Detects whether the given expression evaluates to an instance of the template T.
 template <template <typename...> class T>
@@ -60,7 +60,7 @@ struct template_matcher {
 };
 
 template <typename T, template <typename...> class U, typename = bool>
-struct is_match : decltype(template_matcher<U>::match(std::declval<T>())) {};
+struct is_match : decltype(template_matcher<U>::match(std::declval<T>())){};
 
 template <typename T, template <typename...> class U>
 struct is_match<T, U, requires_conditions<std::is_void<T>>> : std::false_type {};
@@ -77,7 +77,7 @@ static constexpr bool is_error_v = is_error<T>::value;
 
 // Predicate indicating whether type T is not an instantiation of fit::error.
 template <typename T>
-struct not_error_type : cpp17::negation<is_error<T>>::type {};
+struct not_error_type : std::negation<is_error<T>>::type {};
 
 // Predicate indicating whether type T is an instantiation of fit::success.
 template <typename T>
@@ -95,21 +95,20 @@ static constexpr bool is_result_v = is_result<T>::value;
 
 // Predicate indicating whether type T is not an instantiation of fit::result.
 template <typename T>
-struct not_result_type : cpp17::negation<is_result<T>>::type {};
+struct not_result_type : std::negation<is_result<T>>::type {};
 
 // Determines whether T += U is well defined.
 template <typename T, typename U, typename = void>
 struct has_plus_equals : std::false_type {};
 template <typename T, typename U>
-struct has_plus_equals<T, U, cpp17::void_t<decltype(std::declval<T>() += std::declval<U>())>>
+struct has_plus_equals<T, U, std::void_t<decltype(std::declval<T>() += std::declval<U>())>>
     : std::true_type {};
 
 // Enable if relational operator is convertible to bool and the optional
 // conditions are true.
 template <typename Op, typename... Conditions>
 using enable_rel_op =
-    std::enable_if_t<(cpp17::is_convertible_v<Op, bool> && cpp17::conjunction_v<Conditions...>),
-                     bool>;
+    std::enable_if_t<(std::is_convertible_v<Op, bool> && std::conjunction_v<Conditions...>), bool>;
 
 // Specifies whether a type is trivially or non-trivially destructible.
 enum class storage_class_e {
@@ -121,8 +120,8 @@ enum class storage_class_e {
 // destructible, storage_class_e::non_trivial otherwise.
 template <typename... Ts>
 static constexpr storage_class_e storage_class_trait =
-    cpp17::conjunction_v<std::is_trivially_destructible<Ts>...> ? storage_class_e::trivial
-                                                                : storage_class_e::non_trivial;
+    std::conjunction_v<std::is_trivially_destructible<Ts>...> ? storage_class_e::trivial
+                                                              : storage_class_e::non_trivial;
 
 // Trivial type for the default variant of the union below.
 struct empty_type {};

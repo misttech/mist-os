@@ -49,7 +49,6 @@ source_set("codec_impl_tests") {
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/stdcompat",
     "//src/lib/testing/loop_fixture",
     "//src/media/lib/codec_impl",
     "//src/media/lib/codec_impl/test_utils",

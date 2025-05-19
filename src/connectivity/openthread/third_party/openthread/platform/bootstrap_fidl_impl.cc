@@ -37,7 +37,7 @@ BootstrapThreadImpl::~BootstrapThreadImpl() {
 
 zx_status_t BootstrapThreadImpl::Bind(fidl::ServerEnd<fuchsia_lowpan_bootstrap::Thread> request,
                                       async_dispatcher_t* dispatcher,
-                                      cpp17::optional<const fbl::RefPtr<fs::PseudoDir>> svc_dir) {
+                                      std::optional<const fbl::RefPtr<fs::PseudoDir>> svc_dir) {
   if (!ShouldServe()) {
     return ZX_OK;
   }

@@ -84,7 +84,7 @@ class LocalTablePayload final {
   static inline ::std::unique_ptr<LocalTablePayload> New() { return ::std::make_unique<LocalTablePayload>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, LocalTablePayload* _value, size_t _offset);
   zx_status_t Clone(LocalTablePayload* _result) const;
 
@@ -146,7 +146,7 @@ class LocalUnionPayload final {
   static inline ::std::unique_ptr<LocalUnionPayload> New() { return ::std::make_unique<LocalUnionPayload>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, LocalUnionPayload* value, size_t offset);
   zx_status_t Clone(LocalUnionPayload* result) const;
 
@@ -233,7 +233,7 @@ class MainProtocol_TwoWayImportWithError_Result final {
   static inline ::std::unique_ptr<MainProtocol_TwoWayImportWithError_Result> New() { return ::std::make_unique<MainProtocol_TwoWayImportWithError_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocol_TwoWayImportWithError_Result* value, size_t offset);
   zx_status_t Clone(MainProtocol_TwoWayImportWithError_Result* result) const;
 
@@ -320,7 +320,7 @@ class MainProtocol_TwoWayLocalWithError_Result final {
   static inline ::std::unique_ptr<MainProtocol_TwoWayLocalWithError_Result> New() { return ::std::make_unique<MainProtocol_TwoWayLocalWithError_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocol_TwoWayLocalWithError_Result* value, size_t offset);
   zx_status_t Clone(MainProtocol_TwoWayLocalWithError_Result* result) const;
 
@@ -443,7 +443,7 @@ class MainProtocolOneWayAnonRequest final {
   static inline ::std::unique_ptr<MainProtocolOneWayAnonRequest> New() { return ::std::make_unique<MainProtocolOneWayAnonRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocolOneWayAnonRequest* _value, size_t _offset);
   zx_status_t Clone(MainProtocolOneWayAnonRequest* _result) const;
 
@@ -505,7 +505,7 @@ class MainProtocolTwoWayAnonRequest final {
   static inline ::std::unique_ptr<MainProtocolTwoWayAnonRequest> New() { return ::std::make_unique<MainProtocolTwoWayAnonRequest>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocolTwoWayAnonRequest* value, size_t offset);
   zx_status_t Clone(MainProtocolTwoWayAnonRequest* result) const;
 
@@ -607,7 +607,7 @@ class MainProtocolTwoWayAnonResponse final {
   static inline ::std::unique_ptr<MainProtocolTwoWayAnonResponse> New() { return ::std::make_unique<MainProtocolTwoWayAnonResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocolTwoWayAnonResponse* _value, size_t _offset);
   zx_status_t Clone(MainProtocolTwoWayAnonResponse* _result) const;
 
@@ -685,7 +685,7 @@ class MainProtocolTwoWayAnonWithErrorRequest final {
   static inline ::std::unique_ptr<MainProtocolTwoWayAnonWithErrorRequest> New() { return ::std::make_unique<MainProtocolTwoWayAnonWithErrorRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocolTwoWayAnonWithErrorRequest* _value, size_t _offset);
   zx_status_t Clone(MainProtocolTwoWayAnonWithErrorRequest* _result) const;
 
@@ -747,7 +747,7 @@ class MainProtocol_TwoWayAnonWithError_Response final {
   static inline ::std::unique_ptr<MainProtocol_TwoWayAnonWithError_Response> New() { return ::std::make_unique<MainProtocol_TwoWayAnonWithError_Response>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocol_TwoWayAnonWithError_Response* value, size_t offset);
   zx_status_t Clone(MainProtocol_TwoWayAnonWithError_Response* result) const;
 
@@ -834,7 +834,7 @@ class MainProtocol_TwoWayAnonWithError_Result final {
   static inline ::std::unique_ptr<MainProtocol_TwoWayAnonWithError_Result> New() { return ::std::make_unique<MainProtocol_TwoWayAnonWithError_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocol_TwoWayAnonWithError_Result* value, size_t offset);
   zx_status_t Clone(MainProtocol_TwoWayAnonWithError_Result* result) const;
 
@@ -941,7 +941,7 @@ class MainProtocolOnAnonRequest final {
   static inline ::std::unique_ptr<MainProtocolOnAnonRequest> New() { return ::std::make_unique<MainProtocolOnAnonRequest>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocolOnAnonRequest* value, size_t offset);
   zx_status_t Clone(MainProtocolOnAnonRequest* result) const;
 
@@ -1399,7 +1399,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayouts::LocalUnionPayload>>
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::LocalUnionPayload>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -1453,7 +1453,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWay
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -1510,7 +1510,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWay
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -1591,7 +1591,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocolTwoWayA
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocolTwoWayAnonRequest>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -1693,7 +1693,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWay
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -1747,7 +1747,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWay
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -1804,7 +1804,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocolOnAnonR
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocolOnAnonRequest>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);

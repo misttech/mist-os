@@ -22,15 +22,15 @@ namespace {
 // we don't use shared libraries.
 fuchsia_logging::LogSettings g_log_settings;
 
-cpp17::string_view StripDots(cpp17::string_view path) {
+std::string_view StripDots(std::string_view path) {
   auto pos = path.rfind("../");
-  return pos == cpp17::string_view::npos ? path : path.substr(pos + 3);
+  return pos == std::string_view::npos ? path : path.substr(pos + 3);
 }
 
 void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::RawLogSeverity severity,
-                       cpp17::optional<cpp17::string_view> file, unsigned int line,
-                       cpp17::optional<cpp17::string_view> msg,
-                       cpp17::optional<cpp17::string_view> condition) {
+                       std::optional<std::string_view> file, unsigned int line,
+                       std::optional<std::string_view> msg,
+                       std::optional<std::string_view> condition) {
   if (!file) {
     file = "";
   }
@@ -62,7 +62,7 @@ void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::RawLogSeverity severi
 
 // Common initialization for all KV pairs.
 // Returns the header for writing the value.
-internal::MsgHeader* StartKv(LogBuffer* buffer, cpp17::string_view key) {
+internal::MsgHeader* StartKv(LogBuffer* buffer, std::string_view key) {
   auto header = internal::MsgHeader::CreatePtr(buffer);
   if (!header->first_kv || header->has_msg) {
     header->WriteChar(' ');
@@ -73,7 +73,7 @@ internal::MsgHeader* StartKv(LogBuffer* buffer, cpp17::string_view key) {
   return header;
 }
 
-void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value) {
+void WriteKeyValueLegacy(LogBuffer* buffer, std::string_view key, std::string_view value) {
   // "tag" has special meaning to our logging API
   if (key == "tag") {
     auto header = internal::MsgHeader::CreatePtr(buffer);
@@ -99,28 +99,28 @@ void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, cpp17::strin
   header->WriteChar('"');
 }
 
-void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, int64_t value) {
+void WriteKeyValueLegacy(LogBuffer* buffer, std::string_view key, int64_t value) {
   auto header = StartKv(buffer, key);
   char a_buffer[128];
   snprintf(a_buffer, 128, "%" PRId64, value);
   header->WriteString(a_buffer);
 }
 
-void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, uint64_t value) {
+void WriteKeyValueLegacy(LogBuffer* buffer, std::string_view key, uint64_t value) {
   auto header = StartKv(buffer, key);
   char a_buffer[128];
   snprintf(a_buffer, 128, "%" PRIu64, value);
   header->WriteString(a_buffer);
 }
 
-void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, double value) {
+void WriteKeyValueLegacy(LogBuffer* buffer, std::string_view key, double value) {
   auto header = StartKv(buffer, key);
   char a_buffer[128];
   snprintf(a_buffer, 128, "%f", value);
   header->WriteString(a_buffer);
 }
 
-void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, bool value) {
+void WriteKeyValueLegacy(LogBuffer* buffer, std::string_view key, bool value) {
   auto header = StartKv(buffer, key);
   header->WriteString(value ? "true" : "false");
 }
@@ -220,23 +220,23 @@ void BeginRecord(LogBuffer* buffer, fuchsia_logging::RawLogSeverity severity,
   BeginRecordLegacy(buffer, severity, file, line, msg, condition);
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, cpp17::string_view value) {
+void LogBuffer::WriteKeyValue(std::string_view key, std::string_view value) {
   WriteKeyValueLegacy(this, key, value);
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, int64_t value) {
+void LogBuffer::WriteKeyValue(std::string_view key, int64_t value) {
   WriteKeyValueLegacy(this, key, value);
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, uint64_t value) {
+void LogBuffer::WriteKeyValue(std::string_view key, uint64_t value) {
   WriteKeyValueLegacy(this, key, value);
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, double value) {
+void LogBuffer::WriteKeyValue(std::string_view key, double value) {
   WriteKeyValueLegacy(this, key, value);
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, bool value) {
+void LogBuffer::WriteKeyValue(std::string_view key, bool value) {
   WriteKeyValueLegacy(this, key, value);
 }
 

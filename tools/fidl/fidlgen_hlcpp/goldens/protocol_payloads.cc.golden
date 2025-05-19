@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_protocolpayloads_LocalStructPayloadTable;
 const fidl_type_t* LocalStructPayload::FidlType = &test_protocolpayloads_LocalStructPayloadTable;
 
 void LocalStructPayload::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<LocalStructPayload>::value) {
     memcpy(_encoder->template GetPtr<LocalStructPayload>(_offset), this, sizeof(LocalStructPayload));
   } else {
@@ -98,7 +98,7 @@ MainProtocol_TwoWayLocalWithError_Result MainProtocol_TwoWayLocalWithError_Resul
 }
 
 void MainProtocol_TwoWayLocalWithError_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                                                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                      std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -250,7 +250,7 @@ extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOneWayAnonRequest
 const fidl_type_t* MainProtocolOneWayAnonRequest::FidlType = &test_protocolpayloads_MainProtocolOneWayAnonRequestTable;
 
 void MainProtocolOneWayAnonRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                           cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                           std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<MainProtocolOneWayAnonRequest>::value) {
     memcpy(_encoder->template GetPtr<MainProtocolOneWayAnonRequest>(_offset), this, sizeof(MainProtocolOneWayAnonRequest));
   } else {
@@ -282,7 +282,7 @@ extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonRequest
 const fidl_type_t* MainProtocolTwoWayAnonRequest::FidlType = &test_protocolpayloads_MainProtocolTwoWayAnonRequestTable;
 
 void MainProtocolTwoWayAnonRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                           cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                           std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<MainProtocolTwoWayAnonRequest>::value) {
     memcpy(_encoder->template GetPtr<MainProtocolTwoWayAnonRequest>(_offset), this, sizeof(MainProtocolTwoWayAnonRequest));
   } else {
@@ -314,7 +314,7 @@ extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonRespons
 const fidl_type_t* MainProtocolTwoWayAnonResponse::FidlType = &test_protocolpayloads_MainProtocolTwoWayAnonResponseTable;
 
 void MainProtocolTwoWayAnonResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                            cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                            std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<MainProtocolTwoWayAnonResponse>::value) {
     memcpy(_encoder->template GetPtr<MainProtocolTwoWayAnonResponse>(_offset), this, sizeof(MainProtocolTwoWayAnonResponse));
   } else {
@@ -346,7 +346,7 @@ extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonWithErr
 const fidl_type_t* MainProtocolTwoWayAnonWithErrorRequest::FidlType = &test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestTable;
 
 void MainProtocolTwoWayAnonWithErrorRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                    cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                    std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<MainProtocolTwoWayAnonWithErrorRequest>::value) {
     memcpy(_encoder->template GetPtr<MainProtocolTwoWayAnonWithErrorRequest>(_offset), this, sizeof(MainProtocolTwoWayAnonWithErrorRequest));
   } else {
@@ -378,7 +378,7 @@ extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayAnonWithEr
 const fidl_type_t* MainProtocol_TwoWayAnonWithError_Response::FidlType = &test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResponseTable;
 
 void MainProtocol_TwoWayAnonWithError_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                       cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                       std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<MainProtocol_TwoWayAnonWithError_Response>::value) {
     memcpy(_encoder->template GetPtr<MainProtocol_TwoWayAnonWithError_Response>(_offset), this, sizeof(MainProtocol_TwoWayAnonWithError_Response));
   } else {
@@ -460,7 +460,7 @@ MainProtocol_TwoWayAnonWithError_Result MainProtocol_TwoWayAnonWithError_Result:
 }
 
 void MainProtocol_TwoWayAnonWithError_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                                                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -612,7 +612,7 @@ extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnAnonRequestTabl
 const fidl_type_t* MainProtocolOnAnonRequest::FidlType = &test_protocolpayloads_MainProtocolOnAnonRequestTable;
 
 void MainProtocolOnAnonRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                       cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                       std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<MainProtocolOnAnonRequest>::value) {
     memcpy(_encoder->template GetPtr<MainProtocolOnAnonRequest>(_offset), this, sizeof(MainProtocolOnAnonRequest));
   } else {
@@ -694,7 +694,7 @@ MainProtocol_TwoWayImportWithError_Result MainProtocol_TwoWayImportWithError_Res
 }
 
 void MainProtocol_TwoWayImportWithError_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                                                       cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                       std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 

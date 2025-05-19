@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_nullable_StructWithNullableStringTable;
 const fidl_type_t* StructWithNullableString::FidlType = &test_nullable_StructWithNullableStringTable;
 
 void StructWithNullableString::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                      std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<StructWithNullableString>::value) {
     memcpy(_encoder->template GetPtr<StructWithNullableString>(_offset), this, sizeof(StructWithNullableString));
   } else {
@@ -43,7 +43,7 @@ extern "C" const fidl_type_t test_nullable_StructWithNullableVectorTable;
 const fidl_type_t* StructWithNullableVector::FidlType = &test_nullable_StructWithNullableVectorTable;
 
 void StructWithNullableVector::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                      std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<StructWithNullableVector>::value) {
     memcpy(_encoder->template GetPtr<StructWithNullableVector>(_offset), this, sizeof(StructWithNullableVector));
   } else {
@@ -72,7 +72,7 @@ extern "C" const fidl_type_t test_nullable_StructWithNullableHandleTable;
 const fidl_type_t* StructWithNullableHandle::FidlType = &test_nullable_StructWithNullableHandleTable;
 
 void StructWithNullableHandle::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                      std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<StructWithNullableHandle>::value) {
     memcpy(_encoder->template GetPtr<StructWithNullableHandle>(_offset), this, sizeof(StructWithNullableHandle));
   } else {
@@ -104,7 +104,7 @@ extern "C" const fidl_type_t test_nullable_SimpleProtocolAddRequestTable;
 const fidl_type_t* SimpleProtocolAddRequest::FidlType = &test_nullable_SimpleProtocolAddRequestTable;
 
 void SimpleProtocolAddRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                      std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<SimpleProtocolAddRequest>::value) {
     memcpy(_encoder->template GetPtr<SimpleProtocolAddRequest>(_offset), this, sizeof(SimpleProtocolAddRequest));
   } else {
@@ -136,7 +136,7 @@ extern "C" const fidl_type_t test_nullable_SimpleProtocolAddResponseTable;
 const fidl_type_t* SimpleProtocolAddResponse::FidlType = &test_nullable_SimpleProtocolAddResponseTable;
 
 void SimpleProtocolAddResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                       cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                       std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<SimpleProtocolAddResponse>::value) {
     memcpy(_encoder->template GetPtr<SimpleProtocolAddResponse>(_offset), this, sizeof(SimpleProtocolAddResponse));
   } else {
@@ -165,7 +165,7 @@ extern "C" const fidl_type_t test_nullable_StructWithNullableProtocolTable;
 const fidl_type_t* StructWithNullableProtocol::FidlType = &test_nullable_StructWithNullableProtocolTable;
 
 void StructWithNullableProtocol::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                        cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                        std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<StructWithNullableProtocol>::value) {
     memcpy(_encoder->template GetPtr<StructWithNullableProtocol>(_offset), this, sizeof(StructWithNullableProtocol));
   } else {
@@ -195,7 +195,7 @@ extern "C" const fidl_type_t test_nullable_StructWithNullableRequestTable;
 const fidl_type_t* StructWithNullableRequest::FidlType = &test_nullable_StructWithNullableRequestTable;
 
 void StructWithNullableRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                       cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                       std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<StructWithNullableRequest>::value) {
     memcpy(_encoder->template GetPtr<StructWithNullableRequest>(_offset), this, sizeof(StructWithNullableRequest));
   } else {
@@ -227,7 +227,7 @@ extern "C" const fidl_type_t test_nullable_Int32WrapperTable;
 const fidl_type_t* Int32Wrapper::FidlType = &test_nullable_Int32WrapperTable;
 
 void Int32Wrapper::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                          std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<Int32Wrapper>::value) {
     memcpy(_encoder->template GetPtr<Int32Wrapper>(_offset), this, sizeof(Int32Wrapper));
   } else {
@@ -254,7 +254,7 @@ extern "C" const fidl_type_t test_nullable_StructWithNullableStructTable;
 const fidl_type_t* StructWithNullableStruct::FidlType = &test_nullable_StructWithNullableStructTable;
 
 void StructWithNullableStruct::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                      std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<StructWithNullableStruct>::value) {
     memcpy(_encoder->template GetPtr<StructWithNullableStruct>(_offset), this, sizeof(StructWithNullableStruct));
   } else {
@@ -329,7 +329,7 @@ SimpleUnion SimpleUnion::WithB(float&& val) {
 }
 
 void SimpleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -477,7 +477,7 @@ extern "C" const fidl_type_t test_nullable_StructWithNullableUnionTable;
 const fidl_type_t* StructWithNullableUnion::FidlType = &test_nullable_StructWithNullableUnionTable;
 
 void StructWithNullableUnion::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<StructWithNullableUnion>::value) {
     memcpy(_encoder->template GetPtr<StructWithNullableUnion>(_offset), this, sizeof(StructWithNullableUnion));
   } else {

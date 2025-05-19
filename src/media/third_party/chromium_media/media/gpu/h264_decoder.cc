@@ -1685,7 +1685,7 @@ H264Decoder::DecodeResult H264Decoder::Decode() {
           } else {
             ZX_DEBUG_ASSERT(nalu_injection_mode_ == NaluInjectionMode::kOn);
             curr_slice_hdr_ =
-                std::move(cpp17::get<std::unique_ptr<H264SliceHeader>>(
+                std::move(std::get<std::unique_ptr<H264SliceHeader>>(
                     curr_nalu_->preparsed_header));
             state_ = State::kTryPreprocessCurrentSlice;
           }
@@ -1761,7 +1761,7 @@ H264Decoder::DecodeResult H264Decoder::Decode() {
         } else {
           ZX_DEBUG_ASSERT(nalu_injection_mode_ == NaluInjectionMode::kOn);
           par_res = parser_.AcceptPreparsedSPS(
-              std::move(cpp17::get<std::unique_ptr<H264SPS>>(
+              std::move(std::get<std::unique_ptr<H264SPS>>(
                   curr_nalu_->preparsed_header)),
               &sps_id);
         }
@@ -1796,7 +1796,7 @@ H264Decoder::DecodeResult H264Decoder::Decode() {
         } else {
           ZX_DEBUG_ASSERT(nalu_injection_mode_ == NaluInjectionMode::kOn);
           par_res = parser_.AcceptPreparsedPPS(
-              std::move(cpp17::get<std::unique_ptr<H264PPS>>(
+              std::move(std::get<std::unique_ptr<H264PPS>>(
                   curr_nalu_->preparsed_header)),
               &last_parsed_pps_id_);
         }

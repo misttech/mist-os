@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyDartRe
 const fidl_type_t* DenyEachBindingOnlyDenyDartRequest::FidlType = &test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestTable;
 
 void DenyEachBindingOnlyDenyDartRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<DenyEachBindingOnlyDenyDartRequest>::value) {
     memcpy(_encoder->template GetPtr<DenyEachBindingOnlyDenyDartRequest>(_offset), this, sizeof(DenyEachBindingOnlyDenyDartRequest));
   } else {
@@ -43,7 +43,7 @@ extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_
 const fidl_type_t* DenyEachBinding_OnlyDenyDart_Response::FidlType = &test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResponseTable;
 
 void DenyEachBinding_OnlyDenyDart_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                   cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                   std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<DenyEachBinding_OnlyDenyDart_Response>::value) {
     memcpy(_encoder->template GetPtr<DenyEachBinding_OnlyDenyDart_Response>(_offset), this, sizeof(DenyEachBinding_OnlyDenyDart_Response));
   } else {
@@ -120,7 +120,7 @@ DenyEachBinding_OnlyDenyDart_Result DenyEachBinding_OnlyDenyDart_Result::WithErr
 }
 
 void DenyEachBinding_OnlyDenyDart_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                                                 cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                 std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -272,7 +272,7 @@ extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequ
 const fidl_type_t* DenyEachBindingOnlyDenyGoRequest::FidlType = &test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestTable;
 
 void DenyEachBindingOnlyDenyGoRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                              cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                              std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<DenyEachBindingOnlyDenyGoRequest>::value) {
     memcpy(_encoder->template GetPtr<DenyEachBindingOnlyDenyGoRequest>(_offset), this, sizeof(DenyEachBindingOnlyDenyGoRequest));
   } else {
@@ -299,7 +299,7 @@ extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_Re
 const fidl_type_t* DenyEachBinding_OnlyDenyGo_Response::FidlType = &test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResponseTable;
 
 void DenyEachBinding_OnlyDenyGo_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                 cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                 std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<DenyEachBinding_OnlyDenyGo_Response>::value) {
     memcpy(_encoder->template GetPtr<DenyEachBinding_OnlyDenyGo_Response>(_offset), this, sizeof(DenyEachBinding_OnlyDenyGo_Response));
   } else {
@@ -376,7 +376,7 @@ DenyEachBinding_OnlyDenyGo_Result DenyEachBinding_OnlyDenyGo_Result::WithErr(uin
 }
 
 void DenyEachBinding_OnlyDenyGo_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                                               cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                               std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -528,7 +528,7 @@ extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyPython
 const fidl_type_t* DenyEachBindingOnlyDenyPythonRequest::FidlType = &test_bindingsdenylist_DenyEachBindingOnlyDenyPythonRequestTable;
 
 void DenyEachBindingOnlyDenyPythonRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                  cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                  std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<DenyEachBindingOnlyDenyPythonRequest>::value) {
     memcpy(_encoder->template GetPtr<DenyEachBindingOnlyDenyPythonRequest>(_offset), this, sizeof(DenyEachBindingOnlyDenyPythonRequest));
   } else {
@@ -555,7 +555,7 @@ extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyPytho
 const fidl_type_t* DenyEachBinding_OnlyDenyPython_Response::FidlType = &test_bindingsdenylist_DenyEachBinding_OnlyDenyPython_ResponseTable;
 
 void DenyEachBinding_OnlyDenyPython_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<DenyEachBinding_OnlyDenyPython_Response>::value) {
     memcpy(_encoder->template GetPtr<DenyEachBinding_OnlyDenyPython_Response>(_offset), this, sizeof(DenyEachBinding_OnlyDenyPython_Response));
   } else {
@@ -632,7 +632,7 @@ DenyEachBinding_OnlyDenyPython_Result DenyEachBinding_OnlyDenyPython_Result::Wit
 }
 
 void DenyEachBinding_OnlyDenyPython_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                                                   cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                   std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -784,7 +784,7 @@ extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyRustRe
 const fidl_type_t* DenyEachBindingOnlyDenyRustRequest::FidlType = &test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestTable;
 
 void DenyEachBindingOnlyDenyRustRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<DenyEachBindingOnlyDenyRustRequest>::value) {
     memcpy(_encoder->template GetPtr<DenyEachBindingOnlyDenyRustRequest>(_offset), this, sizeof(DenyEachBindingOnlyDenyRustRequest));
   } else {
@@ -811,7 +811,7 @@ extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_
 const fidl_type_t* DenyEachBinding_OnlyDenyRust_Response::FidlType = &test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResponseTable;
 
 void DenyEachBinding_OnlyDenyRust_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                   cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                   std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<DenyEachBinding_OnlyDenyRust_Response>::value) {
     memcpy(_encoder->template GetPtr<DenyEachBinding_OnlyDenyRust_Response>(_offset), this, sizeof(DenyEachBinding_OnlyDenyRust_Response));
   } else {
@@ -888,7 +888,7 @@ DenyEachBinding_OnlyDenyRust_Result DenyEachBinding_OnlyDenyRust_Result::WithErr
 }
 
 void DenyEachBinding_OnlyDenyRust_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                                                 cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                 std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1040,7 +1040,7 @@ extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenySyzkal
 const fidl_type_t* DenyEachBindingOnlyDenySyzkallerRequest::FidlType = &test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerRequestTable;
 
 void DenyEachBindingOnlyDenySyzkallerRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<DenyEachBindingOnlyDenySyzkallerRequest>::value) {
     memcpy(_encoder->template GetPtr<DenyEachBindingOnlyDenySyzkallerRequest>(_offset), this, sizeof(DenyEachBindingOnlyDenySyzkallerRequest));
   } else {
@@ -1067,7 +1067,7 @@ extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenySyzka
 const fidl_type_t* DenyEachBinding_OnlyDenySyzkaller_Response::FidlType = &test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResponseTable;
 
 void DenyEachBinding_OnlyDenySyzkaller_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                        cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                        std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<DenyEachBinding_OnlyDenySyzkaller_Response>::value) {
     memcpy(_encoder->template GetPtr<DenyEachBinding_OnlyDenySyzkaller_Response>(_offset), this, sizeof(DenyEachBinding_OnlyDenySyzkaller_Response));
   } else {
@@ -1144,7 +1144,7 @@ DenyEachBinding_OnlyDenySyzkaller_Result DenyEachBinding_OnlyDenySyzkaller_Resul
 }
 
 void DenyEachBinding_OnlyDenySyzkaller_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                                                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                      std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1296,7 +1296,7 @@ extern "C" const fidl_type_t test_bindingsdenylist_MemberOnlyAppearsInImportingL
 const fidl_type_t* MemberOnlyAppearsInImportingLibrary::FidlType = &test_bindingsdenylist_MemberOnlyAppearsInImportingLibraryTable;
 
 void MemberOnlyAppearsInImportingLibrary::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                 cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                 std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<MemberOnlyAppearsInImportingLibrary>::value) {
     memcpy(_encoder->template GetPtr<MemberOnlyAppearsInImportingLibrary>(_offset), this, sizeof(MemberOnlyAppearsInImportingLibrary));
   } else {
@@ -1323,7 +1323,7 @@ extern "C" const fidl_type_t test_bindingsdenylist_OnlyAppearsInImportingLibrary
 const fidl_type_t* OnlyAppearsInImportingLibrary::FidlType = &test_bindingsdenylist_OnlyAppearsInImportingLibraryTable;
 
 void OnlyAppearsInImportingLibrary::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                           cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                           std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<OnlyAppearsInImportingLibrary>::value) {
     memcpy(_encoder->template GetPtr<OnlyAppearsInImportingLibrary>(_offset), this, sizeof(OnlyAppearsInImportingLibrary));
   } else {

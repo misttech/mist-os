@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_driveroneway_PayloadTable;
 const fidl_type_t* Payload::FidlType = &test_driveroneway_PayloadTable;
 
 void Payload::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<Payload>::value) {
     memcpy(_encoder->template GetPtr<Payload>(_offset), this, sizeof(Payload));
   } else {
@@ -43,7 +43,7 @@ extern "C" const fidl_type_t test_driveroneway_OneWaySendRequestTable;
 const fidl_type_t* OneWaySendRequest::FidlType = &test_driveroneway_OneWaySendRequestTable;
 
 void OneWaySendRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                               cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                               std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<OneWaySendRequest>::value) {
     memcpy(_encoder->template GetPtr<OneWaySendRequest>(_offset), this, sizeof(OneWaySendRequest));
   } else {

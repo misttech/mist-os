@@ -59,7 +59,7 @@ TablePayload& TablePayload::set_a(uint16_t _value) {
 }
 
 void TablePayload::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -174,7 +174,7 @@ UnionPayload UnionPayload::WithB(bool&& val) {
 }
 
 void UnionPayload::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -326,7 +326,7 @@ ComposedProtocolOneWayAnonComposedRequest& ComposedProtocolOneWayAnonComposedReq
 }
 
 void ComposedProtocolOneWayAnonComposedRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -441,7 +441,7 @@ ComposedProtocolTwoWayAnonComposedRequest ComposedProtocolTwoWayAnonComposedRequ
 }
 
 void ComposedProtocolTwoWayAnonComposedRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -593,7 +593,7 @@ ComposedProtocolTwoWayAnonComposedResponse& ComposedProtocolTwoWayAnonComposedRe
 }
 
 void ComposedProtocolTwoWayAnonComposedResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -714,7 +714,7 @@ ComposedProtocolTwoWayAnonComposedWithErrorRequest& ComposedProtocolTwoWayAnonCo
 }
 
 void ComposedProtocolTwoWayAnonComposedWithErrorRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -829,7 +829,7 @@ ComposedProtocol_TwoWayAnonComposedWithError_Response ComposedProtocol_TwoWayAno
 }
 
 void ComposedProtocol_TwoWayAnonComposedWithError_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -988,7 +988,7 @@ ComposedProtocol_TwoWayAnonComposedWithError_Result ComposedProtocol_TwoWayAnonC
 }
 
 void ComposedProtocol_TwoWayAnonComposedWithError_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1178,7 +1178,7 @@ ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest::Wit
 }
 
 void ComposedProtocolOnAnonComposedRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1337,7 +1337,7 @@ ComposedProtocol_TwoWayNamedComposedWithError_Result ComposedProtocol_TwoWayName
 }
 
 void ComposedProtocol_TwoWayNamedComposedWithError_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1540,7 +1540,7 @@ MainProtocol_TwoWayLocalWithError_Result MainProtocol_TwoWayLocalWithError_Resul
 }
 
 void MainProtocol_TwoWayLocalWithError_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1736,7 +1736,7 @@ MainProtocolOneWayAnonRequest& MainProtocolOneWayAnonRequest::set_a(uint16_t _va
 }
 
 void MainProtocolOneWayAnonRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -1859,7 +1859,7 @@ MainProtocolTwoWayAnonRequest MainProtocolTwoWayAnonRequest::WithB(bool&& val) {
 }
 
 void MainProtocolTwoWayAnonRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2031,7 +2031,7 @@ MainProtocolTwoWayAnonResponse& MainProtocolTwoWayAnonResponse::set_a(uint16_t _
 }
 
 void MainProtocolTwoWayAnonResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -2152,7 +2152,7 @@ MainProtocolTwoWayAnonWithErrorRequest& MainProtocolTwoWayAnonWithErrorRequest::
 }
 
 void MainProtocolTwoWayAnonWithErrorRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -2275,7 +2275,7 @@ MainProtocol_TwoWayAnonWithError_Response MainProtocol_TwoWayAnonWithError_Respo
 }
 
 void MainProtocol_TwoWayAnonWithError_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2454,7 +2454,7 @@ MainProtocol_TwoWayAnonWithError_Result MainProtocol_TwoWayAnonWithError_Result:
 }
 
 void MainProtocol_TwoWayAnonWithError_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2652,7 +2652,7 @@ MainProtocolOnAnonRequest MainProtocolOnAnonRequest::WithB(bool&& val) {
 }
 
 void MainProtocolOnAnonRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 

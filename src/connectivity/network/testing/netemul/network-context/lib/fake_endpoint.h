@@ -46,7 +46,7 @@ class FakeEndpoint : public fuchsia::netemul::network::FakeEndpoint, public data
   fidl::Binding<FFakeEndpoint> binding_;
   fxl::WeakPtrFactory<data::Consumer> weak_ptr_factory_;
   std::queue<std::vector<uint8_t>> pending_frames_;
-  cpp17::optional<ReadCallback> pending_callback_;
+  std::optional<ReadCallback> pending_callback_;
   uint64_t dropped_;
 };
 

@@ -316,24 +316,11 @@ enum class TransactionalMessageKind {
   kResponse,
 };
 
-// C++ 14 compatible implementation of std::void_t.
-#if defined(__cplusplus) && __cplusplus >= 201703L
-template <typename... T>
-using void_t = std::void_t<T...>;
-#else
-template <typename... T>
-struct make_void {
-  typedef void type;
-};
-template <typename... T>
-using void_t = typename make_void<T...>::type;
-#endif
-
 // IsResponseType<FidlType>() is true when FidlType is a FIDL response message type.
-template <typename FidlType, typename = void_t<>>
+template <typename FidlType, typename = std::void_t<>>
 struct IsResponseType : std::false_type {};
 template <typename FidlType>
-struct IsResponseType<FidlType, void_t<decltype(TypeTraits<FidlType>::kMessageKind)>>
+struct IsResponseType<FidlType, std::void_t<decltype(TypeTraits<FidlType>::kMessageKind)>>
     : std::integral_constant<bool, TypeTraits<FidlType>::kMessageKind ==
                                        TransactionalMessageKind::kResponse> {};
 

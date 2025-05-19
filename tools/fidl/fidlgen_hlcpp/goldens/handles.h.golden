@@ -116,7 +116,7 @@ class Handles final {
   static inline ::std::unique_ptr<Handles> New() { return ::std::make_unique<Handles>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Handles* value, size_t _offset);
   zx_status_t Clone(Handles* result) const;
 };

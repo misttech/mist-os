@@ -77,7 +77,7 @@ class Heap final {
   void SetHeaderBlock(Block* const hb) { header_block = {hb}; }
 
   // Get header block.
-  cpp17::optional<Block*> GetHeaderBlock() const { return header_block; }
+  std::optional<Block*> GetHeaderBlock() const { return header_block; }
 
  private:
   // Returns true if the given block is free and of the expected order.
@@ -96,7 +96,7 @@ class Heap final {
   uintptr_t buffer_addr_ = 0;
   BlockIndex free_blocks_[8] = {};
 
-  cpp17::optional<Block*> header_block = {};
+  std::optional<Block*> header_block = {};
 };
 
 bool Heap::IsFreeBlock(BlockIndex block, size_t expected_order) const {

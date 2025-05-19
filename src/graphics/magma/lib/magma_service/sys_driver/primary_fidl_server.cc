@@ -105,7 +105,7 @@ void PrimaryFidlServer::Bind() {
         if (unbind_info.reason() == fidl::Reason::kDispatcherError)
           return;
 
-        self->server_binding_ = cpp17::nullopt;
+        self->server_binding_ = std::nullopt;
         self->async_loop()->Quit();
       };
 

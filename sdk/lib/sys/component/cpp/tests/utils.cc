@@ -102,9 +102,9 @@ std::shared_ptr<fctest::ChildOptions> CreateFidlChildOptions(
 }
 
 std::shared_ptr<fctest::Capability> CreateFidlProtocolCapability(
-    std::string_view name, cpp17::optional<std::string_view> as,
-    cpp17::optional<fcdecl::DependencyType> type, cpp17::optional<std::string_view> path,
-    cpp17::optional<std::string_view> from_dictionary) {
+    std::string_view name, std::optional<std::string_view> as,
+    std::optional<fcdecl::DependencyType> type, std::optional<std::string_view> path,
+    std::optional<std::string_view> from_dictionary) {
   fctest::Protocol capability;
   capability.set_name(std::string(name));
   if (as.has_value()) {
@@ -124,8 +124,8 @@ std::shared_ptr<fctest::Capability> CreateFidlProtocolCapability(
 }
 
 std::shared_ptr<fctest::Capability> CreateFidlServiceCapability(
-    std::string_view name, cpp17::optional<std::string_view> as,
-    cpp17::optional<std::string_view> path, cpp17::optional<std::string_view> from_dictionary) {
+    std::string_view name, std::optional<std::string_view> as, std::optional<std::string_view> path,
+    std::optional<std::string_view> from_dictionary) {
   fctest::Service capability;
   capability.set_name(std::string(name));
   if (as.has_value()) {
@@ -149,10 +149,10 @@ std::shared_ptr<fctest::Capability> CreateFidlServiceCapability(std::string_view
 }
 
 std::shared_ptr<fctest::Capability> CreateFidlDirectoryCapability(
-    std::string_view name, cpp17::optional<std::string_view> as,
-    cpp17::optional<fcdecl::DependencyType> type, cpp17::optional<std::string_view> subdir,
-    cpp17::optional<fio::Operations> rights, cpp17::optional<std::string_view> path,
-    cpp17::optional<std::string_view> from_dictionary) {
+    std::string_view name, std::optional<std::string_view> as,
+    std::optional<fcdecl::DependencyType> type, std::optional<std::string_view> subdir,
+    std::optional<fio::Operations> rights, std::optional<std::string_view> path,
+    std::optional<std::string_view> from_dictionary) {
   fctest::Directory capability;
   capability.set_name(std::string(name));
   if (as.has_value()) {

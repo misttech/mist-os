@@ -269,7 +269,7 @@ class UnknownInteractionsProtocolStrictTwoWayFieldsResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictTwoWayFieldsResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictTwoWayFieldsResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocolStrictTwoWayFieldsResponse* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocolStrictTwoWayFieldsResponse* result) const;
 };
@@ -303,7 +303,7 @@ class UnknownInteractionsProtocolStrictTwoWayUnionResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictTwoWayUnionResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictTwoWayUnionResponse>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocolStrictTwoWayUnionResponse* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocolStrictTwoWayUnionResponse* result) const;
 
@@ -407,7 +407,7 @@ class UnknownInteractionsProtocolStrictTwoWayTableResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictTwoWayTableResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictTwoWayTableResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocolStrictTwoWayTableResponse* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocolStrictTwoWayTableResponse* _result) const;
  private:
@@ -464,7 +464,7 @@ class UnknownInteractionsProtocol_StrictTwoWayErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_StrictTwoWayErr_Response> New() { return ::std::make_unique<UnknownInteractionsProtocol_StrictTwoWayErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_StrictTwoWayErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocol_StrictTwoWayErr_Response* result) const;
 };
@@ -499,7 +499,7 @@ class UnknownInteractionsProtocol_StrictTwoWayErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_StrictTwoWayErr_Result> New() { return ::std::make_unique<UnknownInteractionsProtocol_StrictTwoWayErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_StrictTwoWayErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_StrictTwoWayErr_Result* result) const;
 
@@ -604,7 +604,7 @@ class UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response> New() { return ::std::make_unique<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response* result) const;
 };
@@ -639,7 +639,7 @@ class UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result> New() { return ::std::make_unique<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result* result) const;
 
@@ -748,7 +748,7 @@ class UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response> New() { return ::std::make_unique<UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response* result) const;
 
@@ -837,7 +837,7 @@ class UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result> New() { return ::std::make_unique<UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result* result) const;
 
@@ -962,7 +962,7 @@ class UnknownInteractionsProtocol_StrictTwoWayTableErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_StrictTwoWayTableErr_Response> New() { return ::std::make_unique<UnknownInteractionsProtocol_StrictTwoWayTableErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_StrictTwoWayTableErr_Response* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocol_StrictTwoWayTableErr_Response* _result) const;
  private:
@@ -1024,7 +1024,7 @@ class UnknownInteractionsProtocol_StrictTwoWayTableErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_StrictTwoWayTableErr_Result> New() { return ::std::make_unique<UnknownInteractionsProtocol_StrictTwoWayTableErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_StrictTwoWayTableErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_StrictTwoWayTableErr_Result* result) const;
 
@@ -1129,7 +1129,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWay_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWay_Response> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWay_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWay_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWay_Response* result) const;
 };
@@ -1164,7 +1164,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWay_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWay_Result> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWay_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWay_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWay_Result* result) const;
 
@@ -1258,7 +1258,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayFields_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayFields_Response> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayFields_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayFields_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayFields_Response* result) const;
 };
@@ -1293,7 +1293,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayFields_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayFields_Result> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayFields_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayFields_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayFields_Result* result) const;
 
@@ -1391,7 +1391,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response* result) const;
 
@@ -1480,7 +1480,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result* result) const;
 
@@ -1594,7 +1594,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayTable_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayTable_Response> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayTable_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayTable_Response* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayTable_Response* _result) const;
  private:
@@ -1656,7 +1656,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayTable_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayTable_Result> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayTable_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayTable_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayTable_Result* result) const;
 
@@ -1750,7 +1750,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayErr_Response> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayErr_Response* result) const;
 };
@@ -1787,7 +1787,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayErr_Result> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayErr_Result* result) const;
 
@@ -1909,7 +1909,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response* result) const;
 };
@@ -1946,7 +1946,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result* result) const;
 
@@ -2072,7 +2072,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response* result) const;
 
@@ -2163,7 +2163,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result* result) const;
 
@@ -2305,7 +2305,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response* _result) const;
  private:
@@ -2369,7 +2369,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result> New() { return ::std::make_unique<UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result* result) const;
 
@@ -2482,7 +2482,7 @@ class UnknownInteractionsProtocolStrictEventFieldsRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictEventFieldsRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictEventFieldsRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocolStrictEventFieldsRequest* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocolStrictEventFieldsRequest* result) const;
 };
@@ -2516,7 +2516,7 @@ class UnknownInteractionsProtocolStrictEventUnionRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictEventUnionRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictEventUnionRequest>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocolStrictEventUnionRequest* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocolStrictEventUnionRequest* result) const;
 
@@ -2620,7 +2620,7 @@ class UnknownInteractionsProtocolStrictEventTableRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictEventTableRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictEventTableRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocolStrictEventTableRequest* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocolStrictEventTableRequest* _result) const;
  private:
@@ -2668,7 +2668,7 @@ class UnknownInteractionsProtocolFlexibleEventFieldsRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleEventFieldsRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleEventFieldsRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocolFlexibleEventFieldsRequest* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocolFlexibleEventFieldsRequest* result) const;
 };
@@ -2702,7 +2702,7 @@ class UnknownInteractionsProtocolFlexibleEventUnionRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleEventUnionRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleEventUnionRequest>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocolFlexibleEventUnionRequest* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsProtocolFlexibleEventUnionRequest* result) const;
 
@@ -2806,7 +2806,7 @@ class UnknownInteractionsProtocolFlexibleEventTableRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleEventTableRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleEventTableRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsProtocolFlexibleEventTableRequest* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsProtocolFlexibleEventTableRequest* _result) const;
  private:
@@ -3121,7 +3121,7 @@ class UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse* result) const;
 };
@@ -3155,7 +3155,7 @@ class UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse* result) const;
 
@@ -3259,7 +3259,7 @@ class UnknownInteractionsAjarProtocolStrictTwoWayTableResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocolStrictTwoWayTableResponse* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocolStrictTwoWayTableResponse* _result) const;
  private:
@@ -3316,7 +3316,7 @@ class UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response> New() { return ::std::make_unique<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response* result) const;
 };
@@ -3351,7 +3351,7 @@ class UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result> New() { return ::std::make_unique<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result* result) const;
 
@@ -3456,7 +3456,7 @@ class UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response> New() { return ::std::make_unique<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response* result) const;
 };
@@ -3491,7 +3491,7 @@ class UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result> New() { return ::std::make_unique<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result* result) const;
 
@@ -3600,7 +3600,7 @@ class UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response> New() { return ::std::make_unique<UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response* result) const;
 
@@ -3689,7 +3689,7 @@ class UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result> New() { return ::std::make_unique<UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result* result) const;
 
@@ -3814,7 +3814,7 @@ class UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response> New() { return ::std::make_unique<UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response* _result) const;
  private:
@@ -3876,7 +3876,7 @@ class UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result> New() { return ::std::make_unique<UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result* result) const;
 
@@ -3972,7 +3972,7 @@ class UnknownInteractionsAjarProtocolStrictEventFieldsRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictEventFieldsRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictEventFieldsRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocolStrictEventFieldsRequest* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocolStrictEventFieldsRequest* result) const;
 };
@@ -4006,7 +4006,7 @@ class UnknownInteractionsAjarProtocolStrictEventUnionRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictEventUnionRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictEventUnionRequest>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocolStrictEventUnionRequest* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocolStrictEventUnionRequest* result) const;
 
@@ -4110,7 +4110,7 @@ class UnknownInteractionsAjarProtocolStrictEventTableRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictEventTableRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictEventTableRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocolStrictEventTableRequest* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocolStrictEventTableRequest* _result) const;
  private:
@@ -4158,7 +4158,7 @@ class UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest* result) const;
 };
@@ -4192,7 +4192,7 @@ class UnknownInteractionsAjarProtocolFlexibleEventUnionRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocolFlexibleEventUnionRequest* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocolFlexibleEventUnionRequest* result) const;
 
@@ -4296,7 +4296,7 @@ class UnknownInteractionsAjarProtocolFlexibleEventTableRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolFlexibleEventTableRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolFlexibleEventTableRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarProtocolFlexibleEventTableRequest* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarProtocolFlexibleEventTableRequest* _result) const;
  private:
@@ -4515,7 +4515,7 @@ class UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse* result) const;
 };
@@ -4549,7 +4549,7 @@ class UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse* result) const;
 
@@ -4653,7 +4653,7 @@ class UnknownInteractionsClosedProtocolStrictTwoWayTableResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocolStrictTwoWayTableResponse* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocolStrictTwoWayTableResponse* _result) const;
  private:
@@ -4710,7 +4710,7 @@ class UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response> New() { return ::std::make_unique<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response* result) const;
 };
@@ -4745,7 +4745,7 @@ class UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result> New() { return ::std::make_unique<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result* result) const;
 
@@ -4850,7 +4850,7 @@ class UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response> New() { return ::std::make_unique<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response* result) const;
 };
@@ -4885,7 +4885,7 @@ class UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result> New() { return ::std::make_unique<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result* result) const;
 
@@ -4994,7 +4994,7 @@ class UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response> New() { return ::std::make_unique<UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response* result) const;
 
@@ -5083,7 +5083,7 @@ class UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result> New() { return ::std::make_unique<UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result* result) const;
 
@@ -5208,7 +5208,7 @@ class UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response> New() { return ::std::make_unique<UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response* _result) const;
  private:
@@ -5270,7 +5270,7 @@ class UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result> New() { return ::std::make_unique<UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result* result) const;
 
@@ -5366,7 +5366,7 @@ class UnknownInteractionsClosedProtocolStrictEventFieldsRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictEventFieldsRequest> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictEventFieldsRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocolStrictEventFieldsRequest* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocolStrictEventFieldsRequest* result) const;
 };
@@ -5400,7 +5400,7 @@ class UnknownInteractionsClosedProtocolStrictEventUnionRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictEventUnionRequest> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictEventUnionRequest>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocolStrictEventUnionRequest* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocolStrictEventUnionRequest* result) const;
 
@@ -5504,7 +5504,7 @@ class UnknownInteractionsClosedProtocolStrictEventTableRequest final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictEventTableRequest> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictEventTableRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedProtocolStrictEventTableRequest* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsClosedProtocolStrictEventTableRequest* _result) const;
  private:
@@ -5691,7 +5691,7 @@ class UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse* result) const;
 };
@@ -5725,7 +5725,7 @@ class UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse* result) const;
 
@@ -5829,7 +5829,7 @@ class UnknownInteractionsDriverProtocolStrictTwoWayTableResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolStrictTwoWayTableResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocolStrictTwoWayTableResponse* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocolStrictTwoWayTableResponse* _result) const;
  private:
@@ -5886,7 +5886,7 @@ class UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response* result) const;
 };
@@ -5921,7 +5921,7 @@ class UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result* result) const;
 
@@ -6026,7 +6026,7 @@ class UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response* result) const;
 };
@@ -6061,7 +6061,7 @@ class UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result* result) const;
 
@@ -6170,7 +6170,7 @@ class UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response* result) const;
 
@@ -6259,7 +6259,7 @@ class UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result* result) const;
 
@@ -6384,7 +6384,7 @@ class UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response* _result) const;
  private:
@@ -6446,7 +6446,7 @@ class UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result* result) const;
 
@@ -6551,7 +6551,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response* result) const;
 };
@@ -6586,7 +6586,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result* result) const;
 
@@ -6680,7 +6680,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response* result) const;
 };
@@ -6715,7 +6715,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result* result) const;
 
@@ -6813,7 +6813,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response* result) const;
 
@@ -6902,7 +6902,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result* result) const;
 
@@ -7016,7 +7016,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response* _result) const;
  private:
@@ -7078,7 +7078,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result* result) const;
 
@@ -7172,7 +7172,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response* result) const;
 };
@@ -7209,7 +7209,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result* result) const;
 
@@ -7331,7 +7331,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response* result) const;
 };
@@ -7368,7 +7368,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result* result) const;
 
@@ -7494,7 +7494,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response* result) const;
 
@@ -7585,7 +7585,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result* result) const;
 
@@ -7727,7 +7727,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response* _result) const;
  private:
@@ -7791,7 +7791,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result> New() { return ::std::make_unique<UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result* result) const;
 
@@ -7904,7 +7904,7 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse* result) const;
 };
@@ -7938,7 +7938,7 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse* result) const;
 
@@ -8042,7 +8042,7 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse* _result) const;
  private:
@@ -8099,7 +8099,7 @@ class UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response* result) const;
 };
@@ -8134,7 +8134,7 @@ class UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result* result) const;
 
@@ -8239,7 +8239,7 @@ class UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response final
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response* result) const;
 };
@@ -8274,7 +8274,7 @@ class UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result* result) const;
 
@@ -8383,7 +8383,7 @@ class UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response final 
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response* result) const;
 
@@ -8472,7 +8472,7 @@ class UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result* result) const;
 
@@ -8597,7 +8597,7 @@ class UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response final 
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response* _result) const;
  private:
@@ -8659,7 +8659,7 @@ class UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result* result) const;
 
@@ -8755,7 +8755,7 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse* result) const;
 };
@@ -8789,7 +8789,7 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse* result) const;
 
@@ -8893,7 +8893,7 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse* _result) const;
  private:
@@ -8950,7 +8950,7 @@ class UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response* result) const;
 };
@@ -8985,7 +8985,7 @@ class UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result final {
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result* result) const;
 
@@ -9090,7 +9090,7 @@ class UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response fin
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response* value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response* result) const;
 };
@@ -9125,7 +9125,7 @@ class UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result final
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result* result) const;
 
@@ -9234,7 +9234,7 @@ class UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response fina
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response* result) const;
 
@@ -9323,7 +9323,7 @@ class UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result final 
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result* result) const;
 
@@ -9448,7 +9448,7 @@ class UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response fina
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response* _value, size_t _offset);
   zx_status_t Clone(UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response* _result) const;
  private:
@@ -9510,7 +9510,7 @@ class UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result final 
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result* value, size_t offset);
   zx_status_t Clone(UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result* result) const;
 
@@ -9636,7 +9636,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -9737,7 +9737,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -9817,7 +9817,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -9874,7 +9874,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -9928,7 +9928,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -10009,7 +10009,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayTableErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -10089,7 +10089,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -10169,7 +10169,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -10226,7 +10226,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -10280,7 +10280,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -10361,7 +10361,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -10441,7 +10441,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -10523,7 +10523,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -10582,7 +10582,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -10636,7 +10636,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -10719,7 +10719,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -10801,7 +10801,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -10902,7 +10902,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -11003,7 +11003,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -11104,7 +11104,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -11184,7 +11184,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -11241,7 +11241,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -11295,7 +11295,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -11376,7 +11376,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -11456,7 +11456,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -11557,7 +11557,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -11658,7 +11658,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -11759,7 +11759,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -11839,7 +11839,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -11896,7 +11896,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -11950,7 +11950,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -12031,7 +12031,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -12111,7 +12111,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -12212,7 +12212,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -12313,7 +12313,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -12393,7 +12393,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -12450,7 +12450,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -12504,7 +12504,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -12585,7 +12585,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -12665,7 +12665,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -12745,7 +12745,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -12802,7 +12802,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -12856,7 +12856,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -12937,7 +12937,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -13017,7 +13017,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -13099,7 +13099,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -13158,7 +13158,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -13212,7 +13212,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -13295,7 +13295,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -13377,7 +13377,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -13478,7 +13478,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -13558,7 +13558,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -13615,7 +13615,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -13669,7 +13669,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -13750,7 +13750,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -13830,7 +13830,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -13931,7 +13931,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -14011,7 +14011,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -14068,7 +14068,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -14122,7 +14122,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -14203,7 +14203,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);

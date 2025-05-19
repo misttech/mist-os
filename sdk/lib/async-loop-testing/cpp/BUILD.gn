@@ -23,9 +23,6 @@ sdk_source_set("cpp") {
     # <real_loop.h> has #include <lib/fit/function.h>
     "//sdk/lib/fit",
 
-    # <real_loop.h> has #include <lib/stdcompat/optional.h>
-    "//sdk/lib/stdcompat",
-
     # <real_loop.h> has #include <lib/zx/time.h>
     "//zircon/system/ulib/zx",
 

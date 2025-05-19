@@ -39,7 +39,7 @@ class Empty final {
   static inline ::std::unique_ptr<Empty> New() { return ::std::make_unique<Empty>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Empty* value, size_t _offset);
   zx_status_t Clone(Empty* result) const;
 };
@@ -60,7 +60,7 @@ class EmptyProtocolSendRequest final {
   static inline ::std::unique_ptr<EmptyProtocolSendRequest> New() { return ::std::make_unique<EmptyProtocolSendRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, EmptyProtocolSendRequest* value, size_t _offset);
   zx_status_t Clone(EmptyProtocolSendRequest* result) const;
 };
@@ -81,7 +81,7 @@ class EmptyProtocolReceiveRequest final {
   static inline ::std::unique_ptr<EmptyProtocolReceiveRequest> New() { return ::std::make_unique<EmptyProtocolReceiveRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, EmptyProtocolReceiveRequest* value, size_t _offset);
   zx_status_t Clone(EmptyProtocolReceiveRequest* result) const;
 };
@@ -102,7 +102,7 @@ class EmptyProtocolSendAndReceiveRequest final {
   static inline ::std::unique_ptr<EmptyProtocolSendAndReceiveRequest> New() { return ::std::make_unique<EmptyProtocolSendAndReceiveRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, EmptyProtocolSendAndReceiveRequest* value, size_t _offset);
   zx_status_t Clone(EmptyProtocolSendAndReceiveRequest* result) const;
 };
@@ -123,7 +123,7 @@ class EmptyProtocolSendAndReceiveResponse final {
   static inline ::std::unique_ptr<EmptyProtocolSendAndReceiveResponse> New() { return ::std::make_unique<EmptyProtocolSendAndReceiveResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, EmptyProtocolSendAndReceiveResponse* value, size_t _offset);
   zx_status_t Clone(EmptyProtocolSendAndReceiveResponse* result) const;
 };

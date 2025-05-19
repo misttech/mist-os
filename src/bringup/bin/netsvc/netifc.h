@@ -33,7 +33,7 @@ class DeviceBuffer {
 //
 // If non-empty, `interface` holds the topological path of the interface
 // intended to use for networking.
-zx::result<> netifc_open(async_dispatcher_t* dispatcher, cpp17::string_view interface,
+zx::result<> netifc_open(async_dispatcher_t* dispatcher, std::string_view interface,
                          fit::callback<void(zx_status_t)> on_error);
 
 // Return nonzero if interface exists.

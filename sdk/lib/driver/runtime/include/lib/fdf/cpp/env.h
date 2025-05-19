@@ -21,8 +21,8 @@ class DispatcherBuilder final {
   // |driver| is an opaque pointer to the driver object. It will be used to uniquely identify
   // the driver.
   static zx::result<fdf::SynchronizedDispatcher> CreateSynchronizedWithOwner(
-      const void* driver, fdf::SynchronizedDispatcher::Options options, cpp17::string_view name,
-      fdf::Dispatcher::ShutdownHandler shutdown_handler, cpp17::string_view scheduler_role = {}) {
+      const void* driver, fdf::SynchronizedDispatcher::Options options, std::string_view name,
+      fdf::Dispatcher::ShutdownHandler shutdown_handler, std::string_view scheduler_role = {}) {
     ZX_ASSERT_MSG((options.value & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
                       FDF_DISPATCHER_OPTION_SYNCHRONIZED,
                   "options.value=%u, needs to have FDF_DISPATCHER_OPTION_SYNCHRONIZED",
@@ -49,8 +49,8 @@ class DispatcherBuilder final {
   // |driver| is an opaque pointer to the driver object. It will be used to uniquely identify
   // the driver.
   static zx::result<fdf::UnsynchronizedDispatcher> CreateUnsynchronizedWithOwner(
-      const void* driver, fdf::UnsynchronizedDispatcher::Options options, cpp17::string_view name,
-      fdf::Dispatcher::ShutdownHandler shutdown_handler, cpp17::string_view scheduler_role = {}) {
+      const void* driver, fdf::UnsynchronizedDispatcher::Options options, std::string_view name,
+      fdf::Dispatcher::ShutdownHandler shutdown_handler, std::string_view scheduler_role = {}) {
     ZX_ASSERT_MSG((options.value & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
                       FDF_DISPATCHER_OPTION_UNSYNCHRONIZED,
                   "options.value=%u, needs to have FDF_DISPATCHER_OPTION_UNSYNCHRONIZED",

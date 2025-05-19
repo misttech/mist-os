@@ -22,7 +22,6 @@ executable("bin") {
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/async-testing",
     "//sdk/lib/async_patterns/cpp",
-    "//sdk/lib/stdcompat",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//src/sys/test_runners/gtest:death_test",

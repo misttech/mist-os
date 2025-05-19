@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_placementofattributes_ExampleProtocolMethodReq
 const fidl_type_t* ExampleProtocolMethodRequest::FidlType = &test_placementofattributes_ExampleProtocolMethodRequestTable;
 
 void ExampleProtocolMethodRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                          std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ExampleProtocolMethodRequest>::value) {
     memcpy(_encoder->template GetPtr<ExampleProtocolMethodRequest>(_offset), this, sizeof(ExampleProtocolMethodRequest));
   } else {
@@ -43,7 +43,7 @@ extern "C" const fidl_type_t test_placementofattributes_ExampleStructTable;
 const fidl_type_t* ExampleStruct::FidlType = &test_placementofattributes_ExampleStructTable;
 
 void ExampleStruct::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                           cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                           std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ExampleStruct>::value) {
     memcpy(_encoder->template GetPtr<ExampleStruct>(_offset), this, sizeof(ExampleStruct));
   } else {
@@ -113,7 +113,7 @@ ExampleTable& ExampleTable::set_member(uint32_t _value) {
 }
 
 void ExampleTable::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                          std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -228,7 +228,7 @@ ExampleUnion ExampleUnion::WithVariant(uint32_t&& val) {
 }
 
 void ExampleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
-                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                          std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 

@@ -387,14 +387,15 @@ void PrettyTypeManager::AddDefaultRustPrettyTypes() {
                                     {"len", "vec.len"},
                                     {"capacity", "vec.buf.inner.cap"},
                                     {"is_empty", "vec.len == 0"}}));
-  rust_.emplace_back(InternalGlob("std::ffi::os_str::OsString"),
-                     std::make_unique<PrettyHeapString>(
-                         "inner.inner.inner.buf.ptr.pointer.pointer as *u8", "inner.inner.inner.len",
-                         GetterList{{"as_ptr", "inner.inner.buf.ptr.pointer.pointer as *u8"},
-                                    {"as_mut_ptr", "inner.inner.buf.ptr.pointer.pointer as *u8"},
-                                    {"len", "inner.inner.len"},
-                                    {"capacity", "inner.inner.buf.cap"},
-                                    {"is_empty", "inner.inner.len == 0"}}));
+  rust_.emplace_back(
+      InternalGlob("std::ffi::os_str::OsString"),
+      std::make_unique<PrettyHeapString>(
+          "inner.inner.inner.buf.ptr.pointer.pointer as *u8", "inner.inner.inner.len",
+          GetterList{{"as_ptr", "inner.inner.buf.ptr.pointer.pointer as *u8"},
+                     {"as_mut_ptr", "inner.inner.buf.ptr.pointer.pointer as *u8"},
+                     {"len", "inner.inner.len"},
+                     {"capacity", "inner.inner.buf.cap"},
+                     {"is_empty", "inner.inner.len == 0"}}));
   // The RawVec implementation only stores a pointer to a u8 which contains the data and only upon
   // use does it convert those bytes to the correct type. The original type is kept in a PhantomData
   // marker member, so we have to use that to correctly calculate the size of the array when doing
@@ -517,9 +518,9 @@ void PrettyTypeManager::AddDefaultFuchsiaCppPrettyTypes() {
 
   // stdcompat
   cpp_.emplace_back(
-      InternalGlob("cpp17::optional<*>"),
+      InternalGlob("std::optional<*>"),
       std::make_unique<PrettyOptional>(
-          "cpp17::optional", "storage_.index_ == 0", "storage_.base_.value", "cpp17::nullopt",
+          "std::optional", "storage_.index_ == 0", "storage_.base_.value", "std::nullopt",
           GetterList{{"value", "storage_.base_.value"}, {"has_value", "storage_.index_ == 0"}}));
 }
 

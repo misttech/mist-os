@@ -4,8 +4,8 @@
 //
 // This file contains an implementation of an H264 Annex-B video stream parser.
 
-#ifndef MEDIA_VIDEO_H264_PARSER_H_
-#define MEDIA_VIDEO_H264_PARSER_H_
+#ifndef SRC_MEDIA_THIRD_PARTY_CHROMIUM_MEDIA_MEDIA_VIDEO_H264_PARSER_H_
+#define SRC_MEDIA_THIRD_PARTY_CHROMIUM_MEDIA_MEDIA_VIDEO_H264_PARSER_H_
 
 #include <lib/stdcompat/variant.h>
 #include <stddef.h>
@@ -76,10 +76,10 @@ struct MEDIA_EXPORT H264NALU {
   int nal_ref_idc;
   int nal_unit_type;
 
-  using NaluHeaderVariant = cpp17::variant<cpp17::monostate,
-                                           std::unique_ptr<H264SPS>,
-                                           std::unique_ptr<H264PPS>,
-                                           std::unique_ptr<H264SliceHeader>>;
+  using NaluHeaderVariant = std::variant<std::monostate,
+                                         std::unique_ptr<H264SPS>,
+                                         std::unique_ptr<H264PPS>,
+                                         std::unique_ptr<H264SliceHeader>>;
   // If using QueuePreparsedNalu(), this field carries the pre-parsed header.
   // Only SPS, PPS, and SliceHeader are supported.
   NaluHeaderVariant preparsed_header;
@@ -604,4 +604,4 @@ class MEDIA_EXPORT H264Parser {
 
 }  // namespace media
 
-#endif  // MEDIA_VIDEO_H264_PARSER_H_
+#endif  // SRC_MEDIA_THIRD_PARTY_CHROMIUM_MEDIA_MEDIA_VIDEO_H264_PARSER_H_

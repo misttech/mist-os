@@ -29,7 +29,6 @@ source_set("gtest") {
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/async-testing",
     "//sdk/lib/fit",
-    "//sdk/lib/stdcompat",
     "//src/lib/fxl:fxl_cli",
     "//third_party/googletest:gtest_no_testonly",
     "//zircon/system/ulib/zx",

@@ -36,7 +36,7 @@ class SuperFooRequest final {
   static inline ::std::unique_ptr<SuperFooRequest> New() { return ::std::make_unique<SuperFooRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SuperFooRequest* value, size_t _offset);
   zx_status_t Clone(SuperFooRequest* result) const;
 };
@@ -57,7 +57,7 @@ class SuperFooResponse final {
   static inline ::std::unique_ptr<SuperFooResponse> New() { return ::std::make_unique<SuperFooResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SuperFooResponse* value, size_t _offset);
   zx_status_t Clone(SuperFooResponse* result) const;
 };

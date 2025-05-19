@@ -101,7 +101,7 @@ class TablePayload final {
   static inline ::std::unique_ptr<TablePayload> New() { return ::std::make_unique<TablePayload>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, TablePayload* _value, size_t _offset);
   zx_status_t Clone(TablePayload* _result) const;
  private:
@@ -161,7 +161,7 @@ class UnionPayload final {
   static inline ::std::unique_ptr<UnionPayload> New() { return ::std::make_unique<UnionPayload>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnionPayload* value, size_t offset);
   zx_status_t Clone(UnionPayload* result) const;
 
@@ -251,7 +251,7 @@ class ComposedProtocolOneWayAnonComposedRequest final {
   static inline ::std::unique_ptr<ComposedProtocolOneWayAnonComposedRequest> New() { return ::std::make_unique<ComposedProtocolOneWayAnonComposedRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ComposedProtocolOneWayAnonComposedRequest* _value, size_t _offset);
   zx_status_t Clone(ComposedProtocolOneWayAnonComposedRequest* _result) const;
  private:
@@ -311,7 +311,7 @@ class ComposedProtocolTwoWayAnonComposedRequest final {
   static inline ::std::unique_ptr<ComposedProtocolTwoWayAnonComposedRequest> New() { return ::std::make_unique<ComposedProtocolTwoWayAnonComposedRequest>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ComposedProtocolTwoWayAnonComposedRequest* value, size_t offset);
   zx_status_t Clone(ComposedProtocolTwoWayAnonComposedRequest* result) const;
 
@@ -401,7 +401,7 @@ class ComposedProtocolTwoWayAnonComposedResponse final {
   static inline ::std::unique_ptr<ComposedProtocolTwoWayAnonComposedResponse> New() { return ::std::make_unique<ComposedProtocolTwoWayAnonComposedResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ComposedProtocolTwoWayAnonComposedResponse* _value, size_t _offset);
   zx_status_t Clone(ComposedProtocolTwoWayAnonComposedResponse* _result) const;
  private:
@@ -478,7 +478,7 @@ class ComposedProtocolTwoWayAnonComposedWithErrorRequest final {
   static inline ::std::unique_ptr<ComposedProtocolTwoWayAnonComposedWithErrorRequest> New() { return ::std::make_unique<ComposedProtocolTwoWayAnonComposedWithErrorRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ComposedProtocolTwoWayAnonComposedWithErrorRequest* _value, size_t _offset);
   zx_status_t Clone(ComposedProtocolTwoWayAnonComposedWithErrorRequest* _result) const;
  private:
@@ -538,7 +538,7 @@ class ComposedProtocol_TwoWayAnonComposedWithError_Response final {
   static inline ::std::unique_ptr<ComposedProtocol_TwoWayAnonComposedWithError_Response> New() { return ::std::make_unique<ComposedProtocol_TwoWayAnonComposedWithError_Response>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ComposedProtocol_TwoWayAnonComposedWithError_Response* value, size_t offset);
   zx_status_t Clone(ComposedProtocol_TwoWayAnonComposedWithError_Response* result) const;
 
@@ -613,7 +613,7 @@ class ComposedProtocol_TwoWayAnonComposedWithError_Result final {
   static inline ::std::unique_ptr<ComposedProtocol_TwoWayAnonComposedWithError_Result> New() { return ::std::make_unique<ComposedProtocol_TwoWayAnonComposedWithError_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ComposedProtocol_TwoWayAnonComposedWithError_Result* value, size_t offset);
   zx_status_t Clone(ComposedProtocol_TwoWayAnonComposedWithError_Result* result) const;
 
@@ -721,7 +721,7 @@ class ComposedProtocolOnAnonComposedRequest final {
   static inline ::std::unique_ptr<ComposedProtocolOnAnonComposedRequest> New() { return ::std::make_unique<ComposedProtocolOnAnonComposedRequest>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ComposedProtocolOnAnonComposedRequest* value, size_t offset);
   zx_status_t Clone(ComposedProtocolOnAnonComposedRequest* result) const;
 
@@ -796,7 +796,7 @@ class ComposedProtocol_TwoWayNamedComposedWithError_Result final {
   static inline ::std::unique_ptr<ComposedProtocol_TwoWayNamedComposedWithError_Result> New() { return ::std::make_unique<ComposedProtocol_TwoWayNamedComposedWithError_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ComposedProtocol_TwoWayNamedComposedWithError_Result* value, size_t offset);
   zx_status_t Clone(ComposedProtocol_TwoWayNamedComposedWithError_Result* result) const;
 
@@ -1014,7 +1014,7 @@ class MainProtocol_TwoWayLocalWithError_Result final {
   static inline ::std::unique_ptr<MainProtocol_TwoWayLocalWithError_Result> New() { return ::std::make_unique<MainProtocol_TwoWayLocalWithError_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocol_TwoWayLocalWithError_Result* value, size_t offset);
   zx_status_t Clone(MainProtocol_TwoWayLocalWithError_Result* result) const;
 
@@ -1139,7 +1139,7 @@ class MainProtocolOneWayAnonRequest final {
   static inline ::std::unique_ptr<MainProtocolOneWayAnonRequest> New() { return ::std::make_unique<MainProtocolOneWayAnonRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocolOneWayAnonRequest* _value, size_t _offset);
   zx_status_t Clone(MainProtocolOneWayAnonRequest* _result) const;
  private:
@@ -1200,7 +1200,7 @@ class MainProtocolTwoWayAnonRequest final {
   static inline ::std::unique_ptr<MainProtocolTwoWayAnonRequest> New() { return ::std::make_unique<MainProtocolTwoWayAnonRequest>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocolTwoWayAnonRequest* value, size_t offset);
   zx_status_t Clone(MainProtocolTwoWayAnonRequest* result) const;
 
@@ -1304,7 +1304,7 @@ class MainProtocolTwoWayAnonResponse final {
   static inline ::std::unique_ptr<MainProtocolTwoWayAnonResponse> New() { return ::std::make_unique<MainProtocolTwoWayAnonResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocolTwoWayAnonResponse* _value, size_t _offset);
   zx_status_t Clone(MainProtocolTwoWayAnonResponse* _result) const;
  private:
@@ -1381,7 +1381,7 @@ class MainProtocolTwoWayAnonWithErrorRequest final {
   static inline ::std::unique_ptr<MainProtocolTwoWayAnonWithErrorRequest> New() { return ::std::make_unique<MainProtocolTwoWayAnonWithErrorRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocolTwoWayAnonWithErrorRequest* _value, size_t _offset);
   zx_status_t Clone(MainProtocolTwoWayAnonWithErrorRequest* _result) const;
  private:
@@ -1442,7 +1442,7 @@ class MainProtocol_TwoWayAnonWithError_Response final {
   static inline ::std::unique_ptr<MainProtocol_TwoWayAnonWithError_Response> New() { return ::std::make_unique<MainProtocol_TwoWayAnonWithError_Response>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocol_TwoWayAnonWithError_Response* value, size_t offset);
   zx_status_t Clone(MainProtocol_TwoWayAnonWithError_Response* result) const;
 
@@ -1531,7 +1531,7 @@ class MainProtocol_TwoWayAnonWithError_Result final {
   static inline ::std::unique_ptr<MainProtocol_TwoWayAnonWithError_Result> New() { return ::std::make_unique<MainProtocol_TwoWayAnonWithError_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocol_TwoWayAnonWithError_Result* value, size_t offset);
   zx_status_t Clone(MainProtocol_TwoWayAnonWithError_Result* result) const;
 
@@ -1640,7 +1640,7 @@ class MainProtocolOnAnonRequest final {
   static inline ::std::unique_ptr<MainProtocolOnAnonRequest> New() { return ::std::make_unique<MainProtocolOnAnonRequest>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocolOnAnonRequest* value, size_t offset);
   zx_status_t Clone(MainProtocolOnAnonRequest* result) const;
 
@@ -1922,7 +1922,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::UnionPay
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayoutssamelibrary::UnionPayload>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -2001,7 +2001,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::Composed
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -2104,7 +2104,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::Composed
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -2159,7 +2159,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::Composed
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -2216,7 +2216,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::Composed
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -2271,7 +2271,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::Composed
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -2328,7 +2328,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::MainProt
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -2409,7 +2409,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::MainProt
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -2511,7 +2511,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::MainProt
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -2565,7 +2565,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::MainProt
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -2622,7 +2622,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::MainProt
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);

@@ -22,7 +22,7 @@ extern "C" const fidl_type_t test_anonymous_OverrideTestTable;
 const fidl_type_t* OverrideTest::FidlType = &test_anonymous_OverrideTestTable;
 
 void OverrideTest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                          std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<OverrideTest>::value) {
     memcpy(_encoder->template GetPtr<OverrideTest>(_offset), this, sizeof(OverrideTest));
   } else {
@@ -160,7 +160,7 @@ FunctionApplication& FunctionApplication::set_flags(::test::anonymous::Flags _va
 }
 
 void FunctionApplication::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                 cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                 std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -399,7 +399,7 @@ Expression Expression::WithFunctionApplication(::test::anonymous::FunctionApplic
 }
 
 void Expression::Encode(::fidl::Encoder* encoder, size_t offset,
-                        cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                        std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -659,7 +659,7 @@ UnionMember UnionMember::WithUnionData(uint8_t&& val) {
 }
 
 void UnionMember::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -786,7 +786,7 @@ extern "C" const fidl_type_t test_anonymous_TableDataTable;
 const fidl_type_t* TableData::FidlType = &test_anonymous_TableDataTable;
 
 void TableData::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                       cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                       std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<TableData>::value) {
     memcpy(_encoder->template GetPtr<TableData>(_offset), this, sizeof(TableData));
   } else {
@@ -856,7 +856,7 @@ TableMember& TableMember::set_table_data(::std::vector<::test::anonymous::TableD
 }
 
 void TableMember::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -934,7 +934,7 @@ extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodRequestTable;
 const fidl_type_t* SomeProtocolSomeMethodRequest::FidlType = &test_anonymous_SomeProtocolSomeMethodRequestTable;
 
 void SomeProtocolSomeMethodRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                           cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                           std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<SomeProtocolSomeMethodRequest>::value) {
     memcpy(_encoder->template GetPtr<SomeProtocolSomeMethodRequest>(_offset), this, sizeof(SomeProtocolSomeMethodRequest));
   } else {
@@ -973,7 +973,7 @@ extern "C" const fidl_type_t test_anonymous_SomeProtocol_SomeMethod_ResponseTabl
 const fidl_type_t* SomeProtocol_SomeMethod_Response::FidlType = &test_anonymous_SomeProtocol_SomeMethod_ResponseTable;
 
 void SomeProtocol_SomeMethod_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                              cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                              std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<SomeProtocol_SomeMethod_Response>::value) {
     memcpy(_encoder->template GetPtr<SomeProtocol_SomeMethod_Response>(_offset), this, sizeof(SomeProtocol_SomeMethod_Response));
   } else {
@@ -1057,7 +1057,7 @@ SomeProtocol_SomeMethod_Result SomeProtocol_SomeMethod_Result::WithErr(::test::a
 }
 
 void SomeProtocol_SomeMethod_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                                            cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                            std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 

@@ -5,13 +5,14 @@
 #ifndef LIB_SYSLOG_STRUCTURED_BACKEND_CPP_FUCHSIA_SYSLOG_H_
 #define LIB_SYSLOG_STRUCTURED_BACKEND_CPP_FUCHSIA_SYSLOG_H_
 
-#include <lib/stdcompat/optional.h>
-#include <lib/stdcompat/string_view.h>
 #include <lib/syslog/structured_backend/fuchsia_syslog.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/socket.h>
 #include <stdint.h>
+
+#include <optional>
+#include <string_view>
 
 namespace fuchsia_syslog {
 
@@ -61,28 +62,28 @@ class LogBuffer final {
   // dropped_count -- Number of dropped messages
   // pid -- The process ID that generated the message.
   // tid -- The thread ID that generated the message.
-  void BeginRecord(FuchsiaLogSeverity severity, cpp17::optional<cpp17::string_view> file_name,
-                   unsigned int line, cpp17::optional<cpp17::string_view> message,
+  void BeginRecord(FuchsiaLogSeverity severity, std::optional<std::string_view> file_name,
+                   unsigned int line, std::optional<std::string_view> message,
                    zx::unowned_socket socket, uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid);
 
   // Writes a key/value pair to the buffer.
-  void WriteKeyValue(cpp17::string_view key, const char* value) {
-    WriteKeyValue(key, cpp17::string_view(value, strlen(value)));
+  void WriteKeyValue(std::string_view key, const char* value) {
+    WriteKeyValue(key, std::string_view(value, strlen(value)));
   }
 
-  void WriteKeyValue(cpp17::string_view key, cpp17::string_view value);
+  void WriteKeyValue(std::string_view key, std::string_view value);
 
   // Writes a key/value pair to the buffer.
-  void WriteKeyValue(cpp17::string_view key, int64_t value);
+  void WriteKeyValue(std::string_view key, int64_t value);
 
   // Writes a key/value pair to the buffer.
-  void WriteKeyValue(cpp17::string_view key, uint64_t value);
+  void WriteKeyValue(std::string_view key, uint64_t value);
 
   // Writes a key/value pair to the buffer.
-  void WriteKeyValue(cpp17::string_view key, double value);
+  void WriteKeyValue(std::string_view key, double value);
 
   // Writes a key/value pair to the buffer.
-  void WriteKeyValue(cpp17::string_view key, bool value);
+  void WriteKeyValue(std::string_view key, bool value);
 
   // Writes the LogBuffer to the socket.
   bool FlushRecord();

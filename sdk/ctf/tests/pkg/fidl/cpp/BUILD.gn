@@ -49,7 +49,6 @@ source_set("host_test_sources") {
   deps = [
     ":test_util",
     "//sdk/lib/fidl/hlcpp:hlcpp_base",
-    "//sdk/lib/stdcompat",
     "//sdk/testing/fidl:fidl_test_hlcpp",
     "//zircon/system/ulib/zxtest",
   ]

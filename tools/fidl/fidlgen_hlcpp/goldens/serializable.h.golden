@@ -28,7 +28,7 @@ class SerializableStruct final {
   static inline ::std::unique_ptr<SerializableStruct> New() { return ::std::make_unique<SerializableStruct>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SerializableStruct* value, size_t _offset);
   zx_status_t Clone(SerializableStruct* result) const;
 };
@@ -54,7 +54,7 @@ class SerializableTable final {
   static inline ::std::unique_ptr<SerializableTable> New() { return ::std::make_unique<SerializableTable>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SerializableTable* _value, size_t _offset);
   zx_status_t Clone(SerializableTable* _result) const;
 
@@ -107,7 +107,7 @@ class SerializableUnion final {
   static inline ::std::unique_ptr<SerializableUnion> New() { return ::std::make_unique<SerializableUnion>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SerializableUnion* value, size_t offset);
   zx_status_t Clone(SerializableUnion* result) const;
 
@@ -209,7 +209,7 @@ struct CodingTraits<std::unique_ptr<::test::serializable::SerializableUnion>> {
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::serializable::SerializableUnion>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);

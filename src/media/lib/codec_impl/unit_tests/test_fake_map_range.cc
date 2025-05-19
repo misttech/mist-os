@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/stdcompat/optional.h>
 #include <zircon/limits.h>
+
+#include <optional>
 
 #include <fbl/algorithm.h>
 #include <gtest/gtest.h>
@@ -32,7 +33,7 @@ class FakeMapRangeTest : public ::testing::Test {
 
  protected:
   // We store the ranges this way in the test because this is how codec_impl has them stored.
-  cpp17::optional<FakeMapRange> fake_ranges_[kFakeRangeCount];
+  std::optional<FakeMapRange> fake_ranges_[kFakeRangeCount];
   uint32_t first_vmar_byte_offset_ = 0;
   uint32_t last_vmar_byte_offset_ = 0;
 };

@@ -26,7 +26,7 @@ extern "C" const fidl_type_t test_typesinprotocols_StructTable;
 const fidl_type_t* Struct::FidlType = &test_typesinprotocols_StructTable;
 
 void Struct::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<Struct>::value) {
     memcpy(_encoder->template GetPtr<Struct>(_offset), this, sizeof(Struct));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -70,7 +70,7 @@ bool Table::IsEmpty() const {
 }
 
 void Table::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -148,7 +148,7 @@ Union Union::WithB(bool&& val) {
 }
 
 void Union::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -279,7 +279,7 @@ extern "C" const fidl_type_t test_typesinprotocols_ResourceStructTable;
 const fidl_type_t* ResourceStruct::FidlType = &test_typesinprotocols_ResourceStructTable;
 
 void ResourceStruct::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ResourceStruct>::value) {
     memcpy(_encoder->template GetPtr<ResourceStruct>(_offset), this, sizeof(ResourceStruct));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -323,7 +323,7 @@ bool ResourceTable::IsEmpty() const {
 }
 
 void ResourceTable::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -413,7 +413,7 @@ ResourceUnion ResourceUnion::WithB(bool&& val) {
 }
 
 void ResourceUnion::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -546,7 +546,7 @@ extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
 const fidl_type_t* Basic::FidlType = &test_typesinprotocols_BasicTable;
 
 void Basic::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<Basic>::value) {
     memcpy(_encoder->template GetPtr<Basic>(_offset), this, sizeof(Basic));
   } else {::fidl::Encode(_encoder, &uint8, _offset + 0);
@@ -628,7 +628,7 @@ extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
 const fidl_type_t* Compound::FidlType = &test_typesinprotocols_CompoundTable;
 
 void Compound::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<Compound>::value) {
     memcpy(_encoder->template GetPtr<Compound>(_offset), this, sizeof(Compound));
   } else {::fidl::Encode(_encoder, &bits, _offset + 0);
@@ -685,7 +685,7 @@ extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
 const fidl_type_t* ArrayBasic::FidlType = &test_typesinprotocols_ArrayBasicTable;
 
 void ArrayBasic::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ArrayBasic>::value) {
     memcpy(_encoder->template GetPtr<ArrayBasic>(_offset), this, sizeof(ArrayBasic));
   } else {::fidl::Encode(_encoder, &array_uint8, _offset + 0);
@@ -767,7 +767,7 @@ extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
 const fidl_type_t* ArrayCompound::FidlType = &test_typesinprotocols_ArrayCompoundTable;
 
 void ArrayCompound::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ArrayCompound>::value) {
     memcpy(_encoder->template GetPtr<ArrayCompound>(_offset), this, sizeof(ArrayCompound));
   } else {::fidl::Encode(_encoder, &array_bits, _offset + 0);
@@ -824,7 +824,7 @@ extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
 const fidl_type_t* VectorBasic::FidlType = &test_typesinprotocols_VectorBasicTable;
 
 void VectorBasic::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<VectorBasic>::value) {
     memcpy(_encoder->template GetPtr<VectorBasic>(_offset), this, sizeof(VectorBasic));
   } else {::fidl::Encode(_encoder, &vector_uint8, _offset + 0);
@@ -906,7 +906,7 @@ extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
 const fidl_type_t* VectorCompound::FidlType = &test_typesinprotocols_VectorCompoundTable;
 
 void VectorCompound::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<VectorCompound>::value) {
     memcpy(_encoder->template GetPtr<VectorCompound>(_offset), this, sizeof(VectorCompound));
   } else {::fidl::Encode(_encoder, &vector_bits, _offset + 0);
@@ -963,7 +963,7 @@ extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
 const fidl_type_t* VectorOptional::FidlType = &test_typesinprotocols_VectorOptionalTable;
 
 void VectorOptional::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<VectorOptional>::value) {
     memcpy(_encoder->template GetPtr<VectorOptional>(_offset), this, sizeof(VectorOptional));
   } else {::fidl::Encode(_encoder, &opt_vector_uint8, _offset + 0);
@@ -1005,7 +1005,7 @@ extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
 const fidl_type_t* ArrayVectorNested::FidlType = &test_typesinprotocols_ArrayVectorNestedTable;
 
 void ArrayVectorNested::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ArrayVectorNested>::value) {
     memcpy(_encoder->template GetPtr<ArrayVectorNested>(_offset), this, sizeof(ArrayVectorNested));
   } else {::fidl::Encode(_encoder, &array_array_uint8, _offset + 0);
@@ -1049,7 +1049,7 @@ extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
 const fidl_type_t* Resource::FidlType = &test_typesinprotocols_ResourceTable;
 
 void Resource::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<Resource>::value) {
     memcpy(_encoder->template GetPtr<Resource>(_offset), this, sizeof(Resource));
   } else {
@@ -1322,7 +1322,7 @@ Protocol_ErrorBasic_Result Protocol_ErrorBasic_Result::WithErr(uint32_t&& val) {
 }
 
 void Protocol_ErrorBasic_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1525,7 +1525,7 @@ Protocol_ErrorCompound_Result Protocol_ErrorCompound_Result::WithErr(uint32_t&& 
 }
 
 void Protocol_ErrorCompound_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1728,7 +1728,7 @@ Protocol_ErrorArrayBasic_Result Protocol_ErrorArrayBasic_Result::WithErr(uint32_
 }
 
 void Protocol_ErrorArrayBasic_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1931,7 +1931,7 @@ Protocol_ErrorArrayCompound_Result Protocol_ErrorArrayCompound_Result::WithErr(u
 }
 
 void Protocol_ErrorArrayCompound_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2134,7 +2134,7 @@ Protocol_ErrorVectorBasic_Result Protocol_ErrorVectorBasic_Result::WithErr(uint3
 }
 
 void Protocol_ErrorVectorBasic_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2337,7 +2337,7 @@ Protocol_ErrorVectorCompound_Result Protocol_ErrorVectorCompound_Result::WithErr
 }
 
 void Protocol_ErrorVectorCompound_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2540,7 +2540,7 @@ Protocol_ErrorVectorOptional_Result Protocol_ErrorVectorOptional_Result::WithErr
 }
 
 void Protocol_ErrorVectorOptional_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2743,7 +2743,7 @@ Protocol_ErrorArrayVectorNested_Result Protocol_ErrorArrayVectorNested_Result::W
 }
 
 void Protocol_ErrorArrayVectorNested_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2948,7 +2948,7 @@ Protocol_ErrorResource_Result Protocol_ErrorResource_Result::WithErr(uint32_t&& 
 }
 
 void Protocol_ErrorResource_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 

@@ -15,7 +15,6 @@ executable("bin") {
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
-    "//sdk/lib/stdcompat",
     "//sdk/lib/sys/cpp",
     "//zircon/system/ulib/svc",
   ]

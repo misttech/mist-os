@@ -21,10 +21,10 @@ public:
 
   // Constructs an instance of |Bits| from an underlying primitive value
   // if the primitive does not contain any unknown members not defined in the
-  // FIDL schema. Otherwise, returns |cpp17::nullopt|.
-  constexpr inline static cpp17::optional<Bits> TryFrom(uint32_t value) {
+  // FIDL schema. Otherwise, returns |std::nullopt|.
+  constexpr inline static std::optional<Bits> TryFrom(uint32_t value) {
     if (value & ~kMask.value_) {
-      return cpp17::nullopt;
+      return std::nullopt;
     }
     return Bits(value & Bits::kMask.value_);
   }
@@ -208,7 +208,7 @@ class Struct final {
   static inline ::std::unique_ptr<Struct> New() { return ::std::make_unique<Struct>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Struct* value, size_t _offset);
   zx_status_t Clone(Struct* result) const;
 };
@@ -234,7 +234,7 @@ class Table final {
   static inline ::std::unique_ptr<Table> New() { return ::std::make_unique<Table>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Table* _value, size_t _offset);
   zx_status_t Clone(Table* _result) const;
  private:
@@ -287,7 +287,7 @@ class Union final {
   static inline ::std::unique_ptr<Union> New() { return ::std::make_unique<Union>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Union* value, size_t offset);
   zx_status_t Clone(Union* result) const;
 
@@ -364,7 +364,7 @@ class ResourceStruct final {
   static inline ::std::unique_ptr<ResourceStruct> New() { return ::std::make_unique<ResourceStruct>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ResourceStruct* value, size_t _offset);
   zx_status_t Clone(ResourceStruct* result) const;
 };
@@ -390,7 +390,7 @@ class ResourceTable final {
   static inline ::std::unique_ptr<ResourceTable> New() { return ::std::make_unique<ResourceTable>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ResourceTable* _value, size_t _offset);
   zx_status_t Clone(ResourceTable* _result) const;
  private:
@@ -443,7 +443,7 @@ class ResourceUnion final {
   static inline ::std::unique_ptr<ResourceUnion> New() { return ::std::make_unique<ResourceUnion>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ResourceUnion* value, size_t offset);
   zx_status_t Clone(ResourceUnion* result) const;
 
@@ -556,7 +556,7 @@ class Basic final {
   static inline ::std::unique_ptr<Basic> New() { return ::std::make_unique<Basic>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Basic* value, size_t _offset);
   zx_status_t Clone(Basic* result) const;
 };
@@ -597,7 +597,7 @@ class Compound final {
   static inline ::std::unique_ptr<Compound> New() { return ::std::make_unique<Compound>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Compound* value, size_t _offset);
   zx_status_t Clone(Compound* result) const;
 };
@@ -648,7 +648,7 @@ class ArrayBasic final {
   static inline ::std::unique_ptr<ArrayBasic> New() { return ::std::make_unique<ArrayBasic>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ArrayBasic* value, size_t _offset);
   zx_status_t Clone(ArrayBasic* result) const;
 };
@@ -689,7 +689,7 @@ class ArrayCompound final {
   static inline ::std::unique_ptr<ArrayCompound> New() { return ::std::make_unique<ArrayCompound>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ArrayCompound* value, size_t _offset);
   zx_status_t Clone(ArrayCompound* result) const;
 };
@@ -740,7 +740,7 @@ class VectorBasic final {
   static inline ::std::unique_ptr<VectorBasic> New() { return ::std::make_unique<VectorBasic>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, VectorBasic* value, size_t _offset);
   zx_status_t Clone(VectorBasic* result) const;
 };
@@ -781,7 +781,7 @@ class VectorCompound final {
   static inline ::std::unique_ptr<VectorCompound> New() { return ::std::make_unique<VectorCompound>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, VectorCompound* value, size_t _offset);
   zx_status_t Clone(VectorCompound* result) const;
 };
@@ -816,7 +816,7 @@ class VectorOptional final {
   static inline ::std::unique_ptr<VectorOptional> New() { return ::std::make_unique<VectorOptional>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, VectorOptional* value, size_t _offset);
   zx_status_t Clone(VectorOptional* result) const;
 };
@@ -851,7 +851,7 @@ class ArrayVectorNested final {
   static inline ::std::unique_ptr<ArrayVectorNested> New() { return ::std::make_unique<ArrayVectorNested>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ArrayVectorNested* value, size_t _offset);
   zx_status_t Clone(ArrayVectorNested* result) const;
 };
@@ -934,7 +934,7 @@ class Resource final {
   static inline ::std::unique_ptr<Resource> New() { return ::std::make_unique<Resource>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Resource* value, size_t _offset);
   zx_status_t Clone(Resource* result) const;
 };
@@ -971,7 +971,7 @@ class Protocol_ErrorBasic_Result final {
   static inline ::std::unique_ptr<Protocol_ErrorBasic_Result> New() { return ::std::make_unique<Protocol_ErrorBasic_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Protocol_ErrorBasic_Result* value, size_t offset);
   zx_status_t Clone(Protocol_ErrorBasic_Result* result) const;
 
@@ -1080,7 +1080,7 @@ class Protocol_ErrorCompound_Result final {
   static inline ::std::unique_ptr<Protocol_ErrorCompound_Result> New() { return ::std::make_unique<Protocol_ErrorCompound_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Protocol_ErrorCompound_Result* value, size_t offset);
   zx_status_t Clone(Protocol_ErrorCompound_Result* result) const;
 
@@ -1189,7 +1189,7 @@ class Protocol_ErrorArrayBasic_Result final {
   static inline ::std::unique_ptr<Protocol_ErrorArrayBasic_Result> New() { return ::std::make_unique<Protocol_ErrorArrayBasic_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Protocol_ErrorArrayBasic_Result* value, size_t offset);
   zx_status_t Clone(Protocol_ErrorArrayBasic_Result* result) const;
 
@@ -1298,7 +1298,7 @@ class Protocol_ErrorArrayCompound_Result final {
   static inline ::std::unique_ptr<Protocol_ErrorArrayCompound_Result> New() { return ::std::make_unique<Protocol_ErrorArrayCompound_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Protocol_ErrorArrayCompound_Result* value, size_t offset);
   zx_status_t Clone(Protocol_ErrorArrayCompound_Result* result) const;
 
@@ -1407,7 +1407,7 @@ class Protocol_ErrorVectorBasic_Result final {
   static inline ::std::unique_ptr<Protocol_ErrorVectorBasic_Result> New() { return ::std::make_unique<Protocol_ErrorVectorBasic_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Protocol_ErrorVectorBasic_Result* value, size_t offset);
   zx_status_t Clone(Protocol_ErrorVectorBasic_Result* result) const;
 
@@ -1516,7 +1516,7 @@ class Protocol_ErrorVectorCompound_Result final {
   static inline ::std::unique_ptr<Protocol_ErrorVectorCompound_Result> New() { return ::std::make_unique<Protocol_ErrorVectorCompound_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Protocol_ErrorVectorCompound_Result* value, size_t offset);
   zx_status_t Clone(Protocol_ErrorVectorCompound_Result* result) const;
 
@@ -1625,7 +1625,7 @@ class Protocol_ErrorVectorOptional_Result final {
   static inline ::std::unique_ptr<Protocol_ErrorVectorOptional_Result> New() { return ::std::make_unique<Protocol_ErrorVectorOptional_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Protocol_ErrorVectorOptional_Result* value, size_t offset);
   zx_status_t Clone(Protocol_ErrorVectorOptional_Result* result) const;
 
@@ -1734,7 +1734,7 @@ class Protocol_ErrorArrayVectorNested_Result final {
   static inline ::std::unique_ptr<Protocol_ErrorArrayVectorNested_Result> New() { return ::std::make_unique<Protocol_ErrorArrayVectorNested_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Protocol_ErrorArrayVectorNested_Result* value, size_t offset);
   zx_status_t Clone(Protocol_ErrorArrayVectorNested_Result* result) const;
 
@@ -1845,7 +1845,7 @@ class Protocol_ErrorResource_Result final {
   static inline ::std::unique_ptr<Protocol_ErrorResource_Result> New() { return ::std::make_unique<Protocol_ErrorResource_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Protocol_ErrorResource_Result* value, size_t offset);
   zx_status_t Clone(Protocol_ErrorResource_Result* result) const;
 
@@ -3153,7 +3153,7 @@ template <>
 struct CodingTraits<::test::typesinprotocols::Bits> {
   static constexpr size_t kInlineSize = sizeof(::test::typesinprotocols::Bits);
   static void Encode(Encoder* encoder, ::test::typesinprotocols::Bits* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     uint32_t underlying = static_cast<uint32_t>(*value);
     ::fidl::Encode(encoder, &underlying, offset);
@@ -3182,7 +3182,7 @@ template <>
 struct CodingTraits<::test::typesinprotocols::Enum> {
   static constexpr size_t kInlineSize = sizeof(::test::typesinprotocols::Enum);
   static void Encode(Encoder* encoder, ::test::typesinprotocols::Enum* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     uint32_t underlying = static_cast<uint32_t>(*value);
     ::fidl::Encode(encoder, &underlying, offset);
@@ -3254,7 +3254,7 @@ struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Union>> {
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Union>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -3349,7 +3349,7 @@ struct CodingTraits<std::unique_ptr<::test::typesinprotocols::ResourceUnion>> {
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::ResourceUnion>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -3973,7 +3973,7 @@ struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorBasi
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorBasic_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -4030,7 +4030,7 @@ struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorComp
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorCompound_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -4087,7 +4087,7 @@ struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorArra
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -4144,7 +4144,7 @@ struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorArra
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -4201,7 +4201,7 @@ struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorVect
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -4258,7 +4258,7 @@ struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorVect
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -4315,7 +4315,7 @@ struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorVect
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -4372,7 +4372,7 @@ struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorArra
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -4431,7 +4431,7 @@ struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorReso
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorResource_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);

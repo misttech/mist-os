@@ -230,7 +230,7 @@ class DataSlice final {
   WordOffset<T> slice_;
 };
 
-static DataSlice<const char> SliceFromString(const cpp17::string_view& string) {
+static DataSlice<const char> SliceFromString(const std::string_view& string) {
   return DataSlice<const char>(
       string.data(), WordOffset<const char>::FromByteOffset(ByteOffset::Unbounded(string.size())));
 }
@@ -457,7 +457,7 @@ const char kDroppedLogsFieldName[] = "dropped_logs";
 const char kFileFieldName[] = "file";
 const char kLineFieldName[] = "line";
 
-cpp17::string_view StripDots(cpp17::string_view path) {
+std::string_view StripDots(std::string_view path) {
   while (strncmp(path.data(), "../", 3) == 0) {
     path = path.substr(3);
   }
@@ -468,10 +468,10 @@ cpp17::string_view StripDots(cpp17::string_view path) {
 
 namespace fuchsia_syslog {
 
-void LogBuffer::BeginRecord(FuchsiaLogSeverity severity,
-                            cpp17::optional<cpp17::string_view> file_name, unsigned int line,
-                            cpp17::optional<cpp17::string_view> message, zx::unowned_socket socket,
-                            uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid) {
+void LogBuffer::BeginRecord(FuchsiaLogSeverity severity, std::optional<std::string_view> file_name,
+                            unsigned int line, std::optional<std::string_view> message,
+                            zx::unowned_socket socket, uint32_t dropped_count, zx_koid_t pid,
+                            zx_koid_t tid) {
   // Initialize the encoder targeting the passed buffer, and begin the record.
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(24)
@@ -511,7 +511,7 @@ void LogBuffer::BeginRecord(FuchsiaLogSeverity severity,
   encoder.AppendArgumentValue(record, static_cast<uint64_t>(line));
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, cpp17::string_view value) {
+void LogBuffer::WriteKeyValue(std::string_view key, std::string_view value) {
   auto* state = RecordState::CreatePtr(&data_);
   ExternalDataBuffer external_buffer(&data_);
   Encoder<ExternalDataBuffer> encoder(external_buffer);
@@ -523,7 +523,7 @@ void LogBuffer::WriteKeyValue(cpp17::string_view key, cpp17::string_view value) 
                                                       ByteOffset::Unbounded(value.size()))));
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, int64_t value) {
+void LogBuffer::WriteKeyValue(std::string_view key, int64_t value) {
   auto* state = RecordState::CreatePtr(&data_);
   ExternalDataBuffer external_buffer(&data_);
   Encoder<ExternalDataBuffer> encoder(external_buffer);
@@ -533,7 +533,7 @@ void LogBuffer::WriteKeyValue(cpp17::string_view key, int64_t value) {
   encoder.AppendArgumentValue(*state, value);
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, uint64_t value) {
+void LogBuffer::WriteKeyValue(std::string_view key, uint64_t value) {
   auto* state = RecordState::CreatePtr(&data_);
   ExternalDataBuffer external_buffer(&data_);
   Encoder<ExternalDataBuffer> encoder(external_buffer);
@@ -543,7 +543,7 @@ void LogBuffer::WriteKeyValue(cpp17::string_view key, uint64_t value) {
   encoder.AppendArgumentValue(*state, value);
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, double value) {
+void LogBuffer::WriteKeyValue(std::string_view key, double value) {
   auto* state = RecordState::CreatePtr(&data_);
   ExternalDataBuffer external_buffer(&data_);
   Encoder<ExternalDataBuffer> encoder(external_buffer);
@@ -553,7 +553,7 @@ void LogBuffer::WriteKeyValue(cpp17::string_view key, double value) {
   encoder.AppendArgumentValue(*state, value);
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, bool value) {
+void LogBuffer::WriteKeyValue(std::string_view key, bool value) {
   auto* state = RecordState::CreatePtr(&data_);
   ExternalDataBuffer external_buffer(&data_);
   Encoder<ExternalDataBuffer> encoder(external_buffer);

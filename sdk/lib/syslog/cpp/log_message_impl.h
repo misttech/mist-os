@@ -5,12 +5,11 @@
 #ifndef LIB_SYSLOG_CPP_LOG_MESSAGE_IMPL_H_
 #define LIB_SYSLOG_CPP_LOG_MESSAGE_IMPL_H_
 
-#include <lib/stdcompat/optional.h>
-#include <lib/stdcompat/string_view.h>
 #include <lib/syslog/cpp/log_level.h>
 #include <zircon/types.h>
 
 #include <cstdint>
+#include <optional>
 #ifdef __Fuchsia__
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 #endif
@@ -28,7 +27,7 @@ class LogBufferBuilder {
   explicit LogBufferBuilder(fuchsia_logging::RawLogSeverity severity) : severity_(severity) {}
 
   /// Sets the file name and line number for the log message
-  LogBufferBuilder& WithFile(cpp17::string_view file, unsigned int line) {
+  LogBufferBuilder& WithFile(std::string_view file, unsigned int line) {
     file_name_ = file;
     line_ = line;
     return *this;
@@ -39,13 +38,13 @@ class LogBufferBuilder {
   /// to print an assertion message when a test fails.
   /// This prepends the string "Check failed: "<<condition<<". "
   /// to whatever message the user passes.
-  LogBufferBuilder& WithCondition(cpp17::string_view condition) {
+  LogBufferBuilder& WithCondition(std::string_view condition) {
     condition_ = condition;
     return *this;
   }
 
   /// Sets the message for the log message
-  LogBufferBuilder& WithMsg(cpp17::string_view msg) {
+  LogBufferBuilder& WithMsg(std::string_view msg) {
     msg_ = msg;
     return *this;
   }
@@ -61,10 +60,10 @@ class LogBufferBuilder {
   LogBuffer Build();
 
  private:
-  cpp17::optional<cpp17::string_view> file_name_;
+  std::optional<std::string_view> file_name_;
   unsigned int line_ = 0;
-  cpp17::optional<cpp17::string_view> msg_;
-  cpp17::optional<cpp17::string_view> condition_;
+  std::optional<std::string_view> msg_;
+  std::optional<std::string_view> condition_;
 #ifdef __Fuchsia__
   zx_handle_t socket_ = ZX_HANDLE_INVALID;
 #endif
@@ -90,22 +89,22 @@ class KeyValue final {
 class LogBuffer final {
  public:
   void BeginRecord(fuchsia_logging::RawLogSeverity severity,
-                   cpp17::optional<cpp17::string_view> file_name, unsigned int line,
-                   cpp17::optional<cpp17::string_view> message, zx_handle_t socket,
+                   std::optional<std::string_view> file_name, unsigned int line,
+                   std::optional<std::string_view> message, zx_handle_t socket,
                    uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid);
 
-  void WriteKeyValue(cpp17::string_view key, cpp17::string_view value);
+  void WriteKeyValue(std::string_view key, std::string_view value);
 
-  void WriteKeyValue(cpp17::string_view key, int64_t value);
+  void WriteKeyValue(std::string_view key, int64_t value);
 
-  void WriteKeyValue(cpp17::string_view key, uint64_t value);
+  void WriteKeyValue(std::string_view key, uint64_t value);
 
-  void WriteKeyValue(cpp17::string_view key, double value);
+  void WriteKeyValue(std::string_view key, double value);
 
-  void WriteKeyValue(cpp17::string_view key, bool value);
+  void WriteKeyValue(std::string_view key, bool value);
 
-  void WriteKeyValue(cpp17::string_view key, const char* value) {
-    WriteKeyValue(key, cpp17::string_view(value));
+  void WriteKeyValue(std::string_view key, const char* value) {
+    WriteKeyValue(key, std::string_view(value));
   }
 
   // Encodes an int8
@@ -186,7 +185,7 @@ class LogBuffer final {
   void SetRawSeverity(fuchsia_logging::RawLogSeverity severity) { raw_severity_ = severity; }
 
   /// Sets a fatal error string
-  void SetFatalErrorString(cpp17::string_view fatal_error_string) {
+  void SetFatalErrorString(std::string_view fatal_error_string) {
     maybe_fatal_string_ = fatal_error_string;
   }
 
@@ -207,7 +206,7 @@ class LogBuffer final {
   // is valid for the duration of the call (which our macros
   // will ensure for current users).
   // This will leak on usage, as the process will crash shortly afterwards.
-  cpp17::optional<cpp17::string_view> maybe_fatal_string_;
+  std::optional<std::string_view> maybe_fatal_string_;
 
   // Severity of the log message.
   fuchsia_logging::RawLogSeverity raw_severity_;
@@ -229,22 +228,22 @@ class LogBuffer final {
 };
 
 namespace internal {
-// A null-safe wrapper around cpp17::optional<cpp17::string_view>
+// A null-safe wrapper around std::optional<std::string_view>
 //
 // This class is used to represent a string that may be nullptr. It is used
 // to avoid the need to check for nullptr before passing a string to the
 // syslog macros.
 //
-// This class is implicitly convertible to cpp17::optional<cpp17::string_view>.
+// This class is implicitly convertible to std::optional<std::string_view>.
 // NOLINT is used as implicit conversions are intentional here.
 class NullSafeStringView final {
  public:
-  //  Constructs a NullSafeStringView from a cpp17::string_view.
-  constexpr NullSafeStringView(cpp17::string_view string_view)
+  //  Constructs a NullSafeStringView from a std::string_view.
+  constexpr NullSafeStringView(std::string_view string_view)
       : string_view_(string_view) {}  // NOLINT
 
   // Constructs a NullSafeStringView from a nullptr.
-  constexpr NullSafeStringView(std::nullptr_t) : string_view_(cpp17::nullopt) {}  // NOLINT
+  constexpr NullSafeStringView(std::nullptr_t) : string_view_(std::nullopt) {}  // NOLINT
 
   constexpr NullSafeStringView(const NullSafeStringView&) = default;
 
@@ -252,15 +251,15 @@ class NullSafeStringView final {
   // string Nullable string to construct from.
   constexpr NullSafeStringView(const char* input) {  // NOLINT
     if (!input) {
-      string_view_ = cpp17::nullopt;
+      string_view_ = std::nullopt;
     } else {
-      string_view_ = cpp17::string_view(input);
+      string_view_ = std::string_view(input);
     }
   }
 
-  // Creates a NullSafeStringView fro, an optional<cpp17::string_view>.
+  // Creates a NullSafeStringView fro, an optional<std::string_view>.
   // This is not a constructor to prevent accidental misuse.
-  static NullSafeStringView CreateFromOptional(cpp17::optional<cpp17::string_view> string_view) {
+  static NullSafeStringView CreateFromOptional(std::optional<std::string_view> string_view) {
     if (!string_view) {
       return NullSafeStringView(nullptr);
     }
@@ -270,10 +269,10 @@ class NullSafeStringView final {
   // Constructs a NullSafeStringView from an std::string.
   constexpr NullSafeStringView(const std::string& input) : string_view_(input) {}  // NOLINT
 
-  // Converts this NullSafeStringView to a cpp17::optional<cpp17::string_view>.
-  constexpr operator cpp17::optional<cpp17::string_view>() const { return string_view_; }  // NOLINT
+  // Converts this NullSafeStringView to a std::optional<std::string_view>.
+  constexpr operator std::optional<std::string_view>() const { return string_view_; }  // NOLINT
  private:
-  cpp17::optional<cpp17::string_view> string_view_;
+  std::optional<std::string_view> string_view_;
 };
 
 template <typename Msg, typename... Args>

@@ -130,7 +130,7 @@ void fx_logger::SetLogConnection(zx_handle_t handle) {
   }
 }
 
-cpp17::optional<cpp17::string_view> ViewFromC(const char* c_str) {
+std::optional<std::string_view> ViewFromC(const char* c_str) {
   if (c_str) {
     return c_str;
   }

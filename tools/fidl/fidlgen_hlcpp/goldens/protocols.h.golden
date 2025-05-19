@@ -171,7 +171,7 @@ class WithAndWithoutRequestResponseNoRequestWithResponseResponse final {
   static inline ::std::unique_ptr<WithAndWithoutRequestResponseNoRequestWithResponseResponse> New() { return ::std::make_unique<WithAndWithoutRequestResponseNoRequestWithResponseResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithAndWithoutRequestResponseNoRequestWithResponseResponse* value, size_t _offset);
   zx_status_t Clone(WithAndWithoutRequestResponseNoRequestWithResponseResponse* result) const;
 };
@@ -192,7 +192,7 @@ class WithAndWithoutRequestResponseWithRequestNoResponseRequest final {
   static inline ::std::unique_ptr<WithAndWithoutRequestResponseWithRequestNoResponseRequest> New() { return ::std::make_unique<WithAndWithoutRequestResponseWithRequestNoResponseRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithAndWithoutRequestResponseWithRequestNoResponseRequest* value, size_t _offset);
   zx_status_t Clone(WithAndWithoutRequestResponseWithRequestNoResponseRequest* result) const;
 };
@@ -213,7 +213,7 @@ class WithAndWithoutRequestResponseWithRequestEmptyResponseRequest final {
   static inline ::std::unique_ptr<WithAndWithoutRequestResponseWithRequestEmptyResponseRequest> New() { return ::std::make_unique<WithAndWithoutRequestResponseWithRequestEmptyResponseRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithAndWithoutRequestResponseWithRequestEmptyResponseRequest* value, size_t _offset);
   zx_status_t Clone(WithAndWithoutRequestResponseWithRequestEmptyResponseRequest* result) const;
 };
@@ -234,7 +234,7 @@ class WithAndWithoutRequestResponseWithRequestWithResponseRequest final {
   static inline ::std::unique_ptr<WithAndWithoutRequestResponseWithRequestWithResponseRequest> New() { return ::std::make_unique<WithAndWithoutRequestResponseWithRequestWithResponseRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithAndWithoutRequestResponseWithRequestWithResponseRequest* value, size_t _offset);
   zx_status_t Clone(WithAndWithoutRequestResponseWithRequestWithResponseRequest* result) const;
 };
@@ -255,7 +255,7 @@ class WithAndWithoutRequestResponseWithRequestWithResponseResponse final {
   static inline ::std::unique_ptr<WithAndWithoutRequestResponseWithRequestWithResponseResponse> New() { return ::std::make_unique<WithAndWithoutRequestResponseWithRequestWithResponseResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithAndWithoutRequestResponseWithRequestWithResponseResponse* value, size_t _offset);
   zx_status_t Clone(WithAndWithoutRequestResponseWithRequestWithResponseResponse* result) const;
 };
@@ -276,7 +276,7 @@ class WithAndWithoutRequestResponseOnWithResponseRequest final {
   static inline ::std::unique_ptr<WithAndWithoutRequestResponseOnWithResponseRequest> New() { return ::std::make_unique<WithAndWithoutRequestResponseOnWithResponseRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithAndWithoutRequestResponseOnWithResponseRequest* value, size_t _offset);
   zx_status_t Clone(WithAndWithoutRequestResponseOnWithResponseRequest* result) const;
 };
@@ -399,7 +399,7 @@ class WithErrorSyntax_ResponseAsStruct_Response final {
   static inline ::std::unique_ptr<WithErrorSyntax_ResponseAsStruct_Response> New() { return ::std::make_unique<WithErrorSyntax_ResponseAsStruct_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithErrorSyntax_ResponseAsStruct_Response* value, size_t _offset);
   zx_status_t Clone(WithErrorSyntax_ResponseAsStruct_Response* result) const;
 };
@@ -434,7 +434,7 @@ class WithErrorSyntax_ResponseAsStruct_Result final {
   static inline ::std::unique_ptr<WithErrorSyntax_ResponseAsStruct_Result> New() { return ::std::make_unique<WithErrorSyntax_ResponseAsStruct_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithErrorSyntax_ResponseAsStruct_Result* value, size_t offset);
   zx_status_t Clone(WithErrorSyntax_ResponseAsStruct_Result* result) const;
 
@@ -538,7 +538,7 @@ class WithErrorSyntax_ErrorAsPrimitive_Response final {
   static inline ::std::unique_ptr<WithErrorSyntax_ErrorAsPrimitive_Response> New() { return ::std::make_unique<WithErrorSyntax_ErrorAsPrimitive_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithErrorSyntax_ErrorAsPrimitive_Response* value, size_t _offset);
   zx_status_t Clone(WithErrorSyntax_ErrorAsPrimitive_Response* result) const;
 };
@@ -573,7 +573,7 @@ class WithErrorSyntax_ErrorAsPrimitive_Result final {
   static inline ::std::unique_ptr<WithErrorSyntax_ErrorAsPrimitive_Result> New() { return ::std::make_unique<WithErrorSyntax_ErrorAsPrimitive_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithErrorSyntax_ErrorAsPrimitive_Result* value, size_t offset);
   zx_status_t Clone(WithErrorSyntax_ErrorAsPrimitive_Result* result) const;
 
@@ -677,7 +677,7 @@ class WithErrorSyntax_ErrorAsEnum_Response final {
   static inline ::std::unique_ptr<WithErrorSyntax_ErrorAsEnum_Response> New() { return ::std::make_unique<WithErrorSyntax_ErrorAsEnum_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithErrorSyntax_ErrorAsEnum_Response* value, size_t _offset);
   zx_status_t Clone(WithErrorSyntax_ErrorAsEnum_Response* result) const;
 };
@@ -712,7 +712,7 @@ class WithErrorSyntax_ErrorAsEnum_Result final {
   static inline ::std::unique_ptr<WithErrorSyntax_ErrorAsEnum_Result> New() { return ::std::make_unique<WithErrorSyntax_ErrorAsEnum_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithErrorSyntax_ErrorAsEnum_Result* value, size_t offset);
   zx_status_t Clone(WithErrorSyntax_ErrorAsEnum_Result* result) const;
 
@@ -819,7 +819,7 @@ class WithErrorSyntax_HandleInResult_Response final {
   static inline ::std::unique_ptr<WithErrorSyntax_HandleInResult_Response> New() { return ::std::make_unique<WithErrorSyntax_HandleInResult_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithErrorSyntax_HandleInResult_Response* value, size_t _offset);
   zx_status_t Clone(WithErrorSyntax_HandleInResult_Response* result) const;
 };
@@ -854,7 +854,7 @@ class WithErrorSyntax_HandleInResult_Result final {
   static inline ::std::unique_ptr<WithErrorSyntax_HandleInResult_Result> New() { return ::std::make_unique<WithErrorSyntax_HandleInResult_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithErrorSyntax_HandleInResult_Result* value, size_t offset);
   zx_status_t Clone(WithErrorSyntax_HandleInResult_Result* result) const;
 
@@ -1012,7 +1012,7 @@ class ChannelProtocolMethodARequest final {
   static inline ::std::unique_ptr<ChannelProtocolMethodARequest> New() { return ::std::make_unique<ChannelProtocolMethodARequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ChannelProtocolMethodARequest* value, size_t _offset);
   zx_status_t Clone(ChannelProtocolMethodARequest* result) const;
 };
@@ -1035,7 +1035,7 @@ class ChannelProtocolEventARequest final {
   static inline ::std::unique_ptr<ChannelProtocolEventARequest> New() { return ::std::make_unique<ChannelProtocolEventARequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ChannelProtocolEventARequest* value, size_t _offset);
   zx_status_t Clone(ChannelProtocolEventARequest* result) const;
 };
@@ -1058,7 +1058,7 @@ class ChannelProtocolMethodBRequest final {
   static inline ::std::unique_ptr<ChannelProtocolMethodBRequest> New() { return ::std::make_unique<ChannelProtocolMethodBRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ChannelProtocolMethodBRequest* value, size_t _offset);
   zx_status_t Clone(ChannelProtocolMethodBRequest* result) const;
 };
@@ -1079,7 +1079,7 @@ class ChannelProtocolMethodBResponse final {
   static inline ::std::unique_ptr<ChannelProtocolMethodBResponse> New() { return ::std::make_unique<ChannelProtocolMethodBResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ChannelProtocolMethodBResponse* value, size_t _offset);
   zx_status_t Clone(ChannelProtocolMethodBResponse* result) const;
 };
@@ -1102,7 +1102,7 @@ class ChannelProtocolTakeHandleRequest final {
   static inline ::std::unique_ptr<ChannelProtocolTakeHandleRequest> New() { return ::std::make_unique<ChannelProtocolTakeHandleRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ChannelProtocolTakeHandleRequest* value, size_t _offset);
   zx_status_t Clone(ChannelProtocolTakeHandleRequest* result) const;
 };
@@ -1123,7 +1123,7 @@ class ChannelProtocolMutateSocketRequest final {
   static inline ::std::unique_ptr<ChannelProtocolMutateSocketRequest> New() { return ::std::make_unique<ChannelProtocolMutateSocketRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ChannelProtocolMutateSocketRequest* value, size_t _offset);
   zx_status_t Clone(ChannelProtocolMutateSocketRequest* result) const;
 };
@@ -1144,7 +1144,7 @@ class ChannelProtocolMutateSocketResponse final {
   static inline ::std::unique_ptr<ChannelProtocolMutateSocketResponse> New() { return ::std::make_unique<ChannelProtocolMutateSocketResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ChannelProtocolMutateSocketResponse* value, size_t _offset);
   zx_status_t Clone(ChannelProtocolMutateSocketResponse* result) const;
 };
@@ -1258,7 +1258,7 @@ class SyscallProtocolMethodCRequest final {
   static inline ::std::unique_ptr<SyscallProtocolMethodCRequest> New() { return ::std::make_unique<SyscallProtocolMethodCRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SyscallProtocolMethodCRequest* value, size_t _offset);
   zx_status_t Clone(SyscallProtocolMethodCRequest* result) const;
 };
@@ -1309,7 +1309,7 @@ class HandleRightsProtocolNoResponseMethodRequest final {
   static inline ::std::unique_ptr<HandleRightsProtocolNoResponseMethodRequest> New() { return ::std::make_unique<HandleRightsProtocolNoResponseMethodRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, HandleRightsProtocolNoResponseMethodRequest* value, size_t _offset);
   zx_status_t Clone(HandleRightsProtocolNoResponseMethodRequest* result) const;
 };
@@ -1330,7 +1330,7 @@ class HandleRightsProtocolResponseMethodRequest final {
   static inline ::std::unique_ptr<HandleRightsProtocolResponseMethodRequest> New() { return ::std::make_unique<HandleRightsProtocolResponseMethodRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, HandleRightsProtocolResponseMethodRequest* value, size_t _offset);
   zx_status_t Clone(HandleRightsProtocolResponseMethodRequest* result) const;
 };
@@ -1351,7 +1351,7 @@ class HandleRightsProtocolResponseMethodResponse final {
   static inline ::std::unique_ptr<HandleRightsProtocolResponseMethodResponse> New() { return ::std::make_unique<HandleRightsProtocolResponseMethodResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, HandleRightsProtocolResponseMethodResponse* value, size_t _offset);
   zx_status_t Clone(HandleRightsProtocolResponseMethodResponse* result) const;
 };
@@ -1372,7 +1372,7 @@ class HandleRightsProtocolAnEventRequest final {
   static inline ::std::unique_ptr<HandleRightsProtocolAnEventRequest> New() { return ::std::make_unique<HandleRightsProtocolAnEventRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, HandleRightsProtocolAnEventRequest* value, size_t _offset);
   zx_status_t Clone(HandleRightsProtocolAnEventRequest* result) const;
 };
@@ -1457,7 +1457,7 @@ class ProtocolEnds final {
   static inline ::std::unique_ptr<ProtocolEnds> New() { return ::std::make_unique<ProtocolEnds>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ProtocolEnds* value, size_t _offset);
   zx_status_t Clone(ProtocolEnds* result) const;
 };
@@ -1478,7 +1478,7 @@ class WithProtocolEndsClientEndsRequest final {
   static inline ::std::unique_ptr<WithProtocolEndsClientEndsRequest> New() { return ::std::make_unique<WithProtocolEndsClientEndsRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithProtocolEndsClientEndsRequest* value, size_t _offset);
   zx_status_t Clone(WithProtocolEndsClientEndsRequest* result) const;
 };
@@ -1499,7 +1499,7 @@ class WithProtocolEndsClientEndsResponse final {
   static inline ::std::unique_ptr<WithProtocolEndsClientEndsResponse> New() { return ::std::make_unique<WithProtocolEndsClientEndsResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithProtocolEndsClientEndsResponse* value, size_t _offset);
   zx_status_t Clone(WithProtocolEndsClientEndsResponse* result) const;
 };
@@ -1520,7 +1520,7 @@ class WithProtocolEndsServerEndsRequest final {
   static inline ::std::unique_ptr<WithProtocolEndsServerEndsRequest> New() { return ::std::make_unique<WithProtocolEndsServerEndsRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithProtocolEndsServerEndsRequest* value, size_t _offset);
   zx_status_t Clone(WithProtocolEndsServerEndsRequest* result) const;
 };
@@ -1541,7 +1541,7 @@ class WithProtocolEndsServerEndsResponse final {
   static inline ::std::unique_ptr<WithProtocolEndsServerEndsResponse> New() { return ::std::make_unique<WithProtocolEndsServerEndsResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithProtocolEndsServerEndsResponse* value, size_t _offset);
   zx_status_t Clone(WithProtocolEndsServerEndsResponse* result) const;
 };
@@ -1562,7 +1562,7 @@ class WithProtocolEndsStructContainingEndsRequest final {
   static inline ::std::unique_ptr<WithProtocolEndsStructContainingEndsRequest> New() { return ::std::make_unique<WithProtocolEndsStructContainingEndsRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithProtocolEndsStructContainingEndsRequest* value, size_t _offset);
   zx_status_t Clone(WithProtocolEndsStructContainingEndsRequest* result) const;
 };
@@ -1583,7 +1583,7 @@ class WithProtocolEndsStructContainingEndsResponse final {
   static inline ::std::unique_ptr<WithProtocolEndsStructContainingEndsResponse> New() { return ::std::make_unique<WithProtocolEndsStructContainingEndsResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, WithProtocolEndsStructContainingEndsResponse* value, size_t _offset);
   zx_status_t Clone(WithProtocolEndsStructContainingEndsResponse* result) const;
 };
@@ -1707,7 +1707,7 @@ class ManyParametersFifteenRequest final {
   static inline ::std::unique_ptr<ManyParametersFifteenRequest> New() { return ::std::make_unique<ManyParametersFifteenRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ManyParametersFifteenRequest* value, size_t _offset);
   zx_status_t Clone(ManyParametersFifteenRequest* result) const;
 };
@@ -1792,7 +1792,7 @@ class TheUnion final {
   static inline ::std::unique_ptr<TheUnion> New() { return ::std::make_unique<TheUnion>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, TheUnion* value, size_t offset);
   zx_status_t Clone(TheUnion* result) const;
 
@@ -1867,7 +1867,7 @@ class MethodWithUnionUnionMethodRequest final {
   static inline ::std::unique_ptr<MethodWithUnionUnionMethodRequest> New() { return ::std::make_unique<MethodWithUnionUnionMethodRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MethodWithUnionUnionMethodRequest* value, size_t _offset);
   zx_status_t Clone(MethodWithUnionUnionMethodRequest* result) const;
 };
@@ -1888,7 +1888,7 @@ class MethodWithUnionUnionMethodResponse final {
   static inline ::std::unique_ptr<MethodWithUnionUnionMethodResponse> New() { return ::std::make_unique<MethodWithUnionUnionMethodResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+               std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MethodWithUnionUnionMethodResponse* value, size_t _offset);
   zx_status_t Clone(MethodWithUnionUnionMethodResponse* result) const;
 };
@@ -2097,7 +2097,7 @@ template <>
 struct CodingTraits<::test::protocols::ErrorEnum> {
   static constexpr size_t kInlineSize = sizeof(::test::protocols::ErrorEnum);
   static void Encode(Encoder* encoder, ::test::protocols::ErrorEnum* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     uint32_t underlying = static_cast<uint32_t>(*value);
     ::fidl::Encode(encoder, &underlying, offset);
@@ -2161,7 +2161,7 @@ struct CodingTraits<std::unique_ptr<::test::protocols::WithErrorSyntax_ResponseA
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocols::WithErrorSyntax_ResponseAsStruct_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -2241,7 +2241,7 @@ struct CodingTraits<std::unique_ptr<::test::protocols::WithErrorSyntax_ErrorAsPr
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -2321,7 +2321,7 @@ struct CodingTraits<std::unique_ptr<::test::protocols::WithErrorSyntax_ErrorAsEn
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocols::WithErrorSyntax_ErrorAsEnum_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -2404,7 +2404,7 @@ struct CodingTraits<std::unique_ptr<::test::protocols::WithErrorSyntax_HandleInR
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocols::WithErrorSyntax_HandleInResult_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -3010,7 +3010,7 @@ struct CodingTraits<std::unique_ptr<::test::protocols::TheUnion>> {
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocols::TheUnion>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);

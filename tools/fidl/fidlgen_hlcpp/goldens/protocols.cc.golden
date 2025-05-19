@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseNoReque
 const fidl_type_t* WithAndWithoutRequestResponseNoRequestWithResponseResponse::FidlType = &test_protocols_WithAndWithoutRequestResponseNoRequestWithResponseResponseTable;
 
 void WithAndWithoutRequestResponseNoRequestWithResponseResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithAndWithoutRequestResponseNoRequestWithResponseResponse>::value) {
     memcpy(_encoder->template GetPtr<WithAndWithoutRequestResponseNoRequestWithResponseResponse>(_offset), this, sizeof(WithAndWithoutRequestResponseNoRequestWithResponseResponse));
   } else {::fidl::Encode(_encoder, &ret, _offset + 0);
@@ -43,7 +43,7 @@ extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithReq
 const fidl_type_t* WithAndWithoutRequestResponseWithRequestNoResponseRequest::FidlType = &test_protocols_WithAndWithoutRequestResponseWithRequestNoResponseRequestTable;
 
 void WithAndWithoutRequestResponseWithRequestNoResponseRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithAndWithoutRequestResponseWithRequestNoResponseRequest>::value) {
     memcpy(_encoder->template GetPtr<WithAndWithoutRequestResponseWithRequestNoResponseRequest>(_offset), this, sizeof(WithAndWithoutRequestResponseWithRequestNoResponseRequest));
   } else {::fidl::Encode(_encoder, &arg, _offset + 0);
@@ -70,7 +70,7 @@ extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithReq
 const fidl_type_t* WithAndWithoutRequestResponseWithRequestEmptyResponseRequest::FidlType = &test_protocols_WithAndWithoutRequestResponseWithRequestEmptyResponseRequestTable;
 
 void WithAndWithoutRequestResponseWithRequestEmptyResponseRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithAndWithoutRequestResponseWithRequestEmptyResponseRequest>::value) {
     memcpy(_encoder->template GetPtr<WithAndWithoutRequestResponseWithRequestEmptyResponseRequest>(_offset), this, sizeof(WithAndWithoutRequestResponseWithRequestEmptyResponseRequest));
   } else {::fidl::Encode(_encoder, &arg, _offset + 0);
@@ -97,7 +97,7 @@ extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithReq
 const fidl_type_t* WithAndWithoutRequestResponseWithRequestWithResponseRequest::FidlType = &test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseRequestTable;
 
 void WithAndWithoutRequestResponseWithRequestWithResponseRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithAndWithoutRequestResponseWithRequestWithResponseRequest>::value) {
     memcpy(_encoder->template GetPtr<WithAndWithoutRequestResponseWithRequestWithResponseRequest>(_offset), this, sizeof(WithAndWithoutRequestResponseWithRequestWithResponseRequest));
   } else {::fidl::Encode(_encoder, &arg, _offset + 0);
@@ -124,7 +124,7 @@ extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithReq
 const fidl_type_t* WithAndWithoutRequestResponseWithRequestWithResponseResponse::FidlType = &test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseResponseTable;
 
 void WithAndWithoutRequestResponseWithRequestWithResponseResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithAndWithoutRequestResponseWithRequestWithResponseResponse>::value) {
     memcpy(_encoder->template GetPtr<WithAndWithoutRequestResponseWithRequestWithResponseResponse>(_offset), this, sizeof(WithAndWithoutRequestResponseWithRequestWithResponseResponse));
   } else {::fidl::Encode(_encoder, &ret, _offset + 0);
@@ -151,7 +151,7 @@ extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseOnWithR
 const fidl_type_t* WithAndWithoutRequestResponseOnWithResponseRequest::FidlType = &test_protocols_WithAndWithoutRequestResponseOnWithResponseRequestTable;
 
 void WithAndWithoutRequestResponseOnWithResponseRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithAndWithoutRequestResponseOnWithResponseRequest>::value) {
     memcpy(_encoder->template GetPtr<WithAndWithoutRequestResponseOnWithResponseRequest>(_offset), this, sizeof(WithAndWithoutRequestResponseOnWithResponseRequest));
   } else {::fidl::Encode(_encoder, &ret, _offset + 0);
@@ -178,7 +178,7 @@ extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ResponseAsStruct_Res
 const fidl_type_t* WithErrorSyntax_ResponseAsStruct_Response::FidlType = &test_protocols_WithErrorSyntax_ResponseAsStruct_ResponseTable;
 
 void WithErrorSyntax_ResponseAsStruct_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithErrorSyntax_ResponseAsStruct_Response>::value) {
     memcpy(_encoder->template GetPtr<WithErrorSyntax_ResponseAsStruct_Response>(_offset), this, sizeof(WithErrorSyntax_ResponseAsStruct_Response));
   } else {::fidl::Encode(_encoder, &a, _offset + 0);
@@ -265,7 +265,7 @@ WithErrorSyntax_ResponseAsStruct_Result WithErrorSyntax_ResponseAsStruct_Result:
 }
 
 void WithErrorSyntax_ResponseAsStruct_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -418,7 +418,7 @@ extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_Res
 const fidl_type_t* WithErrorSyntax_ErrorAsPrimitive_Response::FidlType = &test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable;
 
 void WithErrorSyntax_ErrorAsPrimitive_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithErrorSyntax_ErrorAsPrimitive_Response>::value) {
     memcpy(_encoder->template GetPtr<WithErrorSyntax_ErrorAsPrimitive_Response>(_offset), this, sizeof(WithErrorSyntax_ErrorAsPrimitive_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -495,7 +495,7 @@ WithErrorSyntax_ErrorAsPrimitive_Result WithErrorSyntax_ErrorAsPrimitive_Result:
 }
 
 void WithErrorSyntax_ErrorAsPrimitive_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -648,7 +648,7 @@ extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsEnum_Response
 const fidl_type_t* WithErrorSyntax_ErrorAsEnum_Response::FidlType = &test_protocols_WithErrorSyntax_ErrorAsEnum_ResponseTable;
 
 void WithErrorSyntax_ErrorAsEnum_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithErrorSyntax_ErrorAsEnum_Response>::value) {
     memcpy(_encoder->template GetPtr<WithErrorSyntax_ErrorAsEnum_Response>(_offset), this, sizeof(WithErrorSyntax_ErrorAsEnum_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -727,7 +727,7 @@ WithErrorSyntax_ErrorAsEnum_Result WithErrorSyntax_ErrorAsEnum_Result::WithErr(:
 }
 
 void WithErrorSyntax_ErrorAsEnum_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -886,7 +886,7 @@ extern "C" const fidl_type_t test_protocols_WithErrorSyntax_HandleInResult_Respo
 const fidl_type_t* WithErrorSyntax_HandleInResult_Response::FidlType = &test_protocols_WithErrorSyntax_HandleInResult_ResponseTable;
 
 void WithErrorSyntax_HandleInResult_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithErrorSyntax_HandleInResult_Response>::value) {
     memcpy(_encoder->template GetPtr<WithErrorSyntax_HandleInResult_Response>(_offset), this, sizeof(WithErrorSyntax_HandleInResult_Response));
   } else {
@@ -967,7 +967,7 @@ WithErrorSyntax_HandleInResult_Result WithErrorSyntax_HandleInResult_Result::Wit
 }
 
 void WithErrorSyntax_HandleInResult_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1122,7 +1122,7 @@ extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodARequestTable;
 const fidl_type_t* ChannelProtocolMethodARequest::FidlType = &test_protocols_ChannelProtocolMethodARequestTable;
 
 void ChannelProtocolMethodARequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ChannelProtocolMethodARequest>::value) {
     memcpy(_encoder->template GetPtr<ChannelProtocolMethodARequest>(_offset), this, sizeof(ChannelProtocolMethodARequest));
   } else {::fidl::Encode(_encoder, &a, _offset + 0);
@@ -1154,7 +1154,7 @@ extern "C" const fidl_type_t test_protocols_ChannelProtocolEventARequestTable;
 const fidl_type_t* ChannelProtocolEventARequest::FidlType = &test_protocols_ChannelProtocolEventARequestTable;
 
 void ChannelProtocolEventARequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ChannelProtocolEventARequest>::value) {
     memcpy(_encoder->template GetPtr<ChannelProtocolEventARequest>(_offset), this, sizeof(ChannelProtocolEventARequest));
   } else {::fidl::Encode(_encoder, &a, _offset + 0);
@@ -1186,7 +1186,7 @@ extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodBRequestTable;
 const fidl_type_t* ChannelProtocolMethodBRequest::FidlType = &test_protocols_ChannelProtocolMethodBRequestTable;
 
 void ChannelProtocolMethodBRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ChannelProtocolMethodBRequest>::value) {
     memcpy(_encoder->template GetPtr<ChannelProtocolMethodBRequest>(_offset), this, sizeof(ChannelProtocolMethodBRequest));
   } else {::fidl::Encode(_encoder, &a, _offset + 0);
@@ -1218,7 +1218,7 @@ extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodBResponseTable;
 const fidl_type_t* ChannelProtocolMethodBResponse::FidlType = &test_protocols_ChannelProtocolMethodBResponseTable;
 
 void ChannelProtocolMethodBResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ChannelProtocolMethodBResponse>::value) {
     memcpy(_encoder->template GetPtr<ChannelProtocolMethodBResponse>(_offset), this, sizeof(ChannelProtocolMethodBResponse));
   } else {::fidl::Encode(_encoder, &result, _offset + 0);
@@ -1247,7 +1247,7 @@ extern "C" const fidl_type_t test_protocols_ChannelProtocolTakeHandleRequestTabl
 const fidl_type_t* ChannelProtocolTakeHandleRequest::FidlType = &test_protocols_ChannelProtocolTakeHandleRequestTable;
 
 void ChannelProtocolTakeHandleRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ChannelProtocolTakeHandleRequest>::value) {
     memcpy(_encoder->template GetPtr<ChannelProtocolTakeHandleRequest>(_offset), this, sizeof(ChannelProtocolTakeHandleRequest));
   } else {
@@ -1278,7 +1278,7 @@ extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketRequestTa
 const fidl_type_t* ChannelProtocolMutateSocketRequest::FidlType = &test_protocols_ChannelProtocolMutateSocketRequestTable;
 
 void ChannelProtocolMutateSocketRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ChannelProtocolMutateSocketRequest>::value) {
     memcpy(_encoder->template GetPtr<ChannelProtocolMutateSocketRequest>(_offset), this, sizeof(ChannelProtocolMutateSocketRequest));
   } else {
@@ -1309,7 +1309,7 @@ extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketResponseT
 const fidl_type_t* ChannelProtocolMutateSocketResponse::FidlType = &test_protocols_ChannelProtocolMutateSocketResponseTable;
 
 void ChannelProtocolMutateSocketResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ChannelProtocolMutateSocketResponse>::value) {
     memcpy(_encoder->template GetPtr<ChannelProtocolMutateSocketResponse>(_offset), this, sizeof(ChannelProtocolMutateSocketResponse));
   } else {
@@ -1342,7 +1342,7 @@ extern "C" const fidl_type_t test_protocols_SyscallProtocolMethodCRequestTable;
 const fidl_type_t* SyscallProtocolMethodCRequest::FidlType = &test_protocols_SyscallProtocolMethodCRequestTable;
 
 void SyscallProtocolMethodCRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<SyscallProtocolMethodCRequest>::value) {
     memcpy(_encoder->template GetPtr<SyscallProtocolMethodCRequest>(_offset), this, sizeof(SyscallProtocolMethodCRequest));
   } else {::fidl::Encode(_encoder, &a, _offset + 0);
@@ -1376,7 +1376,7 @@ extern "C" const fidl_type_t test_protocols_HandleRightsProtocolNoResponseMethod
 const fidl_type_t* HandleRightsProtocolNoResponseMethodRequest::FidlType = &test_protocols_HandleRightsProtocolNoResponseMethodRequestTable;
 
 void HandleRightsProtocolNoResponseMethodRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<HandleRightsProtocolNoResponseMethodRequest>::value) {
     memcpy(_encoder->template GetPtr<HandleRightsProtocolNoResponseMethodRequest>(_offset), this, sizeof(HandleRightsProtocolNoResponseMethodRequest));
   } else {
@@ -1407,7 +1407,7 @@ extern "C" const fidl_type_t test_protocols_HandleRightsProtocolResponseMethodRe
 const fidl_type_t* HandleRightsProtocolResponseMethodRequest::FidlType = &test_protocols_HandleRightsProtocolResponseMethodRequestTable;
 
 void HandleRightsProtocolResponseMethodRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<HandleRightsProtocolResponseMethodRequest>::value) {
     memcpy(_encoder->template GetPtr<HandleRightsProtocolResponseMethodRequest>(_offset), this, sizeof(HandleRightsProtocolResponseMethodRequest));
   } else {
@@ -1438,7 +1438,7 @@ extern "C" const fidl_type_t test_protocols_HandleRightsProtocolResponseMethodRe
 const fidl_type_t* HandleRightsProtocolResponseMethodResponse::FidlType = &test_protocols_HandleRightsProtocolResponseMethodResponseTable;
 
 void HandleRightsProtocolResponseMethodResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<HandleRightsProtocolResponseMethodResponse>::value) {
     memcpy(_encoder->template GetPtr<HandleRightsProtocolResponseMethodResponse>(_offset), this, sizeof(HandleRightsProtocolResponseMethodResponse));
   } else {
@@ -1469,7 +1469,7 @@ extern "C" const fidl_type_t test_protocols_HandleRightsProtocolAnEventRequestTa
 const fidl_type_t* HandleRightsProtocolAnEventRequest::FidlType = &test_protocols_HandleRightsProtocolAnEventRequestTable;
 
 void HandleRightsProtocolAnEventRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<HandleRightsProtocolAnEventRequest>::value) {
     memcpy(_encoder->template GetPtr<HandleRightsProtocolAnEventRequest>(_offset), this, sizeof(HandleRightsProtocolAnEventRequest));
   } else {
@@ -1500,7 +1500,7 @@ extern "C" const fidl_type_t test_protocols_ProtocolEndsTable;
 const fidl_type_t* ProtocolEnds::FidlType = &test_protocols_ProtocolEndsTable;
 
 void ProtocolEnds::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ProtocolEnds>::value) {
     memcpy(_encoder->template GetPtr<ProtocolEnds>(_offset), this, sizeof(ProtocolEnds));
   } else {
@@ -1558,7 +1558,7 @@ extern "C" const fidl_type_t test_protocols_WithProtocolEndsClientEndsRequestTab
 const fidl_type_t* WithProtocolEndsClientEndsRequest::FidlType = &test_protocols_WithProtocolEndsClientEndsRequestTable;
 
 void WithProtocolEndsClientEndsRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithProtocolEndsClientEndsRequest>::value) {
     memcpy(_encoder->template GetPtr<WithProtocolEndsClientEndsRequest>(_offset), this, sizeof(WithProtocolEndsClientEndsRequest));
   } else {
@@ -1589,7 +1589,7 @@ extern "C" const fidl_type_t test_protocols_WithProtocolEndsClientEndsResponseTa
 const fidl_type_t* WithProtocolEndsClientEndsResponse::FidlType = &test_protocols_WithProtocolEndsClientEndsResponseTable;
 
 void WithProtocolEndsClientEndsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithProtocolEndsClientEndsResponse>::value) {
     memcpy(_encoder->template GetPtr<WithProtocolEndsClientEndsResponse>(_offset), this, sizeof(WithProtocolEndsClientEndsResponse));
   } else {
@@ -1620,7 +1620,7 @@ extern "C" const fidl_type_t test_protocols_WithProtocolEndsServerEndsRequestTab
 const fidl_type_t* WithProtocolEndsServerEndsRequest::FidlType = &test_protocols_WithProtocolEndsServerEndsRequestTable;
 
 void WithProtocolEndsServerEndsRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithProtocolEndsServerEndsRequest>::value) {
     memcpy(_encoder->template GetPtr<WithProtocolEndsServerEndsRequest>(_offset), this, sizeof(WithProtocolEndsServerEndsRequest));
   } else {
@@ -1651,7 +1651,7 @@ extern "C" const fidl_type_t test_protocols_WithProtocolEndsServerEndsResponseTa
 const fidl_type_t* WithProtocolEndsServerEndsResponse::FidlType = &test_protocols_WithProtocolEndsServerEndsResponseTable;
 
 void WithProtocolEndsServerEndsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithProtocolEndsServerEndsResponse>::value) {
     memcpy(_encoder->template GetPtr<WithProtocolEndsServerEndsResponse>(_offset), this, sizeof(WithProtocolEndsServerEndsResponse));
   } else {
@@ -1682,7 +1682,7 @@ extern "C" const fidl_type_t test_protocols_WithProtocolEndsStructContainingEnds
 const fidl_type_t* WithProtocolEndsStructContainingEndsRequest::FidlType = &test_protocols_WithProtocolEndsStructContainingEndsRequestTable;
 
 void WithProtocolEndsStructContainingEndsRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithProtocolEndsStructContainingEndsRequest>::value) {
     memcpy(_encoder->template GetPtr<WithProtocolEndsStructContainingEndsRequest>(_offset), this, sizeof(WithProtocolEndsStructContainingEndsRequest));
   } else {::fidl::Encode(_encoder, &in, _offset + 0);
@@ -1709,7 +1709,7 @@ extern "C" const fidl_type_t test_protocols_WithProtocolEndsStructContainingEnds
 const fidl_type_t* WithProtocolEndsStructContainingEndsResponse::FidlType = &test_protocols_WithProtocolEndsStructContainingEndsResponseTable;
 
 void WithProtocolEndsStructContainingEndsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<WithProtocolEndsStructContainingEndsResponse>::value) {
     memcpy(_encoder->template GetPtr<WithProtocolEndsStructContainingEndsResponse>(_offset), this, sizeof(WithProtocolEndsStructContainingEndsResponse));
   } else {::fidl::Encode(_encoder, &out, _offset + 0);
@@ -1738,7 +1738,7 @@ extern "C" const fidl_type_t test_protocols_ManyParametersFifteenRequestTable;
 const fidl_type_t* ManyParametersFifteenRequest::FidlType = &test_protocols_ManyParametersFifteenRequestTable;
 
 void ManyParametersFifteenRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ManyParametersFifteenRequest>::value) {
     memcpy(_encoder->template GetPtr<ManyParametersFifteenRequest>(_offset), this, sizeof(ManyParametersFifteenRequest));
   } else {::fidl::Encode(_encoder, &p1, _offset + 0);
@@ -1880,7 +1880,7 @@ TheUnion TheUnion::WithV(uint32_t&& val) {
 }
 
 void TheUnion::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2009,7 +2009,7 @@ extern "C" const fidl_type_t test_protocols_MethodWithUnionUnionMethodRequestTab
 const fidl_type_t* MethodWithUnionUnionMethodRequest::FidlType = &test_protocols_MethodWithUnionUnionMethodRequestTable;
 
 void MethodWithUnionUnionMethodRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<MethodWithUnionUnionMethodRequest>::value) {
     memcpy(_encoder->template GetPtr<MethodWithUnionUnionMethodRequest>(_offset), this, sizeof(MethodWithUnionUnionMethodRequest));
   } else {::fidl::Encode(_encoder, &u, _offset + 0);
@@ -2036,7 +2036,7 @@ extern "C" const fidl_type_t test_protocols_MethodWithUnionUnionMethodResponseTa
 const fidl_type_t* MethodWithUnionUnionMethodResponse::FidlType = &test_protocols_MethodWithUnionUnionMethodResponseTable;
 
 void MethodWithUnionUnionMethodResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<MethodWithUnionUnionMethodResponse>::value) {
     memcpy(_encoder->template GetPtr<MethodWithUnionUnionMethodResponse>(_offset), this, sizeof(MethodWithUnionUnionMethodResponse));
   } else {::fidl::Encode(_encoder, &u, _offset + 0);

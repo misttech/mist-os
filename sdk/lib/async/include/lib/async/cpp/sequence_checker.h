@@ -7,11 +7,11 @@
 
 #include <assert.h>
 #include <lib/async/sequence_id.h>
-#include <lib/stdcompat/variant.h>
 #include <zircon/compiler.h>
 
 #include <string>
 #include <thread>
+#include <variant>
 
 namespace async {
 
@@ -55,7 +55,7 @@ class __TA_CAPABILITY("mutex") sequence_checker final {
 
   // Returns |monostate| if the current sequence is the sequence this object was
   // created on and a |string| describing the error otherwise.
-  cpp17::variant<cpp17::monostate, std::string> is_sequence_valid() const;
+  std::variant<std::monostate, std::string> is_sequence_valid() const;
 
   // Implementation of the BaseLockable requirement
   void lock() const __TA_ACQUIRE();
@@ -93,7 +93,7 @@ class __TA_CAPABILITY("mutex") synchronization_checker final {
 
   // Returns |monostate| if synchronized access is guaranteed and a |string|
   // describing the error otherwise.
-  cpp17::variant<cpp17::monostate, std::string> is_synchronized() const;
+  std::variant<std::monostate, std::string> is_synchronized() const;
 
   // Implementation of the BaseLockable requirement
   void lock() const __TA_ACQUIRE();
@@ -103,7 +103,7 @@ class __TA_CAPABILITY("mutex") synchronization_checker final {
  private:
   async_dispatcher_t* dispatcher_ = nullptr;
   const char* application_description_ = nullptr;
-  cpp17::variant<std::thread::id, async_sequence_id_t> self_;
+  std::variant<std::thread::id, async_sequence_id_t> self_;
 };
 
 }  // namespace async

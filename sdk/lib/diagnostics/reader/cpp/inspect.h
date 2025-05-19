@@ -56,8 +56,8 @@ class InspectData {
   const InspectData::InspectMetadata& metadata() const { return metadata_; }
 
   // Return the payload of the component that created this data, if defined.
-  cpp17::optional<const inspect::Hierarchy*> payload() const {
-    return payload_.name().empty() ? std::nullopt : cpp17::make_optional(&payload_);
+  std::optional<const inspect::Hierarchy*> payload() const {
+    return payload_.name().empty() ? std::nullopt : std::make_optional(&payload_);
   }
 
   // Return the content of the diagnostics data as a JSON value.

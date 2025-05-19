@@ -8,8 +8,8 @@
 
 #include <fbl/algorithm.h>
 
-zx_status_t FakeMapRange::Create(size_t size, cpp17::optional<FakeMapRange>* result_param) {
-  cpp17::optional<FakeMapRange>& result = *result_param;
+zx_status_t FakeMapRange::Create(size_t size, std::optional<FakeMapRange>* result_param) {
+  std::optional<FakeMapRange>& result = *result_param;
   // We can't emplace without making more constructors public or adding brittle friending of
   // optional implementation details, so instead we create one locally and move it in, since it's
   // fine if the move constructor is public. This also avoids putting anything in *result_param

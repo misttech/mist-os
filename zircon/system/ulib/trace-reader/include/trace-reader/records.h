@@ -5,7 +5,6 @@
 #ifndef TRACE_READER_RECORDS_H_
 #define TRACE_READER_RECORDS_H_
 
-#include <lib/stdcompat/variant.h>
 #include <lib/trace-engine/types.h>
 #include <stdint.h>
 #include <zircon/assert.h>
@@ -14,8 +13,10 @@
 #include <zircon/types.h>
 
 #include <new>
+#include <optional>
 #include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <fbl/array.h>
@@ -97,39 +98,39 @@ class ArgumentValue final {
 
   uint32_t GetBool() const {
     ZX_DEBUG_ASSERT(type() == ArgumentType::kBool);
-    return cpp17::get<Bool>(value_).value;
+    return std::get<Bool>(value_).value;
   }
   int32_t GetInt32() const {
     ZX_DEBUG_ASSERT(type() == ArgumentType::kInt32);
-    return cpp17::get<int32_t>(value_);
+    return std::get<int32_t>(value_);
   }
   uint32_t GetUint32() const {
     ZX_DEBUG_ASSERT(type() == ArgumentType::kUint32);
-    return cpp17::get<uint32_t>(value_);
+    return std::get<uint32_t>(value_);
   }
   int64_t GetInt64() const {
     ZX_DEBUG_ASSERT(type() == ArgumentType::kInt64);
-    return cpp17::get<int64_t>(value_);
+    return std::get<int64_t>(value_);
   }
   uint64_t GetUint64() const {
     ZX_DEBUG_ASSERT(type() == ArgumentType::kUint64);
-    return cpp17::get<uint64_t>(value_);
+    return std::get<uint64_t>(value_);
   }
   double GetDouble() const {
     ZX_DEBUG_ASSERT(type() == ArgumentType::kDouble);
-    return cpp17::get<double>(value_);
+    return std::get<double>(value_);
   }
   const fbl::String& GetString() const {
     ZX_DEBUG_ASSERT(type() == ArgumentType::kString);
-    return cpp17::get<fbl::String>(value_);
+    return std::get<fbl::String>(value_);
   }
   uint64_t GetPointer() const {
     ZX_DEBUG_ASSERT(type() == ArgumentType::kPointer);
-    return cpp17::get<Pointer>(value_).value;
+    return std::get<Pointer>(value_).value;
   }
   zx_koid_t GetKoid() const {
     ZX_DEBUG_ASSERT(type() == ArgumentType::kKoid);
-    return cpp17::get<Koid>(value_).value;
+    return std::get<Koid>(value_).value;
   }
 
   fbl::String ToString() const;
@@ -159,14 +160,13 @@ class ArgumentValue final {
   explicit ArgumentValue(Pointer pointer) : value_(pointer) {}
   explicit ArgumentValue(Koid koid) : value_(koid) {}
 
-  using Variant = cpp17::variant<Null, int32_t, uint32_t, int64_t, uint64_t, double, fbl::String,
-                                 Pointer, Koid, Bool>;
+  using Variant = std::variant<Null, int32_t, uint32_t, int64_t, uint64_t, double, fbl::String,
+                               Pointer, Koid, Bool>;
   Variant value_;
 
   // Ensure the variant size and type order matches the type enum values.
   template <typename T, size_t I>
-  static constexpr bool TypeIndexCheck =
-      std::is_same_v<T, cpp17::variant_alternative_t<I, Variant>>;
+  static constexpr bool TypeIndexCheck = std::is_same_v<T, std::variant_alternative_t<I, Variant>>;
   static_assert(TypeIndexCheck<Bool, TRACE_ARG_BOOL>);
   static_assert(TypeIndexCheck<int32_t, TRACE_ARG_INT32>);
   static_assert(TypeIndexCheck<uint32_t, TRACE_ARG_UINT32>);
@@ -539,7 +539,7 @@ class LargeRecordData final {
   // to free it. The record consumer must finish processing the
   // blob data within the callback, as the pointer may not be valid
   // after the completion of that callback.
-  using Blob = cpp17::variant<BlobEvent, BlobAttachment>;
+  using Blob = std::variant<BlobEvent, BlobAttachment>;
 
   explicit LargeRecordData(Blob blob) : type_(LargeRecordType::kBlob), blob_(std::move(blob)) {}
 
@@ -680,19 +680,19 @@ class Record final {
 
     const LegacyContextSwitch& legacy_context_switch() const {
       ZX_DEBUG_ASSERT(event_type == SchedulerEventType::kLegacyContextSwitch);
-      return cpp17::get<LegacyContextSwitch>(event);
+      return std::get<LegacyContextSwitch>(event);
     }
     const ContextSwitch& context_switch() const {
       ZX_DEBUG_ASSERT(event_type == SchedulerEventType::kContextSwitch);
-      return cpp17::get<ContextSwitch>(event);
+      return std::get<ContextSwitch>(event);
     }
     const ThreadWakeup& thread_wakeup() const {
       ZX_DEBUG_ASSERT(event_type == SchedulerEventType::kThreadWakeup);
-      return cpp17::get<ThreadWakeup>(event);
+      return std::get<ThreadWakeup>(event);
     }
 
     SchedulerEventType event_type;
-    cpp17::variant<LegacyContextSwitch, ContextSwitch, ThreadWakeup> event;
+    std::variant<LegacyContextSwitch, ContextSwitch, ThreadWakeup> event;
   };
 
   // Log record data.

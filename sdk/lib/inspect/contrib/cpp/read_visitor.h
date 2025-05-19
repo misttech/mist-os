@@ -7,7 +7,6 @@
 
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/hierarchy.h>
-#include <lib/stdcompat/string_view.h>
 
 #include <stack>
 
@@ -48,13 +47,13 @@ constexpr char kPathRecursive[] = "**";
 // Returns true if all eligible properties were visited, and false if there was an error with the
 // property selector.
 template <typename T>
-bool VisitProperties(
-    const inspect::Hierarchy& hierarchy, const std::vector<cpp17::string_view>& property_selector,
-    fit::function<void(const std::vector<cpp17::string_view>&, const T&)> visitor) {
+bool VisitProperties(const inspect::Hierarchy& hierarchy,
+                     const std::vector<std::string_view>& property_selector,
+                     fit::function<void(const std::vector<std::string_view>&, const T&)> visitor) {
   struct ctx {
     const Hierarchy* hierarchy;
     size_t path_index;
-    std::vector<cpp17::string_view> path;
+    std::vector<std::string_view> path;
   };
 
   if (property_selector.empty()) {

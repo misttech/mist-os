@@ -50,7 +50,7 @@ class ParentGetChildResponse final {
   static inline ::std::unique_ptr<ParentGetChildResponse> New() { return ::std::make_unique<ParentGetChildResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ParentGetChildResponse* value, size_t _offset);
   zx_status_t Clone(ParentGetChildResponse* result) const;
 };
@@ -71,7 +71,7 @@ class ParentGetChildRequestResponse final {
   static inline ::std::unique_ptr<ParentGetChildRequestResponse> New() { return ::std::make_unique<ParentGetChildRequestResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ParentGetChildRequestResponse* value, size_t _offset);
   zx_status_t Clone(ParentGetChildRequestResponse* result) const;
 };
@@ -92,7 +92,7 @@ class ParentTakeChildRequest final {
   static inline ::std::unique_ptr<ParentTakeChildRequest> New() { return ::std::make_unique<ParentTakeChildRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ParentTakeChildRequest* value, size_t _offset);
   zx_status_t Clone(ParentTakeChildRequest* result) const;
 };
@@ -113,7 +113,7 @@ class ParentTakeChildRequestRequest final {
   static inline ::std::unique_ptr<ParentTakeChildRequestRequest> New() { return ::std::make_unique<ParentTakeChildRequestRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ParentTakeChildRequestRequest* value, size_t _offset);
   zx_status_t Clone(ParentTakeChildRequestRequest* result) const;
 };

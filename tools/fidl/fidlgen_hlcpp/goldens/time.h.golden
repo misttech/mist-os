@@ -32,7 +32,7 @@ class AllInstants final {
   static inline ::std::unique_ptr<AllInstants> New() { return ::std::make_unique<AllInstants>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, AllInstants* value, size_t _offset);
   zx_status_t Clone(AllInstants* result) const;
 };
@@ -154,7 +154,7 @@ class ComplexInstants final {
   static inline ::std::unique_ptr<ComplexInstants> New() { return ::std::make_unique<ComplexInstants>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ComplexInstants* _value, size_t _offset);
   zx_status_t Clone(ComplexInstants* _result) const;
 

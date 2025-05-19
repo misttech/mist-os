@@ -59,7 +59,7 @@ class inline_any : public internal::inline_any_impl<Interface, Reserve, Align,
 //
 // Since |pinned_inline_any| contents cannot be moved or copy assigned, there
 // are only two ways to initialize a |pinned_inline_any|:
-// - At construction time: pass |cpp17::in_place_type_t<T>| to select the
+// - At construction time: pass |std::in_place_type_t<T>| to select the
 //   in-place constructor.
 // - After default construction: via |emplace<T>|, whose arguments are forwarded
 //   to the |T| constructor.

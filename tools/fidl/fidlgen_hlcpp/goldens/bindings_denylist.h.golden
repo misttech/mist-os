@@ -97,7 +97,7 @@ class DenyEachBindingOnlyDenyDartRequest final {
   static inline ::std::unique_ptr<DenyEachBindingOnlyDenyDartRequest> New() { return ::std::make_unique<DenyEachBindingOnlyDenyDartRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBindingOnlyDenyDartRequest* value, size_t _offset);
   zx_status_t Clone(DenyEachBindingOnlyDenyDartRequest* result) const;
 };
@@ -127,7 +127,7 @@ class DenyEachBinding_OnlyDenyDart_Response final {
   static inline ::std::unique_ptr<DenyEachBinding_OnlyDenyDart_Response> New() { return ::std::make_unique<DenyEachBinding_OnlyDenyDart_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBinding_OnlyDenyDart_Response* value, size_t _offset);
   zx_status_t Clone(DenyEachBinding_OnlyDenyDart_Response* result) const;
 };
@@ -162,7 +162,7 @@ class DenyEachBinding_OnlyDenyDart_Result final {
   static inline ::std::unique_ptr<DenyEachBinding_OnlyDenyDart_Result> New() { return ::std::make_unique<DenyEachBinding_OnlyDenyDart_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBinding_OnlyDenyDart_Result* value, size_t offset);
   zx_status_t Clone(DenyEachBinding_OnlyDenyDart_Result* result) const;
 
@@ -256,7 +256,7 @@ class DenyEachBindingOnlyDenyGoRequest final {
   static inline ::std::unique_ptr<DenyEachBindingOnlyDenyGoRequest> New() { return ::std::make_unique<DenyEachBindingOnlyDenyGoRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBindingOnlyDenyGoRequest* value, size_t _offset);
   zx_status_t Clone(DenyEachBindingOnlyDenyGoRequest* result) const;
 };
@@ -286,7 +286,7 @@ class DenyEachBinding_OnlyDenyGo_Response final {
   static inline ::std::unique_ptr<DenyEachBinding_OnlyDenyGo_Response> New() { return ::std::make_unique<DenyEachBinding_OnlyDenyGo_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBinding_OnlyDenyGo_Response* value, size_t _offset);
   zx_status_t Clone(DenyEachBinding_OnlyDenyGo_Response* result) const;
 };
@@ -321,7 +321,7 @@ class DenyEachBinding_OnlyDenyGo_Result final {
   static inline ::std::unique_ptr<DenyEachBinding_OnlyDenyGo_Result> New() { return ::std::make_unique<DenyEachBinding_OnlyDenyGo_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBinding_OnlyDenyGo_Result* value, size_t offset);
   zx_status_t Clone(DenyEachBinding_OnlyDenyGo_Result* result) const;
 
@@ -415,7 +415,7 @@ class DenyEachBindingOnlyDenyPythonRequest final {
   static inline ::std::unique_ptr<DenyEachBindingOnlyDenyPythonRequest> New() { return ::std::make_unique<DenyEachBindingOnlyDenyPythonRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBindingOnlyDenyPythonRequest* value, size_t _offset);
   zx_status_t Clone(DenyEachBindingOnlyDenyPythonRequest* result) const;
 };
@@ -445,7 +445,7 @@ class DenyEachBinding_OnlyDenyPython_Response final {
   static inline ::std::unique_ptr<DenyEachBinding_OnlyDenyPython_Response> New() { return ::std::make_unique<DenyEachBinding_OnlyDenyPython_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBinding_OnlyDenyPython_Response* value, size_t _offset);
   zx_status_t Clone(DenyEachBinding_OnlyDenyPython_Response* result) const;
 };
@@ -480,7 +480,7 @@ class DenyEachBinding_OnlyDenyPython_Result final {
   static inline ::std::unique_ptr<DenyEachBinding_OnlyDenyPython_Result> New() { return ::std::make_unique<DenyEachBinding_OnlyDenyPython_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBinding_OnlyDenyPython_Result* value, size_t offset);
   zx_status_t Clone(DenyEachBinding_OnlyDenyPython_Result* result) const;
 
@@ -574,7 +574,7 @@ class DenyEachBindingOnlyDenyRustRequest final {
   static inline ::std::unique_ptr<DenyEachBindingOnlyDenyRustRequest> New() { return ::std::make_unique<DenyEachBindingOnlyDenyRustRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBindingOnlyDenyRustRequest* value, size_t _offset);
   zx_status_t Clone(DenyEachBindingOnlyDenyRustRequest* result) const;
 };
@@ -604,7 +604,7 @@ class DenyEachBinding_OnlyDenyRust_Response final {
   static inline ::std::unique_ptr<DenyEachBinding_OnlyDenyRust_Response> New() { return ::std::make_unique<DenyEachBinding_OnlyDenyRust_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBinding_OnlyDenyRust_Response* value, size_t _offset);
   zx_status_t Clone(DenyEachBinding_OnlyDenyRust_Response* result) const;
 };
@@ -639,7 +639,7 @@ class DenyEachBinding_OnlyDenyRust_Result final {
   static inline ::std::unique_ptr<DenyEachBinding_OnlyDenyRust_Result> New() { return ::std::make_unique<DenyEachBinding_OnlyDenyRust_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBinding_OnlyDenyRust_Result* value, size_t offset);
   zx_status_t Clone(DenyEachBinding_OnlyDenyRust_Result* result) const;
 
@@ -733,7 +733,7 @@ class DenyEachBindingOnlyDenySyzkallerRequest final {
   static inline ::std::unique_ptr<DenyEachBindingOnlyDenySyzkallerRequest> New() { return ::std::make_unique<DenyEachBindingOnlyDenySyzkallerRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBindingOnlyDenySyzkallerRequest* value, size_t _offset);
   zx_status_t Clone(DenyEachBindingOnlyDenySyzkallerRequest* result) const;
 };
@@ -763,7 +763,7 @@ class DenyEachBinding_OnlyDenySyzkaller_Response final {
   static inline ::std::unique_ptr<DenyEachBinding_OnlyDenySyzkaller_Response> New() { return ::std::make_unique<DenyEachBinding_OnlyDenySyzkaller_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBinding_OnlyDenySyzkaller_Response* value, size_t _offset);
   zx_status_t Clone(DenyEachBinding_OnlyDenySyzkaller_Response* result) const;
 };
@@ -798,7 +798,7 @@ class DenyEachBinding_OnlyDenySyzkaller_Result final {
   static inline ::std::unique_ptr<DenyEachBinding_OnlyDenySyzkaller_Result> New() { return ::std::make_unique<DenyEachBinding_OnlyDenySyzkaller_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, DenyEachBinding_OnlyDenySyzkaller_Result* value, size_t offset);
   zx_status_t Clone(DenyEachBinding_OnlyDenySyzkaller_Result* result) const;
 
@@ -997,7 +997,7 @@ class MemberOnlyAppearsInImportingLibrary final {
   static inline ::std::unique_ptr<MemberOnlyAppearsInImportingLibrary> New() { return ::std::make_unique<MemberOnlyAppearsInImportingLibrary>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MemberOnlyAppearsInImportingLibrary* value, size_t _offset);
   zx_status_t Clone(MemberOnlyAppearsInImportingLibrary* result) const;
 };
@@ -1018,7 +1018,7 @@ class OnlyAppearsInImportingLibrary final {
   static inline ::std::unique_ptr<OnlyAppearsInImportingLibrary> New() { return ::std::make_unique<OnlyAppearsInImportingLibrary>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, OnlyAppearsInImportingLibrary* value, size_t _offset);
   zx_status_t Clone(OnlyAppearsInImportingLibrary* result) const;
 };
@@ -1108,7 +1108,7 @@ struct CodingTraits<std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_On
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -1209,7 +1209,7 @@ struct CodingTraits<std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_On
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -1310,7 +1310,7 @@ struct CodingTraits<std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_On
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -1411,7 +1411,7 @@ struct CodingTraits<std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_On
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -1512,7 +1512,7 @@ struct CodingTraits<std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_On
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);

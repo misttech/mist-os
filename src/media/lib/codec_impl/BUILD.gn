@@ -55,7 +55,6 @@ source_set("codec_impl") {
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fit",
     "//sdk/lib/inspect/component/cpp",
-    "//sdk/lib/stdcompat",
     "//src/lib/metrics_buffer",
     "//src/media/lib/blocking_mpsc_queue",
     "//src/media/lib/metrics",

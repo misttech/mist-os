@@ -5,8 +5,6 @@
 #ifndef LIB_FIDL_CPP_STRING_H_
 #define LIB_FIDL_CPP_STRING_H_
 
-#include <lib/stdcompat/optional.h>
-#include <lib/stdcompat/string_view.h>
 #include <zircon/assert.h>
 
 #include <iosfwd>
@@ -18,12 +16,12 @@
 
 namespace fidl {
 
-class StringPtr final : public cpp17::optional<std::string> {
+class StringPtr final : public std::optional<std::string> {
  public:
   constexpr StringPtr() = default;
 
-  constexpr StringPtr(cpp17::nullopt_t) noexcept {}
-  // Deprecated in favor of cpp17::nullopt_t.
+  constexpr StringPtr(std::nullopt_t) noexcept {}
+  // Deprecated in favor of std::nullopt_t.
   constexpr StringPtr(std::nullptr_t) noexcept {}
 
   StringPtr(const StringPtr&) = default;
@@ -33,57 +31,57 @@ class StringPtr final : public cpp17::optional<std::string> {
   StringPtr& operator=(StringPtr&&) = default;
 
   // Move construct and move assignment from the value type
-  constexpr StringPtr(std::string&& value) : cpp17::optional<std::string>(std::move(value)) {}
+  constexpr StringPtr(std::string&& value) : std::optional<std::string>(std::move(value)) {}
   constexpr StringPtr& operator=(std::string&& value) {
-    cpp17::optional<std::string>::operator=(std::move(value));
+    std::optional<std::string>::operator=(std::move(value));
     return *this;
   }
 
   // Copy construct and copy assignment from the value type
-  constexpr StringPtr(const std::string& value) : cpp17::optional<std::string>(value) {}
+  constexpr StringPtr(const std::string& value) : std::optional<std::string>(value) {}
   constexpr StringPtr& operator=(const std::string& value) {
-    cpp17::optional<std::string>::operator=(value);
+    std::optional<std::string>::operator=(value);
     return *this;
   }
 
   // Construct from string literals
   template <size_t N>
-  constexpr StringPtr(const char (&literal)[N]) : cpp17::optional<std::string>(literal) {}
+  constexpr StringPtr(const char (&literal)[N]) : std::optional<std::string>(literal) {}
   template <size_t N>
   constexpr StringPtr& operator=(const char (&literal)[N]) {
-    cpp17::optional<std::string>::operator=(literal);
+    std::optional<std::string>::operator=(literal);
     return *this;
   }
 
   // Construct from string pointers
-  StringPtr(const char* value) : cpp17::optional<std::string>(value) {}
+  StringPtr(const char* value) : std::optional<std::string>(value) {}
   StringPtr(const char* value, size_t size)
-      : cpp17::optional<std::string>(std::string(value, size)) {}
+      : std::optional<std::string>(std::string(value, size)) {}
   StringPtr& operator=(const char* value) {
-    cpp17::optional<std::string>::operator=(value);
+    std::optional<std::string>::operator=(value);
     return *this;
   }
 
   // Construct from string views.
-  StringPtr(cpp17::string_view value)
-      : cpp17::optional<std::string>(std::string(value.data(), value.size())) {}
-  StringPtr& operator=(cpp17::string_view value) {
-    cpp17::optional<std::string>::operator=(std::string(value.data(), value.size()));
+  StringPtr(std::string_view value)
+      : std::optional<std::string>(std::string(value.data(), value.size())) {}
+  StringPtr& operator=(std::string_view value) {
+    std::optional<std::string>::operator=(std::string(value.data(), value.size()));
     return *this;
   }
 
   // Override unchecked accessors with versions that check.
   constexpr std::string* operator->() {
-    if (!cpp17::optional<std::string>::has_value()) {
+    if (!std::optional<std::string>::has_value()) {
       __builtin_trap();
     }
-    return cpp17::optional<std::string>::operator->();
+    return std::optional<std::string>::operator->();
   }
   constexpr const std::string* operator->() const {
-    if (!cpp17::optional<std::string>::has_value()) {
+    if (!std::optional<std::string>::has_value()) {
       __builtin_trap();
     }
-    return cpp17::optional<std::string>::operator->();
+    return std::optional<std::string>::operator->();
   }
 
   // Destructor.
@@ -187,7 +185,7 @@ struct CodingTraits<::std::string> {
   static constexpr size_t kInlineSize = sizeof(fidl_string_t);
   template <class EncoderImpl>
   static void Encode(EncoderImpl* encoder, std::string* value, size_t offset,
-                     cpp17::optional<HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<HandleInformation> maybe_handle_info = std::nullopt) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     const size_t size = value->size();
     fidl_string_t* string = encoder->template GetPtr<fidl_string_t>(offset);
@@ -210,10 +208,10 @@ struct CodingTraits<StringPtr> {
   static constexpr size_t kInlineSize = sizeof(fidl_string_t);
   template <class EncoderImpl>
   static void Encode(EncoderImpl* encoder, StringPtr* value, size_t offset,
-                     cpp17::optional<HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<HandleInformation> maybe_handle_info = std::nullopt) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     if (value->has_value()) {
-      ::fidl::CodingTraits<std::string>::Encode(encoder, &value->value(), offset, cpp17::nullopt);
+      ::fidl::CodingTraits<std::string>::Encode(encoder, &value->value(), offset, std::nullopt);
     } else {
       fidl_string_t* string = encoder->template GetPtr<fidl_string_t>(offset);
       string->size = 0u;
@@ -237,7 +235,7 @@ struct CodingTraits<StringPtr> {
 
 namespace fit {
 
-inline std::ostream& operator<<(std::ostream& out, const cpp17::optional<std::string>& str) {
+inline std::ostream& operator<<(std::ostream& out, const std::optional<std::string>& str) {
   return out << str.value_or("");
 }
 

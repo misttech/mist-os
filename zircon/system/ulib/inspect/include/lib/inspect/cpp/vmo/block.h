@@ -207,7 +207,7 @@ constexpr size_t PayloadCapacity(BlockOrder order) {
   return OrderToSize(order) - sizeof(Block::header);
 }
 
-constexpr cpp17::optional<size_t> SizeForArrayPayload(const BlockType payload_type) {
+constexpr std::optional<size_t> SizeForArrayPayload(const BlockType payload_type) {
   switch (payload_type) {
     case BlockType::kIntValue:
     case BlockType::kUintValue:
@@ -221,7 +221,7 @@ constexpr cpp17::optional<size_t> SizeForArrayPayload(const BlockType payload_ty
   }
 }
 
-constexpr cpp17::optional<size_t> ArrayCapacity(BlockOrder order, BlockType type) {
+constexpr std::optional<size_t> ArrayCapacity(BlockOrder order, BlockType type) {
   const auto size = SizeForArrayPayload(type);
   if (size.has_value()) {
     return (OrderToSize(order) - sizeof(Block::header) - sizeof(Block::payload)) / size.value();
@@ -270,7 +270,7 @@ template <typename T, typename B,
 // This can't return a pointer because the VMO representation of block indexes is smaller
 // than the C++ one, so a string reference's BlockIndex written directly to the array
 // through the pointer would overwrite other data.
-inline cpp17::optional<BlockIndex> GetArraySlotForString(const Block* block, size_t index) {
+inline std::optional<BlockIndex> GetArraySlotForString(const Block* block, size_t index) {
   const auto* tmp = GetArraySlot<const uint32_t>(block, index);
   if (tmp == nullptr) {
     return {};
@@ -304,7 +304,7 @@ inline void SetHeaderVmoSize(Block* block, size_t headerVmoSize) {
   memcpy(block->payload_ptr() + sizeof(block->payload), &headerVmoSize, sizeof(size_t));
 }
 
-inline cpp17::optional<size_t> GetHeaderVmoSize(const Block* block) {
+inline std::optional<size_t> GetHeaderVmoSize(const Block* block) {
   if (GetType(block) != BlockType::kHeader || GetOrder(block) != kVmoHeaderOrder) {
     return {};
   }

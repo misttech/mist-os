@@ -194,7 +194,7 @@ class NamedValue final {
   // this method panics.
   template <typename T>
   const T& Get() const {
-    return cpp17::get<T::format_index>(value_);
+    return std::get<T::format_index>(value_);
   }
 
   // Gets the value by type. If this NamedValue does not contain the given type, this method returns
@@ -277,9 +277,9 @@ using ByteVectorPropertyValue =
 
 // Property consists of a name and a value corresponding to one PropertyFormat.
 using PropertyValue = internal::NamedValue<
-    cpp17::variant<cpp17::monostate, IntPropertyValue, UintPropertyValue, DoublePropertyValue,
-                   IntArrayValue, UintArrayValue, DoubleArrayValue, StringPropertyValue,
-                   ByteVectorPropertyValue, BoolPropertyValue, StringArrayValue>,
+    std::variant<std::monostate, IntPropertyValue, UintPropertyValue, DoublePropertyValue,
+                 IntArrayValue, UintArrayValue, DoubleArrayValue, StringPropertyValue,
+                 ByteVectorPropertyValue, BoolPropertyValue, StringArrayValue>,
     PropertyFormat>;
 
 // A Node parsed from a Hierarchy.

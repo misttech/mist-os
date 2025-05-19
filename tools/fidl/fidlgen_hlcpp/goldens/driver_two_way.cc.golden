@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_drivertwoway_TwoWayAddRequestTable;
 const fidl_type_t* TwoWayAddRequest::FidlType = &test_drivertwoway_TwoWayAddRequestTable;
 
 void TwoWayAddRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                              cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                              std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<TwoWayAddRequest>::value) {
     memcpy(_encoder->template GetPtr<TwoWayAddRequest>(_offset), this, sizeof(TwoWayAddRequest));
   } else {
@@ -48,7 +48,7 @@ extern "C" const fidl_type_t test_drivertwoway_TwoWayAddResponseTable;
 const fidl_type_t* TwoWayAddResponse::FidlType = &test_drivertwoway_TwoWayAddResponseTable;
 
 void TwoWayAddResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                               cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                               std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<TwoWayAddResponse>::value) {
     memcpy(_encoder->template GetPtr<TwoWayAddResponse>(_offset), this, sizeof(TwoWayAddResponse));
   } else {

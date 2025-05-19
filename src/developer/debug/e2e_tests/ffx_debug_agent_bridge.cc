@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <system_error>
+#include <vector>
 
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/common/host_util.h"

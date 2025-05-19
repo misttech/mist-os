@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_emptystruct_EmptyTable;
 const fidl_type_t* Empty::FidlType = &test_emptystruct_EmptyTable;
 
 void Empty::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                   cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                   std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<Empty>::value) {
     memcpy(_encoder->template GetPtr<Empty>(_offset), this, sizeof(Empty));
   } else {
@@ -43,7 +43,7 @@ extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendRequestTable;
 const fidl_type_t* EmptyProtocolSendRequest::FidlType = &test_emptystruct_EmptyProtocolSendRequestTable;
 
 void EmptyProtocolSendRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                      std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<EmptyProtocolSendRequest>::value) {
     memcpy(_encoder->template GetPtr<EmptyProtocolSendRequest>(_offset), this, sizeof(EmptyProtocolSendRequest));
   } else {
@@ -70,7 +70,7 @@ extern "C" const fidl_type_t test_emptystruct_EmptyProtocolReceiveRequestTable;
 const fidl_type_t* EmptyProtocolReceiveRequest::FidlType = &test_emptystruct_EmptyProtocolReceiveRequestTable;
 
 void EmptyProtocolReceiveRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<EmptyProtocolReceiveRequest>::value) {
     memcpy(_encoder->template GetPtr<EmptyProtocolReceiveRequest>(_offset), this, sizeof(EmptyProtocolReceiveRequest));
   } else {
@@ -97,7 +97,7 @@ extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendAndReceiveRequest
 const fidl_type_t* EmptyProtocolSendAndReceiveRequest::FidlType = &test_emptystruct_EmptyProtocolSendAndReceiveRequestTable;
 
 void EmptyProtocolSendAndReceiveRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<EmptyProtocolSendAndReceiveRequest>::value) {
     memcpy(_encoder->template GetPtr<EmptyProtocolSendAndReceiveRequest>(_offset), this, sizeof(EmptyProtocolSendAndReceiveRequest));
   } else {
@@ -124,7 +124,7 @@ extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendAndReceiveRespons
 const fidl_type_t* EmptyProtocolSendAndReceiveResponse::FidlType = &test_emptystruct_EmptyProtocolSendAndReceiveResponseTable;
 
 void EmptyProtocolSendAndReceiveResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                 cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                 std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<EmptyProtocolSendAndReceiveResponse>::value) {
     memcpy(_encoder->template GetPtr<EmptyProtocolSendAndReceiveResponse>(_offset), this, sizeof(EmptyProtocolSendAndReceiveResponse));
   } else {

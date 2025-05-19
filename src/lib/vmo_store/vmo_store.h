@@ -39,9 +39,9 @@ struct MapOptions {
 // `VmoStore` options controlling mapping and pinning behavior.
 struct Options {
   // If provided, `VmoStore` will attempt to map stored VMOs.
-  cpp17::optional<MapOptions> map;
+  std::optional<MapOptions> map;
   // If provided, `VmoStore` will attempt to pin stored VMOs.
-  cpp17::optional<PinOptions> pin;
+  std::optional<PinOptions> pin;
 };
 
 // A base class used to compose `VmoStore`s.
@@ -170,7 +170,7 @@ class VmoStore : public VmoStoreBase<Backing> {
   // returned to the caller.
   // Returns `ZX_ERR_NOT_FOUND` if `key` does not point to a registered VMO.
   zx::result<zx::vmo> Unregister(Key key) {
-    cpp17::optional<StoredVmo> vmo = this->impl_.Extract(key);
+    std::optional<StoredVmo> vmo = this->impl_.Extract(key);
     if (vmo) {
       return zx::ok(std::move(vmo->take_vmo()));
     }

@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_serializable_SerializableStructTable;
 const fidl_type_t* SerializableStruct::FidlType = &test_serializable_SerializableStructTable;
 
 void SerializableStruct::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<SerializableStruct>::value) {
     memcpy(_encoder->template GetPtr<SerializableStruct>(_offset), this, sizeof(SerializableStruct));
   } else {
@@ -60,7 +60,7 @@ bool SerializableTable::IsEmpty() const {
 }
 
 void SerializableTable::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                               cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                               std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -130,7 +130,7 @@ SerializableUnion SerializableUnion::WithUnused(bool&& val) {
 }
 
 void SerializableUnion::Encode(::fidl::Encoder* encoder, size_t offset,
-                               cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                               std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 

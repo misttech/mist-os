@@ -4,7 +4,7 @@
   "pkg/fidl_cpp/include/lib/fidl/cpp/event_sender.h": "6dd3aac8b622529daef12330dbb2e361",
   "pkg/fidl_cpp/include/lib/fidl/cpp/interface_ptr.h": "6a9d47bcabd33792dafebe19663feca0",
   "pkg/fidl_cpp/include/lib/fidl/cpp/interface_ptr_set.h": "f58f00673b293acbb674b9ec6f02b2dd",
-  "pkg/fidl_cpp/include/lib/fidl/cpp/internal/header.h": "04803fecb3c9ff1c34db2fbd1b979495",
+  "pkg/fidl_cpp/include/lib/fidl/cpp/internal/header.h": "81e5bd978113884814bccdfb61d15512",
   "pkg/fidl_cpp/include/lib/fidl/cpp/internal/implementation.h": "ed2073fa0d165d46d664021897c86167",
   "pkg/fidl_cpp/include/lib/fidl/cpp/internal/message_handler.h": "d449dc0c19faca30cabaa3a8ddb3d3aa",
   "pkg/fidl_cpp/include/lib/fidl/cpp/internal/message_reader.h": "4921ca040168845c3a965b1d9a217617",
@@ -19,5 +19,5 @@
   "pkg/fidl_cpp/include/lib/fidl/cpp/service_connector.h": "921dc36b03d9c1854b05ebed40c00644",
   "pkg/fidl_cpp/include/lib/fidl/cpp/service_handler_base.h": "4a422b98568937fae5340575ac8d4303",
   "pkg/fidl_cpp/include/lib/fidl/cpp/type_converter.h": "81ea87e9526f104ff4bbebd502c6a7ec",
-  "pkg/fidl_cpp/include/lib/fidl/cpp/unknown_interactions_hlcpp.h": "1ae305ebbb47d7b39599e0cc28ff19b5"
+  "pkg/fidl_cpp/include/lib/fidl/cpp/unknown_interactions_hlcpp.h": "cb821f70d252201a9621b1a247ce391f"
 }

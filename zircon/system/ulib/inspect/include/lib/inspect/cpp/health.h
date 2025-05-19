@@ -73,7 +73,7 @@ class NodeHealth final {
 
   ::inspect::Node health_node_;
   ::inspect::StringProperty health_status_;
-  cpp17::optional<::inspect::StringProperty> health_message_;
+  std::optional<::inspect::StringProperty> health_message_;
   ::inspect::IntProperty timestamp_nanos_;
 };
 

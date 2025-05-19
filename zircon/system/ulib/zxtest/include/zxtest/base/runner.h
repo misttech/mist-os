@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_SYSTEM_ULIB_ZXTEST_INCLUDE_ZXTEST_BASE_RUNNER_H_
-#define ZIRCON_SYSTEM_ULIB_ZXTEST_INCLUDE_ZXTEST_BASE_RUNNER_H_
+#ifndef ZXTEST_BASE_RUNNER_H_
+#define ZXTEST_BASE_RUNNER_H_
 
 #include <lib/stdcompat/span.h>
 #include <lib/stdcompat/string_view.h>
@@ -29,7 +29,7 @@
 namespace zxtest {
 
 // Prefix used to prevent a test from executing, without explicitly requesting disabled test to run.
-static constexpr cpp17::string_view kDisabledTestPrefix = "DISABLED_";
+static constexpr std::string_view kDisabledTestPrefix = "DISABLED_";
 
 namespace internal {
 
@@ -366,4 +366,4 @@ int RunAllTests(int argc, char** argv);
 
 }  // namespace zxtest
 
-#endif  // ZIRCON_SYSTEM_ULIB_ZXTEST_INCLUDE_ZXTEST_BASE_RUNNER_H_
+#endif  // ZXTEST_BASE_RUNNER_H_

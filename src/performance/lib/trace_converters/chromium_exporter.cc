@@ -5,11 +5,11 @@
 #include "src/performance/lib/trace_converters/chromium_exporter.h"
 
 #include <inttypes.h>
-#include <lib/stdcompat/variant.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/types.h>
 
 #include <utility>
+#include <variant>
 
 #include <third_party/modp_b64/modp_b64.h>
 #include <trace-reader/reader.h>
@@ -598,8 +598,8 @@ void ChromiumExporter::ExportSchedulerEvent(const trace::Record::SchedulerEvent&
 }
 
 void ChromiumExporter::ExportBlob(const trace::LargeRecordData::Blob& data) {
-  if (cpp17::holds_alternative<trace::LargeRecordData::BlobEvent>(data)) {
-    const auto& blob = cpp17::get<trace::LargeRecordData::BlobEvent>(data);
+  if (std::holds_alternative<trace::LargeRecordData::BlobEvent>(data)) {
+    const auto& blob = std::get<trace::LargeRecordData::BlobEvent>(data);
 
     if (blob.category == "fidl:blob") {
       ExportFidlBlob(blob);
@@ -609,8 +609,8 @@ void ChromiumExporter::ExportBlob(const trace::LargeRecordData::Blob& data) {
     // Drop blob event record.
     FX_LOGS(INFO) << "Dropping large blob event record: "
                   << "name " << blob.name.c_str() << " of size " << blob.blob_size;
-  } else if (cpp17::holds_alternative<trace::LargeRecordData::BlobAttachment>(data)) {
-    const auto& blob = cpp17::get<trace::LargeRecordData::BlobAttachment>(data);
+  } else if (std::holds_alternative<trace::LargeRecordData::BlobAttachment>(data)) {
+    const auto& blob = std::get<trace::LargeRecordData::BlobAttachment>(data);
 
     // Drop blob attachment record.
     FX_LOGS(INFO) << "Dropping large blob attachment record: "

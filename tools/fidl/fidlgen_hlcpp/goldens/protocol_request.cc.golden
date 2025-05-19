@@ -18,7 +18,7 @@ extern "C" const fidl_type_t test_protocolrequest_ParentGetChildResponseTable;
 const fidl_type_t* ParentGetChildResponse::FidlType = &test_protocolrequest_ParentGetChildResponseTable;
 
 void ParentGetChildResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                    cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                    std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ParentGetChildResponse>::value) {
     memcpy(_encoder->template GetPtr<ParentGetChildResponse>(_offset), this, sizeof(ParentGetChildResponse));
   } else {
@@ -48,7 +48,7 @@ extern "C" const fidl_type_t test_protocolrequest_ParentGetChildRequestResponseT
 const fidl_type_t* ParentGetChildRequestResponse::FidlType = &test_protocolrequest_ParentGetChildRequestResponseTable;
 
 void ParentGetChildRequestResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                           cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                           std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ParentGetChildRequestResponse>::value) {
     memcpy(_encoder->template GetPtr<ParentGetChildRequestResponse>(_offset), this, sizeof(ParentGetChildRequestResponse));
   } else {
@@ -78,7 +78,7 @@ extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestTable;
 const fidl_type_t* ParentTakeChildRequest::FidlType = &test_protocolrequest_ParentTakeChildRequestTable;
 
 void ParentTakeChildRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                    cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                    std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ParentTakeChildRequest>::value) {
     memcpy(_encoder->template GetPtr<ParentTakeChildRequest>(_offset), this, sizeof(ParentTakeChildRequest));
   } else {
@@ -108,7 +108,7 @@ extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestRequestT
 const fidl_type_t* ParentTakeChildRequestRequest::FidlType = &test_protocolrequest_ParentTakeChildRequestRequestTable;
 
 void ParentTakeChildRequestRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                           cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                           std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ParentTakeChildRequestRequest>::value) {
     memcpy(_encoder->template GetPtr<ParentTakeChildRequestRequest>(_offset), this, sizeof(ParentTakeChildRequestRequest));
   } else {

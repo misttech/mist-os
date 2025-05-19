@@ -7,7 +7,6 @@
 
 #include <lib/elfldltl/diagnostics-ostream.h>
 #include <lib/elfldltl/diagnostics.h>
-#include <lib/stdcompat/source_location.h>
 
 #include "src/devices/lib/log/log.h"
 

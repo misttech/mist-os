@@ -179,7 +179,7 @@ zx_status_t Snapshot::DetermineSnapshotSize(const zx::vmo& vmo, size_t* snapshot
   if (status != ZX_OK) {
     return status;
   }
-  cpp17::optional<size_t> header_vmo_size =
+  std::optional<size_t> header_vmo_size =
       internal::GetHeaderVmoSize(reinterpret_cast<const Block*>(buffer));
   if (header_vmo_size.has_value()) {
     *snapshot_size = std::min(header_vmo_size.value(), internal::kMaxVmoSize);
@@ -217,7 +217,7 @@ BackingBuffer::BackingBuffer(const zx::vmo& data) {
   zx::vmar::root_self()->allocate(ZX_VM_CAN_MAP_READ, 0, size_, &to_hold_data, &data_ptr);
 
   data_ = std::make_pair(0, std::move(to_hold_data));
-  auto& data_ref = cpp17::get<DiscriminateData::kMapping>(data_);
+  auto& data_ref = std::get<DiscriminateData::kMapping>(data_);
   status = data_ref.second.map(ZX_VM_PERM_READ, 0, data, 0, size_, &data_ref.first);
   ZX_ASSERT(ZX_OK == status);
 }
@@ -227,7 +227,7 @@ BackingBuffer::~BackingBuffer() {
     case DiscriminateData::kVector:
       break;
     case DiscriminateData::kMapping:
-      const auto& data_ref = cpp17::get<DiscriminateData::kMapping>(data_);
+      const auto& data_ref = std::get<DiscriminateData::kMapping>(data_);
       data_ref.second.unmap(data_ref.first, size_);
       break;
   }
@@ -236,9 +236,9 @@ BackingBuffer::~BackingBuffer() {
 const uint8_t* BackingBuffer::Data() const {
   switch (Index()) {
     case DiscriminateData::kVector:
-      return cpp17::get<DiscriminateData::kVector>(data_).data();
+      return std::get<DiscriminateData::kVector>(data_).data();
     case DiscriminateData::kMapping:
-      return reinterpret_cast<const uint8_t*>(cpp17::get<DiscriminateData::kMapping>(data_).first);
+      return reinterpret_cast<const uint8_t*>(std::get<DiscriminateData::kMapping>(data_).first);
   }
 }
 
@@ -247,7 +247,7 @@ size_t BackingBuffer::Size() const { return size_; }
 bool BackingBuffer::Empty() const {
   switch (Index()) {
     case DiscriminateData::kVector:
-      return cpp17::get<DiscriminateData::kVector>(data_).empty();
+      return std::get<DiscriminateData::kVector>(data_).empty();
     case DiscriminateData::kMapping:
       return size_ == 0;
   }

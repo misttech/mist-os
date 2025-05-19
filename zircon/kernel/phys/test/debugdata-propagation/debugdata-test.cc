@@ -29,7 +29,7 @@ bool IsDebugDataItemAt(ZbiIter it, size_t index) {
   if (header->length != expected_debug_data.aligned_size() + sizeof(zbi_debugdata_t)) {
     return false;
   }
-  std::vector<cpp17::byte> buffer(header->length, static_cast<std::byte>(0));
+  std::vector<std::byte> buffer(header->length, static_cast<std::byte>(0));
   auto copy_res = it.view().CopyRawItem(cpp20::span(buffer), it);
   EXPECT_TRUE(copy_res.is_ok(), "Copy Error: %*s\n",
               static_cast<int>(copy_res.error_value().zbi_error.size()),

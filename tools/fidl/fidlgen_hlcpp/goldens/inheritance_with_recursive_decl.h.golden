@@ -38,7 +38,7 @@ class ParentFirstRequest final {
   static inline ::std::unique_ptr<ParentFirstRequest> New() { return ::std::make_unique<ParentFirstRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ParentFirstRequest* value, size_t _offset);
   zx_status_t Clone(ParentFirstRequest* result) const;
 };
@@ -81,7 +81,7 @@ class ChildSecondRequest final {
   static inline ::std::unique_ptr<ChildSecondRequest> New() { return ::std::make_unique<ChildSecondRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ChildSecondRequest* value, size_t _offset);
   zx_status_t Clone(ChildSecondRequest* result) const;
 };

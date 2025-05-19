@@ -10,6 +10,8 @@
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 
+#include <vector>
+
 // For devices that can have their addresses anywhere we run a dynamic
 // allocator that starts fairly high in the guest physical address space.
 constexpr zx_gpaddr_t kFirstDynamicDeviceAddr = 0xb00000000;

@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtoco
 const fidl_type_t* UnknownInteractionsProtocolStrictTwoWayFieldsResponse::FidlType = &test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsResponseTable;
 
 void UnknownInteractionsProtocolStrictTwoWayFieldsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocolStrictTwoWayFieldsResponse>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocolStrictTwoWayFieldsResponse>(_offset), this, sizeof(UnknownInteractionsProtocolStrictTwoWayFieldsResponse));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -88,7 +88,7 @@ UnknownInteractionsProtocolStrictTwoWayUnionResponse UnknownInteractionsProtocol
 }
 
 void UnknownInteractionsProtocolStrictTwoWayUnionResponse::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -260,7 +260,7 @@ UnknownInteractionsProtocolStrictTwoWayTableResponse& UnknownInteractionsProtoco
 }
 
 void UnknownInteractionsProtocolStrictTwoWayTableResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -338,7 +338,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtoco
 const fidl_type_t* UnknownInteractionsProtocol_StrictTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayErr_ResponseTable;
 
 void UnknownInteractionsProtocol_StrictTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocol_StrictTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocol_StrictTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsProtocol_StrictTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -415,7 +415,7 @@ UnknownInteractionsProtocol_StrictTwoWayErr_Result UnknownInteractionsProtocol_S
 }
 
 void UnknownInteractionsProtocol_StrictTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -568,7 +568,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtoco
 const fidl_type_t* UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -645,7 +645,7 @@ UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result UnknownInteractionsProt
 }
 
 void UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -843,7 +843,7 @@ UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response UnknownInteractionsPro
 }
 
 void UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1022,7 +1022,7 @@ UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result UnknownInteractionsProto
 }
 
 void UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1218,7 +1218,7 @@ UnknownInteractionsProtocol_StrictTwoWayTableErr_Response& UnknownInteractionsPr
 }
 
 void UnknownInteractionsProtocol_StrictTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -1346,7 +1346,7 @@ UnknownInteractionsProtocol_StrictTwoWayTableErr_Result UnknownInteractionsProto
 }
 
 void UnknownInteractionsProtocol_StrictTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1499,7 +1499,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtoco
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWay_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWay_ResponseTable;
 
 void UnknownInteractionsProtocol_FlexibleTwoWay_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocol_FlexibleTwoWay_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocol_FlexibleTwoWay_Response>(_offset), this, sizeof(UnknownInteractionsProtocol_FlexibleTwoWay_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -1576,7 +1576,7 @@ UnknownInteractionsProtocol_FlexibleTwoWay_Result UnknownInteractionsProtocol_Fl
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWay_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1729,7 +1729,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtoco
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayFields_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFields_ResponseTable;
 
 void UnknownInteractionsProtocol_FlexibleTwoWayFields_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocol_FlexibleTwoWayFields_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocol_FlexibleTwoWayFields_Response>(_offset), this, sizeof(UnknownInteractionsProtocol_FlexibleTwoWayFields_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -1806,7 +1806,7 @@ UnknownInteractionsProtocol_FlexibleTwoWayFields_Result UnknownInteractionsProto
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWayFields_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2004,7 +2004,7 @@ UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response UnknownInteractionsProt
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2183,7 +2183,7 @@ UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result UnknownInteractionsProtoc
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2379,7 +2379,7 @@ UnknownInteractionsProtocol_FlexibleTwoWayTable_Response& UnknownInteractionsPro
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWayTable_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -2507,7 +2507,7 @@ UnknownInteractionsProtocol_FlexibleTwoWayTable_Result UnknownInteractionsProtoc
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWayTable_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2660,7 +2660,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtoco
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayErr_ResponseTable;
 
 void UnknownInteractionsProtocol_FlexibleTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocol_FlexibleTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocol_FlexibleTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsProtocol_FlexibleTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -2748,7 +2748,7 @@ UnknownInteractionsProtocol_FlexibleTwoWayErr_Result UnknownInteractionsProtocol
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2941,7 +2941,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtoco
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -3029,7 +3029,7 @@ UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result UnknownInteractionsPr
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -3267,7 +3267,7 @@ UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response UnknownInteractionsP
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -3457,7 +3457,7 @@ UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result UnknownInteractionsPro
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -3693,7 +3693,7 @@ UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response& UnknownInteractions
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -3832,7 +3832,7 @@ UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result UnknownInteractionsPro
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -4025,7 +4025,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtoco
 const fidl_type_t* UnknownInteractionsProtocolStrictEventFieldsRequest::FidlType = &test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsRequestTable;
 
 void UnknownInteractionsProtocolStrictEventFieldsRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocolStrictEventFieldsRequest>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocolStrictEventFieldsRequest>(_offset), this, sizeof(UnknownInteractionsProtocolStrictEventFieldsRequest));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -4097,7 +4097,7 @@ UnknownInteractionsProtocolStrictEventUnionRequest UnknownInteractionsProtocolSt
 }
 
 void UnknownInteractionsProtocolStrictEventUnionRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -4269,7 +4269,7 @@ UnknownInteractionsProtocolStrictEventTableRequest& UnknownInteractionsProtocolS
 }
 
 void UnknownInteractionsProtocolStrictEventTableRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -4347,7 +4347,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtoco
 const fidl_type_t* UnknownInteractionsProtocolFlexibleEventFieldsRequest::FidlType = &test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsRequestTable;
 
 void UnknownInteractionsProtocolFlexibleEventFieldsRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocolFlexibleEventFieldsRequest>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocolFlexibleEventFieldsRequest>(_offset), this, sizeof(UnknownInteractionsProtocolFlexibleEventFieldsRequest));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -4419,7 +4419,7 @@ UnknownInteractionsProtocolFlexibleEventUnionRequest UnknownInteractionsProtocol
 }
 
 void UnknownInteractionsProtocolFlexibleEventUnionRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -4591,7 +4591,7 @@ UnknownInteractionsProtocolFlexibleEventTableRequest& UnknownInteractionsProtoco
 }
 
 void UnknownInteractionsProtocolFlexibleEventTableRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -4669,7 +4669,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarPro
 const fidl_type_t* UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseTable;
 
 void UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>(_offset), this, sizeof(UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -4741,7 +4741,7 @@ UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse UnknownInteractionsAjar
 }
 
 void UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -4913,7 +4913,7 @@ UnknownInteractionsAjarProtocolStrictTwoWayTableResponse& UnknownInteractionsAja
 }
 
 void UnknownInteractionsAjarProtocolStrictTwoWayTableResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -4991,7 +4991,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarPro
 const fidl_type_t* UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayErr_ResponseTable;
 
 void UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -5068,7 +5068,7 @@ UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result UnknownInteractionsAjarPr
 }
 
 void UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -5221,7 +5221,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarPro
 const fidl_type_t* UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -5298,7 +5298,7 @@ UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result UnknownInteractions
 }
 
 void UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -5496,7 +5496,7 @@ UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response UnknownInteraction
 }
 
 void UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -5675,7 +5675,7 @@ UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result UnknownInteractionsA
 }
 
 void UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -5871,7 +5871,7 @@ UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response& UnknownInteractio
 }
 
 void UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -5999,7 +5999,7 @@ UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result UnknownInteractionsA
 }
 
 void UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -6152,7 +6152,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarPro
 const fidl_type_t* UnknownInteractionsAjarProtocolStrictEventFieldsRequest::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsRequestTable;
 
 void UnknownInteractionsAjarProtocolStrictEventFieldsRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarProtocolStrictEventFieldsRequest>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarProtocolStrictEventFieldsRequest>(_offset), this, sizeof(UnknownInteractionsAjarProtocolStrictEventFieldsRequest));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -6224,7 +6224,7 @@ UnknownInteractionsAjarProtocolStrictEventUnionRequest UnknownInteractionsAjarPr
 }
 
 void UnknownInteractionsAjarProtocolStrictEventUnionRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -6396,7 +6396,7 @@ UnknownInteractionsAjarProtocolStrictEventTableRequest& UnknownInteractionsAjarP
 }
 
 void UnknownInteractionsAjarProtocolStrictEventTableRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -6474,7 +6474,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarPro
 const fidl_type_t* UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsRequestTable;
 
 void UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>(_offset), this, sizeof(UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -6546,7 +6546,7 @@ UnknownInteractionsAjarProtocolFlexibleEventUnionRequest UnknownInteractionsAjar
 }
 
 void UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -6718,7 +6718,7 @@ UnknownInteractionsAjarProtocolFlexibleEventTableRequest& UnknownInteractionsAja
 }
 
 void UnknownInteractionsAjarProtocolFlexibleEventTableRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -6796,7 +6796,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedP
 const fidl_type_t* UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseTable;
 
 void UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>(_offset), this, sizeof(UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -6868,7 +6868,7 @@ UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse UnknownInteractionsCl
 }
 
 void UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -7040,7 +7040,7 @@ UnknownInteractionsClosedProtocolStrictTwoWayTableResponse& UnknownInteractionsC
 }
 
 void UnknownInteractionsClosedProtocolStrictTwoWayTableResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -7118,7 +7118,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedP
 const fidl_type_t* UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayErr_ResponseTable;
 
 void UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -7195,7 +7195,7 @@ UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result UnknownInteractionsClos
 }
 
 void UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -7348,7 +7348,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedP
 const fidl_type_t* UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -7425,7 +7425,7 @@ UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result UnknownInteractio
 }
 
 void UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -7623,7 +7623,7 @@ UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response UnknownInteracti
 }
 
 void UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -7802,7 +7802,7 @@ UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result UnknownInteraction
 }
 
 void UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -7998,7 +7998,7 @@ UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response& UnknownInteract
 }
 
 void UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -8126,7 +8126,7 @@ UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result UnknownInteraction
 }
 
 void UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -8279,7 +8279,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedP
 const fidl_type_t* UnknownInteractionsClosedProtocolStrictEventFieldsRequest::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsRequestTable;
 
 void UnknownInteractionsClosedProtocolStrictEventFieldsRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedProtocolStrictEventFieldsRequest>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedProtocolStrictEventFieldsRequest>(_offset), this, sizeof(UnknownInteractionsClosedProtocolStrictEventFieldsRequest));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -8351,7 +8351,7 @@ UnknownInteractionsClosedProtocolStrictEventUnionRequest UnknownInteractionsClos
 }
 
 void UnknownInteractionsClosedProtocolStrictEventUnionRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -8523,7 +8523,7 @@ UnknownInteractionsClosedProtocolStrictEventTableRequest& UnknownInteractionsClo
 }
 
 void UnknownInteractionsClosedProtocolStrictEventTableRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -8601,7 +8601,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverP
 const fidl_type_t* UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponseTable;
 
 void UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse>(_offset), this, sizeof(UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -8673,7 +8673,7 @@ UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse UnknownInteractionsDr
 }
 
 void UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -8845,7 +8845,7 @@ UnknownInteractionsDriverProtocolStrictTwoWayTableResponse& UnknownInteractionsD
 }
 
 void UnknownInteractionsDriverProtocolStrictTwoWayTableResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -8923,7 +8923,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverP
 const fidl_type_t* UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResponseTable;
 
 void UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -9000,7 +9000,7 @@ UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result UnknownInteractionsDriv
 }
 
 void UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -9153,7 +9153,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverP
 const fidl_type_t* UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -9230,7 +9230,7 @@ UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result UnknownInteractio
 }
 
 void UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -9428,7 +9428,7 @@ UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response UnknownInteracti
 }
 
 void UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -9607,7 +9607,7 @@ UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result UnknownInteraction
 }
 
 void UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -9803,7 +9803,7 @@ UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response& UnknownInteract
 }
 
 void UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -9931,7 +9931,7 @@ UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result UnknownInteraction
 }
 
 void UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -10084,7 +10084,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverP
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResponseTable;
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response>(_offset), this, sizeof(UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -10161,7 +10161,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result UnknownInteractionsDrive
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -10314,7 +10314,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverP
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResponseTable;
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response>(_offset), this, sizeof(UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -10391,7 +10391,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result UnknownInteraction
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -10589,7 +10589,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response UnknownInteractio
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -10768,7 +10768,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result UnknownInteractions
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -10964,7 +10964,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response& UnknownInteracti
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -11092,7 +11092,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result UnknownInteractions
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -11245,7 +11245,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverP
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResponseTable;
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -11333,7 +11333,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result UnknownInteractionsDr
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -11526,7 +11526,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverP
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -11614,7 +11614,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result UnknownInteract
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -11852,7 +11852,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response UnknownInterac
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -12042,7 +12042,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result UnknownInteracti
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -12278,7 +12278,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response& UnknownIntera
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -12417,7 +12417,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result UnknownInteracti
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -12610,7 +12610,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDri
 const fidl_type_t* UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponseTable;
 
 void UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse>(_offset), this, sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -12682,7 +12682,7 @@ UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse UnknownInteractio
 }
 
 void UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -12854,7 +12854,7 @@ UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse& UnknownInteracti
 }
 
 void UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -12932,7 +12932,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDri
 const fidl_type_t* UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResponseTable;
 
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -13009,7 +13009,7 @@ UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result UnknownInteractions
 }
 
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -13162,7 +13162,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDri
 const fidl_type_t* UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -13239,7 +13239,7 @@ UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result UnknownIntera
 }
 
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -13437,7 +13437,7 @@ UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response UnknownInter
 }
 
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -13616,7 +13616,7 @@ UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result UnknownInterac
 }
 
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -13812,7 +13812,7 @@ UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response& UnknownInte
 }
 
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -13940,7 +13940,7 @@ UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result UnknownInterac
 }
 
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -14093,7 +14093,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedD
 const fidl_type_t* UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponseTable;
 
 void UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse>(_offset), this, sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -14165,7 +14165,7 @@ UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse UnknownInteract
 }
 
 void UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -14337,7 +14337,7 @@ UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse& UnknownInterac
 }
 
 void UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -14415,7 +14415,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedD
 const fidl_type_t* UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResponseTable;
 
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
@@ -14492,7 +14492,7 @@ UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result UnknownInteractio
 }
 
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -14645,7 +14645,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedD
 const fidl_type_t* UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
@@ -14722,7 +14722,7 @@ UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result UnknownInte
 }
 
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -14920,7 +14920,7 @@ UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response UnknownInt
 }
 
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -15099,7 +15099,7 @@ UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result UnknownInter
 }
 
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -15295,7 +15295,7 @@ UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response& UnknownIn
 }
 
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -15423,7 +15423,7 @@ UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result UnknownInter
 }
 
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 

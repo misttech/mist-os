@@ -23,7 +23,7 @@ zx::result<fdf::MmioBuffer> PDev::MapMmio(uint32_t index, uint32_t cache_policy)
   return internal::PDevMakeMmioBufferWeak(*pdev_mmio, cache_policy);
 }
 
-zx::result<fdf::MmioBuffer> PDev::MapMmio(cpp17::string_view name, uint32_t cache_policy) const {
+zx::result<fdf::MmioBuffer> PDev::MapMmio(std::string_view name, uint32_t cache_policy) const {
   zx::result pdev_mmio = GetMmio(name);
   if (pdev_mmio.is_error()) {
     return pdev_mmio.take_error();
@@ -53,7 +53,7 @@ zx::result<PDev::MmioInfo> PDev::GetMmio(uint32_t index) const {
   return zx::ok(std::move(out_mmio));
 }
 
-zx::result<PDev::MmioInfo> PDev::GetMmio(cpp17::string_view name) const {
+zx::result<PDev::MmioInfo> PDev::GetMmio(std::string_view name) const {
   fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMmioByName> result =
       pdev_->GetMmioByName(fidl::StringView::FromExternal(name));
   if (result.status() != ZX_OK) {
@@ -87,7 +87,7 @@ zx::result<zx::interrupt> PDev::GetInterrupt(uint32_t index, uint32_t flags) con
   return zx::ok(std::move(result->value()->irq));
 }
 
-zx::result<zx::interrupt> PDev::GetInterrupt(cpp17::string_view name, uint32_t flags) const {
+zx::result<zx::interrupt> PDev::GetInterrupt(std::string_view name, uint32_t flags) const {
   fidl::WireResult<fuchsia_hardware_platform_device::Device::GetInterruptByName> result =
       pdev_->GetInterruptByName(fidl::StringView::FromExternal(name), flags);
   if (result.status() != ZX_OK) {

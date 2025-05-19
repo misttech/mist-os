@@ -273,8 +273,8 @@ void LocalComponentRunner::Start(
 // implementation that supports the deprecated type.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  if (cpp17::holds_alternative<LocalComponent*>(component)) {
-    auto local_component_ptr = cpp17::get<LocalComponent*>(component);
+  if (std::holds_alternative<LocalComponent*>(component)) {
+    auto local_component_ptr = std::get<LocalComponent*>(component);
 #pragma clang diagnostic pop
     auto on_start = [local_component_ptr](LocalComponentInstance*,
                                           std::unique_ptr<LocalComponentHandles> handles) {
@@ -294,7 +294,7 @@ void LocalComponentRunner::Start(
     running_component_instances_[name] = std::make_unique<LocalComponentInstance>(
         std::move(controller), dispatcher_, std::move(on_start), std::move(on_exit));
   } else {
-    auto local_component_factory = std::move(cpp17::get<LocalComponentFactory>(component));
+    auto local_component_factory = std::move(std::get<LocalComponentFactory>(component));
     auto local_component = local_component_factory();
     auto on_start = [name, local_component = std::move(local_component)](
                         LocalComponentInstance* instance,
@@ -346,7 +346,7 @@ std::unique_ptr<LocalComponentImplBase> LocalComponentRunner::SetComponentToRunn
                 name.c_str());
   running_components_[name] = std::move(ready_components_[name]);
   ZX_ASSERT_MSG(ready_components_.erase(name) == 1, "ready component not erased");
-  return cpp17::get<LocalComponentFactory>(running_components_[name])();
+  return std::get<LocalComponentFactory>(running_components_[name])();
 }
 
 void LocalComponentRunner::SetComponentToReady(std::string name) {

@@ -12,7 +12,6 @@ source_set("dispatcher") {
   ]
   public_deps = [
     "//sdk/lib/fidl/cpp/wire",
-    "//sdk/lib/stdcompat",
     "//zircon/system/public",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",

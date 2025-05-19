@@ -75,7 +75,7 @@ class TreeServer final : public fidl::WireServer<fuchsia_inspect::Tree> {
   async::Executor executor_;
   TreeHandlerSettings settings_;
   std::variant<Inspector, zx::vmo> data_;
-  cpp17::optional<fidl::ServerBindingRef<fuchsia_inspect::Tree>> binding_;
+  std::optional<fidl::ServerBindingRef<fuchsia_inspect::Tree>> binding_;
 };
 
 class TreeNameIterator final : public fidl::WireServer<fuchsia_inspect::TreeNameIterator> {
@@ -101,7 +101,7 @@ class TreeNameIterator final : public fidl::WireServer<fuchsia_inspect::TreeName
 
   std::vector<fidl::StringView> InnerGetNext();
 
-  cpp17::optional<fidl::ServerBindingRef<fuchsia_inspect::TreeNameIterator>> binding_;
+  std::optional<fidl::ServerBindingRef<fuchsia_inspect::TreeNameIterator>> binding_;
   std::vector<std::string> names_;
   uint64_t current_index_ = 0;
 };

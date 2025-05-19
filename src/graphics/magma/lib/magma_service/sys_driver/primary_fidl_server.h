@@ -202,7 +202,7 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
 
   // The binding will be valid after a successful |fidl::BindServer| operation,
   // and back to invalid after this class is unbound from the FIDL dispatcher.
-  cpp17::optional<fidl::ServerBindingRef<fuchsia_gpu_magma::Primary>> server_binding_;
+  std::optional<fidl::ServerBindingRef<fuchsia_gpu_magma::Primary>> server_binding_;
 
   std::unique_ptr<Delegate> delegate_;
   magma_status_t error_{};

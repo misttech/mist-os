@@ -56,7 +56,7 @@ class FlexibleFoo final {
   static inline ::std::unique_ptr<FlexibleFoo> New() { return ::std::make_unique<FlexibleFoo>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, FlexibleFoo* value, size_t offset);
   zx_status_t Clone(FlexibleFoo* result) const;
 
@@ -158,7 +158,7 @@ class StrictFoo final {
   static inline ::std::unique_ptr<StrictFoo> New() { return ::std::make_unique<StrictFoo>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, StrictFoo* value, size_t offset);
   zx_status_t Clone(StrictFoo* result) const;
 
@@ -231,7 +231,7 @@ class ProtocolRequestStrictResponseFlexibleRequest final {
   static inline ::std::unique_ptr<ProtocolRequestStrictResponseFlexibleRequest> New() { return ::std::make_unique<ProtocolRequestStrictResponseFlexibleRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ProtocolRequestStrictResponseFlexibleRequest* value, size_t _offset);
   zx_status_t Clone(ProtocolRequestStrictResponseFlexibleRequest* result) const;
 };
@@ -252,7 +252,7 @@ class ProtocolRequestStrictResponseFlexibleResponse final {
   static inline ::std::unique_ptr<ProtocolRequestStrictResponseFlexibleResponse> New() { return ::std::make_unique<ProtocolRequestStrictResponseFlexibleResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ProtocolRequestStrictResponseFlexibleResponse* value, size_t _offset);
   zx_status_t Clone(ProtocolRequestStrictResponseFlexibleResponse* result) const;
 };
@@ -273,7 +273,7 @@ class ProtocolRequestFlexibleResponseStrictRequest final {
   static inline ::std::unique_ptr<ProtocolRequestFlexibleResponseStrictRequest> New() { return ::std::make_unique<ProtocolRequestFlexibleResponseStrictRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ProtocolRequestFlexibleResponseStrictRequest* value, size_t _offset);
   zx_status_t Clone(ProtocolRequestFlexibleResponseStrictRequest* result) const;
 };
@@ -294,7 +294,7 @@ class ProtocolRequestFlexibleResponseStrictResponse final {
   static inline ::std::unique_ptr<ProtocolRequestFlexibleResponseStrictResponse> New() { return ::std::make_unique<ProtocolRequestFlexibleResponseStrictResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ProtocolRequestFlexibleResponseStrictResponse* value, size_t _offset);
   zx_status_t Clone(ProtocolRequestFlexibleResponseStrictResponse* result) const;
 };
@@ -371,7 +371,7 @@ struct CodingTraits<std::unique_ptr<::test::requestflexibleenvelope::FlexibleFoo
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::requestflexibleenvelope::FlexibleFoo>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -427,7 +427,7 @@ struct CodingTraits<std::unique_ptr<::test::requestflexibleenvelope::StrictFoo>>
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::requestflexibleenvelope::StrictFoo>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);

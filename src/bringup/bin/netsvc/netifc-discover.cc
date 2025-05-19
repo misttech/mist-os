@@ -22,7 +22,7 @@
 
 namespace {
 
-cpp17::string_view SkipInstanceSigil(cpp17::string_view v) {
+std::string_view SkipInstanceSigil(std::string_view v) {
   if (!v.empty() && v.at(0) == '@') {
     return v.substr(1);
   }
@@ -183,7 +183,7 @@ struct Netdevice {
   }
 };
 
-std::optional<Netdevice::Info> netifc_evaluate(cpp17::string_view topological_path,
+std::optional<Netdevice::Info> netifc_evaluate(std::string_view topological_path,
                                                fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
                                                const std::string& dirname,
                                                const std::string& filename) {
@@ -211,7 +211,7 @@ std::optional<Netdevice::Info> netifc_evaluate(cpp17::string_view topological_pa
       return std::nullopt;
     }
 
-    cpp17::string_view topo_path = SkipInstanceSigil(resp.value());
+    std::string_view topo_path = SkipInstanceSigil(resp.value());
     // Allow for limited wildcard matching to avoid coupling too tightly.
     if (!EndsWithWildcardMatch(topo_path, topological_path)) {
       return std::nullopt;
@@ -227,7 +227,7 @@ std::optional<Netdevice::Info> netifc_evaluate(cpp17::string_view topological_pa
 
 zx::result<std::unique_ptr<fsl::DeviceWatcher>> CreateWatcher(
     async_dispatcher_t* dispatcher, std::optional<NetdeviceInterface>& selected_ifc,
-    const std::string& devdir, cpp17::string_view topological_path) {
+    const std::string& devdir, std::string_view topological_path) {
   const std::string classdir = devdir + Netdevice::kDirectory;
   fbl::unique_fd dir(open(classdir.c_str(), O_DIRECTORY | O_RDONLY));
   if (!dir.is_valid()) {
@@ -258,7 +258,7 @@ zx::result<std::unique_ptr<fsl::DeviceWatcher>> CreateWatcher(
 }  // namespace
 
 zx::result<NetdeviceInterface> netifc_discover(const std::string& devdir,
-                                               cpp17::string_view topological_path) {
+                                               std::string_view topological_path) {
   topological_path = SkipInstanceSigil(topological_path);
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   std::optional<NetdeviceInterface> selected_ifc;

@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 #include <fidl/test.types/cpp/fidl.h>
-#include <lib/stdcompat/type_traits.h>
+
+#include <type_traits>
 
 #include <zxtest/zxtest.h>
 
@@ -23,7 +24,7 @@ TEST(Response, FromPayload) {
 
 TEST(Response, InheritFromDomainObject) {
   static_assert(
-      cpp17::is_base_of_v<test_types::BazFooResponse, fidl::Response<test_types::Baz::Foo>>);
+      std::is_base_of_v<test_types::BazFooResponse, fidl::Response<test_types::Baz::Foo>>);
   static_assert(sizeof(test_types::BazFooResponse) == sizeof(fidl::Response<test_types::Baz::Foo>),
                 "Message wrapper must not add any state");
 }
@@ -74,14 +75,14 @@ TEST(Response, FromPayloadErrorSyntaxEmptyStructError) {
 }
 
 TEST(Response, InheritFromDomainObjectErrorSyntax) {
-  static_assert(cpp17::is_base_of_v<fit::result<int32_t, test_types::FooResponse>,
-                                    fidl::Response<test_types::ErrorSyntax::FooPayload>>);
+  static_assert(std::is_base_of_v<fit::result<int32_t, test_types::FooResponse>,
+                                  fidl::Response<test_types::ErrorSyntax::FooPayload>>);
   static_assert(sizeof(fit::result<int32_t, test_types::FooResponse>) ==
                     sizeof(fidl::Response<test_types::ErrorSyntax::FooPayload>),
                 "Message wrapper must not add any state");
 
-  static_assert(cpp17::is_base_of_v<fit::result<int32_t>,
-                                    fidl::Response<test_types::ErrorSyntax::EmptyPayload>>);
+  static_assert(std::is_base_of_v<fit::result<int32_t>,
+                                  fidl::Response<test_types::ErrorSyntax::EmptyPayload>>);
   static_assert(
       sizeof(fit::result<int32_t>) == sizeof(fidl::Response<test_types::ErrorSyntax::EmptyPayload>),
       "Message wrapper must not add any state");
@@ -100,8 +101,7 @@ TEST(Request, FromPayload) {
 }
 
 TEST(Request, InheritFromDomainObject) {
-  static_assert(
-      cpp17::is_base_of_v<test_types::BazFooRequest, fidl::Request<test_types::Baz::Foo>>);
+  static_assert(std::is_base_of_v<test_types::BazFooRequest, fidl::Request<test_types::Baz::Foo>>);
   static_assert(sizeof(test_types::BazFooRequest) == sizeof(fidl::Request<test_types::Baz::Foo>),
                 "Message wrapper must not add any state");
 }
@@ -118,14 +118,14 @@ TEST(Event, FromPayload) {
 }
 
 TEST(Event, InheritFromDomainObject) {
-  static_assert(cpp17::is_base_of_v<test_types::FooEvent, fidl::Event<test_types::Baz::FooEvent>>);
+  static_assert(std::is_base_of_v<test_types::FooEvent, fidl::Event<test_types::Baz::FooEvent>>);
   static_assert(sizeof(test_types::FooEvent) == sizeof(fidl::Event<test_types::Baz::FooEvent>),
                 "Message wrapper must not add any state");
 }
 
 TEST(Result, DefaultConstruction) {
   static_assert(
-      !cpp17::is_default_constructible_v<fidl::Result<test_types::ErrorSyntax::EmptyPayload>>,
+      !std::is_default_constructible_v<fidl::Result<test_types::ErrorSyntax::EmptyPayload>>,
       "Cannot default construct invalid result type");
 }
 }  // namespace
