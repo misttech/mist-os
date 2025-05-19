@@ -11,6 +11,7 @@ python_library("power") {
   library_name = "power"
   sources = [
     "__init__.py",
+    "gonk.py",
     "power_test_utils.py",
   ]
   library_deps = [ "//src/performance/lib/trace_processing" ]

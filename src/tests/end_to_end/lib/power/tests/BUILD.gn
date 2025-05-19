@@ -15,6 +15,15 @@ if (is_host) {
     deps = [ ":runtime_deps" ]
   }
 
+  python_host_test("gonk_test") {
+    main_source = "gonk_test.py"
+    libraries = [
+      "//src/tests/end_to_end/lib/power",
+      "//src/performance/lib/trace_processing",
+    ]
+    deps = [ ":runtime_deps" ]
+  }
+
   # trace2json is necessary for //src/performance/lib/trace_processing
   host_test_data("runtime_deps") {
     deps = [ "//src/performance/trace2json:bin" ]
@@ -25,5 +34,8 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":power_test_utils_test($host_toolchain)" ]
+  public_deps = [
+    ":gonk_test($host_toolchain)",
+    ":power_test_utils_test($host_toolchain)",
+  ]
 }

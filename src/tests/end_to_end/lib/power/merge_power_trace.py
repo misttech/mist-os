@@ -10,7 +10,7 @@ import pathlib
 import shutil
 import sys
 
-from power import power_test_utils
+from power import gonk, power_test_utils
 from trace_processing import trace_importing, trace_model
 
 
@@ -39,16 +39,12 @@ def merge_trace(
 
     shutil.copy(trace, output)
     if power_format == PowerFileFormat.gonk:
-        rail_names = power_test_utils.read_gonk_header(power)
-        gonk_samples = power_test_utils.read_gonk_samples(power)
+        rail_names = gonk.read_gonk_header(power)
+        gonk_samples = gonk.read_gonk_samples(power)
         if gpio:
-            power_test_utils.merge_gonk_data(
-                model, gonk_samples, output, rail_names
-            )
+            gonk.merge_gonk_data(model, gonk_samples, output, rail_names)
         else:
-            power_test_utils.merge_gonk_data_without_gpio(
-                gonk_samples, output, rail_names
-            )
+            gonk.merge_gonk_data_without_gpio(gonk_samples, output, rail_names)
     else:
         samples = power_test_utils.read_power_samples(power)
         power_test_utils.merge_power_data(model, samples, output)

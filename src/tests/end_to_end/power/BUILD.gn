@@ -10,7 +10,10 @@ import("//build/python/python_library.gni")
 python_library("power_test_utils") {
   testonly = true
   library_name = "power_test_utils"
-  sources = [ "__init__.py" ]
+  sources = [
+    "__init__.py",
+    "power_test_utils.py",
+  ]
   library_deps = [
     "//src/performance/lib/trace_processing",
     "//src/tests/end_to_end/lib/power",
