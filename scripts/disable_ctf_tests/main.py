@@ -16,6 +16,7 @@ from typing import Protocol
 import cli
 import command_runner
 import data_structure
+import gui
 import util
 
 
@@ -38,7 +39,10 @@ class UI(Protocol):
 class App:
     def __init__(self, argv: list[str]) -> None:
         args = self._parse_args(argv)
-        self.ui = cli.CLI()
+        if args.gui:
+            self.ui: UI = gui.GUI()
+        else:
+            self.ui = cli.CLI()
         self.build_target = "//sdk/ctf/release:tests"
         self.scan_target = "//sdk/ctf/release"
         if args.tiny_scan:
@@ -52,6 +56,11 @@ class App:
 
     def _parse_args(self, argv: list[str]) -> argparse.Namespace:
         parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--gui",
+            help="Use a GUI",
+            action="store_true",
+        )
         parser.add_argument(
             "--tiny-scan",
             help="Just scan a couple of tests, to save time when debugging",

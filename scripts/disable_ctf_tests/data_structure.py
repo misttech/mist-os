@@ -20,6 +20,7 @@ load_and_merge(enumerated_tests: Tests) -> Tests: Starts with a set of tests
     been dropped from the current test set but is still in the file.
 """
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -44,6 +45,7 @@ class TestSuite:
 
     name: str
     cases: list[TestCase]
+    compact_name: str = ""
 
     def __init__(
         self,
@@ -58,6 +60,9 @@ class TestSuite:
         else:
             self.name = name
             self.cases = cases or []
+        self.compact_name = re.sub(
+            "^fuchsia-pkg://fuchsia.com/", "fx/", self.name
+        )
 
     def _to_dict_suite(self) -> "_DictTestSuite":
         return _DictTestSuite(

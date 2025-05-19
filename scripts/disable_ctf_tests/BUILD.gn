@@ -23,6 +23,7 @@ if (is_host) {
       "cli.py",
       "command_runner.py",
       "data_structure.py",
+      "gui.py",
       "util.py",
     ]
     deps = [ "//scripts/lib/json_get" ]
