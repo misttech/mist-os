@@ -2156,9 +2156,9 @@ void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
             t->pid(), t->tid());
     arch_dump_thread(t);
   } else {
-    printf("thr %p st %4s owq %d %s pid %" PRIu64 " tid %" PRIu64 " (%s:%s)\n", t,
-           thread_state_to_str(t->state()), !t->owned_wait_queues_.is_empty(), profile_str,
-           t->pid(), t->tid(), oname, t->name());
+    printf("thr %p st %4s owq %d %s pid %" PRIu64 " tid %" PRIu64 " run_ns %" PRIi64 " (%s:%s)\n",
+           t, thread_state_to_str(t->state()), !t->owned_wait_queues_.is_empty(), profile_str,
+           t->pid(), t->tid(), runtime, oname, t->name());
   }
 }
 
