@@ -20,9 +20,6 @@ pub mod vmo;
 #[cfg(not(target_os = "fuchsia"))]
 pub mod simple;
 
-#[cfg(test)]
-pub(crate) mod test_utils;
-
 mod common;
 
 pub mod connection;

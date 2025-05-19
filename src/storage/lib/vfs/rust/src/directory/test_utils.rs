@@ -8,18 +8,6 @@
 //! will have multiple assertions, it save a bit of typing to write `assert_something!(arg)`
 //! instead of `assert_something(arg).await`.
 
-#[doc(hidden)]
-pub mod reexport {
-    pub use fuchsia_async::Channel;
-    pub use zx_status::Status;
-    pub use {fidl, fidl_fuchsia_io as fio};
-
-    #[cfg(not(target_os = "fuchsia"))]
-    pub use fuchsia_async::emulated_handle::MessageBuf;
-    #[cfg(target_os = "fuchsia")]
-    pub use zx::MessageBuf;
-}
-
 use byteorder::{LittleEndian, WriteBytesExt};
 use fidl_fuchsia_io as fio;
 use std::convert::TryInto as _;
@@ -59,100 +47,4 @@ impl DirentsSameInodeBuilder {
     pub fn into_vec(self) -> Vec<u8> {
         self.expected
     }
-}
-
-/// Calls `rewind` on the provided `proxy`, checking that the result status is Status::OK.
-#[macro_export]
-macro_rules! assert_rewind {
-    ($proxy:expr) => {{
-        use $crate::directory::test_utils::reexport::Status;
-
-        let status = $proxy.rewind().await.expect("rewind failed");
-        assert_eq!(Status::from_raw(status), Status::OK);
-    }};
-}
-
-/// Opens the specified path as a VMO file and checks its content.  Also see all the `assert_*`
-/// macros in `../test_utils.rs`.
-#[macro_export]
-macro_rules! open_as_vmo_file_assert_content {
-    ($proxy:expr, $flags:expr, $path:expr, $expected_content:expr) => {{
-        let file = open_get_vmo_file_proxy_assert_ok!($proxy, $flags, $path);
-        assert_read!(file, $expected_content);
-        assert_close!(file);
-    }};
-}
-
-#[macro_export]
-macro_rules! assert_watch {
-    ($proxy:expr, $mask:expr) => {{
-        use $crate::directory::test_utils::reexport::{fidl, Channel, Status};
-
-        let (client, server) = fidl::endpoints::create_endpoints();
-
-        let status = $proxy.watch($mask, 0, server).await.expect("watch failed");
-        assert_eq!(Status::from_raw(status), Status::OK);
-
-        Channel::from_channel(client.into_channel())
-    }};
-}
-
-#[macro_export]
-macro_rules! assert_watch_err {
-    ($proxy:expr, $mask:expr, $expected_status:expr) => {{
-        use $crate::directory::test_utils::reexport::{fidl, Status};
-
-        let (_client, server) = fidl::endpoints::create_endpoints();
-
-        let status = $proxy.watch($mask, 0, server).await.expect("watch failed");
-        assert_eq!(Status::from_raw(status), $expected_status);
-    }};
-}
-
-#[macro_export]
-macro_rules! assert_watcher_one_message_watched_events {
-    ($watcher:expr, $( { $type:tt, $name:expr $(,)* } ),* $(,)*) => {{
-        #[allow(unused)]
-        use $crate::directory::test_utils::reexport::{MessageBuf, fio::WatchEvent};
-        use std::convert::TryInto as _;
-
-        let mut buf = MessageBuf::new();
-        $watcher.recv_msg(&mut buf).await.unwrap();
-
-        let (bytes, handles) = buf.split();
-        assert_eq!(
-            handles.len(),
-            0,
-            "Received buffer with handles.\n\
-             Handle count: {}\n\
-             Buffer: {:X?}",
-            handles.len(),
-            bytes
-        );
-
-        let expected = &mut vec![];
-        $({
-            let type_ = assert_watcher_one_message_watched_events!(@expand_event_type $type);
-            let name = Vec::<u8>::from($name);
-            assert!(name.len() <= std::u8::MAX as usize);
-
-            expected.push(type_.into_primitive());
-            expected.push(name.len().try_into().unwrap());
-            expected.extend_from_slice(&name);
-        })*
-
-        assert!(bytes == *expected,
-                "Received buffer does not match the expectation.\n\
-                 Expected: {:X?}\n\
-                 Received: {:X?}\n\
-                 Expected as UTF-8 lossy: {:?}\n\
-                 Received as UTF-8 lossy: {:?}",
-                *expected, bytes,
-                String::from_utf8_lossy(expected), String::from_utf8_lossy(&bytes));
-    }};
-
-    (@expand_event_type EXISTING) => { fio::WatchEvent::Existing };
-    (@expand_event_type IDLE) => { fio::WatchEvent::Idle };
-    (@expand_event_type ADDED) => { fio::WatchEvent::Added };
-    (@expand_event_type REMOVED) => { fio::WatchEvent::Removed };
 }

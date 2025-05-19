@@ -6,8 +6,8 @@
 
 use super::{read_only, VmoFile};
 use crate::{
-    assert_close, assert_get_attr, assert_get_vmo, assert_get_vmo_err, assert_read, assert_read_at,
-    assert_seek, assert_truncate_err, assert_vmo_content, assert_write_err, file,
+    assert_close, assert_get_attr, assert_read, assert_read_at, assert_seek, assert_truncate_err,
+    assert_write_err, file,
 };
 use assert_matches::assert_matches;
 use fidl_fuchsia_io as fio;
@@ -263,30 +263,57 @@ async fn get_attr_read_only_with_inode() {
 async fn get_vmo_read_only() {
     let file = read_only(b"Read only test");
     let proxy = file::serve_proxy(file, fio::PERM_READABLE);
-    {
-        let vmo = assert_get_vmo!(proxy, fio::VmoFlags::READ);
-        assert_vmo_content!(&vmo, b"Read only test");
+
+    async fn assert_get_vmo(
+        proxy: &fio::FileProxy,
+        flags: fio::VmoFlags,
+    ) -> Result<fidl::Vmo, Status> {
+        proxy
+            .get_backing_memory(flags)
+            .await
+            .expect("get_backing_memory fidl error")
+            .map_err(Status::from_raw)
     }
 
-    {
-        let vmo = assert_get_vmo!(proxy, fio::VmoFlags::READ | fio::VmoFlags::SHARED_BUFFER);
-        assert_vmo_content!(&vmo, b"Read only test");
+    fn assert_vmo_content(vmo: &fidl::Vmo, expected: &[u8]) {
+        let size = vmo.get_content_size().unwrap() as usize;
+        assert_eq!(size, expected.len());
+        let mut buffer = vec![0; size];
+        vmo.read(&mut buffer, 0).unwrap();
+        assert_eq!(buffer, expected);
     }
 
-    {
-        let vmo = assert_get_vmo!(proxy, fio::VmoFlags::READ | fio::VmoFlags::PRIVATE_CLONE);
-        assert_vmo_content!(&vmo, b"Read only test");
-    }
+    let vmo = assert_get_vmo(&proxy, fio::VmoFlags::READ).await.unwrap();
+    assert_vmo_content(&vmo, b"Read only test");
 
-    assert_get_vmo_err!(proxy, fio::VmoFlags::READ | fio::VmoFlags::WRITE, Status::ACCESS_DENIED);
-    assert_get_vmo_err!(
-        proxy,
-        fio::VmoFlags::READ | fio::VmoFlags::WRITE | fio::VmoFlags::SHARED_BUFFER,
+    let vmo =
+        assert_get_vmo(&proxy, fio::VmoFlags::READ | fio::VmoFlags::SHARED_BUFFER).await.unwrap();
+    assert_vmo_content(&vmo, b"Read only test");
+
+    let vmo =
+        assert_get_vmo(&proxy, fio::VmoFlags::READ | fio::VmoFlags::PRIVATE_CLONE).await.unwrap();
+    assert_vmo_content(&vmo, b"Read only test");
+
+    assert_eq!(
+        assert_get_vmo(&proxy, fio::VmoFlags::READ | fio::VmoFlags::WRITE).await.unwrap_err(),
         Status::ACCESS_DENIED
     );
-    assert_get_vmo_err!(
-        proxy,
-        fio::VmoFlags::READ | fio::VmoFlags::WRITE | fio::VmoFlags::PRIVATE_CLONE,
+    assert_eq!(
+        assert_get_vmo(
+            &proxy,
+            fio::VmoFlags::READ | fio::VmoFlags::WRITE | fio::VmoFlags::SHARED_BUFFER
+        )
+        .await
+        .unwrap_err(),
+        Status::ACCESS_DENIED
+    );
+    assert_eq!(
+        assert_get_vmo(
+            &proxy,
+            fio::VmoFlags::READ | fio::VmoFlags::WRITE | fio::VmoFlags::PRIVATE_CLONE
+        )
+        .await
+        .unwrap_err(),
         Status::ACCESS_DENIED
     );
 

@@ -99,10 +99,19 @@ impl Unpin for Watcher {}
 impl Watcher {
     /// Creates a new `Watcher` for the directory given by `dir`.
     pub async fn new(dir: &fio::DirectoryProxy) -> Result<Watcher, WatcherCreateError> {
+        Self::new_with_mask(dir, fio::WatchMask::all()).await
+    }
+
+    /// Creates a new `Watcher` for the directory given by `dir`, only returning events specified
+    /// by `mask`.
+    pub async fn new_with_mask(
+        dir: &fio::DirectoryProxy,
+        mask: fio::WatchMask,
+    ) -> Result<Watcher, WatcherCreateError> {
         let (client_end, server_end) = dir.domain().create_endpoints();
         let options = 0u32;
         let status = dir
-            .watch(fio::WatchMask::all(), options, server_end)
+            .watch(mask, options, server_end)
             .await
             .map_err(WatcherCreateError::SendWatchRequest)?;
         zx_status::Status::ok(status).map_err(WatcherCreateError::WatchError)?;

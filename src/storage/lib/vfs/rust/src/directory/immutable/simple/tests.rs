@@ -14,15 +14,19 @@ use crate::file::{self, FidlIoConnection, File, FileIo, FileLike, FileOptions};
 use crate::node::Node;
 use crate::path::Path;
 use crate::{
-    assert_close, assert_get_attr, assert_query, assert_read, assert_read_dirents,
-    assert_read_dirents_err, assert_seek, assert_write,
+    assert_close, assert_get_attr, assert_query, assert_read, assert_read_dirents, assert_seek,
+    assert_write,
 };
 use assert_matches::assert_matches;
 use fidl_fuchsia_io as fio;
-use fuchsia_fs::directory::{open_directory, open_directory_async, open_file, open_file_async};
+use fuchsia_fs::directory::{
+    open_directory, open_directory_async, open_file, open_file_async, WatchEvent, WatchMessage,
+    Watcher,
+};
 use fuchsia_sync::Mutex;
 use futures::StreamExt as _;
 use static_assertions::assert_eq_size;
+use std::path::PathBuf;
 use std::sync::Arc;
 use vfs_macros::pseudo_directory;
 use zx_status::Status;
@@ -542,7 +546,9 @@ async fn read_dirents_very_small_buffer() {
         "file" => file::read_only(b"Content"),
     };
     let root = serve(dir, fio::PERM_READABLE);
-    assert_read_dirents_err!(root, 8, Status::BUFFER_TOO_SMALL);
+    let (status, entries) = root.read_dirents(8).await.expect("read_dirents fidl error");
+    assert_eq!(Status::from_raw(status), Status::BUFFER_TOO_SMALL);
+    assert_eq!(entries.len(), 0);
     assert_close!(root);
 }
 
@@ -567,7 +573,8 @@ async fn read_dirents_rewind() {
         .add(fio::DirentType::File, b"files");
     assert_read_dirents!(root, 39, expected.into_vec());
 
-    assert_rewind!(root);
+    let status = root.rewind().await.expect("rewind fidl error");
+    assert_eq!(Status::from_raw(status), Status::OK);
 
     let mut expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
     // Entry header is 10 bytes + length of the name in bytes.
@@ -833,16 +840,17 @@ async fn in_tree_move_file() {
 async fn watch_empty() {
     let dir = Simple::new();
     let root = serve(dir, fio::PERM_READABLE);
-    let mask = fio::WatchMask::EXISTING
-        | fio::WatchMask::IDLE
-        | fio::WatchMask::ADDED
-        | fio::WatchMask::REMOVED;
-    let watcher_client = assert_watch!(root, mask);
+    let mut watcher = Watcher::new(&root).await.unwrap();
 
-    assert_watcher_one_message_watched_events!(watcher_client, { EXISTING, "." });
-    assert_watcher_one_message_watched_events!(watcher_client, { IDLE, vec![] });
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from(".") }))
+    );
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::IDLE, filename: PathBuf::new() }))
+    );
 
-    drop(watcher_client);
     assert_close!(root);
 }
 
@@ -858,21 +866,25 @@ async fn watch_non_empty() {
         "files" => file::read_only(b"Content"),
     };
     let root = serve(dir, fio::PERM_READABLE);
-    let mask = fio::WatchMask::EXISTING
-        | fio::WatchMask::IDLE
-        | fio::WatchMask::ADDED
-        | fio::WatchMask::REMOVED;
-    let watcher_client = assert_watch!(root, mask);
+    let mut watcher = Watcher::new(&root).await.unwrap();
 
-    assert_watcher_one_message_watched_events!(
-        watcher_client,
-        { EXISTING, "." },
-        { EXISTING, "etc" },
-        { EXISTING, "files" },
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from(".") }))
     );
-    assert_watcher_one_message_watched_events!(watcher_client, { IDLE, vec![] });
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from("etc") }))
+    );
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from("files") }))
+    );
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::IDLE, filename: PathBuf::new() }))
+    );
 
-    drop(watcher_client);
     assert_close!(root);
 }
 
@@ -888,33 +900,44 @@ async fn watch_two_watchers() {
         "files" => file::read_only(b"Content"),
     };
     let root = serve(dir, fio::PERM_READABLE);
+    let mut watcher = Watcher::new(&root).await.unwrap();
 
-    let mask = fio::WatchMask::EXISTING
-        | fio::WatchMask::IDLE
-        | fio::WatchMask::ADDED
-        | fio::WatchMask::REMOVED;
-    let watcher1_client = assert_watch!(root, mask);
-
-    assert_watcher_one_message_watched_events!(
-        watcher1_client,
-        { EXISTING, "." },
-        { EXISTING, "etc" },
-        { EXISTING, "files" },
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from(".") }))
     );
-    assert_watcher_one_message_watched_events!(watcher1_client, { IDLE, vec![] });
-
-    let watcher2_client = assert_watch!(root, mask);
-
-    assert_watcher_one_message_watched_events!(
-        watcher2_client,
-        { EXISTING, "." },
-        { EXISTING, "etc" },
-        { EXISTING, "files" },
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from("etc") }))
     );
-    assert_watcher_one_message_watched_events!(watcher2_client, { IDLE, vec![] });
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from("files") }))
+    );
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::IDLE, filename: PathBuf::new() }))
+    );
 
-    drop(watcher1_client);
-    drop(watcher2_client);
+    let mut watcher2 = Watcher::new(&root).await.unwrap();
+
+    assert_eq!(
+        watcher2.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from(".") }))
+    );
+    assert_eq!(
+        watcher2.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from("etc") }))
+    );
+    assert_eq!(
+        watcher2.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from("files") }))
+    );
+    assert_eq!(
+        watcher2.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::IDLE, filename: PathBuf::new() }))
+    );
+
     assert_close!(root);
 }
 
@@ -938,24 +961,32 @@ async fn watch_addition() {
     assert_close!(file);
 
     let etc_proxy = open_directory(&root, "etc", fio::PERM_READABLE).await.unwrap();
-    let watch_mask = fio::WatchMask::EXISTING
-        | fio::WatchMask::IDLE
-        | fio::WatchMask::ADDED
-        | fio::WatchMask::REMOVED;
-    let watcher = assert_watch!(etc_proxy, watch_mask);
+    let mut watcher = Watcher::new(&etc_proxy).await.unwrap();
 
-    assert_watcher_one_message_watched_events!(
-        watcher,
-        { EXISTING, "." },
-        { EXISTING, "passwd" },
-        { EXISTING, "ssh" },
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from(".") }))
     );
-    assert_watcher_one_message_watched_events!(watcher, { IDLE, vec![] });
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from("passwd") }))
+    );
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from("ssh") }))
+    );
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::IDLE, filename: PathBuf::new() }))
+    );
 
     let fstab = file::read_only(b"/dev/fs /");
     etc.add_entry("fstab", fstab).unwrap();
 
-    assert_watcher_one_message_watched_events!(watcher, { ADDED, "fstab" });
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::ADD_FILE, filename: PathBuf::from("fstab") }))
+    );
 
     let file = open_file(&root, "etc/fstab", fio::PERM_READABLE).await.unwrap();
     assert_read!(file, "/dev/fs /");
@@ -988,19 +1019,24 @@ async fn watch_removal() {
     assert_close!(file);
 
     let etc_proxy = open_directory(&root, "etc", fio::PERM_READABLE).await.unwrap();
-    let watch_mask = fio::WatchMask::EXISTING
-        | fio::WatchMask::IDLE
-        | fio::WatchMask::ADDED
-        | fio::WatchMask::REMOVED;
-    let watcher = assert_watch!(etc_proxy, watch_mask);
+    let mut watcher = Watcher::new(&etc_proxy).await.unwrap();
 
-    assert_watcher_one_message_watched_events!(
-        watcher,
-        { EXISTING, "." },
-        { EXISTING, "fstab" },
-        { EXISTING, "passwd" },
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from(".") }))
     );
-    assert_watcher_one_message_watched_events!(watcher, { IDLE, vec![] });
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from("fstab") }))
+    );
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: PathBuf::from("passwd") }))
+    );
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::IDLE, filename: PathBuf::new() }))
+    );
 
     let o_passwd = etc.remove_entry("passwd", false).unwrap();
     match o_passwd {
@@ -1011,7 +1047,13 @@ async fn watch_removal() {
         }
     }
 
-    assert_watcher_one_message_watched_events!(watcher, { REMOVED, "passwd" });
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage {
+            event: WatchEvent::REMOVE_FILE,
+            filename: PathBuf::from("passwd")
+        }))
+    );
 
     let file = open_file(&root, "etc/fstab", fio::PERM_READABLE).await.unwrap();
     assert_read!(file, "/dev/fs /");
@@ -1034,12 +1076,14 @@ async fn watch_with_mask() {
         "files" => file::read_only(b"Content"),
     };
     let root = serve(dir, fio::PERM_READABLE);
+
     let mask = fio::WatchMask::IDLE | fio::WatchMask::ADDED | fio::WatchMask::REMOVED;
-    let watcher_client = assert_watch!(root, mask);
+    let mut watcher = Watcher::new_with_mask(&root, mask).await.unwrap();
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::IDLE, filename: PathBuf::new() }))
+    );
 
-    assert_watcher_one_message_watched_events!(watcher_client, { IDLE, vec![] });
-
-    drop(watcher_client);
     assert_close!(root);
 }
 
@@ -1050,17 +1094,19 @@ async fn watch_remove_all_entries() {
         "file2" => file::read_only(""),
     };
     let root = serve(dir.clone(), fio::PERM_READABLE);
+    let mut watcher = Watcher::new_with_mask(&root, fio::WatchMask::REMOVED).await.unwrap();
 
-    let watcher = assert_watch!(root, fio::WatchMask::REMOVED);
     dir.remove_all_entries();
 
-    assert_watcher_one_message_watched_events!(
-        watcher,
-        { REMOVED, "file1" },
-        { REMOVED, "file2"}
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::REMOVE_FILE, filename: PathBuf::from("file1") }))
+    );
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::REMOVE_FILE, filename: PathBuf::from("file2") }))
     );
 
-    drop(watcher);
     assert_close!(root);
 }
 

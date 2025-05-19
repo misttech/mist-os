@@ -75,7 +75,6 @@ common_vfs_args = {
     "src/file/connection.rs",
     "src/file/simple.rs",
     "src/file/simple/tests.rs",
-    "src/file/test_utils.rs",
     "src/file/vmo.rs",
     "src/file/vmo/tests.rs",
     "src/lib.rs",
