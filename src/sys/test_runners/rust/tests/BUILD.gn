@@ -61,6 +61,9 @@ fuchsia_test_package("rust-runner-integration-test") {
   test_components = [ ":rust_runner_integration_test" ]
   subpackages = [ "//src/sys/test_manager:pkg" ]
 
+  # TODO(https://fxbug.dev/412436921): Use subpackages instead of package_deps.
+  package_deps = [ "../test_data:rust-test-runner-example" ]
+
   if (!is_coverage) {
     # https://fxbug.dev/42157229: This stress test times out on coverage bot.
     test_components += [ ":rust_runner_stress_test" ]

@@ -97,6 +97,13 @@ _log_severity_allowed_val = [
 #     details.
 #     Type: list of targets
 #
+#   package_deps (optional)
+#     A list of `fuchsia_package` targets that are not subpackages but needed
+#     by the test at runtime. This will get forwarded to the test_spec. See
+#     //build/testing/test_spec.gni for more details. If using this instead of
+#     `subpackages`, please add a comment explaining why.
+#     Type: list of targets
+#
 #   is_bootfs (optional)
 #     ONLY to be used by |fuchsia_bootfs_test_package| to indicate a bootfs based package.
 #
@@ -321,6 +328,7 @@ template("fuchsia_test_package") {
                                "deps",
                                "disable_elf_binaries_checks",
                                "metadata",
+                               "package_deps",
                                "visibility",
                              ])
       package_name = package_name

@@ -60,6 +60,8 @@ fuchsia_test_component("vkvalidation_external_cmp") {
 
 fuchsia_test_package("vkvalidation-external-pkg") {
   package_name = "vkvalidation-external"
+  package_deps =
+      [ "//src/lib/vulkan/vulkan-validation-pkg:validation-server-pkg" ]
   test_components = [ ":vkvalidation_external_cmp" ]
   test_specs = {
     environments = magma_libvulkan_hardware_envs

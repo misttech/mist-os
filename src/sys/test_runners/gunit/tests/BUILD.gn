@@ -37,6 +37,9 @@ fuchsia_test_component("gunit_runner_integration_test") {
 fuchsia_test_package("gunit-runner-integration-test") {
   test_components = [ ":gunit_runner_integration_test" ]
   subpackages = [ "//src/sys/test_manager:pkg" ]
+
+  # TODO(https://fxbug.dev/412436921): Use subpackages instead of package_deps.
+  package_deps = [ ":gunit-runner-example-tests" ]
 }
 
 fuchsia_component("empty_test_component") {

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/board.gni")
+import("//build/config/fuchsia/target_api_level.gni")
 import("//build/group_with_inputs.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/platforms.gni")
@@ -410,6 +411,7 @@ template("test_spec") {
   }
 
   target_name_deps = []
+  target_name_data_deps = []
 
   # Rely on metadata reachable through deps to determine any runtime
   # dependencies of the test; record them to a file.
@@ -440,15 +442,28 @@ template("test_spec") {
   # Some tests depend on other packages so get the paths to the
   # package_manifests of those package dependencies to attach to
   # the test_spec of the test so we know what blobs it depends on.
+  # Most target tests use debug_agent to get backtraces so include
+  # it by default. A target test can be defined by a test that has a
+  # package_manifests field.
   pkg_manifest_deps_file = ""
-  if (defined(invoker.package_deps) && invoker.package_deps != []) {
+  package_deps = []
+  if (defined(invoker.package_deps)) {
+    package_deps = invoker.package_deps
+  }
+  if (package_deps != [] || defined(invoker.package_label)) {
+    if (target_cpu != "riscv64" &&
+        current_build_target_api_level == "PLATFORM") {
+      # TODO(https://fxbug.dev/42074048): Remove conditional once
+      # debug_agent works for riscv64.
+      package_deps += [ "//src/developer/debug/debug_agent" ]
+    }
     pkg_manifest_deps_file = "$target_gen_dir/${target_name}.pkg_manifests.json"
     pkg_manifest_deps_target_name = "${target_name}_pkg_manifest_deps"
 
     _manifest_entries = []
     _manifest_inputs = []
     _package_deps_with_toolchain = []
-    foreach(package_dep, invoker.package_deps) {
+    foreach(package_dep, package_deps) {
       _package_deps_with_toolchain +=
           [ get_label_info(package_dep, "label_no_toolchain") +
             "(${target_toolchain})" ]
@@ -474,7 +489,7 @@ template("test_spec") {
       deps = _package_deps_with_toolchain
       inputs = _manifest_inputs
     }
-    target_name_deps += [
+    target_name_data_deps += [
       ":${pkg_manifest_deps_inputs_name}",
       ":${pkg_manifest_deps_target_name}",
     ]
@@ -616,6 +631,7 @@ template("test_spec") {
       tests = [ test_spec ]
     }
     deps = target_name_deps
+    data_deps = target_name_data_deps
     if (defined(invoker.isolated) && invoker.isolated &&
         # Tests that use product bundles, primarily boot tests, must necessarily
         # run in isolated mode, so they need not be explicitly included in the

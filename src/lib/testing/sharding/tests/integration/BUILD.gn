@@ -46,5 +46,5 @@ fuchsia_test_package("sharding-integration-tests") {
   # from universe via the subpackaged test manager.
   # TODO(http://b/301507292): Stop requiring use of the system resolver in
   # test manager tests.
-  deps = [ "//src/lib/testing/sharding/tests/example_sharded_test:example-sharded-test" ]
+  package_deps = [ "//src/lib/testing/sharding/tests/example_sharded_test:example-sharded-test" ]
 }

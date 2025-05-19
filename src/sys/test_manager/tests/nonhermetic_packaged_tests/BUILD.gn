@@ -26,6 +26,7 @@ fuchsia_test_component("echo_test_specific_package") {
 
 fuchsia_test_package("nonhermetic_packaged_test") {
   test_components = [ ":echo_test_specific_package" ]
+  package_deps = [ ":echo_server_for_test" ]
 }
 
 fuchsia_package("echo_server_for_test") {

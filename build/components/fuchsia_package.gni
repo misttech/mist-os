@@ -391,6 +391,9 @@ template("fuchsia_package") {
                              ])
       public_deps = [ ":$_package_build_target" ]
       deps = main_target_deps
+      if (defined(invoker.package_deps)) {
+        deps += invoker.package_deps
+      }
       if (_is_driver_package) {
         metadata = {
           # Allow exclusion of driver packages by assembly
