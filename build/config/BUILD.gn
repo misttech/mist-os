@@ -923,6 +923,11 @@ config("Wno-undef") {
   visibility = [ "//third_party/googletest:*" ]
 }
 
+config("Wno-character-conversion") {
+  cflags = [ "-Wno-character-conversion" ]
+  visibility = [ "//src/lib/android/aidl:*" ]
+}
+
 config("Wno-bitfield-conversion") {
   cflags = [ "-Wno-bitfield-conversion" ]
   visibility = [ "//src/lib/vulkan:*" ]
