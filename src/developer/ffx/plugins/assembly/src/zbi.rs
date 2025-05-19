@@ -23,7 +23,6 @@ use zbi::ZbiBuilder;
 pub fn construct_zbi(
     zbi_tool: Box<dyn Tool>,
     assembly_manifest: &mut AssemblyManifest,
-    outdir: impl AsRef<Utf8Path>,
     gendir: impl AsRef<Utf8Path>,
     product: &ImageAssemblyConfig,
     zbi_config: &Zbi,
@@ -126,7 +125,7 @@ pub fn construct_zbi(
     zbi_builder.set_output_manifest(gendir.as_ref().join("zbi.json"));
 
     // Build and return the ZBI.
-    let zbi_path = outdir.as_ref().join(format!("{}.zbi", zbi_config.name));
+    let zbi_path = gendir.as_ref().join(format!("{}.zbi", zbi_config.name));
     zbi_builder.build(gendir, zbi_path.as_path())?;
 
     // Only add the unsigned ZBI to the images manifest if we will not be signing the ZBI.
@@ -145,7 +144,7 @@ pub fn construct_zbi(
 pub fn vendor_sign_zbi(
     signing_tool: Box<dyn Tool>,
     assembly_manifest: &mut AssemblyManifest,
-    outdir: impl AsRef<Utf8Path>,
+    gendir: impl AsRef<Utf8Path>,
     zbi_config: &Zbi,
     zbi: impl AsRef<Utf8Path>,
 ) -> Result<Utf8PathBuf> {
@@ -155,7 +154,7 @@ pub fn vendor_sign_zbi(
     };
 
     // The resultant file path
-    let signed_path = outdir.as_ref().join(format!("{}.zbi.signed", zbi_config.name));
+    let signed_path = gendir.as_ref().join(format!("{}.zbi.signed", zbi_config.name));
 
     // If the script config defines extra arguments, add them:
     let mut args = Vec::new();
@@ -172,9 +171,9 @@ pub fn vendor_sign_zbi(
 
     // It is intended to copy the signed zbi to foo.zbi and move the unsigned
     // to a new location (foo.zbi.unsigned).
-    let output_zbi_path = outdir.as_ref().join(format!("{}.zbi", zbi_config.name));
+    let output_zbi_path = gendir.as_ref().join(format!("{}.zbi", zbi_config.name));
     if signed_path.is_file() {
-        let unsigned_zbi_path = outdir.as_ref().join(format!("{}.zbi.unsigned", zbi_config.name));
+        let unsigned_zbi_path = gendir.as_ref().join(format!("{}.zbi.unsigned", zbi_config.name));
         copy(&output_zbi_path, &unsigned_zbi_path).context("Copy unsigned zbi")?;
         copy(&signed_path, &output_zbi_path).context("Copy signed zbi")?;
     }
@@ -257,7 +256,6 @@ mod tests {
             zbi_tool,
             &mut assembly_manifest,
             dir,
-            dir,
             &product_config,
             &zbi_config,
             Some(&base),
@@ -283,7 +281,6 @@ mod tests {
         construct_zbi(
             zbi_tool,
             &mut assembly_manifest,
-            dir,
             dir,
             &product_config,
             &zbi_config,

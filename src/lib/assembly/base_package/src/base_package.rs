@@ -50,12 +50,10 @@ impl BasePackageBuilder {
     /// `gendir`.
     pub fn build(
         self,
-        outdir: impl AsRef<Utf8Path>,
         gendir: impl AsRef<Utf8Path>,
         name: impl AsRef<str>,
         out: impl AsRef<Utf8Path>,
     ) -> Result<BasePackageBuildResults> {
-        let outdir = outdir.as_ref();
         let gendir = gendir.as_ref();
         let out = out.as_ref();
 
@@ -101,7 +99,7 @@ impl BasePackageBuilder {
         for (destination, source) in &external_contents {
             builder.add_file_as_blob(destination, source)?;
         }
-        let manifest_path = outdir.join("package_manifest.json");
+        let manifest_path = gendir.join("package_manifest.json");
         builder.manifest_path(manifest_path.clone());
         builder.manifest_blobs_relative_to(RelativeTo::File);
         builder.build(gendir.as_std_path(), out.as_std_path())?;
@@ -111,7 +109,7 @@ impl BasePackageBuilder {
             base_packages,
             cache_packages,
             generated_files,
-            manifest_path: manifest_path,
+            manifest_path,
         })
     }
 }
@@ -154,9 +152,9 @@ mod tests {
 
     #[test]
     fn build() {
-        let outdir_tmp = TempDir::new().unwrap();
-        let outdir = Utf8Path::from_path(outdir_tmp.path()).unwrap();
-        let far_path = outdir.join("base.far");
+        let gendir_tmp = TempDir::new().unwrap();
+        let gendir = Utf8Path::from_path(gendir_tmp.path()).unwrap();
+        let far_path = gendir.join("base.far");
 
         // Build the base package with an extra file, a base package, and a cache package.
         let mut builder = BasePackageBuilder::default();
@@ -165,9 +163,7 @@ mod tests {
         builder.add_base_package(generate_test_manifest("base_package", None)).unwrap();
         builder.add_cache_package(generate_test_manifest("cache_package", None)).unwrap();
 
-        let gendir_tmp = TempDir::new().unwrap();
-        let gendir = Utf8Path::from_path(gendir_tmp.path()).unwrap();
-        let build_results = builder.build(&outdir, &gendir, "system_image", &far_path).unwrap();
+        let build_results = builder.build(&gendir, "system_image", &far_path).unwrap();
 
         // The following asserts lead up to the final one, catching earlier failure points where it
         // can be more obvious as to why the test is failing, as the hashes themselves are opaque.

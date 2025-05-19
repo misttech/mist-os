@@ -154,7 +154,7 @@ if (current_toolchain == default_toolchain) {
     ]
 
     inputs = [
-      target_out_dir + "/${img_name}/${img_name}.zbi",
+      target_out_dir + "/${img_name}_gen/${img_name}.zbi",
       zbi_tool_path,
     ]
     outputs = [ output_file ]
@@ -163,7 +163,7 @@ if (current_toolchain == default_toolchain) {
       "--zbi",
       rebase_path(zbi_tool_path, root_build_dir),
       "--zbi-image",
-      rebase_path(target_out_dir + "/${img_name}/${img_name}.zbi",
+      rebase_path(target_out_dir + "/${img_name}_gen/${img_name}.zbi",
                   root_build_dir),
       "--output",
       rebase_path(outputs[0], root_build_dir),

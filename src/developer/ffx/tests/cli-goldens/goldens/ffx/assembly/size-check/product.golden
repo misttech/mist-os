@@ -32,7 +32,7 @@
       "optionality": "required",
       "long": "--assembly-manifest",
       "short": null,
-      "description": "path to assembly_manifest.json.",
+      "description": "path to the images.json.",
       "hidden": false
     },
     {
@@ -44,7 +44,7 @@
       "optionality": "optional",
       "long": "--base-assembly-manifest",
       "short": null,
-      "description": "path to the bast assembly_manifest.json which will be used to compare with the current assembly_manifest.json to produce a diff.",
+      "description": "path to the past images.json which will be used to compare with the current images.json to produce a diff.",
       "hidden": false
     },
     {

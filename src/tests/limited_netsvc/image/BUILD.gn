@@ -42,7 +42,7 @@ if (is_host) {
     _assembled_system_label =
         ":limited_netsvc_assembled_system($default_toolchain)"
     _out_dir = get_label_info(_assembled_system_label, "target_out_dir")
-    sources = [ "${_out_dir}/limited_netsvc_assembled_system/limited_netsvc_assembled_system.zbi" ]
+    sources = [ "${_out_dir}/limited_netsvc_assembled_system_gen/limited_netsvc_assembled_system.zbi" ]
     deps = [ _assembled_system_label ]
   }
 }

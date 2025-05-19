@@ -10,7 +10,6 @@ load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_elf_sizes_impl(ctx):
-    images_out = ctx.attr.product[FuchsiaProductImageInfo].images_out
     images_intermediates = ctx.attr.product[FuchsiaProductImageInfo].images_intermediates
     zbi = get_fuchsia_sdk_toolchain(ctx).zbi
 
@@ -31,7 +30,7 @@ def _fuchsia_elf_sizes_impl(ctx):
             extracted_zbi_json.path,
             # NOTE: This currently only supports fuchsia.zbi, for other ZBIs
             # we'll need a way to figure out their names.
-            images_out.path + "/fuchsia.zbi",
+            images_intermediates.path + "/fuchsia.zbi",
         ]),
         progress_message = "Extracting bootfs for %s" % ctx.label.name,
         **LOCAL_ONLY_ACTION_KWARGS

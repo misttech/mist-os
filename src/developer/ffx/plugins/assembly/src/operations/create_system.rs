@@ -58,7 +58,6 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         info!("Creating base package");
         Some(construct_base_package(
             &mut assembly_manifest,
-            &outdir,
             &gendir,
             &base_package_name,
             &image_assembly_config,
@@ -88,7 +87,6 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         // TODO: warn if bootfs_only mode
         if let Some(base_package) = &base_package {
             construct_fvm(
-                &outdir,
                 &gendir,
                 &tools,
                 &mut assembly_manifest,
@@ -103,8 +101,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         info!("Constructing Fxfs image <EXPERIMENTAL!>");
         if let Some(base_package) = &base_package {
             let ConstructedFxfs { image_path, sparse_image_path, contents } =
-                construct_fxfs(&outdir, &gendir, &image_assembly_config, base_package, fxfs_config)
-                    .await?;
+                construct_fxfs(&gendir, &image_assembly_config, base_package, fxfs_config).await?;
             assembly_manifest.images.push(assembly_manifest::Image::Fxfs {
                 path: image_path,
                 contents: contents.clone(),
@@ -137,7 +134,6 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         Some(zbi::construct_zbi(
             tools.get_tool("zbi")?,
             &mut assembly_manifest,
-            &outdir,
             &gendir,
             &image_assembly_config,
             zbi_config,
@@ -160,7 +156,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
 
     if let Some(vbmeta_config) = vbmeta_config {
         info!("Creating the VBMeta image");
-        vbmeta::construct_vbmeta(&mut assembly_manifest, &outdir, vbmeta_config, &zbi_path)
+        vbmeta::construct_vbmeta(&mut assembly_manifest, &gendir, vbmeta_config, &zbi_path)
             .context("Creating the VBMeta image")?;
     } else {
         info!("Skipping vbmeta creation");
@@ -184,7 +180,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
                 zbi::vendor_sign_zbi(
                     signing_tool,
                     &mut assembly_manifest,
-                    &outdir,
+                    &gendir,
                     zbi_config,
                     &zbi_path,
                 )
@@ -202,7 +198,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
 
     // Write the packages manifest.
     create_package_manifest(
-        &outdir,
+        &gendir,
         base_package_name,
         &image_assembly_config,
         base_package.as_ref(),
@@ -218,12 +214,12 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
 }
 
 fn create_package_manifest(
-    outdir: impl AsRef<Utf8Path>,
+    gendir: impl AsRef<Utf8Path>,
     base_package_name: impl AsRef<str>,
     assembly_config: &ImageAssemblyConfig,
     base_package: Option<&BasePackage>,
 ) -> Result<()> {
-    let packages_path = outdir.as_ref().join("packages.json");
+    let packages_path = gendir.as_ref().join("packages.json");
     let packages_file = File::create(packages_path).context("Creating the packages manifest")?;
     let mut packages_manifest = UpdatePackagesManifest::V1(BTreeSet::new());
     let mut add_packages_to_update = |packages: &Vec<Utf8PathBuf>| -> Result<()> {

@@ -91,9 +91,9 @@ if (!use_bazel_images_only && blobfs_capacity != false &&
   _output_dir =
       get_label_info(":convert_size_limits_to_size_budgets", "target_out_dir")
   _size_budgets_blobfs_file = "${_output_dir}/size_budgets.json"
-  _blobs_config = "${_output_dir}/../fuchsia/fuchsia/gen/blobs.json"
+  _blobs_config = "${_output_dir}/../fuchsia/fuchsia_gen/blobs.json"
   _image_assembly_config =
-      "${_output_dir}/../fuchsia/fuchsia/image_assembly.json"
+      "${_output_dir}/../fuchsia/fuchsia_gen/image_assembly.json"
 
   action("convert_size_limits_to_size_budgets") {
     script = "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/tools/convert_size_limits.py"

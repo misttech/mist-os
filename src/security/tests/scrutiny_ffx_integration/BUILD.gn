@@ -122,13 +122,14 @@ if (is_host) {
       sources = [
         get_label_info(
                 ":${_assemble_system_target_name}.image_assembler($target_toolchain)",
-                "target_out_dir") + "/${_assemble_system_target_name}/blob.blk",
+                "target_out_dir") +
+            "/${_assemble_system_target_name}_gen/blob.blk",
         get_label_info(
                 ":${_assemble_system_target_name}.image_assembler($target_toolchain)",
-                "target_out_dir") + "/${_assemble_system_target_name}/${_assemble_system_target_name}.zbi",
+                "target_out_dir") + "/${_assemble_system_target_name}_gen/${_assemble_system_target_name}.zbi",
         get_label_info(
                 ":${_assemble_system_recovery_target_name}.image_assembler($target_toolchain)",
-                "target_out_dir") + "/${_assemble_system_recovery_target_name}/${_assemble_system_recovery_target_name}.zbi",
+                "target_out_dir") + "/${_assemble_system_recovery_target_name}_gen/${_assemble_system_recovery_target_name}.zbi",
       ]
       outputs = [ "$target_out_dir/testdata/{{source_file_part}}" ]
 

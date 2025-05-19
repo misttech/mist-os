@@ -172,11 +172,11 @@ pub struct ProductSizeCheckArgs {
     /// use specific auth mode for oauth2 (see examples; default: pkce).
     #[argh(option, default = "AuthMode::Default")]
     pub auth: AuthMode,
-    /// path to assembly_manifest.json.
+    /// path to the images.json.
     #[argh(option)]
     pub assembly_manifest: Utf8PathBuf,
-    /// path to the bast assembly_manifest.json which will be used to compare with the current
-    /// assembly_manifest.json to produce a diff.
+    /// path to the past images.json which will be used to compare with the current
+    /// images.json to produce a diff.
     #[argh(option)]
     pub base_assembly_manifest: Option<Utf8PathBuf>,
     /// whether to show the verbose output.

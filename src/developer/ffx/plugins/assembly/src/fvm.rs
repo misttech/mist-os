@@ -28,7 +28,6 @@ use utf8_path::path_relative_from_current_dir;
 /// sparse FVM will also be generated for fastboot flashing.
 #[allow(clippy::too_many_arguments)]
 pub fn construct_fvm(
-    outdir: impl AsRef<Utf8Path>,
     gendir: impl AsRef<Utf8Path>,
     tools: &impl ToolProvider,
     assembly_manifest: &mut AssemblyManifest,
@@ -39,7 +38,6 @@ pub fn construct_fvm(
     base_package: &BasePackage,
 ) -> Result<()> {
     let mut builder = MultiFvmBuilder::new(
-        outdir,
         gendir,
         assembly_config,
         assembly_manifest,
@@ -65,8 +63,6 @@ pub struct MultiFvmBuilder<'a> {
     filesystems: HashMap<String, FilesystemEntry>,
     /// List of the FVMs to generate.
     outputs: Vec<FvmOutput>,
-    /// The directory to write the outputs into.
-    outdir: Utf8PathBuf,
     /// The directory to write the intermediate outputs into.
     gendir: Utf8PathBuf,
     /// The image assembly config.
@@ -96,7 +92,6 @@ impl<'a> MultiFvmBuilder<'a> {
     /// These parameters are constant across all generated FVMs.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        outdir: impl AsRef<Utf8Path>,
         gendir: impl AsRef<Utf8Path>,
         assembly_config: &'a ImageAssemblyConfig,
         assembly_manifest: &'a mut AssemblyManifest,
@@ -108,7 +103,6 @@ impl<'a> MultiFvmBuilder<'a> {
         Self {
             filesystems: HashMap::new(),
             outputs: Vec::new(),
-            outdir: outdir.as_ref().to_path_buf(),
             gendir: gendir.as_ref().to_path_buf(),
             assembly_config,
             assembly_manifest,
@@ -165,7 +159,7 @@ impl<'a> MultiFvmBuilder<'a> {
         match &output {
             FvmOutput::Standard(config) => {
                 let fvm_tool = tools.get_tool("fvm")?;
-                let path = self.outdir.join(format!("{}.blk", &config.name));
+                let path = self.gendir.join(format!("{}.blk", &config.name));
                 let fvm_type = FvmType::Standard {
                     resize_image_file_to_fit: config.resize_image_file_to_fit,
                     truncate_to_length: config.truncate_to_length,
@@ -198,7 +192,7 @@ impl<'a> MultiFvmBuilder<'a> {
             }
             FvmOutput::Sparse(config) => {
                 let fvm_tool = tools.get_tool("fvm")?;
-                let path = self.outdir.join(format!("{}.blk", &config.name));
+                let path = self.gendir.join(format!("{}.blk", &config.name));
                 let fvm_type = FvmType::Sparse { max_disk_size: config.max_disk_size };
                 let compress = true;
                 let mut builder = FvmBuilder::new(
@@ -234,8 +228,8 @@ impl<'a> MultiFvmBuilder<'a> {
 
                 // Second, prepare it for NAND.
                 let tool = tools.get_tool("fvm")?;
-                let sparse_output = self.outdir.join(format!("{}.blk", &sparse_tmp_name));
-                let output = self.outdir.join(format!("{}.blk", &config.name));
+                let sparse_output = self.gendir.join(format!("{}.blk", &sparse_tmp_name));
+                let output = self.gendir.join(format!("{}.blk", &config.name));
                 let compression = if config.compress { Some("lz4".to_string()) } else { None };
                 let builder = NandFvmBuilder {
                     tool,
@@ -298,7 +292,6 @@ impl<'a> MultiFvmBuilder<'a> {
             FvmFilesystem::BlobFS(config) => {
                 let (path, contents) = construct_blobfs(
                     tools.get_tool("blobfs")?,
-                    &self.outdir,
                     &self.gendir,
                     self.assembly_config,
                     config,
@@ -366,7 +359,6 @@ mod tests {
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
             dir,
-            dir,
             &assembly_config,
             &mut assembly_manifest,
             compress_blobfs,
@@ -399,7 +391,6 @@ mod tests {
         let compress_blobfs = true;
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
-            dir,
             dir,
             &assembly_config,
             &mut assembly_manifest,
@@ -451,7 +442,6 @@ mod tests {
         let compress_blobfs = true;
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
-            dir,
             dir,
             &assembly_config,
             &mut assembly_manifest,
@@ -578,7 +568,6 @@ mod tests {
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
             dir,
-            dir,
             &assembly_config,
             &mut assembly_manifest,
             compress_blobfs,
@@ -677,7 +666,6 @@ mod tests {
         let compress_blobfs = false;
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
-            dir,
             dir,
             &assembly_config,
             &mut assembly_manifest,

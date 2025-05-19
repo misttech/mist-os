@@ -144,9 +144,10 @@ template("assemble_security_pkg_test_system") {
     assembly_target_out =
         get_label_info(":${labels.assembly}", "target_out_dir")
     assembly_out = "${assembly_target_out}/${assembly_name}"
+    assembly_gen = "${assembly_target_out}/${assembly_name}_gen"
     update_out = "${assembly_target_out}/${labels.update_package}"
     all_package_manifests_list_out =
-        "${assembly_out}/all_package_manifests_list"
+        "${assembly_gen}/all_package_manifests_list"
   }
   if (current_toolchain == target_toolchain) {
     directories.packaged_repository =
@@ -154,11 +155,10 @@ template("assemble_security_pkg_test_system") {
   }
 
   files = {
-    assembly_out_packages_json = "${directories.assembly_out}/packages.json"
     packages_json =
-        "${directories.assembly_out}/security_pkg_test_packages.json"
+        "${directories.assembly_gen}/security_pkg_test_packages.json"
+    board_config = "${directories.assembly_gen}/board_config.json"
     images_json = "${directories.assembly_out}/images.json"
-    board_config = "${directories.assembly_out}/board_config.json"
     base_package_manifests_list =
         "${target_out_dir}/${assembly_name}.base_packages.list"
     update_packages_manifests_list =
@@ -183,11 +183,11 @@ template("assemble_security_pkg_test_system") {
     # a filesystem image. fshost will figure out which one it is when it's loaded into a VMO
     # and added to the isolated dev tree via RamdiskClient.
     fs_blk_resource = {
-      local = "${directories.assembly_out}/${fs_file_name}.blk"
+      local = "${directories.assembly_gen}/${fs_file_name}.blk"
       packaged = "data/assemblies/${packaged_assembly_directory}/fs.blk"
     }
     base_far_resource = {
-      local = "${directories.assembly_out}/base/meta.far"
+      local = "${directories.assembly_gen}/meta.far"
       packaged = "data/assemblies/${packaged_assembly_directory}/base.far"
     }
     update_far_resource = {

@@ -22,14 +22,13 @@ pub struct BasePackage {
 
 pub fn construct_base_package(
     assembly_manifest: &mut AssemblyManifest,
-    outdir: impl AsRef<Utf8Path>,
     gendir: impl AsRef<Utf8Path>,
     name: impl AsRef<str>,
     product: &ImageAssemblyConfig,
 ) -> Result<BasePackage> {
-    let outdir = outdir.as_ref().join("base");
-    if !outdir.exists() {
-        std::fs::create_dir_all(&outdir)?;
+    let gendir = gendir.as_ref();
+    if !gendir.exists() {
+        std::fs::create_dir_all(&gendir)?;
     }
 
     let mut base_pkg_builder = BasePackageBuilder::default();
@@ -52,9 +51,9 @@ pub fn construct_base_package(
         ))?;
     }
 
-    let base_package_path = outdir.join("meta.far");
+    let base_package_path = gendir.join("meta.far");
     let build_results = base_pkg_builder
-        .build(&outdir, gendir, name, &base_package_path)
+        .build(&gendir, name, &base_package_path)
         .context("Failed to build the base package")?;
 
     let base_package = File::open(&base_package_path).context("Failed to open the base package")?;
@@ -64,7 +63,7 @@ pub fn construct_base_package(
     info!("Base merkle: {}", &base_merkle);
 
     // Write the merkle to a file.
-    let merkle_path = outdir.join("base.merkle");
+    let merkle_path = gendir.join("base.merkle");
     std::fs::write(merkle_path, hex::encode(base_merkle.as_bytes()))?;
 
     let base_package_path_relative = path_relative_from_current_dir(base_package_path)?;
@@ -98,11 +97,11 @@ mod tests {
         // Construct the base package.
         let mut assembly_manifest =
             AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
-        construct_base_package(&mut assembly_manifest, dir, dir, "system_image", &product_config)
+        construct_base_package(&mut assembly_manifest, dir, "system_image", &product_config)
             .unwrap();
 
         // Read the base package, and assert the contents are correct.
-        let base_package_path = path_relative_from_current_dir(dir.join("base/meta.far")).unwrap();
+        let base_package_path = path_relative_from_current_dir(dir.join("meta.far")).unwrap();
         let base_package_file = File::open(base_package_path).unwrap();
         let mut far_reader = Utf8Reader::new(&base_package_file).unwrap();
         let contents = far_reader.read_file("meta/contents").unwrap();
@@ -133,11 +132,11 @@ mod tests {
         // Construct the base package.
         let mut assembly_manifest =
             AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
-        construct_base_package(&mut assembly_manifest, dir, dir, "system_image", &product_config)
+        construct_base_package(&mut assembly_manifest, dir, "system_image", &product_config)
             .unwrap();
 
         // Read the base package, and assert the contents are correct.
-        let base_package_path = path_relative_from_current_dir(dir.join("base/meta.far")).unwrap();
+        let base_package_path = path_relative_from_current_dir(dir.join("meta.far")).unwrap();
         let base_package_file = File::open(base_package_path).unwrap();
         let mut far_reader = Utf8Reader::new(&base_package_file).unwrap();
         let contents = far_reader.read_file("meta/package").unwrap();
