@@ -46,27 +46,13 @@ __BEGIN_CDECLS
 #define VTYPE_TO_DTYPE(mode) (((mode) & V_TYPE_MASK) >> 12)
 #define DTYPE_TO_VTYPE(type) (((type) & 15) << 12)
 
-// TODO(b/293947862): Remove vdirent_t and vnattr_t (see deprecation notes below).
-
+/// The format of directory entries returned by fuchsia.io/Directory.ReadDirents.
 typedef struct vdirent {
   uint64_t ino;
   uint8_t size;
   uint8_t type;
   char name[0];
-} __PACKED vdirent_t ZX_DEPRECATED_SINCE(
-    1, 16, "Will be replaced by fuchsia.io/DirectoryIterator as part of io2 migration.");
-
-typedef struct vnattr {
-  uint32_t valid;  // Mask of which bits to set for setattr.
-  uint32_t mode;
-  uint64_t inode;
-  uint64_t size;
-  uint64_t blksize;   // Block size for filesystem I/O.
-  uint64_t blkcount;  // Number of `VNATTR_BLKSIZE` byte blocks allocated.
-  uint64_t nlink;
-  uint64_t create_time;  // POSIX time (seconds since epoch).
-  uint64_t modify_time;  // POSIX time (seconds since epoch).
-} vnattr_t ZX_REMOVED_SINCE(1, 16, 17, "Functionality unused.");
+} __PACKED vdirent_t;
 
 __END_CDECLS
 

@@ -219,14 +219,8 @@ DirentFiller::DirentFiller(void* ptr, size_t len)
     : ptr_(static_cast<char*>(ptr)), pos_(0), len_(len) {}
 
 zx_status_t DirentFiller::Next(std::string_view name, uint8_t type, uint64_t ino) {
-// TODO(b/293947862): Remove use of deprecated `vdirent_t` when transitioning ReadDir to Enumerate
-// as part of io2 migration.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   vdirent_t* de = reinterpret_cast<vdirent_t*>(ptr_ + pos_);
   size_t sz = sizeof(vdirent_t) + name.length();
-#pragma clang diagnostic pop
-
   if (sz > len_ - pos_ || name.length() > NAME_MAX) {
     return ZX_ERR_INVALID_ARGS;
   }
