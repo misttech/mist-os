@@ -20,28 +20,10 @@ pub mod reexport {
     pub use zx::MessageBuf;
 }
 
-use crate::directory::entry::DirectoryEntry;
-use crate::test_utils::run;
-
 use byteorder::{LittleEndian, WriteBytesExt};
 use fidl_fuchsia_io as fio;
-use futures::Future;
 use std::convert::TryInto as _;
 use std::io::Write;
-use std::sync::Arc;
-
-/// A thin wrapper around [`run::run_server_client()`] that sets the `Marker` to be
-/// [`DirectoryMarker`], and providing explicit type for the `get_client` closure argument.  This
-/// makes it possible for the caller not to provide explicit types.
-pub fn run_server_client<GetClientRes>(
-    flags: fio::OpenFlags,
-    server: Arc<dyn DirectoryEntry>,
-    get_client: impl FnOnce(fio::DirectoryProxy) -> GetClientRes,
-) where
-    GetClientRes: Future<Output = ()>,
-{
-    run::run_server_client::<fio::DirectoryMarker, _, _>(flags, server, get_client)
-}
 
 /// A helper to build the "expected" output for a `ReadDirents` call from the Directory protocol in
 /// fuchsia.io.

@@ -7,34 +7,6 @@
 use fidl::endpoints::{create_proxy, ProtocolMarker, ServerEnd};
 use fidl_fuchsia_io as fio;
 
-pub fn open_get_proxy<M>(proxy: &fio::DirectoryProxy, flags: fio::OpenFlags, path: &str) -> M::Proxy
-where
-    M: ProtocolMarker,
-{
-    let (new_proxy, new_server_end) = create_proxy::<M>();
-
-    #[cfg(fuchsia_api_level_at_least = "27")]
-    proxy
-        .deprecated_open(
-            flags,
-            fio::ModeType::empty(),
-            path,
-            ServerEnd::<fio::NodeMarker>::new(new_server_end.into_channel()),
-        )
-        .unwrap();
-    #[cfg(not(fuchsia_api_level_at_least = "27"))]
-    proxy
-        .open(
-            flags,
-            fio::ModeType::empty(),
-            path,
-            ServerEnd::<fio::NodeMarker>::new(new_server_end.into_channel()),
-        )
-        .unwrap();
-
-    new_proxy
-}
-
 /// This trait repeats parts of the `NodeProxy` trait, and is implemented for `NodeProxy`,
 /// `FileProxy`, and `DirectoryProxy`, which all share the same API.  FIDL currently does not
 /// expose the API inheritance, so with this trait we have a workaround.  As soon as FIDL will

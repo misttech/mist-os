@@ -6,7 +6,6 @@
 
 #[doc(hidden)]
 pub mod reexport {
-    pub use crate::directory::test_utils::DirentsSameInodeBuilder;
     pub use fidl_fuchsia_io as fio;
     pub use futures::stream::StreamExt;
     pub use zx_status::Status;
@@ -545,26 +544,6 @@ macro_rules! assert_read_dirents {
             String::from_utf8_lossy(&entries),
         );
     }};
-}
-
-#[macro_export]
-macro_rules! assert_read_dirents_one_listing {
-    ($proxy:expr, $max_bytes:expr, $( { $type:tt, $name:expr $(,)* } ),* $(,)*) => {{
-        use $crate::test_utils::assertions::reexport::{DirentsSameInodeBuilder, fio};
-
-        let mut expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
-        expected
-            $(.add(assert_read_dirents_one_listing!(@expand_dirent_type $type), $name))*
-            ;
-
-        assert_read_dirents!($proxy, $max_bytes, expected.into_vec());
-    }};
-
-    (@expand_dirent_type UNKNOWN) => { fio::DirentType::Unknown };
-    (@expand_dirent_type DIRECTORY) => { fio::DirentType::Directory };
-    (@expand_dirent_type BLOCK_DEVICE) => { fio::DirentType::BlockDevice };
-    (@expand_dirent_type FILE) => { fio::DirentType::File };
-    (@expand_dirent_type SERVICE) => { fio::DirentType::Service };
 }
 
 #[macro_export]

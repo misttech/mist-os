@@ -370,18 +370,25 @@ mod tests {
     use super::{Error, Simple, TreeBuilder};
 
     // Macros are exported into the root of the crate.
-    use crate::{
-        assert_close, assert_event, assert_read, assert_read_dirents,
-        assert_read_dirents_one_listing, assert_read_dirents_path_one_listing,
-        open_as_vmo_file_assert_content, open_get_directory_proxy_assert_ok, open_get_proxy_assert,
-        open_get_vmo_file_proxy_assert_ok,
-    };
+    use crate::{assert_close, assert_read};
 
-    use crate::directory::test_utils::run_server_client;
+    use crate::directory::serve;
     use crate::file;
 
     use fidl_fuchsia_io as fio;
+    use fuchsia_fs::directory::{open_directory, readdir, DirEntry, DirentKind};
     use vfs_macros::pseudo_directory;
+
+    async fn assert_open_file_contents(
+        root: &fio::DirectoryProxy,
+        path: &str,
+        flags: fio::Flags,
+        expected_contents: &str,
+    ) {
+        let file = fuchsia_fs::directory::open_file(&root, path, flags).await.unwrap();
+        assert_read!(file, expected_contents);
+        assert_close!(file);
+    }
 
     async fn get_id_of_path(root: &fio::DirectoryProxy, path: &str) -> u64 {
         let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
@@ -395,8 +402,8 @@ mod tests {
         immutable_attrs.id.expect("ID missing from GetAttributes response")
     }
 
-    #[test]
-    fn vfs_with_custom_inodes() {
+    #[fuchsia::test]
+    async fn vfs_with_custom_inodes() {
         let mut tree = TreeBuilder::empty_dir();
         tree.add_entry(&["a", "b", "file"], file::read_only(b"A content")).unwrap();
         tree.add_entry(&["a", "c", "file"], file::read_only(b"B content")).unwrap();
@@ -410,94 +417,70 @@ mod tests {
             }
         };
         let root = tree.build_with_inode_generator(&mut get_inode);
-
-        run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
-            assert_eq!(get_id_of_path(&root, "a").await, 1);
-            assert_eq!(get_id_of_path(&root, "a/b").await, 2);
-            assert_eq!(get_id_of_path(&root, "a/c").await, 3);
-        });
+        let root = serve(root, fio::PERM_READABLE);
+        assert_eq!(get_id_of_path(&root, "a").await, 1);
+        assert_eq!(get_id_of_path(&root, "a/b").await, 2);
+        assert_eq!(get_id_of_path(&root, "a/c").await, 3);
     }
 
-    #[test]
-    fn two_files() {
+    #[fuchsia::test]
+    async fn two_files() {
         let mut tree = TreeBuilder::empty_dir();
         tree.add_entry("a", file::read_only(b"A content")).unwrap();
         tree.add_entry("b", file::read_only(b"B content")).unwrap();
 
         let root = tree.build();
+        let root = serve(root, fio::PERM_READABLE);
 
-        run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
-            assert_read_dirents_one_listing!(
-                root, 1000,
-                { DIRECTORY, b"." },
-                { FILE, b"a" },
-                { FILE, b"b" },
-            );
-            open_as_vmo_file_assert_content!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "a",
-                "A content"
-            );
-            open_as_vmo_file_assert_content!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "b",
-                "B content"
-            );
+        assert_eq!(
+            readdir(&root).await.unwrap(),
+            vec![
+                DirEntry { name: String::from("a"), kind: DirentKind::File },
+                DirEntry { name: String::from("b"), kind: DirentKind::File },
+            ]
+        );
+        assert_open_file_contents(&root, "a", fio::PERM_READABLE, "A content").await;
+        assert_open_file_contents(&root, "b", fio::PERM_READABLE, "B content").await;
 
-            assert_close!(root);
-        });
+        assert_close!(root);
     }
 
-    #[test]
-    fn overlapping_paths() {
+    #[fuchsia::test]
+    async fn overlapping_paths() {
         let mut tree = TreeBuilder::empty_dir();
         tree.add_entry(&["one", "two"], file::read_only(b"A")).unwrap();
         tree.add_entry(&["one", "three"], file::read_only(b"B")).unwrap();
         tree.add_entry("four", file::read_only(b"C")).unwrap();
 
         let root = tree.build();
+        let root = serve(root, fio::PERM_READABLE);
 
-        run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
-            assert_read_dirents_one_listing!(
-                root, 1000,
-                { DIRECTORY, b"." },
-                { FILE, b"four" },
-                { DIRECTORY, b"one" },
-            );
-            assert_read_dirents_path_one_listing!(
-                &root, "one", 1000,
-                { DIRECTORY, b"." },
-                { FILE, b"three" },
-                { FILE, b"two" },
-            );
+        assert_eq!(
+            readdir(&root).await.unwrap(),
+            vec![
+                DirEntry { name: String::from("four"), kind: DirentKind::File },
+                DirEntry { name: String::from("one"), kind: DirentKind::Directory },
+            ]
+        );
+        let one_dir = open_directory(&root, "one", fio::PERM_READABLE).await.unwrap();
+        assert_eq!(
+            readdir(&one_dir).await.unwrap(),
+            vec![
+                DirEntry { name: String::from("three"), kind: DirentKind::File },
+                DirEntry { name: String::from("two"), kind: DirentKind::File },
+            ]
+        );
+        assert_close!(one_dir);
 
-            open_as_vmo_file_assert_content!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "one/two",
-                "A"
-            );
-            open_as_vmo_file_assert_content!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "one/three",
-                "B"
-            );
-            open_as_vmo_file_assert_content!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "four",
-                "C"
-            );
+        assert_open_file_contents(&root, "one/two", fio::PERM_READABLE, "A").await;
+        assert_open_file_contents(&root, "one/three", fio::PERM_READABLE, "B").await;
+        assert_open_file_contents(&root, "four", fio::PERM_READABLE, "C").await;
 
-            assert_close!(root);
-        });
+        assert_close!(root);
     }
 
-    #[test]
-    fn directory_leaf() {
+    #[fuchsia::test]
+    async fn directory_leaf() {
         let etc = pseudo_directory! {
             "fstab" => file::read_only(b"/dev/fs /"),
             "ssh" => pseudo_directory! {
@@ -510,170 +493,152 @@ mod tests {
         tree.add_entry("uname", file::read_only(b"Fuchsia")).unwrap();
 
         let root = tree.build();
+        let root = serve(root, fio::PERM_READABLE);
 
-        run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
-            assert_read_dirents_one_listing!(
-                root, 1000,
-                { DIRECTORY, b"." },
-                { DIRECTORY, b"etc" },
-                { FILE, b"uname" },
-            );
-            assert_read_dirents_path_one_listing!(
-                &root, "etc", 1000,
-                { DIRECTORY, b"." },
-                { FILE, b"fstab" },
-                { DIRECTORY, b"ssh" },
-            );
-            assert_read_dirents_path_one_listing!(
-                &root, "etc/ssh", 1000,
-                { DIRECTORY, b"." },
-                { FILE, b"sshd_config" },
-            );
+        assert_eq!(
+            readdir(&root).await.unwrap(),
+            vec![
+                DirEntry { name: String::from("etc"), kind: DirentKind::Directory },
+                DirEntry { name: String::from("uname"), kind: DirentKind::File },
+            ]
+        );
+        let etc_dir = open_directory(&root, "etc", fio::PERM_READABLE).await.unwrap();
+        assert_eq!(
+            readdir(&etc_dir).await.unwrap(),
+            vec![
+                DirEntry { name: String::from("fstab"), kind: DirentKind::File },
+                DirEntry { name: String::from("ssh"), kind: DirentKind::Directory },
+            ]
+        );
+        assert_close!(etc_dir);
+        let ssh_dir = open_directory(&root, "etc/ssh", fio::PERM_READABLE).await.unwrap();
+        assert_eq!(
+            readdir(&ssh_dir).await.unwrap(),
+            vec![DirEntry { name: String::from("sshd_config"), kind: DirentKind::File }]
+        );
+        assert_close!(ssh_dir);
 
-            open_as_vmo_file_assert_content!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "etc/fstab",
-                "/dev/fs /"
-            );
-            open_as_vmo_file_assert_content!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "etc/ssh/sshd_config",
-                "# Empty"
-            );
-            open_as_vmo_file_assert_content!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "uname",
-                "Fuchsia"
-            );
+        assert_open_file_contents(&root, "etc/fstab", fio::PERM_READABLE, "/dev/fs /").await;
+        assert_open_file_contents(&root, "etc/ssh/sshd_config", fio::PERM_READABLE, "# Empty")
+            .await;
+        assert_open_file_contents(&root, "uname", fio::PERM_READABLE, "Fuchsia").await;
 
-            assert_close!(root);
-        });
+        assert_close!(root);
     }
 
-    #[test]
-    fn add_empty_dir_populate_later() {
+    #[fuchsia::test]
+    async fn add_empty_dir_populate_later() {
         let mut tree = TreeBuilder::empty_dir();
         tree.add_empty_dir(&["one", "two"]).unwrap();
         tree.add_entry(&["one", "two", "three"], file::read_only(b"B")).unwrap();
 
         let root = tree.build();
+        let root = serve(root, fio::PERM_READABLE);
 
-        run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
-            assert_read_dirents_one_listing!(
-                root, 1000,
-                { DIRECTORY, b"." },
-                { DIRECTORY, b"one" },
-            );
-            assert_read_dirents_path_one_listing!(
-                &root, "one", 1000,
-                { DIRECTORY, b"." },
-                { DIRECTORY, b"two" },
-            );
-            assert_read_dirents_path_one_listing!(
-                &root, "one/two", 1000,
-                { DIRECTORY, b"." },
-                { FILE, b"three" },
-            );
+        assert_eq!(
+            readdir(&root).await.unwrap(),
+            vec![DirEntry { name: String::from("one"), kind: DirentKind::Directory }]
+        );
+        let one_dir = open_directory(&root, "one", fio::PERM_READABLE).await.unwrap();
+        assert_eq!(
+            readdir(&one_dir).await.unwrap(),
+            vec![DirEntry { name: String::from("two"), kind: DirentKind::Directory }]
+        );
+        assert_close!(one_dir);
+        let two_dir = open_directory(&root, "one/two", fio::PERM_READABLE).await.unwrap();
+        assert_eq!(
+            readdir(&two_dir).await.unwrap(),
+            vec![DirEntry { name: String::from("three"), kind: DirentKind::File }]
+        );
+        assert_close!(two_dir);
 
-            open_as_vmo_file_assert_content!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "one/two/three",
-                "B"
-            );
+        assert_open_file_contents(&root, "one/two/three", fio::PERM_READABLE, "B").await;
 
-            assert_close!(root);
-        });
+        assert_close!(root);
     }
 
-    #[test]
-    fn add_empty_dir_already_exists() {
+    #[fuchsia::test]
+    async fn add_empty_dir_already_exists() {
         let mut tree = TreeBuilder::empty_dir();
         tree.add_entry(&["one", "two", "three"], file::read_only(b"B")).unwrap();
         tree.add_empty_dir(&["one", "two"]).unwrap();
 
         let root = tree.build();
+        let root = serve(root, fio::PERM_READABLE);
 
-        run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
-            assert_read_dirents_one_listing!(
-                root, 1000,
-                { DIRECTORY, b"." },
-                { DIRECTORY, b"one" },
-            );
-            assert_read_dirents_path_one_listing!(
-                &root, "one", 1000,
-                { DIRECTORY, b"." },
-                { DIRECTORY, b"two" },
-            );
-            assert_read_dirents_path_one_listing!(
-                &root, "one/two", 1000,
-                { DIRECTORY, b"." },
-                { FILE, b"three" },
-            );
+        assert_eq!(
+            readdir(&root).await.unwrap(),
+            vec![DirEntry { name: String::from("one"), kind: DirentKind::Directory }]
+        );
 
-            open_as_vmo_file_assert_content!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "one/two/three",
-                "B"
-            );
+        let one_dir = open_directory(&root, "one", fio::PERM_READABLE).await.unwrap();
+        assert_eq!(
+            readdir(&one_dir).await.unwrap(),
+            vec![DirEntry { name: String::from("two"), kind: DirentKind::Directory }]
+        );
+        assert_close!(one_dir);
 
-            assert_close!(root);
-        });
+        let two_dir = open_directory(&root, "one/two", fio::PERM_READABLE).await.unwrap();
+        assert_eq!(
+            readdir(&two_dir).await.unwrap(),
+            vec![DirEntry { name: String::from("three"), kind: DirentKind::File }]
+        );
+        assert_close!(two_dir);
+
+        assert_open_file_contents(&root, "one/two/three", fio::PERM_READABLE, "B").await;
+
+        assert_close!(root);
     }
 
-    #[test]
-    fn lone_add_empty_dir() {
+    #[fuchsia::test]
+    async fn lone_add_empty_dir() {
         let mut tree = TreeBuilder::empty_dir();
         tree.add_empty_dir(&["just-me"]).unwrap();
 
         let root = tree.build();
+        let root = serve(root, fio::PERM_READABLE);
 
-        run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
-            assert_read_dirents_one_listing!(
-                root, 1000,
-                { DIRECTORY, b"." },
-                { DIRECTORY, b"just-me" },
-            );
-            assert_read_dirents_path_one_listing!(
-                &root, "just-me", 1000,
-                { DIRECTORY, b"." },
-            );
-            assert_close!(root);
-        });
+        assert_eq!(
+            readdir(&root).await.unwrap(),
+            vec![DirEntry { name: String::from("just-me"), kind: DirentKind::Directory }]
+        );
+        let just_me_dir = open_directory(&root, "just-me", fio::PERM_READABLE).await.unwrap();
+        assert_eq!(readdir(&just_me_dir).await.unwrap(), Vec::new());
+
+        assert_close!(just_me_dir);
+        assert_close!(root);
     }
 
-    #[test]
-    fn add_empty_dir_inside_add_empty_dir() {
+    #[fuchsia::test]
+    async fn add_empty_dir_inside_add_empty_dir() {
         let mut tree = TreeBuilder::empty_dir();
         tree.add_empty_dir(&["container"]).unwrap();
         tree.add_empty_dir(&["container", "nested"]).unwrap();
 
         let root = tree.build();
+        let root = serve(root, fio::PERM_READABLE);
 
-        run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
-            assert_read_dirents_one_listing!(
-                root, 1000,
-                { DIRECTORY, b"." },
-                { DIRECTORY, b"container" },
-            );
-            assert_read_dirents_path_one_listing!(
-                &root, "container", 1000,
-                { DIRECTORY, b"." },
-                { DIRECTORY, b"nested" },
-            );
-            assert_read_dirents_path_one_listing!(
-                &root, "container/nested", 1000,
-                { DIRECTORY, b"." },
-            );
-            assert_close!(root);
-        });
+        assert_eq!(
+            readdir(&root).await.unwrap(),
+            vec![DirEntry { name: String::from("container"), kind: DirentKind::Directory }]
+        );
+
+        let container_dir = open_directory(&root, "container", fio::PERM_READABLE).await.unwrap();
+        assert_eq!(
+            readdir(&container_dir).await.unwrap(),
+            vec![DirEntry { name: String::from("nested"), kind: DirentKind::Directory }]
+        );
+        assert_close!(container_dir);
+
+        let nested_dir =
+            open_directory(&root, "container/nested", fio::PERM_READABLE).await.unwrap();
+        assert_eq!(readdir(&nested_dir).await.unwrap(), Vec::new());
+        assert_close!(nested_dir);
+
+        assert_close!(root);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn error_empty_path_in_add_entry() {
         let mut tree = TreeBuilder::empty_dir();
         let err = tree
@@ -682,7 +647,7 @@ mod tests {
         assert_eq!(err, Error::EmptyPath);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn error_slash_in_component() {
         let mut tree = TreeBuilder::empty_dir();
         let err = tree
@@ -694,7 +659,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn error_slash_in_second_component() {
         let mut tree = TreeBuilder::empty_dir();
         let err = tree
@@ -706,7 +671,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn error_component_name_too_long() {
         let mut tree = TreeBuilder::empty_dir();
 
@@ -727,7 +692,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn error_leaf_over_directory() {
         let mut tree = TreeBuilder::empty_dir();
 
@@ -738,7 +703,7 @@ mod tests {
         assert_eq!(err, Error::LeafOverDirectory { path: "top/nested".to_string() });
     }
 
-    #[test]
+    #[fuchsia::test]
     fn error_leaf_over_leaf() {
         let mut tree = TreeBuilder::empty_dir();
 
@@ -749,7 +714,7 @@ mod tests {
         assert_eq!(err, Error::LeafOverLeaf { path: "top/nested/file".to_string() });
     }
 
-    #[test]
+    #[fuchsia::test]
     fn error_entry_inside_leaf() {
         let mut tree = TreeBuilder::empty_dir();
 
@@ -766,7 +731,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn error_entry_inside_leaf_directory() {
         let mut tree = TreeBuilder::empty_dir();
 
