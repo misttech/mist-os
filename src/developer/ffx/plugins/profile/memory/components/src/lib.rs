@@ -96,7 +96,7 @@ impl MemoryComponentsTool {
             return Ok(());
         }
 
-        let (summary, kernel_statistics) = process_snapshot(snapshot);
+        let (summary, kernel_statistics, thrashing_metrics) = process_snapshot(snapshot);
         if writer.is_machine() {
             writer.machine(ComponentProfileResult {
                 kernel: kernel_statistics,
@@ -104,9 +104,15 @@ impl MemoryComponentsTool {
                 undigested: summary.undigested,
             })?;
         } else {
-            output::write_summary(&mut writer.stdout(), self.cmd.csv, &summary, &kernel_statistics)
-                .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
-                .map_err(|e| fho::Error::Unexpected(e.into()))?;
+            output::write_summary(
+                &mut writer.stdout(),
+                self.cmd.csv,
+                &summary,
+                kernel_statistics,
+                thrashing_metrics,
+            )
+            .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
+            .map_err(|e| fho::Error::Unexpected(e.into()))?;
         }
         Ok(())
     }
@@ -130,7 +136,9 @@ impl MemoryComponentsTool {
     }
 }
 
-fn process_snapshot(snapshot: fplugin::Snapshot) -> (MemorySummary, KernelStatistics) {
+fn process_snapshot(
+    snapshot: fplugin::Snapshot,
+) -> (MemorySummary, KernelStatistics, fplugin::PerformanceImpactMetrics) {
     // Map from moniker token ID to Principal struct.
     let principals: Vec<Principal> =
         snapshot.principals.into_iter().flatten().map(|p| p.into()).collect();
@@ -155,6 +163,7 @@ fn process_snapshot(snapshot: fplugin::Snapshot) -> (MemorySummary, KernelStatis
         })
         .summary(),
         snapshot.kernel_statistics.unwrap().into(),
+        snapshot.performance_metrics.unwrap(),
     )
 }
 
@@ -513,10 +522,15 @@ mod tests {
                 }),
                 ..Default::default()
             }),
+            performance_metrics: Some(fplugin::PerformanceImpactMetrics {
+                some_memory_stalls_ns: Some(10),
+                full_memory_stalls_ns: Some(5),
+                ..Default::default()
+            }),
             ..Default::default()
         };
 
-        let (output, _) = process_snapshot(snapshot);
+        let (output, _, performance_metrics) = process_snapshot(snapshot);
 
         // VMO 1011 is the parent of VMO 1010, but not claimed by any Principal; it is thus
         // undigested.
@@ -711,6 +725,15 @@ mod tests {
                 .collect(),
             }
         );
+
+        assert_eq!(
+            performance_metrics,
+            fplugin::PerformanceImpactMetrics {
+                some_memory_stalls_ns: Some(10),
+                full_memory_stalls_ns: Some(5),
+                ..Default::default()
+            }
+        );
     }
 
     #[test]
@@ -866,10 +889,15 @@ mod tests {
                 }),
                 ..Default::default()
             }),
+            performance_metrics: Some(fplugin::PerformanceImpactMetrics {
+                some_memory_stalls_ns: Some(10),
+                full_memory_stalls_ns: Some(5),
+                ..Default::default()
+            }),
             ..Default::default()
         };
 
-        let (output, _) = process_snapshot(snapshot);
+        let (output, _, _) = process_snapshot(snapshot);
 
         assert_eq!(output.undigested, 0);
         assert_eq!(output.principals.len(), 3);

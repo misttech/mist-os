@@ -7,7 +7,6 @@ use fuchsia_trace::duration;
 use futures::AsyncWriteExt;
 use traces::CATEGORY_MEMORY_CAPTURE;
 
-use attribution_processing::kernel_statistics::KernelStatistics;
 use attribution_processing::AttributionData;
 
 /// AttributionSnapshot holds and serves a snapshot of the memory of a Fuchsia system, to be sent
@@ -17,7 +16,8 @@ pub struct AttributionSnapshot(fplugin::Snapshot);
 impl AttributionSnapshot {
     pub fn new(
         attribution_data: AttributionData,
-        kernel_statistics: KernelStatistics,
+        kernel_statistics: fplugin::KernelStatistics,
+        memory_stalls: zx::MemoryStall,
     ) -> AttributionSnapshot {
         AttributionSnapshot(fplugin::Snapshot {
             attributions: Some(
@@ -32,6 +32,11 @@ impl AttributionSnapshot {
                 attribution_data.resource_names.iter().map(|r| r.to_string()).collect(),
             ),
             kernel_statistics: Some(kernel_statistics.into()),
+            performance_metrics: Some(fplugin::PerformanceImpactMetrics {
+                some_memory_stalls_ns: Some(memory_stalls.stall_time_some),
+                full_memory_stalls_ns: Some(memory_stalls.stall_time_full),
+                ..Default::default()
+            }),
             ..Default::default()
         })
     }

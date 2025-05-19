@@ -30,6 +30,8 @@ type Snapshot = table {
     4: resource_names vector<string:MAX>:MAX;
     /// System-wide memory statistics from the kernel.
     5: kernel_statistics KernelStatistics;
+    /// Details of performance impact of memory usage (e.g. thrashing, stalling, etc)
+    6: performance_metrics PerformanceImpactMetrics;
 };
 
 /// Globally-unique identifier used to refer to a specific [`Principal`]..
@@ -158,4 +160,12 @@ type Mapping = table {
 type KernelStatistics = table {
     1: memory_stats fuchsia.kernel.MemoryStats;
     2: compression_stats fuchsia.kernel.MemoryStatsCompression;
+};
+
+/// Metrics about the performance impact of memory usage, such as stalling.
+type PerformanceImpactMetrics = table {
+    /// Total time spent with at least one memory-stalled thread, in nanoseconds.
+    1: some_memory_stalls_ns int64;
+    /// Total time spent with all threads memory-stalled.
+    2: full_memory_stalls_ns int64;
 };

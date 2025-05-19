@@ -309,7 +309,7 @@ pub fn vmo_name_to_digest_name(name: &str) -> &str {
                 .map(|&(pattern, replacement)| (regex::Regex::new(pattern).unwrap(), replacement))
                 .collect()
         });
-    RULES.iter().find(|(regex, _)| regex.is_match(name)).map_or(name, |rule| rule.1)
+    RULES.iter().find(|(regex, _)| regex.is_match(name.trim())).map_or(name, |rule| rule.1)
 }
 
 pub fn vmo_name_to_digest_zxname(name: &ZXName) -> &ZXName {

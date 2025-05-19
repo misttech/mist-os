@@ -6,13 +6,15 @@ use attribution_processing::kernel_statistics::KernelStatistics;
 use attribution_processing::summary::{MemorySummary, PrincipalSummary, VmoSummary};
 use attribution_processing::ZXName;
 
+use fidl_fuchsia_memory_attribution_plugin as fplugin;
 use prettytable::{row, table, Table};
 
 pub fn write_summary(
     f: &mut dyn std::io::Write,
     csv: bool,
     value: &MemorySummary,
-    kernel_statistics: &KernelStatistics,
+    kernel_statistics: KernelStatistics,
+    performance_metrics: fplugin::PerformanceImpactMetrics,
 ) -> std::io::Result<()> {
     if csv {
         let mut csv_writer = csv::Writer::from_writer(f);
@@ -31,7 +33,7 @@ pub fn write_summary(
             write_summary_principal_csv(&mut csv_writer, principal)?;
         }
     } else {
-        write_summary_kernel_stats(f, kernel_statistics)?;
+        write_summary_kernel_stats(f, kernel_statistics, performance_metrics)?;
         for principal in &value.principals {
             writeln!(f)?;
             writeln!(f)?;
@@ -106,78 +108,70 @@ fn write_summary_principal(
 
 fn write_summary_kernel_stats(
     w: &mut dyn std::io::Write,
-    value: &KernelStatistics,
+    kernel_statistics: KernelStatistics,
+    performance_metrics: fplugin::PerformanceImpactMetrics,
 ) -> std::io::Result<()> {
-    writeln!(
-        w,
-        "Total memory: {}",
-        format_bytes(value.memory_statistics.total_bytes.unwrap() as f64)
-    )?;
-    writeln!(
-        w,
-        "Free memory: {}",
-        format_bytes(value.memory_statistics.free_bytes.unwrap() as f64)
-    )?;
-    let kernel_total = value.memory_statistics.wired_bytes.unwrap()
-        + value.memory_statistics.total_heap_bytes.unwrap()
-        + value.memory_statistics.mmu_overhead_bytes.unwrap()
-        + value.memory_statistics.ipc_bytes.unwrap();
+    let memory_statistics = kernel_statistics.memory_statistics;
+    writeln!(w, "Total memory: {}", format_bytes(memory_statistics.total_bytes.unwrap() as f64))?;
+    writeln!(w, "Free memory: {}", format_bytes(memory_statistics.free_bytes.unwrap() as f64))?;
+    let kernel_total = memory_statistics.wired_bytes.unwrap()
+        + memory_statistics.total_heap_bytes.unwrap()
+        + memory_statistics.mmu_overhead_bytes.unwrap()
+        + memory_statistics.ipc_bytes.unwrap();
     writeln!(w, "Kernel:    {}", format_bytes(kernel_total as f64))?;
-    writeln!(
-        w,
-        "    wired: {}",
-        format_bytes(value.memory_statistics.wired_bytes.unwrap() as f64)
-    )?;
-    writeln!(w, "    vmo:   {}", format_bytes(value.memory_statistics.vmo_bytes.unwrap() as f64))?;
-    writeln!(
-        w,
-        "    heap:  {}",
-        format_bytes(value.memory_statistics.total_heap_bytes.unwrap() as f64)
-    )?;
+    writeln!(w, "    wired: {}", format_bytes(memory_statistics.wired_bytes.unwrap() as f64))?;
+    writeln!(w, "    vmo:   {}", format_bytes(memory_statistics.vmo_bytes.unwrap() as f64))?;
+    writeln!(w, "    heap:  {}", format_bytes(memory_statistics.total_heap_bytes.unwrap() as f64))?;
     writeln!(
         w,
         "    mmu:   {}",
-        format_bytes(value.memory_statistics.mmu_overhead_bytes.unwrap() as f64)
+        format_bytes(memory_statistics.mmu_overhead_bytes.unwrap() as f64)
     )?;
-    writeln!(w, "    ipc:   {}", format_bytes(value.memory_statistics.ipc_bytes.unwrap() as f64))?;
-    if let Some(zram_bytes) = value.memory_statistics.zram_bytes {
+    writeln!(w, "    ipc:   {}", format_bytes(memory_statistics.ipc_bytes.unwrap() as f64))?;
+    if let Some(zram_bytes) = memory_statistics.zram_bytes {
         writeln!(w, "    zram:  {}", format_bytes(zram_bytes as f64))?;
     }
-    writeln!(
-        w,
-        "    other: {}",
-        format_bytes(value.memory_statistics.other_bytes.unwrap() as f64)
-    )?;
+    writeln!(w, "    other: {}", format_bytes(memory_statistics.other_bytes.unwrap() as f64))?;
     writeln!(w, "  including:")?;
     writeln!(
         w,
         "    vmo_reclaim_total_bytes:        {}",
-        format_bytes(value.memory_statistics.vmo_reclaim_total_bytes.unwrap() as f64)
+        format_bytes(memory_statistics.vmo_reclaim_total_bytes.unwrap() as f64)
     )?;
     writeln!(
         w,
         "    vmo_reclaim_newest_bytes:       {}",
-        format_bytes(value.memory_statistics.vmo_reclaim_newest_bytes.unwrap() as f64)
+        format_bytes(memory_statistics.vmo_reclaim_newest_bytes.unwrap() as f64)
     )?;
     writeln!(
         w,
         "    vmo_reclaim_oldest_bytes:       {}",
-        format_bytes(value.memory_statistics.vmo_reclaim_oldest_bytes.unwrap() as f64)
+        format_bytes(memory_statistics.vmo_reclaim_oldest_bytes.unwrap() as f64)
     )?;
     writeln!(
         w,
         "    vmo_reclaim_disabled_bytes:     {}",
-        format_bytes(value.memory_statistics.vmo_reclaim_disabled_bytes.unwrap() as f64)
+        format_bytes(memory_statistics.vmo_reclaim_disabled_bytes.unwrap() as f64)
     )?;
     writeln!(
         w,
         "    vmo_discardable_locked_bytes:   {}",
-        format_bytes(value.memory_statistics.vmo_discardable_locked_bytes.unwrap() as f64)
+        format_bytes(memory_statistics.vmo_discardable_locked_bytes.unwrap() as f64)
     )?;
     writeln!(
         w,
         "    vmo_discardable_unlocked_bytes: {}",
-        format_bytes(value.memory_statistics.vmo_discardable_unlocked_bytes.unwrap() as f64)
+        format_bytes(memory_statistics.vmo_discardable_unlocked_bytes.unwrap() as f64)
+    )?;
+    writeln!(
+        w,
+        "  Memory stalls (some): {}",
+        format_nanoseconds(performance_metrics.some_memory_stalls_ns.unwrap() as f64)
+    )?;
+    writeln!(
+        w,
+        "  Memory stalls (full): {}",
+        format_nanoseconds(performance_metrics.full_memory_stalls_ns.unwrap() as f64)
     )
 }
 
@@ -222,6 +216,18 @@ pub fn format_bytes(bytes: f64) -> String {
         format!("{:0.2} KiB", bytes / 1024.0)
     } else {
         format!("{:0.2} MiB", bytes / (1024.0 * 1024.0))
+    }
+}
+
+pub fn format_nanoseconds(time: f64) -> String {
+    if time < 1000.0 {
+        format!("{:0} ns", time)
+    } else if time / 1000.0 < 1000.0 {
+        format!("{:0.2} µs", time / 1000.0)
+    } else if time / (1000.0 * 1000.0) < 1000.0 {
+        format!("{:0.2} ms", time / (1000.0 * 1000.0))
+    } else {
+        format!("{:0.3} s", time / (1000.0 * 1000.0 * 1000.0))
     }
 }
 
@@ -311,7 +317,8 @@ mod tests {
 
         let actual_output = {
             let mut buf = BufWriter::new(Vec::new());
-            write_summary(&mut buf, true, &summary, &Default::default()).unwrap();
+            write_summary(&mut buf, true, &summary, Default::default(), Default::default())
+                .unwrap();
             let bytes = buf.into_inner().unwrap();
             String::from_utf8(bytes).unwrap()
         };
@@ -342,12 +349,79 @@ mod tests {
 
         let actual_output = {
             let mut buf = BufWriter::new(Vec::new());
-            write_summary(&mut buf, true, &summary, &Default::default()).unwrap();
+            write_summary(&mut buf, true, &summary, Default::default(), Default::default())
+                .unwrap();
             let bytes = buf.into_inner().unwrap();
             String::from_utf8(bytes).unwrap()
         };
         let expected_output = r#"attributor,principal,vmo,committed_private,populated_private,committed_scaled,populated_scaled,committed_total,populated_total
 ,test_name,Total,1,4,2,5,3,6
+"#;
+        pretty_assertions::assert_eq!(actual_output, expected_output);
+    }
+
+    #[test]
+    fn kernel_stats_output_string() {
+        let kernel_statistics: KernelStatistics = KernelStatistics {
+            memory_statistics: fidl_fuchsia_kernel::MemoryStats {
+                total_bytes: Some(42 * 1024 * 1024),
+                free_bytes: Some(1024),
+                wired_bytes: Some(2 * 1024),
+                total_heap_bytes: Some(3 * 1024),
+                free_heap_bytes: Some(4 * 1024),
+                vmo_bytes: Some(5 * 1024),
+                mmu_overhead_bytes: Some(6 * 1024),
+                ipc_bytes: Some(7 * 1024),
+                other_bytes: Some(8 * 1024),
+                free_loaned_bytes: Some(9 * 1024),
+                cache_bytes: Some(10 * 1024),
+                slab_bytes: Some(11 * 1024),
+                zram_bytes: Some(12 * 1024),
+                vmo_reclaim_total_bytes: Some(13 * 1024),
+                vmo_reclaim_newest_bytes: Some(14 * 1024),
+                vmo_reclaim_oldest_bytes: Some(15 * 1024),
+                vmo_reclaim_disabled_bytes: Some(16 * 1024),
+                vmo_discardable_locked_bytes: Some(17 * 1024),
+                vmo_discardable_unlocked_bytes: Some(18 * 1024),
+                ..Default::default()
+            },
+            compression_statistics: fidl_fuchsia_kernel::MemoryStatsCompression::default(),
+            ..Default::default()
+        };
+        let performance_metrics = fplugin::PerformanceImpactMetrics {
+            some_memory_stalls_ns: Some(1000 * 1000 * 2048),
+            full_memory_stalls_ns: Some(1000 * 1000 * 512),
+            ..Default::default()
+        };
+
+        let actual_output = {
+            let mut buf = BufWriter::new(Vec::new());
+            write_summary_kernel_stats(&mut buf, kernel_statistics.into(), performance_metrics)
+                .unwrap();
+
+            let bytes = buf.into_inner().unwrap();
+            String::from_utf8(bytes).unwrap()
+        };
+
+        let expected_output = r#"Total memory: 42.00 MiB
+Free memory: 1.00 KiB
+Kernel:    18.00 KiB
+    wired: 2.00 KiB
+    vmo:   5.00 KiB
+    heap:  3.00 KiB
+    mmu:   6.00 KiB
+    ipc:   7.00 KiB
+    zram:  12.00 KiB
+    other: 8.00 KiB
+  including:
+    vmo_reclaim_total_bytes:        13.00 KiB
+    vmo_reclaim_newest_bytes:       14.00 KiB
+    vmo_reclaim_oldest_bytes:       15.00 KiB
+    vmo_reclaim_disabled_bytes:     16.00 KiB
+    vmo_discardable_locked_bytes:   17.00 KiB
+    vmo_discardable_unlocked_bytes: 18.00 KiB
+  Memory stalls (some): 2.048 s
+  Memory stalls (full): 512.00 ms
 "#;
         pretty_assertions::assert_eq!(actual_output, expected_output);
     }

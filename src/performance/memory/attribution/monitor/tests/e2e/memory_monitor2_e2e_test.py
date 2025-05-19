@@ -54,6 +54,9 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         assertContainsRegex(
             r"(?m)^\s*Processes:\s*memory_monitor2\.cm \(\d+\)\s*$", profile
         )
+        assertContainsRegex(
+            r"(?m)^\s*Memory stalls \(full\): \d+(\.\d+)? .?s\s*$", profile
+        )
 
     def test_ffx_profile_memory_component_with_json_output(self) -> None:
         cmd_output = self.dut.ffx.run(

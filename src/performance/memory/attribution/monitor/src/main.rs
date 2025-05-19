@@ -5,7 +5,6 @@
 use anyhow::{Context, Error};
 use attribution_data::AttributionDataProviderImpl;
 use attribution_processing::digest::BucketDefinition;
-use attribution_processing::kernel_statistics::KernelStatistics;
 use attribution_processing::AttributionDataProvider;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
@@ -18,6 +17,7 @@ use memory_monitor2_config::Config;
 use metrics::{collect_metrics_forever, create_metric_event_logger};
 use resources::Job;
 use snapshot::AttributionSnapshot;
+use stalls::StallProvider;
 use std::sync::Arc;
 use traces::CATEGORY_MEMORY_CAPTURE;
 use zx::MonotonicDuration;
@@ -119,6 +119,7 @@ async fn main() -> Result<(), Error> {
                         stream,
                         attribution_data_provider.clone(),
                         kernel_stats.clone(),
+                        stall_provider.clone(),
                     )
                     .await
                     {
@@ -136,6 +137,7 @@ async fn serve_client_stream(
     mut stream: fattribution_plugin::MemoryMonitorRequestStream,
     attribution_data_provider: Arc<AttributionDataProviderImpl>,
     kernel_stats_proxy: fkernel::StatsProxy,
+    stall_provider: Arc<impl StallProvider>,
 ) -> Result<(), Error> {
     while let Some(request) = stream.next().await.transpose()? {
         match request {
@@ -143,6 +145,7 @@ async fn serve_client_stream(
                 if let Err(err) = provide_snapshot(
                     attribution_data_provider.clone(),
                     kernel_stats_proxy.clone(),
+                    stall_provider.clone(),
                     snapshot,
                 )
                 .await
@@ -164,17 +167,22 @@ async fn serve_client_stream(
 async fn provide_snapshot(
     attribution_data_provider: Arc<AttributionDataProviderImpl>,
     kernel_stats_proxy: fkernel::StatsProxy,
+    stall_provider: Arc<impl StallProvider>,
     snapshot: zx::Socket,
 ) -> Result<(), Error> {
     duration!(CATEGORY_MEMORY_CAPTURE, c"provide_snapshot");
     let attribution_data = attribution_data_provider.get_attribution_data().await?;
 
-    let kernel_stats = KernelStatistics {
-        memory_statistics: kernel_stats_proxy.get_memory_stats().await?,
-        compression_statistics: kernel_stats_proxy.get_memory_stats_compression().await?,
+    let kernel_stats = fattribution_plugin::KernelStatistics {
+        memory_stats: Some(kernel_stats_proxy.get_memory_stats().await?),
+        compression_stats: Some(kernel_stats_proxy.get_memory_stats_compression().await?),
+        ..Default::default()
     };
 
-    let attribution_snapshot = AttributionSnapshot::new(attribution_data, kernel_stats);
+    let memory_stalls = stall_provider.get_stall_info()?;
+
+    let attribution_snapshot =
+        AttributionSnapshot::new(attribution_data, kernel_stats, memory_stalls);
     attribution_snapshot.serve(snapshot).await;
     Ok(())
 }
