@@ -4,6 +4,7 @@
 
 use anyhow::{format_err, Result};
 use at_commands as at;
+use log::info;
 
 use super::{
     at_cmd, at_ok, at_resp, CommandFromHf, CommandToHf, Procedure, ProcedureInput, ProcedureOutput,
@@ -168,6 +169,7 @@ impl SlcInitProcedure {
     }
 
     fn terminate(&mut self) -> Vec<ProcedureOutput> {
+        info!("SLCI complete!");
         self.state = State::Terminated;
         vec![]
     }

@@ -5,7 +5,7 @@
 use anyhow::{format_err, Result};
 use bt_hfp::{audio, sco};
 use bt_rfcomm::profile as rfcomm;
-use fidl::endpoints::create_proxy_and_stream;
+use fidl::endpoints::{create_request_stream, ClientEnd};
 use fuchsia_bluetooth::profile::ProtocolDescriptor;
 use fuchsia_bluetooth::types::{Channel, PeerId};
 use fuchsia_sync::Mutex;
@@ -86,13 +86,16 @@ impl Peer {
 
     /// Handle a PeerConnected ProfileEvent.  This creates a new peer task, so return the
     /// PeerHandlerProxy appropriate to it.
-    pub fn handle_peer_connected(&mut self, rfcomm: Channel) -> fidl_hfp::PeerHandlerProxy {
+    pub fn handle_peer_connected(
+        &mut self,
+        rfcomm: Channel,
+    ) -> ClientEnd<fidl_hfp::PeerHandlerMarker> {
         if self.task.take().is_some() {
             info!(peer:% = self.peer_id; "Shutting down existing task on incoming RFCOMM channel");
         }
 
-        let (peer_handler_proxy, peer_handler_request_stream) =
-            create_proxy_and_stream::<fidl_hfp::PeerHandlerMarker>();
+        let (peer_handler_client_end, peer_handler_request_stream) =
+            create_request_stream::<fidl_hfp::PeerHandlerMarker>();
 
         let task = PeerTask::spawn(
             self.peer_id,
@@ -105,7 +108,7 @@ impl Peer {
         self.task = Some(task);
         self.awaken();
 
-        peer_handler_proxy
+        peer_handler_client_end
     }
 
     fn awaken(&mut self) {
@@ -114,12 +117,14 @@ impl Peer {
         }
     }
 
-    /// Handle a SearchResult ProfileEvent.  If a new peer task is created, return the
-    /// PeerHandlerProxy appropriate to it.
+    /// Handle a SearchResult ProfileEvent.  If a new peer task is created,
+    /// return the PeerHandlerProxy appropriate to it.  Returns Err(_) in the
+    /// case of an error, Ok(None) in the case a task is already running for
+    /// this peeer, or  Ok(Some(client_end)) if a new task was created.
     pub async fn handle_search_result(
         &mut self,
         protocol: Option<Vec<ProtocolDescriptor>>,
-    ) -> Result<Option<fidl_hfp::PeerHandlerProxy>> {
+    ) -> Result<Option<ClientEnd<fidl_hfp::PeerHandlerMarker>>> {
         if self.task.is_some() {
             info!(peer:% = self.peer_id; "Already connected, ignoring search result");
             return Ok(None);
@@ -136,8 +141,8 @@ impl Peer {
             }
         };
 
-        let (peer_handler_proxy, peer_handler_request_stream) =
-            create_proxy_and_stream::<fidl_hfp::PeerHandlerMarker>();
+        let (peer_handler_client_end, peer_handler_request_stream) =
+            create_request_stream::<fidl_hfp::PeerHandlerMarker>();
 
         let task = PeerTask::spawn(
             self.peer_id,
@@ -150,7 +155,7 @@ impl Peer {
         self.task = Some(task);
         self.awaken();
 
-        Ok(Some(peer_handler_proxy))
+        Ok(Some(peer_handler_client_end))
     }
 
     async fn connect_from_protocol(
