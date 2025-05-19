@@ -133,7 +133,15 @@ impl PeerTask {
                     let procedure_outputs_result =
                         procedure_outputs_result_option
                             .ok_or_else(|| format_err!("Procedure manager stream closed for peer {}", self.peer_id))?;
-                    let procedure_outputs = procedure_outputs_result?;
+
+                    let procedure_outputs = match procedure_outputs_result {
+                        Ok(procedure_outputs) => procedure_outputs,
+                        Err(err) => {
+                            // TODO(b/327283873) Remove this when all AT commands are handled.
+                            warn!("Procedure error: {:?}", err);
+                            continue;
+                        }
+                    };
 
                     for procedure_output in procedure_outputs {
                         self.handle_procedure_output(procedure_output).await?;
@@ -237,6 +245,7 @@ impl PeerTask {
             self.handle_unsolicited_response(at_response)
         } else {
             let procedure_input = ProcedureInput::AtResponseFromAg(at_response);
+
             self.procedure_manager.enqueue(procedure_input);
         }
     }
