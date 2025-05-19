@@ -38,7 +38,7 @@ class SerialDevice : public fdf::DriverBase,
   void SetConfig(SetConfigRequestView request, SetConfigCompleter::Sync& completer) override;
 
   zx_status_t Enable(bool enable);
-  zx_status_t CancelAll();
+  void ResetSerialImplConnectionAndThen(fit::closure completer);
 
   zx_status_t Bind(fidl::ServerEnd<fuchsia_hardware_serial::Device> server);
   void DevfsConnect(fidl::ServerEnd<fuchsia_hardware_serial::DeviceProxy> server);

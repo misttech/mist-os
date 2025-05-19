@@ -135,9 +135,18 @@ zx_status_t SerialDevice::Enable(bool enable) {
   return ZX_OK;
 }
 
-zx_status_t SerialDevice::CancelAll() {
+void SerialDevice::ResetSerialImplConnectionAndThen(fit::closure completer) {
   fdf::Arena arena('SERI');
-  return serial_.sync().buffer(arena)->CancelAll().status();
+  serial_.buffer(arena)->CancelAll().Then([&serial = serial_, arena = std::move(arena),
+                                           completer = std::move(completer)](auto&) mutable {
+    // Explicitly ignoring the result of CancelAll.
+    FDF_LOG(TRACE, "SerialDevice::ResetSerialImplConnectionAndThen - pending operations aborted");
+    serial.buffer(arena)->Enable(false).Then([completer = std::move(completer)](auto&) mutable {
+      FDF_LOG(TRACE, "SerialDevice::ResetSerialImplConnectionAndThen - disabled serial");
+      // Explicitly ignoring the result of Enable.
+      completer();
+    });
+  });
 }
 
 zx_status_t SerialDevice::Bind(fidl::ServerEnd<fuchsia_hardware_serial::Device> server) {
@@ -153,11 +162,7 @@ zx_status_t SerialDevice::Bind(fidl::ServerEnd<fuchsia_hardware_serial::Device> 
   binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server), this,
                    [](SerialDevice* self, fidl::UnbindInfo) {
                      FDF_LOG(TRACE, "SerialDevice::Bind - on close");
-
-                     // Clear any pending read or write requests and disable the device.
-                     self->CancelAll();
-                     self->Enable(false);
-                     self->binding_.reset();
+                     self->ResetSerialImplConnectionAndThen([self]() { self->binding_.reset(); });
                    });
   return ZX_OK;
 }
@@ -171,17 +176,9 @@ void SerialDevice::DevfsConnect(fidl::ServerEnd<fuchsia_hardware_serial::DeviceP
 
 void SerialDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
   FDF_LOG(TRACE, "SerialDevice::PrepareStop");
-
-  fdf::Arena arena('SERI');
-  serial_.buffer(arena)->CancelAll().Then([&serial = serial_, arena = std::move(arena),
-                                           completer = std::move(completer)](auto&) mutable {
-    // Explicitly ignoring the result of CancelAll.
-    FDF_LOG(TRACE, "SerialDevice::PrepareStop - pending operations aborted");
-    serial.buffer(arena)->Enable(false).Then([completer = std::move(completer)](auto&) mutable {
-      FDF_LOG(TRACE, "SerialDevice::PrepareStop - disabled serial");
-      // Explicitly ignoring the result of Enable.
-      completer(zx::ok());
-    });
+  ResetSerialImplConnectionAndThen([completer = std::move(completer)]() mutable {
+    FDF_LOG(TRACE, "SerialDevice::PrepareStop - completed");
+    completer(zx::ok());
   });
 }
 
