@@ -41,6 +41,8 @@ if (is_host) {
       "//src/developer/ffx/plugins/target:ffx_target_tool_test_data",
     ]
 
+    package_deps = [ ":ffx_connection_test_components" ]
+
     test_environments = all_fuchsia_envs
 
     # TODO(https://fxbug.dev/42143551): The arm64 emulator is run from an arm64 host but we only

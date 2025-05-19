@@ -83,6 +83,7 @@ template("rustc_test_internal") {
       forward_variables_from(invoker,
                              [
                                "args",
+                               "package_deps",
                                "visibility",
                              ])
     }
@@ -265,6 +266,10 @@ template("rustc_test_internal") {
 #   data_deps (optional)
 #     List of GN targets that are only needed at runtime.  Use this for any
 #     host_test_data() that is needed by the test.
+#
+#   package_deps (optional)
+#     List of `fuchsia_package` labels needed by the test at runtime.
+#     See //build/testing/test_spec.gni for more details.
 #
 #   test_environments (optional)
 #     What environments the unit test should target. Only used here
