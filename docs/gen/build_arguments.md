@@ -88,7 +88,7 @@ these device types will be used for tests.
 
 **Current value (from the default):** `[]`
 
-From //build/testing/test_spec.gni:13
+From //build/testing/test_spec.gni:14
 
 ### always_zedboot
 
@@ -351,6 +351,15 @@ Supported options:
 **Current value (from the default):** `"remote"`
 
 From //build/bazel/remote_services.gni:25
+
+### bazel_root_host_targets
+
+A similar list to extend the list above for custom build configuration
+in args.gn.
+
+**Current value (from the default):** `[]`
+
+From //build/bazel/bazel_root_targets_list.gni:31
 
 ### bazel_upload_build_events
 
@@ -1060,7 +1069,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   ubsan = {
@@ -1734,7 +1743,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   ubsan = {
@@ -2177,6 +2186,36 @@ From //src/storage/fshost/generated_fshost_config.gni:12
 **Current value (from the default):** `"debug"`
 
 From //build/config/compiler.gni:56
+
+### default_bazel_root_host_targets
+
+A list of scopes describing Bazel host targets that can be built directly
+with Bazel, without invoking Ninja. These *cannot* depend on any Ninja
+artifact. Schema is:
+
+   bazel_label [string]: A Bazel target label, must begin with @
+
+   bazel_name [string]: Optional filename of Bazel artifact file, in case
+      it does not match the label.
+
+   ninja_name [GN path]: Optional filename for Ninja hard-link to Bazel
+      artifact, which will appear under $NINJA_BUILD_DIR/bazel_artifacts/,
+      defaults to bazel_name.
+
+   install_host_tool [boolean]: Optional, set to true to make it available
+      to the `fx host-tool <ninja_name>` command.
+
+
+**Current value (from the default):**
+
+```none
+[{
+  bazel_label = "//build/tools/json_validator:json_validator_valico"
+  install_host_tool = true
+}]
+```
+
+From //build/bazel/bazel_root_targets_list.gni:22
 
 ### delegated_network_provisioning
 
