@@ -1019,7 +1019,10 @@ impl CrashListener {
         // An empty child moniker should not be allowed, something must
         // be after the separator.
         assert_ne!(moniker, "");
-        info!("observed component '{moniker}' stop with status={status:?} exit_code={exit_code:?}");
+        info!(
+            "{realm_moniker}: observed component '{moniker}' stop with \
+            status={status:?} exit_code={exit_code:?}"
+        );
         let bad = match (status, exit_code) {
             // A clean exit from CF means ok.
             (component_events::events::ExitStatus::Clean, _) => false,
