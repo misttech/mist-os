@@ -84,7 +84,7 @@ struct FenceState {
 }
 
 impl SyncFile {
-    const SIGNAL: zx::Signals = zx::Signals::USER_0;
+    const SIGNALS: zx::Signals = zx::Signals::COUNTER_SIGNALED.union(zx::Signals::USER_0);
 
     pub fn new(name: [u8; 32], fence: SyncFence) -> SyncFile {
         SyncFile { name, fence }
@@ -94,10 +94,7 @@ impl SyncFile {
         let mut state: Vec<FenceState> = vec![];
 
         for sync_point in &self.fence.sync_points {
-            if sync_point
-                .counter
-                .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::ZERO)
-                .to_result()
+            if sync_point.counter.wait_handle(Self::SIGNALS, zx::MonotonicInstant::ZERO).to_result()
                 == Err(zx::Status::TIMED_OUT)
             {
                 state.push(FenceState { status: Status::Active, timestamp_ns: 0 });
@@ -187,7 +184,7 @@ impl FileOps for SyncFile {
                 while i < fence.sync_points.len() {
                     if fence.sync_points[i]
                         .counter
-                        .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::ZERO)
+                        .wait_handle(Self::SIGNALS, zx::MonotonicInstant::ZERO)
                         .to_result()
                         != Err(zx::Status::TIMED_OUT)
                     {
@@ -301,7 +298,7 @@ impl FileOps for SyncFile {
                 inner: SignalHandlerInner::ManyZxHandle(ManyZxHandleSignalHandler {
                     count: self.fence.sync_points.len(),
                     counter: count.clone(),
-                    expected_signals: Self::SIGNAL,
+                    expected_signals: Self::SIGNALS,
                     events: FdEvents::POLLIN,
                 }),
                 event_handler: event_handler.clone(),
@@ -310,7 +307,7 @@ impl FileOps for SyncFile {
 
             let canceler_result = waiter.wake_on_zircon_signals(
                 sync_point.counter.as_ref(),
-                Self::SIGNAL,
+                Self::SIGNALS,
                 signal_handler,
             );
             let canceler_result = match canceler_result {
@@ -326,7 +323,7 @@ impl FileOps for SyncFile {
             // query_events() after this query_async() returns; however that works only if all
             // handles are signaled.  Here we perform the counting, and cancel waits, for any
             // handles currently signaled.
-            if sync_point.counter.wait_handle(Self::SIGNAL, zx::MonotonicInstant::ZERO).to_result()
+            if sync_point.counter.wait_handle(Self::SIGNALS, zx::MonotonicInstant::ZERO).to_result()
                 == Err(zx::Status::TIMED_OUT)
             {
                 canceler = WaitCanceler::merge_unbounded(
