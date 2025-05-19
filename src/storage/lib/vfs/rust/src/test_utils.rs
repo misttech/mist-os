@@ -11,9 +11,6 @@ pub(crate) mod node;
 #[cfg(test)]
 pub(crate) mod run;
 
-#[cfg(test)]
-pub(crate) use run::run_client;
-
 /// Returns a list of flag combinations to test. Returns a vector of the aggregate of
 /// every constant flag and every combination of variable flags. For example, calling
 /// build_flag_combinations(100, 011) would return [100, 110, 101, 111] (in binary),

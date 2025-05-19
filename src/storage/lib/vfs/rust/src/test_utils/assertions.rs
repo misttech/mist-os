@@ -10,11 +10,6 @@ pub mod reexport {
     pub use fidl_fuchsia_io as fio;
     pub use futures::stream::StreamExt;
     pub use zx_status::Status;
-
-    #[cfg(not(target_os = "fuchsia"))]
-    pub use fuchsia_async::emulated_handle::MessageBuf;
-    #[cfg(target_os = "fuchsia")]
-    pub use zx::MessageBuf;
 }
 
 // All of the macros in this file should be async functions.  There are two reasons they are not:
@@ -604,27 +599,6 @@ macro_rules! assert_read_dirents_err {
             entries,
             String::from_utf8_lossy(&entries),
         );
-    }};
-}
-
-#[macro_export]
-macro_rules! assert_channel_closed {
-    ($channel:expr) => {{
-        use $crate::test_utils::assertions::reexport::{MessageBuf, Status};
-
-        // Allows $channel to be a temporary.
-        let channel = &$channel;
-
-        let mut msg = MessageBuf::new();
-        match channel.recv_msg(&mut msg).await {
-            Ok(()) => panic!(
-                "'{}' received a message, instead of been closed: {:?}",
-                stringify!($channel),
-                msg.bytes(),
-            ),
-            Err(Status::PEER_CLOSED) => (),
-            Err(status) => panic!("'{}' closed with status: {}", stringify!($channel), status),
-        }
     }};
 }
 
