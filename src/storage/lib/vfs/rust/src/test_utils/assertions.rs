@@ -7,7 +7,6 @@
 #[doc(hidden)]
 pub mod reexport {
     pub use fidl_fuchsia_io as fio;
-    pub use futures::stream::StreamExt;
     pub use zx_status::Status;
 }
 
@@ -253,32 +252,6 @@ macro_rules! assert_close {
             .expect("close failed")
             .map_err(Status::from_raw)
             .expect("close error");
-    }};
-}
-
-// PartialEq is not defined for FileEvent for the moment.
-// Because of that I can not write a macro that would just accept a FileEvent instance to
-// compare against:
-//
-//     assert_event!(proxy, FileEvent::OnOpen_ {
-//         s: Status::SHOULD_WAIT.into_raw(),
-//         info: Some(Box::new(NodeInfoDeprecated::{File,Directory} { ... })),
-//     });
-//
-// Instead, I need to split the assertion into a pattern and then additional assertions on what
-// the pattern have matched.
-#[macro_export]
-macro_rules! assert_event {
-    ($proxy:expr, $expected_pattern:pat, $expected_assertion:block) => {{
-        use $crate::test_utils::assertions::reexport::StreamExt;
-
-        let event_stream = $proxy.take_event_stream();
-        match event_stream.into_future().await {
-            (Some(Ok($expected_pattern)), _) => $expected_assertion,
-            (unexpected, _) => {
-                panic!("Unexpected event: {:?}", unexpected);
-            }
-        }
     }};
 }
 

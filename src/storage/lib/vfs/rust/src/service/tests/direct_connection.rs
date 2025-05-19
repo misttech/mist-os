@@ -6,17 +6,30 @@
 
 use super::{endpoint, host};
 
-use crate::file::test_utils::run_server_client;
+use crate::directory::serve;
+use crate::pseudo_directory;
 
 use assert_matches::assert_matches;
-use fidl::endpoints::{Proxy, RequestStream};
+use fidl::endpoints::RequestStream;
 use fidl::Error;
 use fidl_fuchsia_io as fio;
-use fidl_test_placeholders::{EchoProxy, EchoRequest, EchoRequestStream};
+use fidl_test_placeholders::{EchoMarker, EchoProxy, EchoRequest, EchoRequestStream};
 use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
 use futures::stream::StreamExt;
 use zx_status::Status;
+
+fn connect_at(root: &fio::DirectoryProxy, path: &str) -> EchoProxy {
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<EchoMarker>();
+    root.open(
+        path,
+        fio::Flags::PROTOCOL_SERVICE,
+        &fio::Options::default(),
+        server_end.into_channel(),
+    )
+    .unwrap();
+    proxy
+}
 
 async fn echo_server(
     mut requests: EchoRequestStream,
@@ -44,164 +57,88 @@ async fn echo_server(
     }
 }
 
-#[test]
-fn construction() {
-    run_server_client(fio::OpenFlags::empty(), endpoint(|_scope, _channel| ()), |_proxy| {
-        async move {
-            // NOOP.  Can not even call `Close` as it is part of the `Node` interface and we
-            // did not connect to a service that speaks `Node`.
-        }
-    });
-}
-
-#[test]
-fn simple_endpoint() {
-    run_server_client(
-        fio::OpenFlags::empty(),
-        endpoint(|scope, channel| {
+#[fuchsia::test]
+async fn simple_endpoint() {
+    let dir = pseudo_directory! {
+        "server" => endpoint(|scope, channel| {
             scope.spawn(async move {
                 echo_server(RequestStream::from_channel(channel), None, None).await;
             });
         }),
-        |node_proxy| async move {
-            let proxy = EchoProxy::from_channel(node_proxy.into_channel().unwrap());
-
-            let response = proxy.echo_string(Some("test")).await.unwrap();
-
-            assert_eq!(response.as_deref(), Some("test"));
-        },
-    );
+    };
+    let root = serve(dir, fio::Flags::empty());
+    let proxy = connect_at(&root, "server");
+    let response = proxy.echo_string(Some("test")).await.unwrap();
+    assert_eq!(response.as_deref(), Some("test"));
 }
 
-#[test]
-fn simple_host() {
-    run_server_client(
-        fio::OpenFlags::empty(),
-        host(|requests| echo_server(requests, None, None)),
-        |node_proxy| async move {
-            let proxy = EchoProxy::from_channel(node_proxy.into_channel().unwrap());
-
-            let response = proxy.echo_string(Some("test")).await.unwrap();
-
-            assert_eq!(response.as_deref(), Some("test"));
-        },
-    );
+#[fuchsia::test]
+async fn simple_host() {
+    let dir = pseudo_directory! {
+        "server" => host(|requests| echo_server(requests, None, None)),
+    };
+    let root = serve(dir, fio::Flags::empty());
+    let proxy = connect_at(&root, "server");
+    let response = proxy.echo_string(Some("test")).await.unwrap();
+    assert_eq!(response.as_deref(), Some("test"));
 }
 
-#[test]
-fn server_state_checking() {
+#[fuchsia::test]
+async fn server_state_checking() {
     let (done_tx, done_rx) = oneshot::channel();
     let (on_message_tx, mut on_message_rx) = mpsc::unbounded();
 
     let done_tx = Mutex::new(Some(done_tx));
     let on_message_tx = Mutex::new(Some(on_message_tx));
 
-    run_server_client(
-        fio::OpenFlags::empty(),
-        host(move |requests| {
+    let dir = pseudo_directory! {
+        "server" => host(move |requests| {
             echo_server(
                 requests,
                 Some(on_message_tx.lock().take().unwrap()),
                 Some(done_tx.lock().take().unwrap()),
             )
         }),
-        |node_proxy| {
-            async move {
-                let proxy = EchoProxy::from_channel(node_proxy.into_channel().unwrap());
+    };
+    let root = serve(dir, fio::Flags::empty());
+    let proxy = connect_at(&root, "server");
 
-                let response = proxy.echo_string(Some("message 1")).await.unwrap();
+    let response = proxy.echo_string(Some("message 1")).await.unwrap();
 
-                // `next()` wraps in `Option` and our value is `Option<String>`, hence double
-                // `Option`.
-                assert_eq!(on_message_rx.next().await, Some(Some("message 1".to_string())));
-                assert_eq!(response.as_deref(), Some("message 1"));
+    // `next()` wraps in `Option` and our value is `Option<String>`, hence double `Option`.
+    assert_eq!(on_message_rx.next().await, Some(Some("message 1".to_string())));
+    assert_eq!(response.as_deref(), Some("message 1"));
 
-                let response = proxy.echo_string(Some("message 2")).await.unwrap();
+    let response = proxy.echo_string(Some("message 2")).await.unwrap();
 
-                // `next()` wraps in `Option` and our value is `Option<String>`, hence double
-                // `Option`.
-                assert_eq!(on_message_rx.next().await, Some(Some("message 2".to_string())));
-                assert_eq!(response.as_deref(), Some("message 2"));
+    // `next()` wraps in `Option` and our value is `Option<String>`, hence double `Option`.
+    assert_eq!(on_message_rx.next().await, Some(Some("message 2".to_string())));
+    assert_eq!(response.as_deref(), Some("message 2"));
 
-                drop(proxy);
+    drop(proxy);
 
-                assert_eq!(done_rx.await, Ok(()));
-            }
-        },
-    );
+    assert_eq!(done_rx.await, Ok(()));
 }
 
-#[test]
-fn test_describe() {
-    run_server_client(
-        fio::OpenFlags::empty() | fio::OpenFlags::DESCRIBE,
-        host(|requests| echo_server(requests, None, None)),
-        |node_proxy| async move {
-            let (status, node_info) = node_proxy
-                .take_event_stream()
-                .next()
-                .await
-                .expect("Channel closed")
-                .expect("Expected event")
-                .into_on_open_()
-                .expect("Expected OnOpen");
-            assert_eq!(Status::from_raw(status), Status::OK);
-            assert_matches!(
-                node_info.as_deref(),
-                Some(fio::NodeInfoDeprecated::Service(fio::Service))
-            );
-
-            let proxy = EchoProxy::from_channel(node_proxy.into_channel().unwrap());
-
-            let response = proxy.echo_string(Some("test")).await.unwrap();
-
-            assert_eq!(response.as_deref(), Some("test"));
-        },
+#[fuchsia::test]
+async fn test_epitaph() {
+    let dir = pseudo_directory! {
+        "server" => host(|requests| echo_server(requests, None, None)),
+    };
+    let root = serve(dir, fio::Flags::empty());
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<EchoMarker>();
+    root.open(
+        "server",
+        fio::Flags::PROTOCOL_DIRECTORY,
+        &fio::Options::default(),
+        server_end.into_channel(),
+    )
+    .unwrap();
+    let mut event_stream = proxy.take_event_stream();
+    assert_matches!(
+        event_stream.next().await,
+        Some(Err(Error::ClientChannelClosed { status: Status::NOT_DIR, .. }))
     );
-}
 
-#[test]
-fn test_describe_error() {
-    run_server_client(
-        fio::OpenFlags::empty() | fio::OpenFlags::DIRECTORY | fio::OpenFlags::DESCRIBE,
-        host(|requests| echo_server(requests, None, None)),
-        |node_proxy| async move {
-            let mut event_stream = node_proxy.take_event_stream();
-
-            let (status, node_info) = event_stream
-                .next()
-                .await
-                .expect("Channel closed")
-                .expect("Expected event")
-                .into_on_open_()
-                .expect("Expected OnOpen");
-            assert_eq!(Status::from_raw(status), Status::NOT_DIR);
-            assert_eq!(node_info, None);
-
-            // And we should also get an epitaph.
-            assert_matches!(
-                event_stream.next().await,
-                Some(Err(Error::ClientChannelClosed { status: Status::NOT_DIR, .. }))
-            );
-
-            assert_matches!(event_stream.next().await, None);
-        },
-    );
-}
-
-#[test]
-fn test_epitaph() {
-    run_server_client(
-        fio::OpenFlags::empty() | fio::OpenFlags::DIRECTORY,
-        host(|requests| echo_server(requests, None, None)),
-        |node_proxy| async move {
-            let mut event_stream = node_proxy.take_event_stream();
-            assert_matches!(
-                event_stream.next().await,
-                Some(Err(Error::ClientChannelClosed { status: Status::NOT_DIR, .. }))
-            );
-
-            assert_matches!(event_stream.next().await, None);
-        },
-    );
+    assert_matches!(event_stream.next().await, None);
 }

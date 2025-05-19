@@ -4,30 +4,8 @@
 
 //! Common utilities used by pseudo-file related tests.
 
-use crate::directory::entry::DirectoryEntry;
-use crate::test_utils::run;
-
-use fidl_fuchsia_io as fio;
-use futures::Future;
-use std::sync::Arc;
-
 #[cfg(target_os = "fuchsia")]
 use zx_status::Status;
-
-pub use run::run_client;
-
-/// A thin wrapper around [`run::run_server_client()`] that sets the `Marker` to be
-/// [`FileMarker`], and providing explicit type for the `get_client` closure argument.  This makes
-/// it possible for the caller not to provide explicit types.
-pub fn run_server_client<GetClientRes>(
-    flags: fio::OpenFlags,
-    server: Arc<dyn DirectoryEntry>,
-    get_client: impl FnOnce(fio::FileProxy) -> GetClientRes,
-) where
-    GetClientRes: Future<Output = ()>,
-{
-    run::run_server_client::<fio::FileMarker, _, _>(flags, server, get_client)
-}
 
 /// Possible errors for the [`assert_vmo_content()`] function.
 #[cfg(target_os = "fuchsia")]
