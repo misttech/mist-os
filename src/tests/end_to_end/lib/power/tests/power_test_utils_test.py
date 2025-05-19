@@ -13,7 +13,7 @@ import unittest
 import unittest.mock as mock
 from pathlib import Path
 
-from power_test_utils import power_test_utils
+from power import power_test_utils
 from trace_processing import trace_model, trace_time
 
 _METRIC_NAME = "M3tr1cN4m3"

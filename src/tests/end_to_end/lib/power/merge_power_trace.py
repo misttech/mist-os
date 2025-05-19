@@ -10,7 +10,7 @@ import pathlib
 import shutil
 import sys
 
-from power_test_utils import power_test_utils
+from power import power_test_utils
 from trace_processing import trace_importing, trace_model
 
 
