@@ -1,7 +1,7 @@
 [
     {
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.sdmmc.BIND_PROTOCOL.SDHCI"
+            "fuchsia.hardware.sdhci.Service": "fuchsia.hardware.sdhci.Service.DriverTransport"
         },
         "expected": "match",
         "name": "Match"
