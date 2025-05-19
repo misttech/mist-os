@@ -396,8 +396,8 @@ impl ToRequestFlags for fio::Flags {
 mod tests {
     use super::*;
     use crate::directory::immutable::Simple;
-    use crate::{assert_event, file};
-    use fidl::endpoints::create_proxy;
+    use crate::file;
+    use crate::object_request::ObjectRequest;
 
     #[test]
     fn add_entry_success() {
@@ -455,16 +455,12 @@ mod tests {
             ("dir", None),
             ("dir/does-not-exist", Some("dir/does-not-exist".to_string())),
         ] {
-            let (proxy, server_end) = create_proxy::<fio::NodeMarker>();
-            let flags = fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE;
+            log::info!("{path}");
+            let (_proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
+            let flags = fio::Flags::PROTOCOL_NODE | fio::Flags::FLAG_SEND_REPRESENTATION;
             let path = Path::validate_and_split(path).unwrap();
-            dir.clone().deprecated_open(
-                scope.clone(),
-                flags,
-                path,
-                server_end.into_channel().into(),
-            );
-            assert_event!(proxy, fio::NodeEvent::OnOpen_ { .. }, {});
+            ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
+                .handle(|request| dir.clone().open(scope.clone(), path, flags, request));
 
             assert_eq!(expectation, path_mutex.lock().take());
         }

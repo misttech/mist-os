@@ -254,7 +254,6 @@ mod tests {
         use crate::path::Path;
         use crate::token_registry::{TokenInterface, TokenRegistry};
         use crate::ObjectRequestRef;
-        use fidl::endpoints::ServerEnd;
         use fidl_fuchsia_io as fio;
         use std::sync::Arc;
         use zx_status::Status;
@@ -295,15 +294,6 @@ mod tests {
         }
 
         impl Directory for MockDirectory {
-            fn deprecated_open(
-                self: Arc<Self>,
-                _scope: ExecutionScope,
-                _flags: fio::OpenFlags,
-                _path: Path,
-                _server_end: ServerEnd<fio::NodeMarker>,
-            ) {
-            }
-
             fn open(
                 self: Arc<Self>,
                 _scope: ExecutionScope,
