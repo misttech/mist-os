@@ -1105,13 +1105,18 @@ class GnBuildArgs(object):
                 if vartype == "string_or_false" and not value:
                     value = ""
                 elif vartype == "path":
-                    if not value.startswith("//"):
+                    if value.startswith("//"):
+                        value = value[2:]
+                    elif value.startswith("/"):
+                        # Pass through the absolute path.
+                        value = value
+                    else:
                         fail(
-                            "Path '{}' does not begin with '//'".format(
+                            "Path '{}' does not begin with '//' or '/'".format(
                                 value,
                             )
                         )
-                    value = value[2:]
+
                 args_contents += '{} = "{}"'.format(varname, value)
             else:
                 fail(

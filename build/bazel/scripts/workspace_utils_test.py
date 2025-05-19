@@ -534,6 +534,12 @@ class GnBuildArgsTest(unittest.TestCase):
                 "type": "path",
                 "value": "//prebuilt/third_party/fuzz",
             },
+            {
+                "location": "//build/fizz.gni",
+                "name": "absolute_fizz",
+                "type": "path",
+                "value": "/path/to/prebuilt/third_party/fuzz",
+            },
         ]
 
         args_bzl = GnBuildArgs.generate_args_bzl(
@@ -563,6 +569,9 @@ baz = ['1', '2', '3', '40', 'fuzz']
 
 # From //build/fuzz.gni
 fuzz = "prebuilt/third_party/fuzz"
+
+# From //build/fizz.gni
+absolute_fizz = "/path/to/prebuilt/third_party/fuzz"
 ''',
         )
 
