@@ -6,25 +6,20 @@ point in time and export them in a
 
 ## How to use
 
-* Add `//src/performance/memory/heapdump/instrumentation` to the `deps` of the
-  `executable` target that you want to profile.
 * Add `heapdump_instrumentation/collector.shard.cml` to the `include` list in
   your component's manifest.
 * Add `//src/performance/memory/heapdump/collector` to the `subpackages` of
   your package.
-* C++: Add `#include <heapdump/bind.h>` and call `heapdump_bind_with_fdio()` at
-  the beginning of `main` in your program.
-* Rust: Add the following declaration at the global scope of your main file.
-    ```
-    #[link(name = "heapdump_instrumentation")]
-    extern "C" {
-      fn heapdump_bind_with_fdio();
-    }
-    ```
-    Then, at the beginning of your main, call
-    ```
-    unsafe { heapdump_bind_with_fdio() };
-    ```
+* C++:
+  * Add `//src/performance/memory/heapdump/instrumentation` to the `deps` of the
+    `executable` target that you want to profile.
+  * Add `#include <heapdump/bind.h>` and call `heapdump_bind_with_fdio()` at
+    the beginning of `main` in your program.
+* Rust:
+  * Add `//src/performance/memory/heapdump/instrumentation:rust` to the `deps`
+    of the `rustc_binary` target that you want to profile.
+  * Call `heapdump::bind_with_fdio()` at the beginning of `main` in your
+    program.
 
 * Run your program as usual.
 * Use `ffx profile heapdump snapshot` while your program is running to take a
