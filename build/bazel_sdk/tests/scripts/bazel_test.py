@@ -312,8 +312,6 @@ class BazelRepositoryMap(object):
             "rules_cc": fuchsia_source_dir / "third_party/bazel_rules_cc",
             "rules_license": fuchsia_source_dir
             / "third_party/bazel_rules_license",
-            "rules_java": fuchsia_source_dir
-            / "build/bazel/local_repositories/rules_java",
             "remote_coverage_tools": fuchsia_source_dir
             / "build/bazel/local_repositories/remote_coverage_tools",
             "rules_fuchsia": fuchsia_source_dir
