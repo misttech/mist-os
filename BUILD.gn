@@ -102,6 +102,11 @@ declare_args() {
   # extension mechanism for IDK bits outside of the main repository.
   sdk_archive_labels = []
 
+  # Extra generate_fuchsia_bazel_sdk targets to be included in the
+  #`bazel_sdk_info` API module. This allows defining bazel SDKs outside of the
+  # main repository.
+  additional_bazel_sdk_labels = []
+
   # Platform builders should populate this list in their product.gni file.
   # The result will be built and uploaded to CIPD by infra.
   assembly_board_configs = []
@@ -372,9 +377,9 @@ build_api_module("bazel_sdk_info") {
   testonly = true
   data_keys = [ "bazel_sdk_info" ]
   deps = [
-    "//sdk:final_fuchsia_sdk",
-    "//sdk/pdk:sdk",
-  ]
+           "//sdk:final_fuchsia_sdk",
+           "//sdk/pdk:sdk",
+         ] + additional_bazel_sdk_labels
 }
 
 # Describes the location where the Bazel rules are.
