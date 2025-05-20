@@ -122,13 +122,6 @@ files = {
     # The output file containing (only) packages in universe.
     universe_package_manifests =
         "$root_build_dir/universe_package_manifests.list"
-
-    # TODO(https://fxbug.dev/42074075): Audit and add the following paths when
-    # only Bazel assembly is enabled.
-    if (!use_bazel_images_only) {
-      flash_manifest = "${_images_outdir}/flash_manifest/flash.json"
-      blobfs = "${_assembly_outdir}/blob.blk"
-    }
   }
 
   if (use_gigaboot) {

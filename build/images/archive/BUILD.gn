@@ -12,11 +12,7 @@ assert(current_toolchain == default_toolchain,
 
 group("archive-extras") {
   testonly = true
-  deps = [
-    ":build_args_metadata",
-    "//build/images/flash:fastboot_manifest_archive",
-    "//build/images/flash:flash_script_archive",
-  ]
+  deps = [ ":build_args_metadata" ]
 }
 
 group("build_args_metadata") {
@@ -54,8 +50,6 @@ foreach(format, archive_formats) {
       deps = [
         ":archive-extras",
         "//build/images",
-        "//build/images/flash:fastboot_manifest_archive",
-        "//build/images/flash:flash_script_archive",
         "//build/images/tools:bootserver",
       ]
 

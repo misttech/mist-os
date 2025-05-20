@@ -133,8 +133,6 @@ group("record_filesystem_sizes") {
   }
 }
 
-default_image_deps += [ "//build/images/flash" ]
-
 # If a GPT image was specified, make it available as a build artifact.
 if (gpt_image != "") {
   copy("gpt") {
@@ -286,14 +284,6 @@ group("default-images") {
   if (build_uefi_disk && !product_skip_uefi_disk) {
     deps += [ ":uefi-disk" ]
   }
-
-  # Even if Bazel assembly uses product bundle to flash, downstream tools can
-  # still expect flash.json and flash.sh to exist for flashing.
-  deps += [
-    "//build/images/flash:fastboot_manifest",
-    "//build/images/flash:flash_script",
-    "//build/images/tools:fastboot($host_toolchain)",
-  ]
 
   if (use_bazel_images_only) {
     if (bazel_product_bundle_target != "") {
