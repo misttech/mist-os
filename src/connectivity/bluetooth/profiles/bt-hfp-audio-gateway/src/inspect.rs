@@ -278,8 +278,8 @@ mod tests {
     use fidl_fuchsia_bluetooth_hfp::SignalStrength;
     use fuchsia_inspect_derive::WithInspect;
 
-    #[test]
-    fn call_entry_inspect_tree() {
+    #[fuchsia::test]
+    async fn call_entry_inspect_tree() {
         let inspect = inspect::Inspector::default();
         let mut call_entry =
             CallEntryInspect::default().with_inspect(inspect.root(), "call").unwrap();
@@ -304,8 +304,8 @@ mod tests {
         });
     }
 
-    #[test]
-    fn peer_task_inspect_tree() {
+    #[fuchsia::test]
+    async fn peer_task_inspect_tree() {
         let inspect = inspect::Inspector::default();
 
         let id = PeerId(2);
@@ -348,14 +348,14 @@ mod tests {
 
     #[test]
     fn service_level_connection_inspect_tree() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1230000));
         let inspect = inspect::Inspector::default();
 
         let mut slc =
             ServiceLevelConnectionInspect::default().with_inspect(inspect.root(), "slc").unwrap();
         // Default inspect tree.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             slc: {
                 hf_supported_codecs: "",
                 handsfree_feature_support: {
@@ -389,7 +389,7 @@ mod tests {
         slc.initialized(fasync::MonotonicInstant::now());
         slc.update_slc_state(&state);
         slc.connected(fasync::MonotonicInstant::now());
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             slc: {
                 connected_at: 1230000i64,
                 initialized_at: 1230000i64,
@@ -417,7 +417,7 @@ mod tests {
         });
 
         slc.set_selected_codec(&None);
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             slc: {
                 connected_at: 1230000i64,
                 initialized_at: 1230000i64,
@@ -437,7 +437,7 @@ mod tests {
             procedure_node.record_string("name", "FooBar");
             slc.record_procedure(procedure_node);
         }
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             slc: {
                 connected_at: 1230000i64,
                 initialized_at: 1230000i64,

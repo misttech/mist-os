@@ -409,8 +409,10 @@ struct TemperatureInput {
 
 impl TemperatureInput {
     fn new(config: &TemperatureInputConfig) -> Self {
-        let temperature_filter =
-            TemperatureFilter::new(config.temperature_handler_node.clone(), config.filter_time_constant);
+        let temperature_filter = TemperatureFilter::new(
+            config.temperature_handler_node.clone(),
+            config.filter_time_constant,
+        );
 
         Self {
             temperature_filter,
@@ -937,6 +939,7 @@ mod tests {
 
         // Verify the expected thermal load values are present for both temperature inputs
         assert_data_tree!(
+            @executor node_runner.executor,
             inspector,
             root: {
                 "ThermalLoadDriver": {

@@ -274,8 +274,8 @@ mod tests {
     use futures::stream::StreamExt;
     use {fidl_fuchsia_bluetooth_avrcp as fidl_avrcp, fuchsia_async as fasync};
 
-    #[test]
-    fn multiple_peers_connection_updates_to_shared_node() {
+    #[fuchsia::test]
+    async fn multiple_peers_connection_updates_to_shared_node() {
         let inspect = inspect::Inspector::default();
 
         let metrics = MetricsNode::default().with_inspect(inspect.root(), "metrics").unwrap();
@@ -346,8 +346,8 @@ mod tests {
         });
     }
 
-    #[test]
-    fn controller_peers_service_updates() {
+    #[fuchsia::test]
+    async fn controller_peers_service_updates() {
         let inspect = inspect::Inspector::default();
 
         let metrics = MetricsNode::default().with_inspect(inspect.root(), "metrics").unwrap();
@@ -441,7 +441,7 @@ mod tests {
                 "player 1".to_string(),
             )],
         );
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             metrics: contains {
                 distinct_target_peers_with_players_support_browsing: 0u64,
                 distinct_target_peers_with_players_only_browsable_when_addressed: 0u64,
@@ -483,7 +483,7 @@ mod tests {
         );
         // Metrics is not incremented since the highest level of support
         // for peer 1 hasn't changed since last time.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             metrics: contains {
                 distinct_target_peers_with_players_support_browsing: 0u64,
                 distinct_target_peers_with_players_only_browsable_when_addressed: 0u64,
@@ -520,7 +520,7 @@ mod tests {
         );
         // `..._support_browsing` metric is incremented since it's the highest
         // support level for player 2.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             metrics: contains {
                 distinct_target_peers_with_players_support_browsing: 1u64,
                 distinct_target_peers_with_players_only_browsable_when_addressed: 0u64,
@@ -564,7 +564,7 @@ mod tests {
         );
         // `...only_browsable_when_addressed` metric is incremented since the
         // highest support level changed since last time.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             metrics: contains {
                 distinct_target_peers_with_players_support_browsing: 1u64,
                 distinct_target_peers_with_players_only_browsable_when_addressed: 1u64,

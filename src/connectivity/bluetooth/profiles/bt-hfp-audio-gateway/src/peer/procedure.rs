@@ -534,14 +534,14 @@ mod tests {
         assert_eq!(marker, ProcedureMarker::Indicators);
     }
 
-    #[test]
-    fn answer_procedure_default_inspect_tree() {
+    #[fuchsia::test]
+    async fn answer_procedure_default_inspect_tree() {
         let inspect = inspect::Inspector::default();
         let mut proc = ProcedureMarker::Answer.initialize();
         let mut state = SlcState::default();
         proc.iattach(&inspect.root(), "procedure_0").expect("can initialize inspect");
         // Default inspect tree.
-        let hierarchy = inspect.get_diagnostics_hierarchy();
+        let hierarchy = inspect.get_diagnostics_hierarchy().await;
         assert_data_tree!(hierarchy, root: {
             procedure_0: {
                 name: "Answer",
@@ -566,7 +566,7 @@ mod tests {
 
         let node = proc.take_inspect_node();
         assert_matches!(node, Some(_));
-        let hierarchy = inspect.get_diagnostics_hierarchy();
+        let hierarchy = inspect.get_diagnostics_hierarchy().await;
         assert_data_tree!(hierarchy, root: {
             procedure_0: {
                 name: "Answer",

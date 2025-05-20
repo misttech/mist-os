@@ -202,7 +202,7 @@ struct GenericYak<'a, T: Unit> {
 }
 
 #[fuchsia::test]
-fn unit_primitive() {
+async fn unit_primitive() {
     let inspector = Inspector::default();
     let root = inspector.root();
     let mut num = 127i8;
@@ -216,7 +216,7 @@ fn unit_primitive() {
 }
 
 #[fuchsia::test]
-fn unit_flat() {
+async fn unit_flat() {
     let inspector = Inspector::default();
     let root = inspector.root();
     let mut yakling = Yakling { name: "Lil Sebastian".to_string(), age: 5 };
@@ -235,7 +235,7 @@ fn unit_flat() {
 }
 
 #[fuchsia::test]
-fn unit_nested() {
+async fn unit_nested() {
     let inspector = Inspector::default();
     let root = inspector.root();
     let mut yak = Yak {
@@ -274,7 +274,7 @@ fn unit_nested() {
 }
 
 #[fuchsia::test]
-fn unit_basic_types() {
+async fn unit_basic_types() {
     let inspector = Inspector::default();
     let root = inspector.root();
     let mut basic = BasicTypes::default();
@@ -327,7 +327,7 @@ fn unit_basic_types() {
 }
 
 #[fuchsia::test]
-fn unit_generic() {
+async fn unit_generic() {
     let inspector = Inspector::default();
     let root = inspector.root();
     let a = "some_ref".to_string();
@@ -346,7 +346,7 @@ fn unit_generic() {
 }
 
 #[fuchsia::test]
-fn unit_option() -> Result<(), AttachError> {
+async fn unit_option() -> Result<(), AttachError> {
     let inspector = Inspector::default();
     let mut option_yakling: Option<Yakling> = None;
     let mut option_yakling_data = option_yakling.inspect_create(inspector.root(), "option_yakling");
@@ -392,7 +392,7 @@ fn unit_option() -> Result<(), AttachError> {
 }
 
 #[fuchsia::test]
-fn ivalue_primitive() {
+async fn ivalue_primitive() {
     let inspector = Inspector::default();
     let root = inspector.root();
     let mut num = IValue::attached(126i8, root, "num");
@@ -416,7 +416,7 @@ fn ivalue_primitive() {
 }
 
 #[fuchsia::test]
-fn ivalue_nested() {
+async fn ivalue_nested() {
     let inspector = Inspector::default();
     let root = inspector.root();
     let yak_base = Yak {
@@ -457,7 +457,7 @@ fn ivalue_nested() {
 }
 
 #[fuchsia::test]
-fn idebug_enum() {
+async fn idebug_enum() {
     let inspector = Inspector::default();
     let root = inspector.root();
     let mut horse = IDebug::attached(Horse::Arabian, root, "horse");
@@ -631,7 +631,7 @@ async fn derive_inspect_nodeless() -> Result<(), AttachError> {
 }
 
 #[fuchsia::test]
-fn derive_inspect_generic() -> Result<(), AttachError> {
+async fn derive_inspect_generic() -> Result<(), AttachError> {
     let inspector = Inspector::default();
     let age = 4u16;
     let mut yak = GenericYak {

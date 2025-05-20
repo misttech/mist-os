@@ -50,18 +50,18 @@ async fn test_logs_lifecycle() {
         };
         puppet.log(&request).await.expect("Log succeeds");
 
-        check_message(&puppet_name, subscription.next().await.unwrap());
+        check_message(&puppet_name, subscription.next().await.unwrap()).await;
 
         reader.with_minimum_schema_count(i);
         let all_messages = reader.snapshot().await.unwrap();
 
         for message in all_messages {
-            check_message("puppet", message);
+            check_message("puppet", message).await;
         }
     }
 }
 
-fn check_message(expected_moniker_prefix: &str, message: Data<Logs>) {
+async fn check_message(expected_moniker_prefix: &str, message: Data<Logs>) {
     assert!(message.moniker.to_string().starts_with(expected_moniker_prefix));
     assert_data_tree!(message.payload.unwrap(), root: {
         message: {

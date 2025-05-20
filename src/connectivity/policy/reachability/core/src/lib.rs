@@ -1477,8 +1477,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_log_state_vals_inspect() {
+    #[fuchsia::test]
+    async fn test_log_state_vals_inspect() {
         let inspector = Inspector::default();
         LinkState::log_state_vals_inspect(inspector.root(), "state_vals");
         assert_data_tree!(inspector, root: {

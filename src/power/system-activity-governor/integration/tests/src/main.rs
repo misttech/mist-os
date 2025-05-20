@@ -1961,18 +1961,18 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
         let mut wake_lease_child = TreeAssertion::new(server_token_koid, false);
         wake_lease_child.add_property_assertion(
             fobs::WAKE_LEASE_ITEM_NODE_CREATED_AT,
-            Box::new(NonZeroUintProperty),
+            Arc::new(NonZeroUintProperty),
         );
         wake_lease_child.add_property_assertion(
             fobs::WAKE_LEASE_ITEM_CLIENT_TOKEN_KOID,
-            Box::new(*client_token_koid),
+            Arc::new(*client_token_koid),
         );
         wake_lease_child
-            .add_property_assertion(fobs::WAKE_LEASE_ITEM_NAME, Box::new(wake_lease_name));
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_NAME, Arc::new(wake_lease_name));
         wake_lease_child
-            .add_property_assertion(fobs::WAKE_LEASE_ITEM_TYPE, Box::new(AnyStringProperty));
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_TYPE, Arc::new(AnyStringProperty));
         wake_lease_child
-            .add_property_assertion(fobs::WAKE_LEASE_ITEM_STATUS, Box::new(AnyStringProperty));
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_STATUS, Arc::new(AnyStringProperty));
         wake_leases_child.add_child_assertion(wake_lease_child);
 
         wake_leases.push(wake_lease);
@@ -2038,18 +2038,18 @@ async fn test_activity_governor_handles_1000_acquired_wake_leases() -> Result<()
         let mut wake_lease_child = TreeAssertion::new(server_token_koid, false);
         wake_lease_child.add_property_assertion(
             fobs::WAKE_LEASE_ITEM_NODE_CREATED_AT,
-            Box::new(NonZeroUintProperty),
+            Arc::new(NonZeroUintProperty),
         );
         wake_lease_child.add_property_assertion(
             fobs::WAKE_LEASE_ITEM_CLIENT_TOKEN_KOID,
-            Box::new(*client_token_koid),
+            Arc::new(*client_token_koid),
         );
         wake_lease_child
-            .add_property_assertion(fobs::WAKE_LEASE_ITEM_NAME, Box::new(wake_lease_name));
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_NAME, Arc::new(wake_lease_name));
         wake_lease_child
-            .add_property_assertion(fobs::WAKE_LEASE_ITEM_TYPE, Box::new(AnyStringProperty));
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_TYPE, Arc::new(AnyStringProperty));
         wake_lease_child
-            .add_property_assertion(fobs::WAKE_LEASE_ITEM_STATUS, Box::new(AnyStringProperty));
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_STATUS, Arc::new(AnyStringProperty));
         wake_leases_child.add_child_assertion(wake_lease_child);
 
         wake_leases.push(wake_lease);

@@ -114,7 +114,7 @@ mod tests {
     use futures::FutureExt;
 
     #[fuchsia::test]
-    fn health_checker_lifecycle() {
+    async fn health_checker_lifecycle() {
         let inspector = super::inspector();
         // In the beginning, the inspector has no stats.
         assert_data_tree!(inspector, root: contains {});
@@ -170,7 +170,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn record_on_inspector() {
+    async fn record_on_inspector() {
         let inspector = super::inspector();
         assert_eq!(inspector.max_size().unwrap(), constants::DEFAULT_VMO_SIZE_BYTES);
         inspector.root().record_int("a", 1);
@@ -186,7 +186,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn inspect_stats() {
+    async fn inspect_stats() {
         let inspector = super::inspector();
         super::serve_inspect_stats();
         inspector.root().record_lazy_child("foo", || {

@@ -633,7 +633,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_set_default_network_id() {
+    async fn test_set_default_network_id() {
         let inspector = fuchsia_inspect::Inspector::default();
         let manager = &NetworkManagerHandle::new_with_inspect(inspector.root()).0;
 
@@ -663,7 +663,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_add_network() {
+    async fn test_add_network() {
         let inspector = fuchsia_inspect::Inspector::default();
         let manager = &NetworkManagerHandle::new_with_inspect(inspector.root()).0;
 
@@ -698,7 +698,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_update_network() {
+    async fn test_update_network() {
         let inspector = fuchsia_inspect::Inspector::default();
         let manager = &NetworkManagerHandle::new_with_inspect(inspector.root()).0;
 
@@ -736,7 +736,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_add_empty_network() {
+    async fn test_add_empty_network() {
         let inspector = fuchsia_inspect::Inspector::default();
         let manager = &NetworkManagerHandle::new_with_inspect(inspector.root()).0;
 
@@ -762,7 +762,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_remove_network() {
+    async fn test_remove_network() {
         let inspector = fuchsia_inspect::Inspector::default();
         let manager = &NetworkManagerHandle::new_with_inspect(inspector.root()).0;
 
@@ -797,7 +797,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn test_multiple_operations() {
+    async fn test_multiple_operations() {
         let inspector = fuchsia_inspect::Inspector::default();
         let manager = &NetworkManagerHandle::new_with_inspect(inspector.root()).0;
 
@@ -901,7 +901,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    fn replay_network_events() {
+    async fn replay_network_events() {
         let inspector = fuchsia_inspect::Inspector::default();
         let manager = NetworkManagerHandle::new_with_inspect(inspector.root());
 
@@ -1548,7 +1548,7 @@ mod tests {
             },
         });
 
-        while assertion.run(&inspector.get_diagnostics_hierarchy()).is_err() {
+        while assertion.run(&inspector.get_diagnostics_hierarchy().await.into_owned()).is_err() {
             // Loop until the other thread updates the inspect values
         }
     }
@@ -1608,7 +1608,7 @@ mod tests {
             },
         });
 
-        while assertion.run(&inspector.get_diagnostics_hierarchy()).is_err() {
+        while assertion.run(&inspector.get_diagnostics_hierarchy().await.into_owned()).is_err() {
             // Loop until the other thread updates the inspect values
         }
     }

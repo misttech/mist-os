@@ -654,7 +654,7 @@ mod historical_max_cpu_temperature_tests {
     /// temperature at the end of each N samples.
     #[test]
     fn test_reset_max_temperature_after_sample_count() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         let inspector = inspect::Inspector::default();
         let mut max_temperatures =
             HistoricalMaxCpuTemperature::new_with_max_sample_count(inspector.root(), 10);
@@ -673,6 +673,7 @@ mod historical_max_cpu_temperature_tests {
         }
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 historical_max_cpu_temperature_c: {
@@ -687,7 +688,7 @@ mod historical_max_cpu_temperature_tests {
     /// temperature samples are observed.
     #[test]
     fn test_dispatch_reading_after_n_samples() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         let inspector = inspect::Inspector::default();
         let mut max_temperatures =
             HistoricalMaxCpuTemperature::new_with_max_sample_count(inspector.root(), 10);
@@ -696,6 +697,7 @@ mod historical_max_cpu_temperature_tests {
 
         // Tree is initially empty
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 historical_max_cpu_temperature_c: {}
@@ -709,6 +711,7 @@ mod historical_max_cpu_temperature_tests {
 
         // Tree is still empty
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 historical_max_cpu_temperature_c: {}
@@ -718,6 +721,7 @@ mod historical_max_cpu_temperature_tests {
         // After one more temperature sample, the max temperature should be logged
         max_temperatures.log_raw_cpu_temperature(Celsius(50.0));
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 historical_max_cpu_temperature_c: {
@@ -731,7 +735,7 @@ mod historical_max_cpu_temperature_tests {
     /// into Inspect.
     #[test]
     fn test_max_record_count() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         let inspector = inspect::Inspector::default();
         let mut max_temperatures =
             HistoricalMaxCpuTemperature::new_with_max_sample_count(inspector.root(), 2);
@@ -752,6 +756,7 @@ mod historical_max_cpu_temperature_tests {
         }
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 historical_max_cpu_temperature_c: {
@@ -765,7 +770,7 @@ mod historical_max_cpu_temperature_tests {
     /// Tests that the actual max value is recorded after varying temperature values were logged.
     #[test]
     fn test_max_temperature_selection() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         let inspector = inspect::Inspector::default();
         let mut max_temperatures =
             HistoricalMaxCpuTemperature::new_with_max_sample_count(inspector.root(), 3);
@@ -776,6 +781,7 @@ mod historical_max_cpu_temperature_tests {
         max_temperatures.log_raw_cpu_temperature(Celsius(20.0));
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 historical_max_cpu_temperature_c: {
@@ -795,7 +801,7 @@ mod inspect_throttle_history_tests {
     #[test]
     fn test_inspect_throttle_history_window() {
         // Need an executor for the `get_current_timestamp()` calls
-        let executor = fasync::TestExecutor::new_with_fake_time();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         // Create a InspectThrottleHistory with capacity for only one throttling entry
         let inspector = inspect::Inspector::default();
@@ -809,6 +815,7 @@ mod inspect_throttle_history_tests {
         throttle_history.set_inactive();
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 throttle_history: {
@@ -827,6 +834,7 @@ mod inspect_throttle_history_tests {
         throttle_history.set_inactive();
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 throttle_history: {
@@ -917,6 +925,7 @@ mod tests {
         // Verify `throttle_history` entry has `throttle_start_time` populated and
         // `throttling_state` shows "active"
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 platform_metrics: {
@@ -988,6 +997,7 @@ mod tests {
         );
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 platform_metrics: {
@@ -1015,6 +1025,7 @@ mod tests {
         run_all_tasks_until_stalled(&mut executor);
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 platform_metrics: {
@@ -1106,6 +1117,7 @@ mod tests {
         {
             // Verify `throttle_history` entry has ended and throttling state is "not throttled"
             assert_data_tree!(
+                @executor executor,
                 inspector,
                 root: {
                     platform_metrics: {
@@ -1128,11 +1140,11 @@ mod tests {
     ///     - dispatch a Cobalt event for the `raw_temperature` metric
     #[test]
     fn test_cpu_temperature_logging_task() {
-        let mut executor = fasync::TestExecutor::new_with_fake_time();
+        let executor = std::sync::Mutex::new(fasync::TestExecutor::new_with_fake_time());
 
         // Initialize current time
         let mut current_time = Seconds(0.0);
-        executor.set_fake_time(current_time.into());
+        executor.lock().unwrap().set_fake_time(current_time.into());
 
         let mut mock_maker = MockNodeMaker::new();
         let mock_cpu_temperature = mock_maker.make("MockCpuTemperature", vec![]);
@@ -1154,6 +1166,7 @@ mod tests {
         let mut futures_out = futures_out.collect::<()>();
 
         let mut iterate_polling_loop = |temperature| {
+            let mut executor = executor.lock().unwrap();
             mock_cpu_temperature.add_msg_response_pair((
                 msg_eq!(ReadTemperature),
                 msg_ok_return!(ReadTemperature(temperature)),
@@ -1181,6 +1194,7 @@ mod tests {
 
         // Verify the `historical_max_cpu_temperature_c` property is published
         assert_data_tree!(
+            @executor executor.lock().unwrap(),
             inspector,
             root: {
                 platform_metrics: contains {
@@ -1199,6 +1213,7 @@ mod tests {
 
         // Verify the first "minute" is rolled out
         assert_data_tree!(
+            @executor executor.lock().unwrap(),
             inspector,
             root: {
                 platform_metrics: contains {
@@ -1335,6 +1350,7 @@ mod tests {
         expected_thermal_load_hist.insert_values(vec![40]);
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: contains {
                 platform_metrics: contains {

@@ -64,6 +64,7 @@ rustc_library_with_features("netstack3-filter") {
           "//src/connectivity/network/lib/diagnostics-traits",
           "//src/lib/diagnostics/inspect/rust:fuchsia-inspect",
           "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+          "//src/lib/fuchsia-async",
         ]
       }
     },

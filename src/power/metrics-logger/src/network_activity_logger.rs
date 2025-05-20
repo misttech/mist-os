@@ -548,6 +548,7 @@ pub mod tests {
 
         // Check NetworkActivityLogger added before first poll.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -564,6 +565,7 @@ pub mod tests {
             runner.network_counters.set([i + 1, (i + 1) * 2, (i + 1) * 3, (i + 1) * 4]);
             runner.iterate_task(&mut task);
             assert_data_tree!(
+                @executor runner.executor,
                 runner.inspector,
                 root: {
                     MetricsLogger: {
@@ -584,6 +586,7 @@ pub mod tests {
             runner.network_counters.set([5, 10, 15, 20]);
             runner.iterate_task(&mut task);
             assert_data_tree!(
+                @executor runner.executor,
                 runner.inspector,
                 root: {
                     MetricsLogger: {
@@ -604,6 +607,7 @@ pub mod tests {
         // With one more time step, the end time has been reached.
         runner.iterate_task(&mut task);
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {

@@ -117,14 +117,14 @@ mod tests {
 
     #[test]
     fn remote_peer_inspect_tree() {
-        let _executor = fasync::TestExecutor::new();
+        let mut executor = fasync::TestExecutor::new();
         let inspect = inspect::Inspector::default();
 
         let mut peer_inspect =
             RemotePeerInspect::new(PeerId(1)).with_inspect(inspect.root(), "peer").unwrap();
 
         // Default inspect tree.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor executor, inspect, root: {
             peer: {
                 peer_id: AnyProperty,
                 controller_info: {},
@@ -145,7 +145,7 @@ mod tests {
         // Setting the opposite feature set has no effect.
         peer_inspect.record_target_features(controller_info);
         peer_inspect.record_controller_features(target_info);
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor executor, inspect, root: {
             peer: {
                 peer_id: AnyProperty,
                 controller_info: {},
@@ -155,7 +155,7 @@ mod tests {
 
         peer_inspect.record_target_features(target_info);
         peer_inspect.record_controller_features(controller_info);
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor executor, inspect, root: {
             peer: {
                 peer_id: AnyProperty,
                 controller_info: {
@@ -169,7 +169,7 @@ mod tests {
 
         let time = fasync::MonotonicInstant::from_nanos(123_456_789);
         peer_inspect.record_connected(time);
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor executor, inspect, root: {
             peer: {
                 peer_id: AnyProperty,
                 controller_info: contains {},

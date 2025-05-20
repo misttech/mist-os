@@ -129,7 +129,7 @@ mod test {
 
     static TARGET_VERSION: &str = "some-ver";
 
-    fn assert_emit_inspect(event: Event<'_>, child: TreeAssertion) {
+    async fn assert_emit_inspect(event: Event<'_>, child: TreeAssertion) {
         let inspector = Inspector::default();
         let mut emitter = Emitter::from_node(inspector.root().create_child("emitter"));
 
@@ -150,8 +150,8 @@ mod test {
         );
     }
 
-    #[test]
-    fn checking_for_updates() {
+    #[fuchsia::test]
+    async fn checking_for_updates() {
         mock::set_session_id(9);
         assert_emit_inspect(
             Event::CheckingForUpdates,
@@ -163,10 +163,11 @@ mod test {
                 }
             ),
         )
+        .await
     }
 
-    #[test]
-    fn error_checking_for_update() {
+    #[fuchsia::test]
+    async fn error_checking_for_update() {
         mock::set_session_id(9);
         assert_emit_inspect(
             Event::ErrorCheckingForUpdate,
@@ -177,11 +178,12 @@ mod test {
                     "session-id": 0u64
                 }
             ),
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn no_update_available() {
+    #[fuchsia::test]
+    async fn no_update_available() {
         mock::set_session_id(9);
         assert_emit_inspect(
             Event::NoUpdateAvailable,
@@ -193,10 +195,11 @@ mod test {
                 }
             ),
         )
+        .await
     }
 
-    #[test]
-    fn installation_deferred_by_policy() {
+    #[fuchsia::test]
+    async fn installation_deferred_by_policy() {
         mock::set_session_id(9);
         assert_emit_inspect(
             Event::InstallationDeferredByPolicy { target_version: Some(TARGET_VERSION) },
@@ -208,11 +211,12 @@ mod test {
                     "target-version": TARGET_VERSION,
                 }
             ),
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn installing_update() {
+    #[fuchsia::test]
+    async fn installing_update() {
         mock::set_session_id(9);
         assert_emit_inspect(
             Event::InstallingUpdate { target_version: Some(TARGET_VERSION) },
@@ -224,11 +228,12 @@ mod test {
                     "target-version": TARGET_VERSION,
                 }
             ),
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn installation_error() {
+    #[fuchsia::test]
+    async fn installation_error() {
         mock::set_session_id(9);
         let inspector = Inspector::default();
         let mut emitter = Emitter::from_node(inspector.root().create_child("emitter"));
@@ -266,8 +271,8 @@ mod test {
         );
     }
 
-    #[test]
-    fn waiting_for_reboot() {
+    #[fuchsia::test]
+    async fn waiting_for_reboot() {
         mock::set_session_id(9);
         assert_emit_inspect(
             Event::WaitingForReboot { target_version: Some(TARGET_VERSION) },
@@ -279,11 +284,12 @@ mod test {
                     "target-version": TARGET_VERSION,
                 }
             ),
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn target_version_defaults_to_empty_string() {
+    #[fuchsia::test]
+    async fn target_version_defaults_to_empty_string() {
         mock::set_session_id(9);
         assert_emit_inspect(
             Event::InstallationDeferredByPolicy { target_version: None },
@@ -295,11 +301,12 @@ mod test {
                     "target-version": "",
                 }
             ),
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn session_id_persists() {
+    #[fuchsia::test]
+    async fn session_id_persists() {
         let inspector = Inspector::default();
         let mut emitter = Emitter::from_node(inspector.root().create_child("emitter"));
 
@@ -332,8 +339,8 @@ mod test {
         )
     }
 
-    #[test]
-    fn new_session_new_id() {
+    #[fuchsia::test]
+    async fn new_session_new_id() {
         let inspector = Inspector::default();
         let mut emitter = Emitter::from_node(inspector.root().create_child("emitter"));
 

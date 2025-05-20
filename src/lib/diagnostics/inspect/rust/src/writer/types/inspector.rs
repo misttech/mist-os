@@ -10,7 +10,6 @@ use inspect_format::{constants, BlockContainer, Container};
 use log::error;
 use std::borrow::Cow;
 use std::cmp::max;
-use std::fmt;
 use std::sync::Arc;
 
 #[cfg(target_os = "fuchsia")]
@@ -28,21 +27,12 @@ pub struct Inspector {
     storage: Option<Arc<<Container as BlockContainer>::ShareableData>>,
 }
 
-impl fmt::Debug for Inspector {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let tree = self.get_diagnostics_hierarchy();
-        if fmt.alternate() {
-            write!(fmt, "{tree:#?}")
-        } else {
-            write!(fmt, "{tree:?}")
-        }
-    }
-}
-
 impl DiagnosticsHierarchyGetter<String> for Inspector {
-    fn get_diagnostics_hierarchy(&self) -> Cow<'_, DiagnosticsHierarchy> {
-        let hierarchy = futures::executor::block_on(async move { crate::reader::read(self).await })
-            .expect("failed to get hierarchy");
+    async fn get_diagnostics_hierarchy<'a>(&'a self) -> Cow<'_, DiagnosticsHierarchy>
+    where
+        String: 'a,
+    {
+        let hierarchy = crate::reader::read(self).await.expect("failed to get hierarchy");
         Cow::Owned(hierarchy)
     }
 }
@@ -321,72 +311,6 @@ impl InspectorConfig {
 mod tests {
     use super::*;
     use crate::assert_update_is_atomic;
-    use futures::FutureExt;
-
-    #[fuchsia::test]
-    fn debug_impl() {
-        let inspector = Inspector::default();
-        inspector.root().record_int("name", 5);
-
-        assert_eq!(
-            format!("{:?}", &inspector),
-            "DiagnosticsHierarchy { name: \
-            \"root\", properties: [Int(\"name\", 5)], children: [], missing: [] }"
-        );
-
-        let pretty = r#"DiagnosticsHierarchy {
-    name: "root",
-    properties: [
-        Int(
-            "name",
-            5,
-        ),
-    ],
-    children: [],
-    missing: [],
-}"#;
-        assert_eq!(format!("{:#?}", &inspector), pretty);
-
-        let two = inspector.root().create_child("two");
-        two.record_lazy_child("two_child", || {
-            let insp = Inspector::default();
-            insp.root().record_double("double", 1.0);
-
-            async move { Ok(insp) }.boxed()
-        });
-
-        let pretty = r#"DiagnosticsHierarchy {
-    name: "root",
-    properties: [
-        Int(
-            "name",
-            5,
-        ),
-    ],
-    children: [
-        DiagnosticsHierarchy {
-            name: "two",
-            properties: [],
-            children: [
-                DiagnosticsHierarchy {
-                    name: "two_child",
-                    properties: [
-                        Double(
-                            "double",
-                            1.0,
-                        ),
-                    ],
-                    children: [],
-                    missing: [],
-                },
-            ],
-            missing: [],
-        },
-    ],
-    missing: [],
-}"#;
-        assert_eq!(format!("{:#?}", &inspector), pretty);
-    }
 
     #[fuchsia::test]
     fn inspector_new() {

@@ -143,7 +143,7 @@ mod tests {
             Poll::Ready(())
         );
 
-        assert_data_tree!(test_helper.inspector, root: contains {
+        assert_data_tree!(@executor test_helper.exec, test_helper.inspector, root: contains {
             wlan_mock_node: {
                 iface_power_events: {
                     "0": {

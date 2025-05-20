@@ -179,7 +179,7 @@ mod tests {
     use injectable_time::FakeTime;
 
     #[fuchsia::test]
-    fn health_checker_lifecycle() {
+    async fn health_checker_lifecycle() {
         let inspector = Inspector::default();
         let root = inspector.root();
         // In the beginning, the inspector has no stats.
@@ -248,7 +248,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn health_is_recordable() {
+    async fn health_is_recordable() {
         let inspector = Inspector::default();
         let root = inspector.root();
 

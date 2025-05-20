@@ -749,7 +749,7 @@ mod tests {
         // Run all background tasks until stalled.
         let _ = executor.run_until_stalled(&mut future::pending::<()>());
 
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor executor, inspector, root: {
             stash_failures: {
                 testkey: {
                     count: 1u64,

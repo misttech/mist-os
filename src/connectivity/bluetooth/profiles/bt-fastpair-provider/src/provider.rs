@@ -1632,8 +1632,8 @@ mod tests {
         let ((), _server_fut) = run_while(&mut exec, server_fut, expect_fut);
     }
 
-    #[test]
-    fn provider_server_inspect_tree() {
+    #[fuchsia::test]
+    async fn provider_server_inspect_tree() {
         let inspect = inspect::Inspector::default();
         let provider_inspect =
             ProviderInspect::default().with_inspect(inspect.root(), "provider").unwrap();

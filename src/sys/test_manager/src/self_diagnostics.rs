@@ -177,7 +177,7 @@ mod test {
     use fuchsia_inspect::Inspector;
 
     #[fuchsia::test]
-    fn inspect_lifetimes() {
+    async fn inspect_lifetimes() {
         let inspector = Inspector::default();
         let root_node = DiagnosticNode::new("root", Arc::new(inspector.root().clone_weak()));
 

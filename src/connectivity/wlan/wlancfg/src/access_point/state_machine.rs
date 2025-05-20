@@ -2738,12 +2738,15 @@ mod tests {
         let exec = fasync::TestExecutor::new_with_fake_time();
         let mut test_values = InspectTestValues::new(exec);
         let hierarchy = test_values.log_status(Status::Stopping);
-        diagnostics_assertions::assert_data_tree!(hierarchy, root: contains {
-            node: contains {
-                "0": contains {
-                    status: "Stopping"
+        diagnostics_assertions::assert_data_tree!(
+            @executor test_values.exec,
+            hierarchy,
+            root: contains {
+                node: contains {
+                    "0": contains {
+                        status: "Stopping"
+                    }
                 }
-            }
         });
     }
 
@@ -2752,12 +2755,15 @@ mod tests {
         let exec = fasync::TestExecutor::new_with_fake_time();
         let mut test_values = InspectTestValues::new(exec);
         let hierarchy = test_values.log_status(Status::Stopped);
-        diagnostics_assertions::assert_data_tree!(hierarchy, root: contains {
-            node: contains {
-                "0": contains {
-                    status: "Stopped"
+        diagnostics_assertions::assert_data_tree!(
+            @executor test_values.exec,
+            hierarchy,
+            root: contains {
+                node: contains {
+                    "0": contains {
+                        status: "Stopped"
+                    }
                 }
-            }
         });
     }
 
@@ -2766,12 +2772,15 @@ mod tests {
         let exec = fasync::TestExecutor::new_with_fake_time();
         let mut test_values = InspectTestValues::new(exec);
         let hierarchy = test_values.log_status(Status::Starting);
-        diagnostics_assertions::assert_data_tree!(hierarchy, root: contains {
-            node: contains {
-                "0": contains {
-                    status: "Starting"
+        diagnostics_assertions::assert_data_tree!(
+            @executor test_values.exec,
+            hierarchy,
+            root: contains {
+                node: contains {
+                    "0": contains {
+                        status: "Starting"
+                    }
                 }
-            }
         });
     }
 
@@ -2786,20 +2795,23 @@ mod tests {
             num_clients: 2,
             security_type: types::SecurityType::None,
         });
-        diagnostics_assertions::assert_data_tree!(hierarchy, root: contains {
-            node: contains {
-                "0": contains {
-                    status: contains {
-                        Started: {
-                            band: "Any",
-                            channel: 1_u64,
-                            mode: "Unrestricted",
-                            num_clients: 2_u64,
-                            security_type: "None"
+        diagnostics_assertions::assert_data_tree!(
+            @executor test_values.exec,
+            hierarchy,
+            root: contains {
+                node: contains {
+                    "0": contains {
+                        status: contains {
+                            Started: {
+                                band: "Any",
+                                channel: 1_u64,
+                                mode: "Unrestricted",
+                                num_clients: 2_u64,
+                                security_type: "None"
+                            }
                         }
                     }
                 }
-            }
         });
     }
 }

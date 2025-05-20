@@ -108,7 +108,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn string_array_property() {
+    async fn string_array_property() {
         let inspector = Inspector::default();
         let root = inspector.root();
         let node = root.create_child("node");

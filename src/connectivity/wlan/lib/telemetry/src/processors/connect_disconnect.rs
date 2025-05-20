@@ -580,6 +580,7 @@ mod tests {
 
         let tree = harness.get_inspect_data_tree();
         assert_data_tree!(
+            @executor harness.exec,
             tree,
             root: contains {
                 test_stats: contains {
@@ -646,7 +647,7 @@ mod tests {
 
         // Validate Inspect data
         let data = test_helper.get_inspect_data_tree();
-        assert_data_tree!(data, root: contains {
+        assert_data_tree!(@executor test_helper.exec, data, root: contains {
             test_stats: contains {
                 metadata: contains {
                     connected_networks: contains {
@@ -974,7 +975,7 @@ mod tests {
 
         // Validate Inspect data
         let data = test_helper.get_inspect_data_tree();
-        assert_data_tree!(data, root: contains {
+        assert_data_tree!(@executor test_helper.exec, data, root: contains {
             test_stats: contains {
                 metadata: {
                     connected_networks: {

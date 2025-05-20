@@ -1057,7 +1057,9 @@ mod tests {
             let inspector = Inspector::default();
             state.write_to_inspect(inspector.root());
 
+            let mut executor = fuchsia_async::TestExecutor::new();
             assert_data_tree! {
+                @executor executor,
                 inspector,
                 root: contains {
                     "state": state.name(),
@@ -1153,8 +1155,8 @@ mod tests {
 
     }
 
-    #[test]
-    fn populates_inspect_fail_stage() {
+    #[fuchsia::test]
+    async fn populates_inspect_fail_stage() {
         let state = State::FailStage(
             UpdateInfoAndProgress {
                 info: UpdateInfo { download_size: 4096 },
@@ -1180,8 +1182,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn populates_inspect_fail_fetch() {
+    #[fuchsia::test]
+    async fn populates_inspect_fail_fetch() {
         let state = State::FailFetch(
             UpdateInfoAndProgress {
                 info: UpdateInfo { download_size: 4096 },
@@ -1207,8 +1209,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn populates_inspect_fail_prepare() {
+    #[fuchsia::test]
+    async fn populates_inspect_fail_prepare() {
         let state = State::FailPrepare(PrepareFailureReason::OutOfSpace);
         let inspector = Inspector::default();
         state.write_to_inspect(inspector.root());
@@ -1221,8 +1223,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn populates_inspect_reboot() {
+    #[fuchsia::test]
+    async fn populates_inspect_reboot() {
         let state = State::Reboot(UpdateInfoAndProgress {
             info: UpdateInfo { download_size: 4096 },
             progress: Progress { bytes_downloaded: 2048, fraction_completed: 0.5 },

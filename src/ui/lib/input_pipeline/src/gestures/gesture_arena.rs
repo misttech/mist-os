@@ -3540,7 +3540,7 @@ mod tests {
         }
 
         #[fuchsia::test]
-        fn gesture_arena_initialized_with_inspect_node() {
+        async fn gesture_arena_initialized_with_inspect_node() {
             let inspector = fuchsia_inspect::Inspector::default();
             let fake_handlers_node = inspector.root().create_child("input_handlers_node");
             let _handler = GestureArena::new_internal(
@@ -3795,7 +3795,7 @@ mod tests {
             }
             */
 
-            diagnostics_assertions::assert_data_tree!(inspector, root: {
+            diagnostics_assertions::assert_data_tree!(@executor executor, inspector, root: {
                 gestures_event_log: {
                     "0": {
                         touchpad_event: {
@@ -4143,7 +4143,7 @@ mod tests {
                 executor.run_until_stalled(&mut handle_event_fut),
                 std::task::Poll::Ready(_)
             );
-            diagnostics_assertions::assert_data_tree!(inspector, root: {
+            diagnostics_assertions::assert_data_tree!(@executor executor, inspector, root: {
                 gestures_event_log: {
                     "0": {
                         touchpad_event: {

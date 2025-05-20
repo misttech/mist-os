@@ -936,6 +936,7 @@ mod tests {
 
         // Check for default initialized values
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 thermal_state_handler: {
@@ -957,6 +958,7 @@ mod tests {
         assert_matches!(client2.get_thermal_state(&mut executor), Ok(Some(ThermalState(0))));
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 thermal_state_handler: {
@@ -979,6 +981,7 @@ mod tests {
             .unwrap();
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 thermal_state_handler: {
@@ -1027,6 +1030,7 @@ mod tests {
 
         // Check for default initialized values
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 thermal_state_handler: {
@@ -1048,6 +1052,7 @@ mod tests {
         assert_matches!(cpu_client.get_thermal_state(&mut executor), Ok(Some(ThermalState(0))));
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 thermal_state_handler: {
@@ -1069,6 +1074,7 @@ mod tests {
         assert_matches!(cpu_client.get_thermal_state(&mut executor), Ok(Some(ThermalState(11))));
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 thermal_state_handler: {

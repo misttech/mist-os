@@ -201,7 +201,7 @@ mod tests {
         let event = ClientConnectionsToggleEvent::Enabled;
         run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
-        assert_data_tree!(test_helper.inspector, root: contains {
+        assert_data_tree!(@executor test_helper.exec, test_helper.inspector, root: contains {
             wlan_mock_node: {
                 client_connections_toggle_events: {
                     "0": {

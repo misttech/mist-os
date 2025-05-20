@@ -4393,12 +4393,15 @@ mod tests {
         let exec = fasync::TestExecutor::new_with_fake_time();
         let mut test_values = InspectTestValues::new(exec);
         let hierarchy = test_values.log_status(Status::Disconnecting);
-        diagnostics_assertions::assert_data_tree!(hierarchy, root: contains {
-            node: contains {
-                "0": contains {
-                    status: "Disconnecting"
+        diagnostics_assertions::assert_data_tree!(
+            @executor test_values.exec,
+            hierarchy,
+            root: contains {
+                node: contains {
+                    "0": contains {
+                        status: "Disconnecting"
+                    }
                 }
-            }
         });
     }
 
@@ -4407,12 +4410,15 @@ mod tests {
         let exec = fasync::TestExecutor::new_with_fake_time();
         let mut test_values = InspectTestValues::new(exec);
         let hierarchy = test_values.log_status(Status::Disconnected);
-        diagnostics_assertions::assert_data_tree!(hierarchy, root: contains {
-            node: contains {
-                "0": contains {
-                    status: "Disconnected"
+        diagnostics_assertions::assert_data_tree!(
+            @executor test_values.exec,
+            hierarchy,
+            root: contains {
+                node: contains {
+                    "0": contains {
+                        status: "Disconnected"
+                    }
                 }
-            }
         });
     }
 
@@ -4421,12 +4427,15 @@ mod tests {
         let exec = fasync::TestExecutor::new_with_fake_time();
         let mut test_values = InspectTestValues::new(exec);
         let hierarchy = test_values.log_status(Status::Connecting);
-        diagnostics_assertions::assert_data_tree!(hierarchy, root: contains {
-            node: contains {
-                "0": contains {
-                    status: "Connecting"
+        diagnostics_assertions::assert_data_tree!(
+            @executor test_values.exec,
+            hierarchy,
+            root: contains {
+                node: contains {
+                    "0": contains {
+                        status: "Connecting"
+                    }
                 }
-            }
         });
     }
 
@@ -4435,14 +4444,17 @@ mod tests {
         let exec = fasync::TestExecutor::new_with_fake_time();
         let mut test_values = InspectTestValues::new(exec);
         let hierarchy = test_values.log_status(Status::Connected { channel: 1, rssi: 2, snr: 3 });
-        diagnostics_assertions::assert_data_tree!(hierarchy, root: contains {
-            node: contains {
-                "0": contains {
-                    status: contains {
-                        Connected: { channel: 1_u64, rssi: 2_i64, snr: 3_i64 }
+        diagnostics_assertions::assert_data_tree!(
+            @executor test_values.exec,
+            hierarchy,
+            root: contains {
+                node: contains {
+                    "0": contains {
+                        status: contains {
+                            Connected: { channel: 1_u64, rssi: 2_i64, snr: 3_i64 }
+                        }
                     }
                 }
-            }
         });
     }
 }

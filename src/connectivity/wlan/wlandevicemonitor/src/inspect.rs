@@ -133,7 +133,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_add_iface() {
+    async fn test_add_iface() {
         let inspector = Inspector::new(Default::default());
         let ifaces_tree = IfacesTree::new(inspector.clone());
 
@@ -151,7 +151,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_add_duplicate_iface() {
+    async fn test_add_duplicate_iface() {
         let inspector = Inspector::new(Default::default());
         let ifaces_tree = IfacesTree::new(inspector.clone());
 
@@ -170,7 +170,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_destroy_iface() {
+    async fn test_destroy_iface() {
         let inspector = Inspector::new(Default::default());
         let ifaces_tree = IfacesTree::new(inspector.clone());
 
@@ -190,7 +190,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_destroy_missing_iface() {
+    async fn test_destroy_missing_iface() {
         let inspector = Inspector::new(Default::default());
         let ifaces_tree = IfacesTree::new(inspector.clone());
 
@@ -204,7 +204,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_exceed_cached_ifaces() {
+    async fn test_exceed_cached_ifaces() {
         let inspector = Inspector::new(Default::default());
         let ifaces_tree = IfacesTree::new(inspector.clone());
 

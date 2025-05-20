@@ -222,7 +222,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn test_successes() {
+    async fn test_successes() {
         let inspector = Inspector::default();
         let inspect = InspectDiagnostics::new(inspector.root());
         assert_data_tree!(
@@ -270,7 +270,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn test_success_overwrite_on_overflow() {
+    async fn test_success_overwrite_on_overflow() {
         let inspector = Inspector::default();
         let inspect = InspectDiagnostics::new(inspector.root());
         assert_data_tree!(
@@ -320,7 +320,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn test_failure() {
+    async fn test_failure() {
         let inspector = Inspector::default();
         let inspect = InspectDiagnostics::new(inspector.root());
         assert_data_tree!(
@@ -357,7 +357,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn test_phase() {
+    async fn test_phase() {
         let inspector = Inspector::default();
         let inspect = InspectDiagnostics::new(inspector.root());
         assert_data_tree!(
@@ -378,7 +378,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn test_network_check() {
+    async fn test_network_check() {
         let inspector = Inspector::default();
         let inspect = InspectDiagnostics::new(inspector.root());
 

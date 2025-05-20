@@ -403,7 +403,7 @@ mod test {
     use fuchsia_inspect::{component, Inspector};
 
     #[fuchsia::test]
-    fn health() {
+    async fn health() {
         component::health().set_ok();
         assert_data_tree!(component::inspector(),
         root: {
@@ -434,7 +434,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn processing_time_tracker() {
+    async fn processing_time_tracker() {
         let inspector = Inspector::default();
         let mut tracker = ProcessingTimeTracker::new(inspector.root().create_child("test"));
 

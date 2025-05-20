@@ -850,6 +850,7 @@ mod tests {
 
         // Check for default initialized values
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 SystemPowerModeHandler: {
@@ -873,6 +874,7 @@ mod tests {
         assert_matches!(client2.get_power_level(&mut executor), Ok(Some(1)));
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 SystemPowerModeHandler: {
@@ -896,6 +898,7 @@ mod tests {
         assert_matches!(client2.get_power_level(&mut executor), Ok(Some(2)));
 
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: {
                 SystemPowerModeHandler: {

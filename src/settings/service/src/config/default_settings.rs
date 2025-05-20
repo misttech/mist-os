@@ -218,7 +218,7 @@ pub(crate) mod testing {
         );
 
         assert_matches!(load_result, Ok(Some(TestConfigData { value: 3 })));
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor executor, inspector, root: {
             config_loads: {
                 "nuthatch": {
                     "count": AnyProperty,

@@ -85,7 +85,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_simple_graph() {
+    async fn test_simple_graph() {
         let inspector = inspect::Inspector::default();
 
         // Create a new graph.
@@ -144,7 +144,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_all_metadata_types_on_nodes() {
+    async fn test_all_metadata_types_on_nodes() {
         let inspector = inspect::Inspector::default();
 
         // Create a new graph.
@@ -217,7 +217,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_all_metadata_types_on_edges() {
+    async fn test_all_metadata_types_on_edges() {
         let inspector = inspect::Inspector::default();
 
         // Create a new graph.
@@ -316,7 +316,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_raii_semantics() {
+    async fn test_raii_semantics() {
         let inspector = inspect::Inspector::default();
         let graph = Digraph::new(inspector.root(), DigraphOpts::default());
         let mut foo = graph.add_vertex("foo", |meta| {
@@ -439,7 +439,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn drop_target_semantics() {
+    async fn drop_target_semantics() {
         let inspector = inspect::Inspector::default();
         let graph = Digraph::new(inspector.root(), DigraphOpts::default());
         let mut vertex_one = graph.add_vertex("test-node-1", |_| NoOpMeta);

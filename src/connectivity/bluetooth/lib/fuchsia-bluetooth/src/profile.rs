@@ -1408,8 +1408,8 @@ mod tests {
         assert_eq!(combine_channel_parameters(&p1, &p2), expected);
     }
 
-    #[test]
-    fn local_sco_parameters_inspect_tree() {
+    #[fuchsia::test]
+    async fn local_sco_parameters_inspect_tree() {
         let inspect = inspect::Inspector::default();
         assert_data_tree!(inspect, root: {});
 

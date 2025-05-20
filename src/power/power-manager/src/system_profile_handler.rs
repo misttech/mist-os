@@ -352,8 +352,8 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
 
     /// Tests for the presence and correctness of dynamically-added inspect data
-    #[test]
-    fn test_inspect_data() {
+    #[fuchsia::test]
+    async fn test_inspect_data() {
         let inspector = inspect::Inspector::default();
 
         let node =

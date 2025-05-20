@@ -443,6 +443,7 @@ pub mod tests {
 
         // Check GpuUsageLogger added before first poll.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -460,6 +461,7 @@ pub mod tests {
             runner.monotonic_time_ns.set((i + 1) * 100);
             runner.iterate_task(&mut task);
             assert_data_tree!(
+                @executor runner.executor,
                 runner.inspector,
                 root: {
                     MetricsLogger: {
@@ -479,6 +481,7 @@ pub mod tests {
             runner.monotonic_time_ns.set((i + 1) * 100);
             runner.iterate_task(&mut task);
             assert_data_tree!(
+                @executor runner.executor,
                 runner.inspector,
                 root: {
                     MetricsLogger: {
@@ -498,6 +501,7 @@ pub mod tests {
         // With one more time step, the end time has been reached.
         runner.iterate_task(&mut task);
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {

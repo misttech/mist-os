@@ -1114,19 +1114,19 @@ mod tests {
         let inspect = inspect::Inspector::default();
         peers.iattach(inspect.root(), "peers").expect("should attach to inspect tree");
 
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             peers: { streams_builder: contains {}, discovered: contains {}, preferred_peer_direction: "Sink" }});
 
         peers.set_preferred_peer_direction(avdtp::EndpointType::Source);
 
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             peers: { streams_builder: contains {}, discovered: contains {}, preferred_peer_direction: "Source" }});
 
         // Connect a peer, it should show up in the tree.
         let (_remote, channel) = Channel::create();
         assert!(exec.run_singlethreaded(peers.connected(id, channel, None)).is_ok());
 
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             peers: {
                 discovered: contains {},
                 preferred_peer_direction: "Source",

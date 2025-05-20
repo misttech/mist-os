@@ -2073,7 +2073,6 @@ mod tests {
     #[cfg(target_os = "fuchsia")]
     #[ip_test(I)]
     fn inspect<I: IpExt + TestIpExt>() {
-        use alloc::boxed::Box;
         use alloc::string::ToString;
         use diagnostics_assertions::assert_data_tree;
         use diagnostics_traits::FuchsiaInspector;
@@ -2088,7 +2087,9 @@ mod tests {
             let mut bindings_inspector = FuchsiaInspector::<()>::new(inspector.root());
             bindings_inspector.delegate_inspectable(&table);
 
-            assert_data_tree!(inspector, "root": {
+            let mut exec = fuchsia_async::TestExecutor::new();
+
+            assert_data_tree!(@executor exec, inspector, "root": {
                 "table_limit_drops": 0u64,
                 "table_limit_hits": 0u64,
                 "num_entries": 0u64,
@@ -2117,7 +2118,8 @@ mod tests {
             let mut bindings_inspector = FuchsiaInspector::<()>::new(inspector.root());
             bindings_inspector.delegate_inspectable(&table);
 
-            assert_data_tree!(inspector, "root": {
+            let mut exec = fuchsia_async::TestExecutor::new();
+            assert_data_tree!(@executor exec, inspector, "root": {
                 "table_limit_drops": 0u64,
                 "table_limit_hits": 0u64,
                 "num_entries": 2u64,
@@ -2210,7 +2212,8 @@ mod tests {
             let mut bindings_inspector = FuchsiaInspector::<()>::new(inspector.root());
             bindings_inspector.delegate_inspectable(&table);
 
-            assert_data_tree!(inspector, "root": contains {
+            let mut exec = fuchsia_async::TestExecutor::new();
+            assert_data_tree!(@executor exec, inspector, "root": contains {
                 "table_limit_drops": 1u64,
                 "table_limit_hits": 2u64,
                 "num_entries": MAXIMUM_ENTRIES as u64,

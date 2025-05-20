@@ -84,7 +84,7 @@ mod tests {
     use std::sync::mpsc;
 
     #[fuchsia::test]
-    fn test_bounded_list_node_basic() {
+    async fn test_bounded_list_node_basic() {
         let inspector = Inspector::default();
         let list_node = inspector.root().create_child("list_node");
         let mut list_node = BoundedListNode::new(list_node, 3);
@@ -99,7 +99,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_bounded_list_node_eviction() {
+    async fn test_bounded_list_node_eviction() {
         let inspector = Inspector::default();
         let list_node = inspector.root().create_child("list_node");
         let mut list_node = BoundedListNode::new(list_node, 3);
@@ -120,7 +120,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_bounded_list_node_specified_zero_capacity() {
+    async fn test_bounded_list_node_specified_zero_capacity() {
         let inspector = Inspector::default();
         let list_node = inspector.root().create_child("list_node");
         let mut list_node = BoundedListNode::new(list_node, 0);
@@ -131,7 +131,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_bounded_list_node_holds_its_values() {
+    async fn test_bounded_list_node_holds_its_values() {
         let inspector = Inspector::default();
         let list_node = inspector.root().create_child("list_node");
         let mut list_node = BoundedListNode::new(list_node, 3);

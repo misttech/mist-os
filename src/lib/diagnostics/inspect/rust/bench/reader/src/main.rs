@@ -156,7 +156,9 @@ fn snapshot_and_parse_bench(b: &mut criterion::Bencher, size: usize) {
         fuchsia_inspect_bench_utils::filled_hierarchy_generator(HIERARCHY_GENERATOR_SEED, size);
 
     b.iter_with_large_drop(|| {
-        let _hierarchy = hierarchy_generator.get_diagnostics_hierarchy();
+        let _hierarchy = fasync::TestExecutor::new()
+            .run_singlethreaded(hierarchy_generator.get_diagnostics_hierarchy())
+            .into_owned();
     });
 }
 

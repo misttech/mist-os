@@ -1594,14 +1594,14 @@ mod tests {
 
     #[test]
     fn autorepeater_initialized_with_inspect_node() {
-        let _executor = TestExecutor::new_with_fake_time();
+        let mut executor = TestExecutor::new_with_fake_time();
 
         let (_, receiver) = mpsc::unbounded();
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
         let _autorepeater =
             Autorepeater::new(receiver, &fake_handlers_node, metrics::MetricsLogger::default());
-        diagnostics_assertions::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(@executor executor, inspector, root: {
             input_handlers_node: {
                 autorepeater: {
                     events_received_count: 0u64,

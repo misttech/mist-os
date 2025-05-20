@@ -82,8 +82,8 @@ mod quick_start_after {
         }
     }
 
-    #[test]
-    fn init() -> Result<(), fuchsia_inspect_derive::AttachError> {
+    #[fuchsia::test]
+    async fn init() -> Result<(), fuchsia_inspect_derive::AttachError> {
         let inspector = fuchsia_inspect::Inspector::default();
 
         // [START quick_start_after_init]
@@ -197,8 +197,8 @@ mod derive_inspect {
         }
     }
 
-    #[test]
-    fn attach_yak() -> Result<(), AttachError> {
+    #[fuchsia::test]
+    async fn attach_yak() -> Result<(), AttachError> {
         let inspector = fuchsia_inspect::Inspector::default();
 
         // [START inspect_node_present_init]
@@ -210,8 +210,8 @@ mod derive_inspect {
         Ok(())
     }
 
-    #[test]
-    fn attach_stable() -> Result<(), AttachError> {
+    #[fuchsia::test]
+    async fn attach_stable() -> Result<(), AttachError> {
         let inspector = fuchsia_inspect::Inspector::default();
 
         // [START inspect_nested_init]
@@ -230,8 +230,8 @@ mod smart_pointers {
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_inspect_derive::{AttachError, IValue, WithInspect};
 
-    #[test]
-    fn ivalue_demo() -> Result<(), AttachError> {
+    #[fuchsia::test]
+    async fn ivalue_demo() -> Result<(), AttachError> {
         let inspector = fuchsia_inspect::Inspector::default();
 
         // [START smart_pointers_ivalue]
@@ -292,8 +292,8 @@ mod unit {
     }
     // [END unit_nested_decl]
 
-    #[test]
-    fn unit_demo() -> Result<(), AttachError> {
+    #[fuchsia::test]
+    async fn unit_demo() -> Result<(), AttachError> {
         let inspector = fuchsia_inspect::Inspector::default();
 
         // [START unit_nested_init]

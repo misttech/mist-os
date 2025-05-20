@@ -327,10 +327,10 @@ mod tests {
 
     #[test]
     fn data_stream_inspect_data_transfer_before_start_has_no_effect() {
-        let (_exec, inspector, mut d) = setup_inspect(5_123400000);
+        let (mut exec, inspector, mut d) = setup_inspect(5_123400000);
 
         // Default inspect tree.
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             data_stream: {
                 total_bytes: 0 as u64,
                 streaming_secs: 0 as u64,
@@ -340,7 +340,7 @@ mod tests {
 
         // Recording a data transfer before start() has no effect.
         d.record_transferred(1, fasync::MonotonicInstant::now());
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             data_stream: {
                 total_bytes: 0 as u64,
                 streaming_secs: 0 as u64,
@@ -352,10 +352,10 @@ mod tests {
     #[test]
     fn data_stream_inspect_record_past_time_has_no_effect() {
         let curr_time = 5_678900000;
-        let (_exec, inspector, mut d) = setup_inspect(curr_time);
+        let (mut exec, inspector, mut d) = setup_inspect(curr_time);
 
         d.start();
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             data_stream: {
                 start_time: 5_678900000i64,
                 total_bytes: 0 as u64,
@@ -367,7 +367,7 @@ mod tests {
         // Recording a data transfer with an older time has no effect.
         let time_from_past = curr_time - 10;
         d.record_transferred(1, fasync::MonotonicInstant::from_nanos(time_from_past));
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             data_stream: {
                 start_time: 5_678900000i64,
                 total_bytes: 0 as u64,
@@ -380,10 +380,10 @@ mod tests {
     #[test]
     fn data_stream_inspect_data_transfer_immediately_after_start_is_ok() {
         let curr_time = 5_678900000;
-        let (_exec, inspector, mut d) = setup_inspect(curr_time);
+        let (mut exec, inspector, mut d) = setup_inspect(curr_time);
 
         d.start();
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             data_stream: {
                 start_time: 5_678900000i64,
                 total_bytes: 0 as u64,
@@ -395,7 +395,7 @@ mod tests {
         // Although unlikely, recording a data transfer at the same instantaneous moment as starting
         // is OK.
         d.record_transferred(5, fasync::MonotonicInstant::from_nanos(curr_time));
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             data_stream: {
                 start_time: 5_678900000i64,
                 total_bytes: 5 as u64,
@@ -407,11 +407,11 @@ mod tests {
 
     #[test]
     fn data_stream_inspect_records_correct_throughput() {
-        let (exec, inspector, mut d) = setup_inspect(5_678900000);
+        let (mut exec, inspector, mut d) = setup_inspect(5_678900000);
 
         d.start();
 
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             data_stream: {
                 start_time: 5_678900000i64,
                 total_bytes: 0 as u64,
@@ -425,7 +425,7 @@ mod tests {
 
         // If we transferred 500 bytes then, we should have 1000 bytes per second.
         d.record_transferred(500, fasync::MonotonicInstant::now());
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             data_stream: {
                 start_time: 5_678900000i64,
                 total_bytes: 500 as u64,
@@ -437,7 +437,7 @@ mod tests {
         // In 5 seconds, we transfer 500 more bytes which is much slower.
         exec.set_fake_time(zx::MonotonicDuration::from_seconds(5).after_now());
         d.record_transferred(500, fasync::MonotonicInstant::now());
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             data_stream: {
                 start_time: 5_678900000i64,
                 total_bytes: 1000 as u64,
@@ -448,7 +448,7 @@ mod tests {
 
         // Receiving another update at the same time is OK.
         d.record_transferred(900, fasync::MonotonicInstant::now());
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             data_stream: {
                 start_time: 5_678900000i64,
                 total_bytes: 1900 as u64,

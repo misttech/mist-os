@@ -148,7 +148,7 @@ mod tests {
     use std::fs;
 
     #[fuchsia::test]
-    fn parse_missing_pipeline() {
+    async fn parse_missing_pipeline() {
         let dir = tempfile::tempdir().unwrap();
         let config_path = dir.path().join("config");
         fs::create_dir(config_path).unwrap();
@@ -171,7 +171,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn parse_partially_valid_pipeline() {
+    async fn parse_partially_valid_pipeline() {
         let dir = tempfile::tempdir().unwrap();
         let config_path = dir.path().join("config");
         fs::create_dir(&config_path).unwrap();
@@ -203,7 +203,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn parse_valid_pipeline() {
+    async fn parse_valid_pipeline() {
         let dir = tempfile::tempdir().unwrap();
         let config_path = dir.path().join("config");
         fs::create_dir(&config_path).unwrap();
@@ -234,7 +234,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn parse_allow_empty_pipeline() {
+    async fn parse_allow_empty_pipeline() {
         // If a pipeline is left unconfigured, do not filter results for the pipeline.
         let dir = tempfile::tempdir().unwrap();
         let config_path = dir.path().join("config");
@@ -256,7 +256,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn parse_disabled_valid_pipeline() {
+    async fn parse_disabled_valid_pipeline() {
         let dir = tempfile::tempdir().unwrap();
         let config_path = dir.path().join("config");
         fs::create_dir(&config_path).unwrap();
@@ -289,7 +289,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn parse_pipeline_disallow_recursive_glob() {
+    async fn parse_pipeline_disallow_recursive_glob() {
         let dir = tempfile::tempdir().unwrap();
         let config_path = dir.path().join("config");
         fs::create_dir(&config_path).unwrap();

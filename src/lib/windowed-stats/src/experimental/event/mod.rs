@@ -694,6 +694,7 @@ mod tests {
         executor.set_fake_time(harness::TIME_ONE_SECOND);
         harness::assert_inspect_time_matrix_server_polls_pending(&mut executor, &mut server);
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: contains {
                 event_test_node: {
@@ -746,6 +747,7 @@ mod tests {
         executor.set_fake_time(harness::TIME_ONE_SECOND);
         harness::assert_inspect_time_matrix_server_polls_pending(&mut executor, &mut server);
         assert_data_tree!(
+            @executor executor,
             inspector,
             root: contains {
                 event_test_node: {

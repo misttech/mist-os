@@ -304,7 +304,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_typeface_inspect_data() {
+    async fn test_typeface_inspect_data() {
         let inspector = finspect::Inspector::default();
 
         let typeface = Typeface {

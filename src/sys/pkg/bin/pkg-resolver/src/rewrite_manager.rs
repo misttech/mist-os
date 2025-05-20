@@ -934,8 +934,8 @@ pub(crate) mod tests {
         );
     }
 
-    #[test]
-    fn test_create_rule_inspect_state_passes_through_fields() {
+    #[fasync::run_singlethreaded(test)]
+    async fn test_create_rule_inspect_state_passes_through_fields() {
         let inspector = inspect::Inspector::default();
         let node = inspector.root().create_child("rule_node");
 

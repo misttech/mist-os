@@ -950,8 +950,8 @@ mod tests {
         assert_matches!(exec.run_until_stalled(&mut finished2), Poll::Pending);
     }
 
-    #[test]
-    fn session_channel_inspect_updates_with_new_flow_control() {
+    #[fuchsia::test]
+    async fn session_channel_inspect_updates_with_new_flow_control() {
         let inspect = inspect::Inspector::default();
 
         // Set up a channel with inspect.
@@ -997,7 +997,7 @@ mod tests {
         let (inspect, _channel, _client, mut outgoing_frames) =
             create_and_establish(Role::Initiator, DLCI::try_from(8).unwrap(), Some(flow_control));
         // Upon establishment, the inspect tree should have a `flow_controller` node.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             channel_: contains {
                 flow_controller: {
                     controller_type: "credit_flow",
@@ -1024,7 +1024,7 @@ mod tests {
         expect_frame(&mut exec, &mut outgoing_frames, FrameData::Disconnect, Some(dlci));
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
         // The flow controller node should be removed indicating the inactiveness of the channel.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             channel_: {
                 dlci: 8u64,
                 server_channel: 4u64,
@@ -1056,7 +1056,7 @@ mod tests {
             assert!(exec.run_until_stalled(&mut data_received_by_client).is_ready());
         }
         // Flow controller inspect node should be updated.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             flow_controller: {
                 controller_type: "credit_flow",
                 local_credits: 60u64, // 50 (initial) + 10 (Replenished in `data1`)
@@ -1087,7 +1087,7 @@ mod tests {
             assert!(exec.run_until_stalled(&mut send_fut).is_ready());
         }
         // Flow controller inspect node should be updated.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             flow_controller: {
                 controller_type: "credit_flow",
                 local_credits: 59u64, // 60 (previous amount) - 1 (sent frame)

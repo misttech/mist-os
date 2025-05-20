@@ -168,7 +168,7 @@ mod tests {
     use inspect_format::constants;
 
     #[fuchsia::test]
-    fn inspect_stats() {
+    async fn inspect_stats() {
         let inspector = Inspector::default();
         inspector.record_lazy_stats();
 
@@ -247,7 +247,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn stats_are_updated() {
+    async fn stats_are_updated() {
         let inspector = Inspector::default();
         let stats = super::StatsNode::new(&inspector);
         assert_json_diff!(inspector, root: {
@@ -295,7 +295,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn recorded_stats_are_persisted() {
+    async fn recorded_stats_are_persisted() {
         let inspector = Inspector::default();
         {
             let stats = super::StatsNode::new(&inspector);

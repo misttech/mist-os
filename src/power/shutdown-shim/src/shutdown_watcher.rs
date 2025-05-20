@@ -264,14 +264,9 @@ mod tests {
         zx::MonotonicDuration::from_seconds(seconds as i64)
     }
 
-    fn run_all_tasks_until_stalled(executor: &mut fuchsia_async::TestExecutor) {
-        assert!(executor.run_until_stalled(&mut futures::future::pending::<()>()).is_pending());
-    }
-
     /// Tests for the presence and correctness of inspect data
-    #[test]
-    fn test_inspect_data() {
-        let mut exec = fasync::TestExecutor::new();
+    #[fuchsia::test]
+    async fn test_inspect_data() {
         let inspector = inspect::Inspector::default();
         let registrar = ShutdownWatcher::new_with_inspector(&inspector);
 
@@ -285,12 +280,8 @@ mod tests {
             }
         );
 
-        let (watcher_proxy, _) = fidl::endpoints::create_proxy::<fpower::RebootWatcherMarker>();
-        let fut = async {
-            registrar.add_reboot_watcher(watcher_proxy.clone()).await;
-        };
-        futures::pin_mut!(fut);
-        exec.run_until_stalled(&mut fut).is_ready();
+        let (watcher_proxy, s) = fidl::endpoints::create_proxy::<fpower::RebootWatcherMarker>();
+        registrar.add_reboot_watcher(watcher_proxy.clone()).await;
 
         assert_data_tree!(
             inspector,
@@ -302,10 +293,11 @@ mod tests {
             }
         );
 
-        drop(fut);
-        run_all_tasks_until_stalled(&mut exec);
+        drop(s);
+        watcher_proxy.on_closed().await.expect("closed");
 
         assert_data_tree!(
+            @retry 10,
             inspector,
             root: {
                 ShutdownWatcher: {
@@ -315,14 +307,11 @@ mod tests {
             }
         );
 
-        let (watcher_proxy, _) = fidl::endpoints::create_proxy::<fpower::RebootWatcherMarker>();
-        let fut = async {
-            registrar.add_reboot_watcher(watcher_proxy.clone()).await;
-        };
-        futures::pin_mut!(fut);
-        exec.run_until_stalled(&mut fut).is_ready();
+        let (watcher_proxy, s) = fidl::endpoints::create_proxy::<fpower::RebootWatcherMarker>();
+        registrar.add_reboot_watcher(watcher_proxy.clone()).await;
 
         assert_data_tree!(
+            @retry 10,
             inspector,
             root: {
                 ShutdownWatcher: {
@@ -331,11 +320,11 @@ mod tests {
                 }
             }
         );
-
-        drop(fut);
-        run_all_tasks_until_stalled(&mut exec);
+        drop(s);
+        watcher_proxy.on_closed().await.expect("closed");
 
         assert_data_tree!(
+            @retry 10,
             inspector,
             root: {
                 ShutdownWatcher: {

@@ -60,7 +60,7 @@ mod test {
     // This tests all the types, and also the stack-safety mechanism by including data that should
     // be clipped.
     #[fuchsia::test]
-    fn test_json_export() -> Result<(), Error> {
+    async fn test_json_export() -> Result<(), Error> {
         let inspector = Inspector::default();
         let inspect = inspector.root();
         assert_data_tree!(

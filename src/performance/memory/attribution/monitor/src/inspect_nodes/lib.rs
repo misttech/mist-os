@@ -447,7 +447,7 @@ mod tests {
             .run_singlethreaded(fuchsia_inspect::reader::read(&inspector))
             .expect("got hierarchy");
 
-        assert_data_tree!(output, root: {
+        assert_data_tree!(@executor exec, output, root: {
             kmem_stats: {
                 total_bytes: 1u64,
                 free_bytes: 2u64,
@@ -572,7 +572,7 @@ mod tests {
             panic!("Couldn't retrieve inspect output");
         };
 
-        assert_data_tree!(output, root: {
+        assert_data_tree!(@executor exec, output, root: {
             logger: {
                 buckets: vec![
                     "Undigested",
@@ -705,7 +705,7 @@ mod tests {
             panic!("Couldn't retrieve inspect output");
         };
 
-        assert_data_tree!(output, root: {
+        assert_data_tree!(@executor exec, output, root: {
             logger: {
                 buckets: vec![
                     "Undigested",
@@ -792,7 +792,7 @@ mod tests {
             .run_singlethreaded(fuchsia_inspect::reader::read(&inspector))
             .expect("got hierarchy");
 
-        assert_data_tree!(output, root: {
+        assert_data_tree!(@executor exec, output, root: {
             logger: {
                 measurements: {},
             },
@@ -846,7 +846,7 @@ mod tests {
             .run_singlethreaded(fuchsia_inspect::reader::read(&inspector))
             .expect("got hierarchy");
 
-        assert_data_tree!(output, root: {
+        assert_data_tree!(@executor exec, output, root: {
             logger: {
                 buckets: vec![
                     "Undigested",

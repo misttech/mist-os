@@ -943,7 +943,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn factory_reset_handler_initialized_with_inspect_node() {
+    async fn factory_reset_handler_initialized_with_inspect_node() {
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
         let _handler =

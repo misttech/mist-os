@@ -1269,8 +1269,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn dead_keys_handler_initialized_with_inspect_node() {
+    #[fuchsia::test]
+    async fn dead_keys_handler_initialized_with_inspect_node() {
         let loader = icu_data::Loader::new().unwrap();
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
@@ -1292,8 +1292,8 @@ mod tests {
         });
     }
 
-    #[test]
-    fn dead_keys_handler_inspect_counts_events() {
+    #[fuchsia::test]
+    async fn dead_keys_handler_inspect_counts_events() {
         let loader = icu_data::Loader::new().unwrap();
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");

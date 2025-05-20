@@ -168,7 +168,7 @@ async fn package_cache_get() {
         hierarchy
     }
 
-    fn contains_missing_blob_stats(
+    async fn contains_missing_blob_stats(
         hierarchy: &DiagnosticsHierarchy,
         remaining: u64,
         open: u64,
@@ -228,7 +228,7 @@ async fn package_cache_get() {
 
     // Missing blobs requested, expect client writing content blobs.
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
-    contains_missing_blob_stats(&hierarchy, 2, 0, 0);
+    contains_missing_blob_stats(&hierarchy, 2, 0, 0).await;
 
     let mut contents = contents
         .into_iter()
@@ -244,13 +244,13 @@ async fn package_cache_get() {
 
     // Content blob open for writing.
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
-    contains_missing_blob_stats(&hierarchy, 2, 1, 0);
+    contains_missing_blob_stats(&hierarchy, 2, 1, 0).await;
     let () = compress_and_write_blob(&buf, *content_blob).await.unwrap();
     let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
 
     // Content blob written.
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
-    contains_missing_blob_stats(&hierarchy, 1, 0, 1);
+    contains_missing_blob_stats(&hierarchy, 1, 0, 1).await;
 
     let blob = missing_blobs_iter.next().unwrap();
 
@@ -260,7 +260,7 @@ async fn package_cache_get() {
 
     // Last content blob open for writing.
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
-    contains_missing_blob_stats(&hierarchy, 1, 1, 1);
+    contains_missing_blob_stats(&hierarchy, 1, 1, 1).await;
     let () = compress_and_write_blob(&buf, *content_blob).await.unwrap();
     let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
 

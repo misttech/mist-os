@@ -215,7 +215,7 @@ mod tests {
     use test_util::assert_lt;
 
     #[fuchsia::test]
-    fn test_inspect_log_basic() {
+    async fn test_inspect_log_basic() {
         let (inspector, mut node) = inspector_and_list_node();
 
         // Logging string and full-size numeric type
@@ -233,7 +233,7 @@ mod tests {
         // Logging empty event
         inspect_log!(node, {});
 
-        let hierarchy = inspector.get_diagnostics_hierarchy();
+        let hierarchy = inspector.get_diagnostics_hierarchy().await;
         assert_data_tree!(hierarchy, root: {
             list_node: {
                 "0": { "@time": AnyProperty, k1: "1", meaning_of_life: 42u64, k3: 3i64, k4: 4f64 },
@@ -255,7 +255,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_inspect_log_nested() {
+    async fn test_inspect_log_nested() {
         let (inspector, mut node) = inspector_and_list_node();
         inspect_log!(node, {
             k1: {
@@ -286,7 +286,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_inspect_log_var_key_syntax() {
+    async fn test_inspect_log_var_key_syntax() {
         let (inspector, mut node) = inspector_and_list_node();
         let key = "@@@";
         inspect_log!(node, var key: "!!!");
@@ -345,7 +345,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_log_option() {
+    async fn test_log_option() {
         let (inspector, mut node) = inspector_and_list_node();
 
         inspect_log!(node, some?: Some("a"));
@@ -361,7 +361,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_log_inspect_bytes() {
+    async fn test_log_inspect_bytes() {
         let (inspector, mut node) = inspector_and_list_node();
         let bytes = [11u8, 22, 33];
 
@@ -379,7 +379,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_log_inspect_list() {
+    async fn test_log_inspect_list() {
         let (inspector, mut node) = inspector_and_list_node();
         let list = [11u8, 22, 33];
 
@@ -400,7 +400,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_log_inspect_list_closure() {
+    async fn test_log_inspect_list_closure() {
         let (inspector, mut node) = inspector_and_list_node();
         let list = [13u32, 17, 29];
         let list_mapped = InspectListClosure(&list, |node_writer, key, item| {
@@ -424,7 +424,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_log_inspect_uint_array() {
+    async fn test_log_inspect_uint_array() {
         let (inspector, mut node) = inspector_and_list_node();
         let list = [1u32, 2, 3, 4, 5, 6];
 
@@ -466,7 +466,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_make_inspect_loggable() {
+    async fn test_make_inspect_loggable() {
         let (inspector, mut node) = inspector_and_list_node();
 
         let obj = make_inspect_loggable!(k1: "1", k2: 2i64, k3: "3");
@@ -493,7 +493,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_log_inspect_string_reference() {
+    async fn test_log_inspect_string_reference() {
         let (inspector, mut node) = inspector_and_list_node();
 
         inspect_log!(node, "foo" => "foo_1");

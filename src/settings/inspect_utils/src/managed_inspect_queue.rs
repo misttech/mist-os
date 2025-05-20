@@ -130,7 +130,7 @@ mod tests {
     // Test that a queue with less items than its capacity has the correct
     // inspect and queue content.
     #[fuchsia::test]
-    fn test_queue_under_capacity() {
+    async fn test_queue_under_capacity() {
         let inspector = inspect::Inspector::default();
         let mut wrapper = TestInspectWrapper::default()
             .with_inspect(inspector.root(), "inspect_wrapper")
@@ -161,7 +161,7 @@ mod tests {
     // Test that a queue with more items than its capacity has the correct
     // inspect and queue content.
     #[fuchsia::test]
-    fn test_queue_over_capacity() {
+    async fn test_queue_over_capacity() {
         let inspector = inspect::Inspector::default();
         let mut wrapper = TestInspectWrapper::default()
             .with_inspect(inspector.root(), "inspect_wrapper")
@@ -194,7 +194,7 @@ mod tests {
     // Test that when setting the size limit smaller than the current number of elements, the
     // excess elements are dropped.
     #[fuchsia::test]
-    fn test_size_limit() {
+    async fn test_size_limit() {
         let inspector = inspect::Inspector::default();
         let mut wrapper = TestInspectWrapper::default()
             .with_inspect(inspector.root(), "inspect_wrapper")
@@ -223,7 +223,7 @@ mod tests {
 
     // Tests that removing items from the queue automatically removes them from inspect.
     #[fuchsia::test]
-    fn test_queue_remove() {
+    async fn test_queue_remove() {
         let inspector = inspect::Inspector::default();
 
         let mut queue = ManagedInspectQueue::<IValue<String>>::with_node(

@@ -4774,7 +4774,7 @@ mod tests {
                     }
                     Poll::Ready(result) => {
                         let hierarchy = result.expect("failed to get hierarchy");
-                        assert_data_tree!(hierarchy, $($rest)+);
+                        assert_data_tree!(@executor $test_helper.exec, hierarchy, $($rest)+);
                         break
                     }
                 }

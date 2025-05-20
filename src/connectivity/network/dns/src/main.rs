@@ -2206,7 +2206,7 @@ mod tests {
             });
             expected.add_child_assertion(child);
         }
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             expected,
         });
     }
@@ -2231,7 +2231,7 @@ mod tests {
                 FAILED_QUERY_DURATION,
             );
         }
-        assert_data_tree!(inspector, root:{
+        assert_data_tree!(@executor exec, inspector, root:{
             query_stats: {
                 "window 1": {
                     start_time_nanos: u64::try_from(
@@ -2292,7 +2292,7 @@ mod tests {
             let () = run_fake_no_records_lookup(4097.into());
         }
 
-        assert_data_tree!(inspector, root:{
+        assert_data_tree!(@executor exec, inspector, root:{
             query_stats: {
                 "window 1": {
                     start_time_nanos: u64::try_from(
@@ -2354,9 +2354,9 @@ mod tests {
         let mut expected_address_counts = tree_assertion!(address_counts: {});
         for (count, occurrences) in address_counts.iter() {
             expected_address_counts
-                .add_property_assertion(&count.to_string(), Box::new(*occurrences));
+                .add_property_assertion(&count.to_string(), Arc::new(*occurrences));
         }
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             query_stats: {
                 "window 1": {
                     start_time_nanos: u64::try_from(
@@ -2438,7 +2438,7 @@ mod tests {
             });
             expected.add_child_assertion(child);
         }
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             expected,
         });
     }

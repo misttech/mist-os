@@ -192,7 +192,7 @@ async fn test_packet_logs_inspect() {
 }
 
 #[fuchsia::test]
-fn test_snoop_config_inspect() {
+async fn test_snoop_config_inspect() {
     let args = Args {
         log_size_soft_kib: 1,
         log_size_hard_kib: 1,

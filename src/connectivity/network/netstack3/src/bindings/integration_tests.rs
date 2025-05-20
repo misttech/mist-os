@@ -1008,7 +1008,7 @@ async fn test_neighbor_table_inspect() {
     });
     let inspector = test_stack.inspector();
     use diagnostics_hierarchy::DiagnosticsHierarchyGetter;
-    let data = inspector.get_diagnostics_hierarchy();
+    let data = inspector.get_diagnostics_hierarchy().await;
     println!("{:#?}", data);
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Neighbors": {

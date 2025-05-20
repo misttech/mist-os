@@ -21,7 +21,7 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
 
     #[fuchsia::test]
-    fn test_unique_name() {
+    async fn test_unique_name() {
         let inspector = Inspector::default();
 
         let name_1 = unique_name("a");

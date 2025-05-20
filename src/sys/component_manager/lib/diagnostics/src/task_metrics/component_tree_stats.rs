@@ -913,7 +913,7 @@ mod tests {
 
         stats.prune_dead_tasks(max_dead_tasks).await;
 
-        let hierarchy = inspector.get_diagnostics_hierarchy();
+        let hierarchy = inspector.get_diagnostics_hierarchy().await;
         assert_data_tree!(inspector, root: {
             stats: contains {
                 measurements: contains {
@@ -1120,7 +1120,7 @@ mod tests {
 
         stats.measure().await;
 
-        let hierarchy = inspector.get_diagnostics_hierarchy();
+        let hierarchy = inspector.get_diagnostics_hierarchy().await;
         assert_data_tree!(hierarchy, root: {
             stats: contains {
                 measurements: contains {
@@ -1142,7 +1142,7 @@ mod tests {
         // Add another measurement
         stats.measure().await;
 
-        let hierarchy = inspector.get_diagnostics_hierarchy();
+        let hierarchy = inspector.get_diagnostics_hierarchy().await;
         assert_data_tree!(hierarchy, root: {
             stats: contains {
                 measurements: contains {

@@ -1296,7 +1296,7 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("relay active");
 
         // The default Inspect tree doesn't have any player data.
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             avrcp_relay: {
                 battery_watcher_active: false,
                 recent_player_requests: {},
@@ -1308,7 +1308,7 @@ mod tests {
             finish_relay_setup(&mut relay_fut, &mut exec, avrcp_requests);
         // After finishing the initial relay set up, the inspect data should be updated. This data
         // is populated by `expect_media_attributes_request` and `expect_play_status_request`.
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             avrcp_relay: {
                 battery_watcher_active: false,
                 player_status: {
@@ -1340,7 +1340,7 @@ mod tests {
         expect_panel_command(&mut exec, &mut controller_requests, avrcp::AvcPanelCommand::Play);
         exec.run_until_stalled(&mut relay_fut).expect_pending("relay active");
         let (_delta, _relay_fut) = run_while(&mut exec, relay_fut, watch_fut);
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             avrcp_relay: contains {
                 recent_player_requests: {
                     "0": { "@time": AnyProperty, request: "pause" },

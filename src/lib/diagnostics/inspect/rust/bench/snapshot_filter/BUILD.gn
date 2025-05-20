@@ -18,6 +18,7 @@ rustc_binary("snapshot-filter-bin") {
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/inspect/rust/bench/utils:fuchsia_inspect_bench_utils",
     "//src/lib/diagnostics/selectors",
+    "//src/lib/fuchsia-async",
   ]
 
   test_deps = [ "//src/lib/fuchsia" ]
